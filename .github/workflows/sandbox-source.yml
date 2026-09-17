@@ -17,16 +17,12 @@ jobs:
       - uses: actions/setup-node@v7.0.0
         with:
           node-version: '22'
-      - name: Prepare portable source and dependencies
+      - name: Prepare isolated Playwright browser
         run: |
-          npm install --save-exact @sqlite.org/sqlite-wasm@3.53.4-build1 web-push@3.6.7
-          npm install --save-dev --save-exact @types/web-push@3.6.4
-          tar --exclude=.git --exclude=node_modules -czf /tmp/scada-source.tar.gz .
-          tar -czf /tmp/scada-vendor.tar.gz node_modules package.json package-lock.json
+          npx --yes playwright@1.63.0 install chromium-headless-shell
+          tar -C "$HOME/.cache/ms-playwright" -czf /tmp/scada-browser.tar.gz .
       - uses: actions/upload-artifact@v7.0.1
         with:
-          name: sandbox-source
-          path: |
-            /tmp/scada-source.tar.gz
-            /tmp/scada-vendor.tar.gz
+          name: sandbox-browser
+          path: /tmp/scada-browser.tar.gz
           retention-days: 1
