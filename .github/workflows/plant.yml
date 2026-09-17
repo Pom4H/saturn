@@ -1,0 +1,30 @@
+name: Isomorphic SCADA and PWA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: plant-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run plant:check
+      - run: npx playwright install --with-deps chromium-headless-shell
+      - run: npm run plant:test:browser
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: plant-evidence
+          path: plant-test-results/
+          retention-days: 7
