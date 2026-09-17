@@ -1,0 +1,90 @@
+import { AppError, id, type Expr, type System, type Simulation, type Project, type Derived, type Device, type AlarmRule, type Report, type Layout, type HistoryPolicy } from './types';
+import { model, type builtInModels } from './models';
+export const signal = (path: string): Expr => ({ ref: id(path) });
+export const add = (...args: Expr[]): Expr => ({ op: 'add', args });
+export const mul = (...args: Expr[]): Expr => ({ op: 'mul', args });
+export const sub = (a: Expr, b: Expr): Expr => ({ op: 'sub', args: [a, b] });
+export const div = (a: Expr, b: Expr): Expr => ({ op: 'div', args: [a, b] });
+export const max = (...args: Expr[]): Expr => ({ op: 'max', args });
+export const min = (...args: Expr[]): Expr => ({ op: 'min', args });
+export const system = (name: string, title: string, parent?: string): System => ({ id: id(name), title, ...(parent ? { parent } : {}) });
+type BuiltInModels = typeof builtInModels;
+/** Module augmentation can add metadata for independently installed equipment. */
+export interface ModelCatalog extends BuiltInModels {
+}
+export type SimRef<M = {
+    outputs: Record<string, string>;
+}> = {
+    node: Simulation;
+} & {
+    readonly [K in M extends {
+        outputs: infer O;
+    } ? keyof O : never]: Expr;
+};
+type Options<M extends {
+    inputs: object;
+    parameters: object;
+}> = {
+    system: string;
+    at: Layout;
+    inputs?: Partial<Record<keyof M['inputs'], Expr>>;
+    parameters?: Partial<Record<keyof M['parameters'], number>>;
+    history?: Record<string, HistoryPolicy>;
+};
+/** Runtime metadata supplies validation and editor completion, including external installed models. */
+export function simulation<K extends keyof ModelCatalog>(name: string, kind: K, options: Options<ModelCatalog[K]>): SimRef<ModelCatalog[K]> {
+    const spec = model(kind), node: Simulation = { id: id(name), model: kind, system: options.system, parameters: { ...Object.fromEntries(Object.entries(spec.parameters).map(([k, v]) => [k, v.default])), ...options.parameters }, inputs: { ...spec.inputs, ...options.inputs }, layout: options.at, ...(options.history ? { history: options.history } : {}) };
+    return Object.assign({ node }, Object.fromEntries(Object.keys(spec.outputs).map(k => [k, signal(`${name}.${k}`)]))) as SimRef<ModelCatalog[K]>;
+}
+export const derived = (name: string, expression: Expr, unit = 'отн.', history?: HistoryPolicy): Derived => ({ id: id(name), expression, unit, ...(history ? { history } : {}) });
+export const equipment = (name: string, type: string, options: {
+    system: string;
+    at: Layout;
+    signals: Record<string, Expr>;
+}): Device => ({ id: id(name), type, system: options.system, layout: options.at, signals: options.signals });
+export const alarm = (name: string, options: Omit<AlarmRule, 'id' | 'notify' | 'delay' | 'priority'> & Partial<Pick<AlarmRule, 'notify' | 'delay' | 'priority'>>): AlarmRule => ({ id: id(name), notify: true, delay: 1000, priority: 'warning', ...options });
+export const report = (name: string, options: Omit<Report, 'id' | 'notify'> & {
+    notify?: boolean;
+}): Report => ({ id: id(name), notify: true, ...options });
+export function project(name: string, options: Omit<Project, 'id' | 'version' | 'simulations' | 'devices' | 'stepMs' | 'seed' | 'history'> & {
+    simulations: {
+        node: Simulation;
+    }[];
+    devices?: Device[];
+    stepMs?: number;
+    seed?: number;
+    history?: Project['history'];
+}): Project {
+    const simulations = options.simulations.map(ref => ref.node);
+    if (simulations.some(x => !x))
+        throw new AppError('project.simulations expects simulation() references');
+    const devices = options.devices ?? simulations.map(s => ({ id: s.id, type: model(s.model).visual, system: s.system, layout: s.layout, signals: Object.fromEntries(Object.keys(model(s.model).outputs).map(k => [k, signal(`${s.id}.${k}`)])) }));
+    return { version: 1, id: id(name), stepMs: 100, seed: 1, history: { deadband: .001, maxInterval: 10000, retention: 86400000 }, ...options, simulations, devices };
+}
+/** Repeated equipment is expanded to ordinary stable-ID nodes before runtime execution. */
+export function bank<K extends keyof ModelCatalog>(prefix: string, kind: K, options: Options<ModelCatalog[K]> & {
+    count: number;
+    columns: number;
+    pitch: Layout;
+}): SimRef<ModelCatalog[K]>[] {
+    if (!Number.isInteger(options.count) || options.count < 1 || options.count > 128 || !Number.isInteger(options.columns) || options.columns < 1 || options.columns > 128)
+        throw new AppError('Invalid bank dimensions');
+    return Array.from({ length: options.count }, (_, i) => simulation(`${prefix}${i + 1}`, kind, { ...options, at: { x: options.at.x + (i % options.columns) * options.pitch.x, y: options.at.y + Math.floor(i / options.columns) * options.pitch.y } }));
+}
+export function aggregate<T extends {
+    node: Simulation;
+}>(items: T[], output: Exclude<keyof T, 'node'> & string, operation: 'mean' | 'sum' | 'min' | 'max' = 'mean'): Expr {
+    if (!Array.isArray(items) || !items.length || items.length > 256)
+        throw new AppError('Aggregate needs a bounded non-empty equipment list');
+    const args = items.map(item => { if (!model(item.node.model).outputs[output])
+        throw new AppError(`Unknown aggregate output: ${output}`); return signal(`${item.node.id}.${output}`); });
+    if (operation === 'mean')
+        return div(add(...args), args.length);
+    if (operation === 'sum')
+        return add(...args);
+    if (operation === 'min')
+        return min(...args);
+    if (operation === 'max')
+        return max(...args);
+    throw new AppError('Unknown aggregate operation');
+}

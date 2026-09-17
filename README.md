@@ -1,5 +1,22 @@
 # SCADA playground
 
+## Node.js / offline PWA workbench
+
+The new installation workbench runs the same process models, signal expressions, alarms, historian and report workflows in Node.js and a browser Worker. SQLite is native on the server and WASM/OPFS in the demo. Git-backed server releases and local browser revisions support explicit publication and rollback.
+
+```sh
+npm ci
+npm run plant
+```
+
+Open `http://127.0.0.1:4176/plant/app/` (initial password printed once), or `/plant/demo/` (autonomous public demo). `npm run build` includes the static PWA under `dist/plant/`. Nothing is automatically deployed.
+
+[Run, PWA, authentication and Web Push](docs/plant/README.md) · [Installation/report DSL](docs/plant/dsl.md) · [Chernobyl-inspired model and explicit limitations](docs/plant/model.md).
+
+**The accident demonstration is a normalized coupled-process model, not a full or validated historical Chernobyl/RBMK simulation.** Remote Web Push requires server configuration and device permission; the offline demo cannot execute continuously while the browser is closed.
+
+Run `npm run plant:check` and `npm run plant:test:browser` for the new workbench. The existing editor and its tests below are retained.
+
 [Open the editor](https://pom4h.github.io/scada/) · [DSL reference](docs/dsl.md) · [Architecture](docs/architecture.md) · [Experimental 3D lab and catalog](docs/3d-foundation.md)
 
 A browser workbench for designing animated SCADA diagrams in TypeScript. Code, canvas and property inspector edit **one TS document per scene**. A server can also deliver a Git-backed project containing scenes and reference files. The editor works as a static site. The optional local Node server adds durable synthetic equipment runs, authenticated signals, history and replay. No hardware connection is included.
