@@ -16,9 +16,17 @@
   "checks": {
     "native": 64,
     "browser": 19,
-    "legacy": 79,
+    "legacy": 93,
     "typecheck": true,
-    "externalSdkConsumer": true
+    "externalSdkConsumer": true,
+    "legacyBreakdown": {
+      "core": 38,
+      "behavior": 9,
+      "apiClient": 17,
+      "challengeCore": 14,
+      "lab": 7,
+      "review": 8
+    }
   },
   "browserChecks": [
     "persistent browser Worker starts with SQLite WASM and live equipment",
