@@ -40,4 +40,104 @@ const protection = installed({ kind: 'protection', title: 'Защита и по�
     initialize: () => ({ insertion: 0, trip: 0 }), advance: (s, i, q, dt) => { const trip = s.trip || i.temperature > q.temperatureLimit || i.power > q.powerLimit || i.demand > .5 ? 1 : 0; return { trip, insertion: approach(s.insertion, trip, dt, q.actuation) }; }, observe: s => ({ ...s }) });
 const structure = installed({ kind: 'structure', title: 'Реакторное здание', visual: 'structure', inputs: { release: 0 }, parameters: { capacity: p(12, .1, 100), vent: p(.3, 0, 10), strength: p(1.4, .1, 10) }, outputs: { pressure: 'отн.', damage: 'доля' },
     initialize: () => ({ pressure: 0, damage: 0 }), advance: (s, i, q, dt) => { const pressure = Math.max(0, s.pressure + dt * (Math.max(0, i.release) - q.vent * s.pressure) / q.capacity); return { pressure, damage: clamp(s.damage + dt * .08 * Math.max(0, pressure - q.strength) ** 2) }; }, observe: s => ({ ...s }) });
-export const builtInModels = { supply, pump, 'feedback-source': feedback, channel, separator, turbine, 'heat-exchanger': exchanger, sensor, protection, structure };
+/** Generic balance-of-plant teaching components. Coefficients are dimensionless,
+ * not equipment datasheets, nuclear operating limits, or a site reconstruction. */
+const reservoir = installed({ kind: 'reservoir', title: 'Буферная ёмкость', visual: 'reservoir', inputs: { inflow: .1, demand: .1 },
+    parameters: { capacity: p(10, 1, 1000), initialLevel: p(.7, 0, 1) },
+    outputs: { level: '%', inventory: 'отн.', flow: 'отн.', spill: 'отн.', balance: 'отн.' },
+    initialize: q => ({ inventory: q.capacity * q.initialLevel, flow: 0, spill: 0, balance: 0 }),
+    advance: (s, i, q, dt) => {
+        const incoming = Math.max(0, i.inflow), available = s.inventory + incoming * dt;
+        const flow = Math.min(Math.max(0, i.demand), available / dt);
+        const spill = Math.max(0, (available - flow * dt - q.capacity) / dt);
+        const inventory = clamp(available - (flow + spill) * dt, 0, q.capacity);
+        return { inventory, flow, spill, balance: inventory - s.inventory - dt * (incoming - flow - spill) };
+    }, observe: (s, q) => ({ ...s, level: 100 * s.inventory / q.capacity }) });
+const valve = installed({ kind: 'motor-valve', title: 'Регулирующий клапан', visual: 'valve', inputs: { demand: .5, pressure: 1 },
+    parameters: { travel: p(2, .1, 60), capacity: p(.3, .01, 10) }, outputs: { opening: '%', flow: 'отн.' },
+    initialize: () => ({ opening: .5, flow: .15 }),
+    advance: (s, i, q, dt) => { const opening = approach(s.opening, clamp(i.demand), dt, q.travel); return { opening, flow: q.capacity * opening * Math.sqrt(Math.max(0, i.pressure)) }; },
+    observe: s => ({ opening: s.opening * 100, flow: s.flow }) });
+const ups = installed({ kind: 'ups', title: 'Резервное питание', visual: 'battery', inputs: { grid: 1, demand: .1 },
+    parameters: { capacity: p(30, 1, 1000), charging: p(.1, .01, 10) }, outputs: { voltage: 'отн.', charge: '%', load: 'отн.' },
+    initialize: q => ({ energy: q.capacity, voltage: 1, load: 0 }),
+    advance: (s, i, q, dt) => { const grid = i.grid >= .8, load = Math.max(0, i.demand); const energy = clamp(s.energy + dt * (grid ? q.charging : -load), 0, q.capacity); return { energy, voltage: grid || energy > 0 ? 1 : 0, load }; },
+    observe: (s, q) => ({ voltage: s.voltage, charge: 100 * s.energy / q.capacity, load: s.load }) });
+const switchgear = installed({ kind: 'switchgear', title: 'Щит питания', visual: 'switchgear', inputs: { voltage: 1, demand: 1, load: .1 },
+    parameters: { limit: p(1.5, .1, 10) }, outputs: { voltage: 'отн.', closed: 'лог.', trip: 'лог.' },
+    initialize: () => ({ voltage: 1, closed: 1, trip: 0 }),
+    advance: (s, i, q) => { const trip = s.trip || i.load > q.limit ? 1 : 0, closed = i.demand > .5 && !trip ? 1 : 0; return { voltage: Math.max(0, i.voltage) * closed, closed, trip }; }, observe: s => ({ ...s }) });
+const fan = installed({ kind: 'fan', title: 'Вентиляция и теплоотвод', visual: 'fan', inputs: { voltage: 1, demand: .8 },
+    parameters: { inertia: p(3, .1, 120) }, outputs: { airflow: 'отн.', rpm: 'об/мин', load: 'отн.' },
+    initialize: () => ({ speed: .8 }), advance: (s, i, q, dt) => ({ speed: approach(s.speed, clamp(i.voltage) * clamp(i.demand), dt, q.inertia) }),
+    observe: s => ({ airflow: s.speed, rpm: 1200 * s.speed, load: .3 * s.speed ** 3 }) });
+
+
+/** Balance-of-plant primitives in normalized teaching units. Never site operating data. */
+const motor = installed({ kind: 'electric-motor', title: 'Электропривод', visual: 'motor',
+    inputs: { voltage: 1, demand: .85 }, parameters: { inertia: p(5, .1, 60) },
+    outputs: { speed: 'отн.', rpm: 'об/мин', load: 'отн.' },
+    initialize: () => ({ speed: .85 }),
+    advance: (s, i, q, dt) => ({ speed: approach(s.speed, clamp(i.voltage) * clamp(i.demand, 0, 1.2), dt, q.inertia) }),
+    observe: s => ({ speed: s.speed, rpm: s.speed * 1500, load: .25 * s.speed ** 3 }) });
+const tower = installed({ kind: 'cooling-tower', title: 'Охладитель оборотной воды', visual: 'tower',
+    inputs: { drive: .85, temperature: 1, flow: 1 }, parameters: { inertia: p(6, .1, 120), ambient: p(.2, 0, 1) },
+    outputs: { cooling: 'отн.', rejected: 'отн.', rpm: 'об/мин' },
+    initialize: () => ({ cooling: .85, rejected: 0 }),
+    advance: (s, i, q, dt) => { const cooling = approach(s.cooling, clamp(i.drive, 0, 1.2) * clamp(i.flow), dt, q.inertia);
+        return { cooling, rejected: cooling * Math.max(0, i.temperature - q.ambient) }; },
+    observe: s => ({ ...s, rpm: s.cooling * 900 }) });
+const filter = installed({ kind: 'strainer', title: 'Сетчатый фильтр', visual: 'filter',
+    inputs: { flow: .2, impurity: .02, flush: .02 }, parameters: { accumulation: p(.03, 0, 1) },
+    outputs: { resistance: 'отн.', fouling: '%', pressureDrop: 'отн.' },
+    initialize: () => ({ dirt: .1, pressureDrop: .02 }),
+    advance: (s, i, q, dt) => { const dirt = clamp(s.dirt + dt * q.accumulation * (Math.max(0, i.impurity) * Math.abs(i.flow) - Math.max(0, i.flush) * s.dirt));
+        return { dirt, pressureDrop: (1 + 5 * dirt) * i.flow ** 2 }; },
+    observe: s => ({ resistance: 1 + 5 * s.dirt, fouling: s.dirt * 100, pressureDrop: s.pressureDrop }) });
+const checkValve = installed({ kind: 'check-valve', title: 'Обратный клапан', visual: 'checkvalve',
+    inputs: { upstream: 1, downstream: .3 }, parameters: { capacity: p(.2, .01, 10), cracking: p(.02, 0, 2) },
+    outputs: { flow: 'отн.', opening: '%' }, initialize: () => ({ flow: 0, opening: 0 }),
+    advance: (_s, i, q) => { const head = Math.max(0, i.upstream - i.downstream - q.cracking);
+        return { flow: q.capacity * Math.sqrt(head), opening: head > 0 ? 100 : 0 }; }, observe: s => ({ ...s }) });
+const vessel = installed({ kind: 'expansion-vessel', title: 'Расширительный бак', visual: 'accumulator',
+    inputs: { inflow: .05, outflow: .05 }, parameters: { capacity: p(10, 1, 100), stiffness: p(1, .1, 5) },
+    outputs: { pressure: 'отн.', level: '%', outflow: 'отн.', spill: 'отн.', balance: 'отн.' },
+    initialize: q => ({ inventory: q.capacity * .5, outflow: 0, spill: 0, balance: 0 }),
+    advance: (s, i, q, dt) => { const incoming = Math.max(0, i.inflow), available = s.inventory + incoming * dt;
+        const outflow = Math.min(Math.max(0, i.outflow), available / dt), spill = Math.max(0, (available - outflow * dt - q.capacity) / dt);
+        const inventory = clamp(available - dt * (outflow + spill), 0, q.capacity);
+        return { inventory, outflow, spill, balance: inventory - s.inventory - dt * (incoming - outflow - spill) }; },
+    observe: (s, q) => ({ pressure: q.stiffness * s.inventory / q.capacity, level: s.inventory / q.capacity * 100, outflow: s.outflow, spill: s.spill, balance: s.balance }) });
+const relief = installed({ kind: 'relief-valve', title: 'Предохранительный клапан', visual: 'relief',
+    inputs: { pressure: .5, downstream: 0 }, parameters: { setpoint: p(.7, .1, 5), capacity: p(.4, .01, 10), travel: p(.4, .05, 10) },
+    outputs: { flow: 'отн.', opening: '%' }, initialize: () => ({ opening: 0, flow: 0 }),
+    advance: (s, i, q, dt) => { const opening = approach(s.opening, clamp((i.pressure - q.setpoint) * 5), dt, q.travel);
+        return { opening, flow: opening * q.capacity * Math.sqrt(Math.max(0, i.pressure - i.downstream)) }; },
+    observe: s => ({ flow: s.flow, opening: s.opening * 100 }) });
+const transformer = installed({ kind: 'transformer', title: 'Трансформатор', visual: 'transformer',
+    inputs: { voltage: 1, load: .2 }, parameters: { efficiency: p(.96, .5, 1), thermalTime: p(20, 1, 100) },
+    outputs: { voltage: 'отн.', temperature: 'отн.', loss: 'отн.' },
+    initialize: () => ({ voltage: 1, temperature: .2, loss: 0 }),
+    advance: (s, i, q, dt) => { const loss = Math.max(0, i.load) * (1 - q.efficiency);
+        return { voltage: clamp(i.voltage, 0, 1.5), loss, temperature: approach(s.temperature, .2 + loss * 2, dt, q.thermalTime) }; }, observe: s => ({ ...s }) });
+const alternator = installed({ kind: 'alternator', title: 'Турбогенератор', visual: 'alternator',
+    inputs: { rpm: 1500, load: .5 }, parameters: { efficiency: p(.94, .5, 1) },
+    outputs: { voltage: 'отн.', electricity: 'отн.', rpm: 'об/мин' }, initialize: () => ({ voltage: 1, electricity: .47, rpm: 1500 }),
+    advance: (_s, i, q) => ({ voltage: clamp(i.rpm / 1500, 0, 1.2), electricity: Math.max(0, i.rpm / 1500 * i.load * q.efficiency), rpm: Math.max(0, i.rpm) }), observe: s => ({ ...s }) });
+/** Fictional self-heating calorimeter for recovery exercises, unrelated to neutron physics.
+ * Energy balance and irreversible accumulated damage; no event clock or scenario name. */
+const thermalStore = installed({ kind: 'thermal-store', title: 'Тепловой учебный агрегат', visual: 'calorimeter',
+    inputs: { load: .85, cooling: .85 },
+    parameters: { capacity: p(75, 10, 150), feedback: p(.75, 0, 2), ambient: p(.2, 0, .5), initialTemperature: p(1.15, .2, 2) },
+    outputs: { temperature: 'отн.', energy: 'отн.', generated: 'отн.', removed: 'отн.', trend: 'отн./с', damage: 'доля', balance: 'отн.' },
+    initialize: q => ({ temperature: q.initialTemperature, energy: q.capacity * q.initialTemperature, generated: .85, removed: .85, trend: 0, damage: 0, balance: 0 }),
+    advance: (s, i, q, dt) => {
+        const generated = Math.max(0, i.load) + q.feedback * Math.min(8, Math.max(0, s.temperature - 1.2) ** 2);
+        const requestedRemoval = (.18 + .85 * Math.max(0, i.cooling)) * Math.max(0, s.temperature - q.ambient) * (1 - .25 * s.damage);
+        const removed = Math.min(requestedRemoval, s.energy / dt + generated), energy = s.energy + dt * (generated - removed);
+        const temperature = energy / q.capacity, trend = (temperature - s.temperature) / dt;
+        const damage = clamp(s.damage + dt * .015 * Math.max(0, temperature - 2.8) ** 2);
+        return { temperature, energy, generated, removed, trend, damage, balance: energy - s.energy - dt * (generated - removed) };
+    }, observe: s => ({ ...s }) });
+
+export const builtInModels = { supply, pump, 'feedback-source': feedback, channel, separator, turbine, 'heat-exchanger': exchanger, sensor, protection, structure, reservoir, 'motor-valve': valve, ups, switchgear, fan, 'electric-motor': motor, 'cooling-tower': tower, strainer: filter, 'check-valve': checkValve, 'expansion-vessel': vessel, 'relief-valve': relief, transformer, alternator, 'thermal-store': thermalStore };

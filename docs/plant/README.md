@@ -4,6 +4,10 @@ This implementation is a runnable **simulation/engineering workbench**, not an o
 
 The same `Kernel`, `Service`, alarm evaluator, historian queries, report renderer, and project compiler run in Node.js and a browser Worker. Native SQLite and SQLite WASM are adapters. The browser repository emulates the application-level commit/publish/rollback contract, not the Git wire format.
 
+## Operator controls and equipment views
+
+The current extension adds four declared operator signals, a coupled auxiliary service loop, searchable equipment inventory and dedicated shared-state 2D/3D views. See [operator signals and equipment](operator-controls.md) for the DSL, semantics, model boundary and verification. This is still a normalized teaching model, not a complete calibrated nuclear-station digital twin.
+
 ## Run
 
 ```sh
@@ -89,3 +93,7 @@ npm run check
 The browser command starts its own isolated Node server on a free port, uses temporary credentials/database/Git, checks both remote and offline modes, and cleans up. `PWA_CHROMIUM` may select a test browser executable. `PWA_EVIDENCE_DIR` selects screenshots and JSON evidence (default `plant-test-results`). `.github/workflows/plant.yml` is **manual**, not a deploy or a billable test loop on every commit.
 
 The Chernobyl-inspired model, assumptions and counterfactual results are documented [separately](model.md). Code under `plant/tests/` includes native/browser equation parity, SQL parity, quality, archive compression, native Git, release CAS, rollback, authentication, CSRF, report isolation and notification lifecycle tests. Type assertions also check the public DSL metadata inference. The existing legacy test suite remains separate; do not present its browser test counts as new PWA coverage.
+
+## Unified visualization and extended equipment
+
+See [unified canvas, equipment coverage, and isolated recovery exercises](unified-canvas.md). The latest example adds nested backplates, nine generic equipment models with matching SVG/3D anatomy, and a separately wired fictional thermal training loop. See `verification-unified.json` for the latest run; the earlier verification files refer to earlier revisions.

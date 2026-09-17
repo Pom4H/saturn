@@ -1,5 +1,13 @@
-import { AppError, id, type Expr, type System, type Simulation, type Project, type Derived, type Device, type AlarmRule, type Report, type Layout, type HistoryPolicy } from './types';
+import { AppError, id, type Expr, type System, type Simulation, type Project, type Derived, type Device, type AlarmRule, type Report, type Layout, type HistoryPolicy, type Control } from './types';
 import { model, type builtInModels } from './models';
+export interface ControlRef { control: Control; value: Expr; requested: Expr; blocked: Expr }
+export const control = (name: string, options: Omit<Control, 'id' | 'unit' | 'step'> & Partial<Pick<Control, 'unit' | 'step'>>): ControlRef => ({
+    control: { id: id(name), unit: 'отн.', step: .01, ...options },
+    value: signal(`${name}.value`), requested: signal(`${name}.requested`), blocked: signal(`${name}.blocked`),
+});
+export const gt = (a: Expr, b: Expr): Expr => ({ op: 'gt', args: [a, b] });
+export const lt = (a: Expr, b: Expr): Expr => ({ op: 'lt', args: [a, b] });
+export const and = (...args: Expr[]): Expr => ({ op: 'and', args });
 export const signal = (path: string): Expr => ({ ref: id(path) });
 export const add = (...args: Expr[]): Expr => ({ op: 'add', args });
 export const mul = (...args: Expr[]): Expr => ({ op: 'mul', args });
@@ -46,11 +54,12 @@ export const alarm = (name: string, options: Omit<AlarmRule, 'id' | 'notify' | '
 export const report = (name: string, options: Omit<Report, 'id' | 'notify'> & {
     notify?: boolean;
 }): Report => ({ id: id(name), notify: true, ...options });
-export function project(name: string, options: Omit<Project, 'id' | 'version' | 'simulations' | 'devices' | 'stepMs' | 'seed' | 'history'> & {
+export function project(name: string, options: Omit<Project, 'id' | 'version' | 'simulations' | 'devices' | 'stepMs' | 'seed' | 'history' | 'controls'> & {
     simulations: {
         node: Simulation;
     }[];
     devices?: Device[];
+    controls?: ControlRef[];
     stepMs?: number;
     seed?: number;
     history?: Project['history'];
@@ -59,7 +68,7 @@ export function project(name: string, options: Omit<Project, 'id' | 'version' | 
     if (simulations.some(x => !x))
         throw new AppError('project.simulations expects simulation() references');
     const devices = options.devices ?? simulations.map(s => ({ id: s.id, type: model(s.model).visual, system: s.system, layout: s.layout, signals: Object.fromEntries(Object.keys(model(s.model).outputs).map(k => [k, signal(`${s.id}.${k}`)])) }));
-    return { version: 1, id: id(name), stepMs: 100, seed: 1, history: { deadband: .001, maxInterval: 10000, retention: 86400000 }, ...options, simulations, devices };
+    return { version: 1, id: id(name), stepMs: 100, seed: 1, history: { deadband: .001, maxInterval: 10000, retention: 86400000 }, ...options, simulations, devices, controls: (options.controls ?? []).map(c => c.control) };
 }
 /** Repeated equipment is expanded to ordinary stable-ID nodes before runtime execution. */
 export function bank<K extends keyof ModelCatalog>(prefix: string, kind: K, options: Options<ModelCatalog[K]> & {

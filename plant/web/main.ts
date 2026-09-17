@@ -1,3 +1,4 @@
+import type { SceneView3D } from '../../src/view3d';
 import { EditorState } from '@codemirror/state';
 import { EditorView, basicSetup } from 'codemirror';
 import { javascript } from '@codemirror/lang-javascript';
@@ -10,6 +11,7 @@ import { LocalClient, RemoteClient, type Connection, type Status, type Revision,
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const base = new URL('../', location.href), demo = location.pathname.endsWith('/demo/');
 let client: Connection, status: Status, frame: Frame, scene: SceneView, system = '', selected: string | null = null, tab = 'scheme', file = 'plant.ts', files: Record<string, string> = {}, head: string | null = null, dirty = false, validDraft = true, editor: EditorView, loadingEditor = false, failed = false;
+let scene3d: SceneView3D | undefined, viewMode: '2d' | '3d' = '2d', changingView = false;
 let registration: ServiceWorkerRegistration | undefined, pendingInstall: any, noticeEnabled = false, closed = false;
 const fmt = (v: number | null | undefined, digits = 2) => typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—';
 const time = (v: number | null | undefined) => v ? new Date(v).toLocaleString('ru-RU') : '—';
@@ -26,22 +28,23 @@ function ensureActive() { if (failed)
     throw new Error('Нет достоверной связи с runtime'); }
 function refreshActions() { for (const id of ['pause', 'restart', 'commit', 'publish'])
     $(id).toggleAttribute('disabled', failed || (id === 'publish' && (dirty || !validDraft))); }
-async function command(action: string, extra: object = {}) { ensureActive(); const result = await client.request('command', { id: `cmd-${crypto.randomUUID()}`, revision: frame.revision, action, ...extra }); await refreshStatus(); if (action === 'set')
+async function command(action: string, extra: object = {}) { ensureActive(); const result = await client.request('command', { id: `cmd-${crypto.randomUUID()}`, revision: frame.revision, runId: frame.runId, action, ...extra }); await refreshStatus(); if (action === 'set')
     renderInspector(); return result; }
 async function refreshStatus() { const previous = status?.project; status = await client.request<Status>('session'); frame = status.frame; if (previous !== status.project && JSON.stringify(previous) !== JSON.stringify(status.project))
     setupProject(); renderFrame(frame); refreshActions(); }
 function setupProject() {
     $('title').textContent = status.project.title;
     $('description').textContent = status.project.description;
-    if (!status.project.systems.some(s => s.id === system))
-        system = status.project.systems.find(s => !s.parent)?.id ?? status.project.systems[0].id;
+    if (!status.project.systems.some(s => s.id === system)) system = '';
+    if (!status.project.devices.some(d => d.id === selected)) selected = null;
     $('tree').replaceChildren();
+    const all = document.createElement('button'); all.textContent = 'Все системы'; all.dataset.system = ''; all.onclick = () => focusSystem(''); $('tree').append(all);
     const append = (parent?: string, depth = 0) => { for (const group of status.project.systems.filter(g => g.parent === parent)) {
         const button = document.createElement('button');
         button.textContent = group.title;
         button.dataset.system = group.id;
         button.style.paddingLeft = `${8 + depth * 12}px`;
-        button.onclick = () => { system = group.id; selected = null; renderScene(); };
+        button.onclick = () => focusSystem(group.id);
         $('tree').append(button);
         append(group.id, depth + 1);
     } };
@@ -50,28 +53,42 @@ function setupProject() {
     $('report-definitions').innerHTML = definitions;
     renderScene();
     renderMetrics();
+    renderControls();
+    renderInventory();
 }
 function renderScene() {
     if (!scene)
         return;
-    const group = status.project.systems.find(g => g.id === system)!;
-    $('system-title').textContent = group.title;
-    const next = sceneFor(status.project, system);
-    $('system-count').textContent = `${next.nodes.length} компонентов · ${status.project.simulations.length} в проекте`;
+    const next = sceneFor(status.project);
     scene.render(next);
     scene.setRuntime(visualFrame(status.project, frame));
     scene.select(selected);
-    scene.fit();
-    document.querySelectorAll('[data-system]').forEach(b => b.classList.toggle('selected', (b as HTMLElement).dataset.system === system));
+    if (scene3d) { scene3d.render(next); scene3d.setRuntime(visualFrame(status.project, frame)); scene3d.select(selected); }
+    focusSystem(system);
     drawDependencies();
     renderInspector();
 }
+function focusSystem(id: string) {
+    system = id;
+    const group = scene.scene.groups?.find(g => g.id === id);
+    $('system-title').textContent = group ? group.title : 'Все системы · единый холст';
+    $('system-count').textContent = `${scene.scene.nodes.length} приборов на холсте${group ? ` · ${group.count} в выбранной группе` : ` · ${scene.scene.groups?.length ?? 0} групп`}`;
+    document.querySelectorAll<HTMLElement>('[data-system]').forEach(button => {
+        button.classList.toggle('selected', button.dataset.system === id);
+        button.setAttribute('aria-pressed', String(button.dataset.system === id));
+    });
+    scene.svg.dataset.focusedGroup = id;
+    if (group) { scene.fitGroup(id); scene3d?.focusGroup(id); if (viewMode === '3d') scene3d?.fitGroup(id); }
+    else { scene.fit(); scene3d?.focusGroup(null); if (viewMode === '3d') scene3d?.fit(); }
+}
+
 function dependencies(target: string): string[] { const node = status.project.simulations.find(n => n.id === target); if (!node)
     return []; const outputs = new Map<string, string>(status.project.simulations.flatMap(n => Object.keys(model(n.model).outputs).map(k => [`${n.id}.${k}`, n.id] as const))); const derived = new Map(status.project.signals.map(s => [s.id, s.expression])); const collect = (ref: string): string[] => outputs.has(ref) ? [outputs.get(ref)!] : derived.has(ref) ? references(derived.get(ref)!).flatMap(collect) : []; return [...new Set(Object.values(node.inputs).flatMap(references).flatMap(collect))].filter(id => id !== target); }
 function drawDependencies() {
     const svg = $<HTMLElement>('diagram') as unknown as SVGSVGElement;
     svg.querySelector('.signal-links')?.remove();
     $('boundary').textContent = '';
+    scene3d?.showSignalDependencies(selected, selected ? dependencies(selected) : []);
     if (!selected)
         return;
     const nodes = new Map(scene.scene.nodes.map(n => [n.id, n])), target = nodes.get(selected);
@@ -87,7 +104,7 @@ function drawDependencies() {
             continue;
         }
         const x = Number(from.props.x) + 150, y = Number(from.props.y) + 48, tx = Number(target.props.x), ty = Number(target.props.y) + 48;
-        el(layer, 'path', { d: `M${x} ${y} C${(x + tx) / 2} ${y} ${(x + tx) / 2} ${ty} ${tx} ${ty}` });
+        el(layer, 'path', { 'data-from': source, 'data-to': selected, d: `M${x} ${y} C${(x + tx) / 2} ${y} ${(x + tx) / 2} ${ty} ${tx} ${ty}` });
         el(layer, 'circle', { cx: tx, cy: ty, r: 4, fill: '#567f90' });
     }
     if (external.length)
@@ -113,7 +130,10 @@ function renderFrame(next: Frame) {
     }
     const outstanding = frame.alarms.filter(a => a.active || (!a.acknowledged && a.raisedAt !== null));
     $('alarm-count').textContent = String(outstanding.length);
-    scene?.setRuntime(visualFrame(status.project, frame));
+    const observation = visualFrame(status.project, frame);
+    scene?.setRuntime(observation);
+    if (scene3d) { scene3d.paused = frame.paused; scene3d.setRuntime(observation); }
+    refreshControls();
     if (scene)
         scene.paused = frame.paused;
     if (selected)
@@ -126,6 +146,8 @@ function renderFrame(next: Frame) {
     refreshActions();
 }
 function renderInspector() {
+    $('inspector').hidden = !selected;
+    document.querySelector('.workspace')!.classList.toggle('has-selection', !!selected);
     if (!selected) {
         $('inspector').innerHTML = '<h2>Оборудование</h2><p>Выберите компонент на схеме. Входы могут поступать из любой подсистемы.</p>';
         return;
@@ -157,6 +179,7 @@ function renderAlarms() { const list = frame.alarms.filter(a => a.raisedAt !== n
 async function refreshPanel() {
     if (tab === 'alarms')
         renderAlarms();
+    if (tab === 'inventory') renderInventory();
     if (tab === 'reports') {
         const rows = await client.request<Record<string, any>[]>('reports');
         $('report-runs').innerHTML = rows.length ? `<div class="table-scroll"><table><thead><tr><th>Отчёт / запуск</th><th>Триггер</th><th>Ревизия</th><th>Статус</th><th></th></tr></thead><tbody>${rows.map(r => `<tr><td>${escape(r.reportId)}<br><small>${time(r.createdAt)}</small></td><td>${escape(r.trigger)}</td><td>${escape(String(r.revision).slice(0, 16))}</td><td><span class="badge ${escape(r.status)}">${escape(r.status)}</span>${r.error ? `<p>${escape(r.error)}</p>` : ''}</td><td><button data-artifact="${escape(r.id)}" ${r.status !== 'success' ? 'disabled' : ''}>Открыть</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Отчётов пока нет. Запустите первый вручную.</div>';
@@ -266,7 +289,8 @@ async function start(memory = false) {
         $('logout').hidden = demo;
         installEquipment();
         scene = new SceneView($('diagram') as unknown as SVGSVGElement);
-        scene.onSelect = id => { selected = id; drawDependencies(); renderInspector(); };
+        scene.onSelect = selectEquipment;
+        scene.onGroupFocus = focusSystem;
         editor = new EditorView({ parent: $('editor'), state: EditorState.create({ doc: '' }) });
         setupProject();
         renderFrame(frame);
@@ -307,22 +331,17 @@ $('logout').onclick = () => void guard(async () => { await client.request('logou
 $('pause').onclick = () => void guard(() => command(frame.paused ? 'resume' : 'pause'));
 $('restart').onclick = () => void guard(async () => { if (!confirm('Начать новый прогон с исходными параметрами? Архив и отчёты сохранятся.'))
     return; await client.request('restart', {}); await refreshStatus(); });
-$('fit').onclick = () => scene.fit();
-$('zoom-in').onclick = () => scene.zoom(.8);
-$('zoom-out').onclick = () => scene.zoom(1.25);
-$('diagram').addEventListener('click', e => { const target = (e.target as Element).closest('[data-node]'); if (target) {
-    selected = target.getAttribute('data-node');
-    scene.select(selected);
-    drawDependencies();
-    renderInspector();
-} });
+$('fit').onclick = () => focusSystem('');
+$('zoom-in').onclick = () => viewMode === '3d' ? scene3d?.zoom(.8) : scene.zoom(.8);
+$('zoom-out').onclick = () => viewMode === '3d' ? scene3d?.zoom(1.25) : scene.zoom(1.25);
+$('diagram').addEventListener('click', e => { const target = (e.target as Element).closest('[data-node]'); if (target) selectEquipment(target.getAttribute('data-node')); });
 $('diagram').addEventListener('wheel', e => { e.preventDefault(); scene?.zoom(e.deltaY > 0 ? 1.08 : .92); }, { passive: false });
 let pan: {
     x: number;
     y: number;
     camera: SceneView['camera'];
 } | null = null;
-$('diagram').addEventListener('pointerdown', e => { if ((e.target as Element).closest('[data-node]'))
+$('diagram').addEventListener('pointerdown', e => { if ((e.target as Element).closest('[data-node], [data-group] [role=button]'))
     return; pan = { x: e.clientX, y: e.clientY, camera: { ...scene.camera } }; $('diagram').setPointerCapture(e.pointerId); });
 $('diagram').addEventListener('pointermove', e => { if (!pan)
     return; const a = scene.point(e.clientX, e.clientY), b = scene.point(pan.x, pan.y); scene.setCamera({ ...pan.camera, x: pan.camera.x - (a.x - b.x), y: pan.camera.y - (a.y - b.y) }); });
@@ -341,12 +360,14 @@ document.addEventListener('click', e => {
     if (!button)
         return;
     const d = button.dataset;
+    if (d.operate) void guard(async () => { const input = document.querySelector<HTMLInputElement>(`[data-control-input="${CSS.escape(d.operate!)}"]`)!; await command('operate', { target: d.operate, value: Number(input.value) }); toast('Уставка принята. Фактический сигнал изменяется с заданной скоростью.'); });
+    if (d.focusSystem) { document.querySelector<HTMLButtonElement>('[data-tab=scheme]')!.click(); focusSystem(d.focusSystem); }
+    if (d.inspect) { const node = status.project.devices.find(n => n.id === d.inspect); if (node) { document.querySelector<HTMLButtonElement>('[data-tab=scheme]')!.click(); selectEquipment(node.id); focusSystem(node.system); } }
     if (d.tab) {
         tab = d.tab;
         document.querySelectorAll<HTMLElement>('[data-panel]').forEach(p => p.hidden = p.dataset.panel !== tab);
         document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', (b as HTMLElement).dataset.tab === tab));
-        if (tab === 'scheme')
-            scene.fit();
+        if (tab === 'scheme') { /* Preserve the current installation camera across tabs. */ }
         void guard(refreshPanel);
     }
     if ('refresh' in d)
@@ -371,4 +392,79 @@ window.addEventListener('beforeunload', e => { if (dirty) {
 setInterval(() => { if (!status || failed || closed)
     return; if (tab === 'reports' || tab === 'events')
     void guard(refreshPanel); void updateTrend(); }, 3000);
+
+function selectEquipment(id: string | null) {
+    selected = id; scene.select(id); scene3d?.select(id); drawDependencies(); renderInspector();
+}
+async function setView(mode: '2d' | '3d') {
+    if (changingView || mode === viewMode) return;
+    changingView = true;
+    try {
+        if (mode === '3d' && !scene3d) {
+            const { SceneView3D } = await import('../../src/view3d');
+            $('scene3d').hidden = false;
+            try { scene3d = new SceneView3D($('scene3d')); }
+            catch (e) { $('scene3d').hidden = true; throw new Error(`3D не запустился: ${e instanceof Error ? e.message : String(e)}. 2D продолжает работать.`); }
+            scene3d.onSelect = selectEquipment;
+            scene3d.onOverview = () => focusSystem('');
+        }
+        viewMode = mode; $('diagram').hidden = mode === '3d'; $('scene3d').hidden = mode !== '3d';
+        for (const m of ['2d', '3d']) $(`view-${m}`).setAttribute('aria-pressed', String(m === mode));
+        if (scene3d && mode === '3d') {
+            scene3d.render(scene.scene); scene3d.setRuntime(visualFrame(status.project, frame)); scene3d.select(selected); focusSystem(system); drawDependencies();
+        } else { scene.focusGroup(system || null); }
+    } finally { changingView = false; }
+}
+function renderControls() {
+    const controls = status.project.controls ?? [];
+    const groups = [...new Set(controls.map(c => c.system))];
+    $('control-list').innerHTML = groups.map(id => {
+        const system = status.project.systems.find(s => s.id === id)!;
+        const observations = status.project.devices.filter(d => d.system === id).slice(0, 6).flatMap(d => {
+            const first = Object.entries(d.signals)[0];
+            return first && typeof first[1] === 'object' && 'ref' in first[1] ? [{id:d.id,key:first[1].ref}] : [];
+        });
+        return `<section class="control-system"><div class="card-header"><h3>${escape(system.title)}</h3><button data-focus-system="${escape(id)}">На схеме</button></div>
+            <div class="control-observations">${observations.map(o => `<div><span>${escape(o.id)}</span><b data-control-observation="${escape(o.key)}">—</b><small>${escape(o.key)}</small></div>`).join('')}</div>
+            <div class="control-grid">${controls.filter(c=>c.system===id).map(c => `<article class="control-card" data-control="${escape(c.id)}">
+      <p class="eyebrow">${escape(status.project.systems.find(s => s.id === c.system)?.title ?? c.system)}</p>
+      <h3>${escape(c.title)}</h3><p class="control-id">${escape(c.id)}.value · ${escape(c.unit)}</p>
+      <div class="control-readouts"><span>Уставка <b data-demand>—</b></span><span>Фактически <b data-actual>—</b></span></div>
+      <meter min="${c.min}" max="${c.max}" value="${c.initial}"></meter>
+      <label class="control-edit">Новая уставка<input type="number" aria-label="${escape(c.title)}" data-control-input="${escape(c.id)}" min="${c.min}" max="${c.max}" step="${c.step}" value="${c.initial}"><button data-operate="${escape(c.id)}">Применить</button></label>
+      <p>${c.min}…${c.max} ${escape(c.unit)} · скорость до ${c.rate} /с</p><p class="control-gate" data-gate role="status"></p>
+    </article>`).join('')}</div></section>`;
+    }).join('') || '<p>В этом проекте управляющие сигналы не объявлены.</p>';
+    refreshControls();
+}
+function refreshControls() {
+    if (!status || !frame) return;
+    for (const e of document.querySelectorAll<HTMLElement>('[data-control-observation]')) { const sample=frame.samples[e.dataset.controlObservation!]; e.textContent=fmt(sample?.quality==='good'?sample.value:null); }
+    for (const c of status.project.controls ?? []) {
+        const node = document.querySelector<HTMLElement>(`[data-control="${CSS.escape(c.id)}"]`); if (!node) continue;
+        const actual = frame.samples[`${c.id}.value`], requested = frame.samples[`${c.id}.requested`];
+        node.querySelector('[data-actual]')!.textContent = fmt(actual?.quality === 'good' ? actual.value : null);
+        node.querySelector('[data-demand]')!.textContent = fmt(requested?.quality === 'good' ? requested.value : null);
+        const healthy = !failed && actual?.quality === 'good';
+        const blocked = !!frame.samples[`${c.id}.blocked`]?.value;
+        node.querySelector('meter')!.value = healthy ? actual.value ?? c.min : c.min;
+        (node.querySelector('[data-operate]') as HTMLButtonElement).disabled = !healthy || blocked || status.actor.role === 'viewer';
+        node.dataset.blocked = String(blocked);
+        node.querySelector('[data-gate]')!.textContent = !healthy ? 'Данные недостоверны: команды заблокированы.' : blocked ? c.blockedReason ?? 'Блокировка активна' : c.enableWhen ? 'Разрешающие условия выполнены' : 'Диапазон учебной модели';
+    }
+}
+function renderInventory() {
+    if (!status) return;
+    const q = $<HTMLInputElement>('equipment-search').value.toLocaleLowerCase('ru');
+    const rows = status.project.simulations.filter(n => `${n.id} ${model(n.model).title} ${n.system}`.toLocaleLowerCase('ru').includes(q));
+    $('coverage').textContent = `${status.project.simulations.length} приборов · ${new Set(status.project.simulations.map(n => n.model)).size} моделей · ${status.project.systems.length} подсистем · ${status.project.controls?.length ?? 0} управляющих сигналов. Все модели учебные, без валидации по реальной АЭС.`;
+    $('inventory-list').innerHTML = `<div class="table-scroll"><table><thead><tr><th>Прибор</th><th>Подсистема</th><th>Модель / версия</th><th>Входы → выходы</th><th>Представления</th></tr></thead><tbody>${rows.map(n => { const m = model(n.model); return `<tr><td><button data-inspect="${escape(n.id)}">${escape(n.id)}</button></td><td>${escape(status.project.systems.find(s => s.id === n.system)?.title ?? n.system)}</td><td>${escape(m.title)}<br><small>${escape(n.model)} / ${escape(m.version)}</small></td><td>${Object.keys(n.inputs).length} → ${Object.keys(m.outputs).length}</td><td>2D / 3D · схема</td></tr>`; }).join('')}</tbody></table></div>`;
+}
+$('view-2d').onclick = () => void guard(() => setView('2d'));
+$('diagram').addEventListener('keydown', e => { if (e.key.toLowerCase() === 'f') { e.preventDefault(); focusSystem(''); } });
+$('view-3d').onclick = () => void guard(() => setView('3d'));
+$('equipment-search').oninput = renderInventory;
+window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
+window.addEventListener('pagehide', () => { closed = true; scene3d?.dispose(); client?.close(); });
+
 void start();

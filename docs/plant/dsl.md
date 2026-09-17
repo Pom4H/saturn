@@ -114,3 +114,7 @@ For a chart, return an x column and a numeric-or-null y column and specify `char
 ## Root
 
 The default export is `project(id, {...})` with systems, simulations, derived signals, alarms and reports. `overview` optionally names the dashboard metrics; no Chernobyl-specific signal IDs are hard-coded in the UI. See executable multi-file examples under `plant/demo/` and the public typed consumer test in `plant/tests/sdk-types.ts`.
+
+## Operator input signals
+
+`control()` declares bounded, rate-limited operator input with separate requested/actual/blocked signals, optional continuously checked `enableWhen`, fail-closed `safeValue` and `blockedReason`. Include the references in `project({ controls: [...] })`. These live commands never edit the authored project. See the [full operator-control example](operator-controls.md).

@@ -1,0 +1,114 @@
+{
+  "base": "3b72d954ec74f2ae6cb8fb5e6b278694504ca07a",
+  "integratesPriorLocalControls": true,
+  "scope": {
+    "instances": 41,
+    "systems": 17,
+    "installedModels": 24,
+    "newModelTypes": 9,
+    "controls": 6
+  },
+  "environment": {
+    "node": "v22.16.0",
+    "browser": "153.0.8010.12",
+    "render": "real WebGL with software rendering under Xvfb"
+  },
+  "checks": {
+    "native": 64,
+    "browser": 19,
+    "legacy": 79,
+    "typecheck": true,
+    "externalSdkConsumer": true
+  },
+  "browserChecks": [
+    "persistent browser Worker starts with SQLite WASM and live equipment",
+    "service worker installs and only public demo resources enter cache",
+    "Node and browser execute identical equations, control/interlock traces and SQL reports",
+    "one canvas keeps all equipment DOM nodes while nested groups only change the camera",
+    "backplate headers are keyboard navigable and retain cross-system equipment",
+    "subsystem focus and sensor observation update the same SVG",
+    "operator panel sends ramped commands without editing the project",
+    "equipment inventory searches and focuses the matching subsystem",
+    "real WebGL 3D shares selection and signal identity with the 2D view",
+    "3D overview and backplates use all equipment and retain selection when changing view",
+    "manual report runs SQL in a separate browser worker and renders HTML",
+    "draft validation, CAS commit and explicit publication use the same project files",
+    "explicit rollback creates a new revision without deleting reports",
+    "public browser alarm notification and acknowledgement follow emergent state",
+    "offline PWA reload resumes persisted state, report artifacts and local revisions",
+    "offline installation loads the lazy 3D bundle from the public cache",
+    "a second tab cannot silently become another database writer",
+    "mobile 2D and 3D have no horizontal document overflow",
+    "authenticated Node receives operator commands and publishes SSE without a local simulation"
+  ],
+  "trainingParity": true,
+  "training": {
+    "baseline": {
+      "warningAt": null,
+      "damageAt": null,
+      "responseAt": null,
+      "recoveredAt": null,
+      "peak": 1.1499901666666668,
+      "residual": 7.105427357601002e-15,
+      "finalTemperature": 1.1418535082211982,
+      "damage": 0
+    },
+    "pulse": {
+      "warningAt": null,
+      "damageAt": null,
+      "responseAt": null,
+      "recoveredAt": null,
+      "peak": 1.395635716896244,
+      "residual": 7.105427357601002e-15,
+      "finalTemperature": 1.1431954427607647,
+      "damage": 0
+    },
+    "stress": {
+      "warningAt": 34.1,
+      "damageAt": 91,
+      "responseAt": null,
+      "recoveredAt": null,
+      "peak": 24.627519274387033,
+      "residual": 1.1363132657038477e-13,
+      "finalTemperature": 24.627519274387033,
+      "damage": 1
+    },
+    "recover": {
+      "warningAt": 34.1,
+      "damageAt": null,
+      "responseAt": 54.1,
+      "recoveredAt": 129.9,
+      "peak": 2.2703675954635294,
+      "residual": 1.4210854715202004e-14,
+      "finalTemperature": 0.4117816808247877,
+      "damage": 0
+    },
+    "heat-only": {
+      "warningAt": 34.1,
+      "damageAt": 122.8,
+      "responseAt": 54.1,
+      "recoveredAt": null,
+      "peak": 19.068772848824945,
+      "residual": 1.1368683772161603e-13,
+      "finalTemperature": 19.068772848824945,
+      "damage": 1
+    },
+    "cooling-only": {
+      "warningAt": 34.1,
+      "damageAt": 151.4,
+      "responseAt": 54.1,
+      "recoveredAt": null,
+      "peak": 8.7155406047673,
+      "residual": 5.684341886080802e-14,
+      "finalTemperature": 8.7155406047673,
+      "damage": 1
+    }
+  },
+  "boundaries": [
+    "Fictional independent thermal recovery exercise, not reactor operation or a historical RBMK reconstruction",
+    "Nine generic model types do not constitute the complete engineering inventory of an NPP",
+    "Difficulty thresholds are regression criteria, not human usability results or real physical limits",
+    "Legacy browser suites and external provider-to-phone push were not rerun",
+    "No merge or deployment performed"
+  ]
+}

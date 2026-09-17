@@ -12,7 +12,7 @@ Missing physical mechanisms include spatial neutronics, delayed neutron groups, 
 
 ## Actual decomposition
 
-Ten navigation systems contain 23 simulated components: one normalized feedback heat source, two banks of six lumped channels, two circulating pumps, two drum/separator aggregates, one turbine, one heat exchanger, one supply, one sensor, one protective actuator and one building aggregate. The grouping is site → unit → functional subsystems → repeated banks. Only the studied unit is represented; the other historical reactors and site infrastructure are not modeled.
+The original ten navigation systems contained 23 simulated components: one normalized feedback heat source, two banks of six lumped channels, two circulating pumps, two drum/separator aggregates, one turbine, one heat exchanger, one supply, one sensor, one protective actuator and one building aggregate. The grouping is site → unit → functional subsystems → repeated banks. The auxiliary extension adds three systems and six coupled instances, for 13 navigation systems and 29 components. Four operator controls act on that fictional auxiliary loop. See [operator controls](operator-controls.md). Only a teaching representation of the studied unit is present; the other historical reactors and complete site infrastructure are not modeled.
 
 `core.ts`, `cooling.ts`, `steam.ts` and `safety.ts` export component lists and public signals. `plant.ts` composes them. `reports.ts` adds workflows. `bank()` and `aggregate()` demonstrate repeated-component decomposition without copy-pasted model code. No special equipment IDs occur inside the kernel, historian or report runner.
 

@@ -255,7 +255,10 @@ export function validateProject(value: unknown): asserts value is Project {
     unique(p.devices.map(n => n.id));
     unique(p.alarms.map(a => a.id));
     unique(p.reports.map(r => r.id));
-    const signals = unique([...p.simulations.flatMap(n => Object.keys(model(n.model).outputs).map(k => `${n.id}.${k}`)), ...p.signals.map(s => s.id)]);
+    if (p.controls !== undefined && (!Array.isArray(p.controls) || p.controls.length > 128))
+        throw new AppError('At most 128 controls');
+    unique([...(p.controls ?? []).map(c => c.id), ...p.simulations.map(n => n.id)]);
+    const signals = unique([...(p.controls ?? []).flatMap(c => ['value', 'requested', 'blocked'].map(k => `${c.id}.${k}`)), ...p.simulations.flatMap(n => Object.keys(model(n.model).outputs).map(k => `${n.id}.${k}`)), ...p.signals.map(s => s.id)]);
     let expressions = 0;
     const checkExpr = (e: Expr, depth = 0): void => { if (++expressions > 20000)
         throw new AppError('Signal expression budget'); if (depth > 32)
@@ -273,6 +276,18 @@ export function validateProject(value: unknown): asserts value is Project {
         throw new AppError('not requires one operand'); if (['sub', 'div', 'gt', 'lt'].includes(e.op) && e.args.length !== 2)
         throw new AppError('Binary operation requires two operands'); for (const v of e.args)
         checkExpr(v, depth + 1); };
+    for (const c of p.controls ?? []) {
+        if (!groups.has(c.system) || typeof c.title !== 'string' || !c.title.trim() || c.title.length > 150 || typeof c.unit !== 'string' || c.unit.length > 32)
+            throw new AppError('Invalid control metadata');
+        finite(c.min, 'control min'); finite(c.max, 'control max', c.min); finite(c.initial, 'control initial', c.min, c.max);
+        finite(c.rate, 'control rate', .000001, 1e6); finite(c.step, 'control step', .000001, 1e6);
+        if (c.enableWhen !== undefined) {
+            checkExpr(c.enableWhen);
+            finite(c.safeValue, 'interlocked control safeValue', c.min, c.max);
+            if (typeof c.blockedReason !== 'string' || !c.blockedReason.trim() || c.blockedReason.length > 200)
+                throw new AppError('Interlocked control needs a blockedReason');
+        }
+    }
     for (const n of p.simulations) {
         const m = model(n.model);
         if (!groups.has(n.system))

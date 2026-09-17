@@ -102,12 +102,29 @@ export interface Report {
     };
     notify: boolean;
 }
+/** Operator setpoints are signals, not edits to model coefficients. */
+export interface Control {
+    id: string;
+    title: string;
+    system: string;
+    unit: string;
+    min: number;
+    max: number;
+    initial: number;
+    rate: number;
+    step: number;
+    enableWhen?: Expr;
+    safeValue?: number;
+    blockedReason?: string;
+}
+export interface ControlState { requested: number; value: number; blocked: boolean }
 export interface Project {
     version: 1;
     id: string;
     title: string;
     description: string;
     systems: System[];
+    controls?: Control[];
     simulations: Simulation[];
     signals: Derived[];
     devices: Device[];
@@ -147,6 +164,7 @@ export interface Checkpoint {
     epoch: number;
     states: Record<string, Record<string, number>>;
     overrides: Record<string, number>;
+    controls?: Record<string, ControlState>;
     paused: boolean;
     modelVersions: Record<string, string>;
     invalidModels?: string[];

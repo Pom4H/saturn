@@ -1,0 +1,57 @@
+{
+  "base": {
+    "repository": "Pom4H/scada",
+    "pr": 12,
+    "sha": "3b72d954ec74f2ae6cb8fb5e6b278694504ca07a"
+  },
+  "delivery": "local source and patch; not committed or pushed to GitHub",
+  "scope": {
+    "modelInstances": 29,
+    "navigationSystems": 13,
+    "modelVisualTypes": 15,
+    "operatorControls": 4,
+    "realNuclearControlSequence": false,
+    "calibratedPlantDigitalTwin": false
+  },
+  "environment": {
+    "node": "v22.16.0",
+    "browser": "153.0.8010.12",
+    "webgl": "WebGL2 via SwiftShader under Xvfb",
+    "display": "headless test display"
+  },
+  "checks": {
+    "newSystemNative": 46,
+    "legacyNative": 93,
+    "externalSDKConsumer": "pass",
+    "strictTypeScript": "pass",
+    "build": "pass",
+    "browser": [
+      "persistent browser Worker starts with SQLite WASM and live equipment",
+      "service worker installs and only public demo resources enter cache",
+      "Node and browser execute identical equations, control/interlock traces and SQL reports",
+      "system decomposition and sensor observation actually update the SVG",
+      "operator panel sends ramped commands without editing the project",
+      "equipment inventory searches and focuses the matching subsystem",
+      "real WebGL 3D shares selection and signal identity with the 2D view",
+      "manual report runs SQL in a separate browser worker and renders HTML",
+      "draft validation, CAS commit and explicit publication use the same project files",
+      "explicit rollback creates a new revision without deleting reports",
+      "public browser alarm notification and acknowledgement follow emergent state",
+      "offline PWA reload resumes persisted state, report artifacts and local revisions",
+      "offline installation loads the lazy 3D bundle from the public cache",
+      "a second tab cannot silently become another database writer",
+      "mobile 2D and 3D have no horizontal document overflow",
+      "authenticated Node receives operator commands and publishes SSE without a local simulation"
+    ],
+    "browserErrors": [],
+    "controlParity": "exact equality of Node/browser auxiliary traces including interlock and cleared demand",
+    "physicalPhoneWebPush": "not tested",
+    "oldBrowserSuites": "not rerun"
+  },
+  "limitations": [
+    "Normalized teaching models only; no validated historical accident reconstruction",
+    "Auxiliary controls are not real nuclear equipment settings",
+    "Schematic 3D geometry is not a surveyed engineering drawing",
+    "No public deployment, production qualification or multiyear capacity test"
+  ]
+}

@@ -3,19 +3,19 @@ export const coreSystem = system("core", "Реактор и группы кан�
 export const groupA = system("coreA", "Каналы · группа A", "core");
 export const groupB = system("coreB", "Каналы · группа B", "core");
 export const reactor = simulation("CORE", "feedback-source", {
-    system: "core", at: { x: 690, y: 55 },
+    system: "core", at: { x: 950, y: 190 },
     parameters: { initialPower: 0.8, feedback: 3 },
     inputs: { void: signal("core.void"), temperature: signal("core.temperature"), absorber: signal("PROTECT.insertion") },
 });
 // One declaration per group, stable instance IDs and independent component state.
 export const groupAChannels = bank("CH-A", "channel", {
-    count: 6, columns: 3, pitch: { x: 265, y: 210 },
-    system: "coreA", at: { x: 550, y: 330 },
+    count: 6, columns: 3, pitch: { x: 230, y: 230 },
+    system: "coreA", at: { x: 710, y: 540 },
     inputs: { power: reactor.power, flow: signal("PUMP-A.flow"), inlet: signal("COND.temperature") },
 });
 export const groupBChannels = bank("CH-B", "channel", {
-    count: 6, columns: 3, pitch: { x: 265, y: 210 },
-    system: "coreB", at: { x: 550, y: 800 },
+    count: 6, columns: 3, pitch: { x: 230, y: 230 },
+    system: "coreB", at: { x: 710, y: 1080 },
     inputs: { power: reactor.power, flow: signal("PUMP-B.flow"), inlet: signal("COND.temperature") },
 });
 export const channels = [...groupAChannels, ...groupBChannels];

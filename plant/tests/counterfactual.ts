@@ -28,3 +28,7 @@ export function runCounterfactuals() {
     }
     return results;
 }
+
+export { runControlTrace } from './control-trace';
+
+export {runTrainingSuite} from './stability-trace';

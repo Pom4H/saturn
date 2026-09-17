@@ -5,7 +5,7 @@ import { Store } from './store';
 import { cronMatches } from './workflows';
 import { AppError, clone, finite, id, requireRole, type Actor, type AlarmState, type Event, type Frame, type Project, type Repository, type ReportTask, type ReportArtifact } from './types';
 const engineering: Actor = { id: 'system', role: 'engineer' };
-const configuration = (p: Project) => JSON.stringify({ simulations: p.simulations.map(({ layout, system, history, ...n }) => n).sort((a, b) => a.id.localeCompare(b.id)), signals: p.signals.map(({ unit, history, ...s }) => s), stepMs: p.stepMs });
+const configuration = (p: Project) => JSON.stringify({ simulations: p.simulations.map(({ layout, system, history, ...n }) => n).sort((a, b) => a.id.localeCompare(b.id)), signals: p.signals.map(({ unit, history, ...s }) => s), stepMs: p.stepMs, controls: p.controls ?? [] });
 export class Service {
     kernel!: Kernel;
     project!: Project;
@@ -119,6 +119,7 @@ export class Service {
         id: string;
         revision: string;
         action: string;
+        runId?: string;
         target?: string;
         parameter?: string;
         value?: number;
@@ -143,6 +144,11 @@ export class Service {
         let event: Event;
         try {
             switch (payload.action) {
+                case 'operate':
+                    if (payload.runId !== this.kernel.state.runId) throw new AppError('Simulation run changed', 409);
+                    this.kernel.operate(payload.target!, payload.value!);
+                    event = this.event('command.control', payload.target!, JSON.stringify({ requested: payload.value, actual: this.kernel.state.controls![payload.target!].value }), actor);
+                    break;
                 case 'set':
                     requireRole(actor, 'engineer');
                     this.kernel.setParameter(payload.target!, payload.parameter!, payload.value!);
@@ -162,7 +168,7 @@ export class Service {
                     break;
                 default: throw new AppError('Unknown command');
             }
-            const receipt = { id: payload.id, status: 'applied', seq: this.kernel.state.seq };
+            const receipt = { id: payload.id, status: payload.action === 'operate' ? 'accepted' : 'applied', seq: this.kernel.state.seq, runId: this.kernel.state.runId };
             // Commands and their effects share one SQLite transaction (save() is kept outside to avoid nested BEGIN).
             this.store.db.transaction(() => { this.store.db.exec('UPDATE checkpoints SET state=?,alarms=? WHERE run_id=?', [JSON.stringify(this.kernel.state), JSON.stringify(this.alarms), this.kernel.state.runId]); this.store.event(event); this.store.db.exec('INSERT INTO commands VALUES(?,?,?)', [payload.id, encoded, JSON.stringify(receipt)]); });
             this.emit();
@@ -171,6 +177,10 @@ export class Service {
         catch (error) {
             this.kernel.state = before;
             this.alarms = alarms;
+            if (payload.action === 'operate' && error instanceof AppError) {
+                try { this.store.event(this.event('command.rejected', payload.target ?? 'unknown', error.message, actor)); }
+                catch { this.healthy = false; }
+            }
             throw error;
         }
     }
