@@ -1,0 +1,35 @@
+name: Sandbox source bundle
+on:
+  push:
+    branches: [feature/server-runs]
+    paths: [.github/workflows/sandbox-bundle.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install build and browser SQL dependencies
+        run: |
+          npm ci
+          npm install --no-save --package-lock=false @sqlite.org/sqlite-wasm web-push
+          node --version > sandbox-versions.txt
+          npm ls --depth=0 >> sandbox-versions.txt || true
+          git archive HEAD -o source.tar
+          mkdir sandbox-source
+          tar -xf source.tar -C sandbox-source
+          cp -a node_modules sandbox-source/
+          cp sandbox-versions.txt sandbox-source/
+          cp "$(command -v node)" sandbox-source/node-sandbox
+          tar -czf sandbox-source.tar.gz sandbox-source
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sandbox-source
+          path: sandbox-source.tar.gz
+          retention-days: 2
