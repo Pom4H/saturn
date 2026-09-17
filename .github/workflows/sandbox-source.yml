@@ -1,0 +1,32 @@
+name: Sandbox source bundle
+on:
+  push:
+    branches: [feature/isomorphic-pwa]
+    paths: [.github/workflows/sandbox-source.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '22'
+      - name: Prepare portable source and dependencies
+        run: |
+          mkdir -p /tmp/scada-vendor
+          npm install --prefix /tmp/scada-vendor @sqlite.org/sqlite-wasm web-push typescript esbuild
+          tar --exclude=.git --exclude=node_modules -czf /tmp/scada-source.tar.gz .
+          tar -C /tmp/scada-vendor -czf /tmp/scada-vendor.tar.gz .
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: sandbox-source
+          path: |
+            /tmp/scada-source.tar.gz
+            /tmp/scada-vendor.tar.gz
+          retention-days: 1
