@@ -3,7 +3,7 @@ import { createWriteStream, existsSync } from 'node:fs';
 import { mkdir, rm, writeFile, readFile } from 'node:fs/promises';
 import { join, delimiter, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 
 const root=process.cwd(),temp=process.env.RUNNER_TEMP??tmpdir();
 const evidence=process.env.EVIDENCE??join(temp,'saturn-target-evidence');
@@ -35,7 +35,24 @@ function findGit(){
   }
   return null;
 }
-const gitDir=findGit();if(gitDir)process.env.PATH=gitDir+delimiter+process.env.PATH;
+async function portableGit(){
+  if(process.platform!=='win32'||process.arch!=='x64')return null;
+  const dir=join(temp,'saturn-mingit-2.55.0.5'),exe=join(dir,'cmd','git.exe');
+  if(existsSync(exe))return join(dir,'cmd');
+  const zip=join(temp,'saturn-mingit-2.55.0.5.zip');
+  const url='https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/MinGit-2.55.0.5-64-bit.zip';
+  const expected='56d7b226b7693196cfc71fef26568f536c4a021ab6c37ff2db4287bed908e96e';
+  const response=await fetch(url,{signal:AbortSignal.timeout(60000)});if(!response.ok)throw new Error(`MinGit download failed: ${response.status}`);
+  const bytes=Buffer.from(await response.arrayBuffer()),actual=createHash('sha256').update(bytes).digest('hex');
+  if(actual!==expected)throw new Error(`MinGit digest mismatch: ${actual}`);
+  await writeFile(zip,bytes);await rm(dir,{recursive:true,force:true});await mkdir(dir,{recursive:true});
+  const expand=spawnSync('powershell.exe',['-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-Command',`Expand-Archive -LiteralPath '${zip.replaceAll("'","''")}' -DestinationPath '${dir.replaceAll("'","''")}' -Force`],{encoding:'utf8'});
+  if(expand.status!==0||!existsSync(exe))throw new Error(`MinGit extraction failed: ${expand.stderr||expand.stdout}`);
+  return join(dir,'cmd');
+}
+let gitDir=findGit(),gitSource='system';
+if(!gitDir){gitDir=await portableGit();gitSource=gitDir?'portable-ci':'missing';}
+if(gitDir)process.env.PATH=gitDir+delimiter+process.env.PATH;
 
 function version(cmd,args=[]){
   const spec=command(cmd,args),r=spawnSync(spec.cmd,spec.args,{encoding:'utf8',shell:false});
@@ -50,6 +67,7 @@ await writeFile(join(evidence,'environment.txt'),[
   `npm=${version(npm,['--version'])}`,
   `bun=${version('bun',['--version'])}`,
   `git=${version('git',['--version'])}`,
+  `git_source=${gitSource}`,
   `docker=${version('docker',['--version'])}`,
   `docker_compose=${version('docker',['compose','version'])}`,
 ].join('\n')+'\n');
