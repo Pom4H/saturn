@@ -16,18 +16,21 @@ export class IndustrialGateway {
   constructor(readonly registry:DriverRegistry,readonly connections:Map<string,ConnectionConfig>,readonly now=Date.now){}
   snapshot():Record<string,Sample>{return this.values;}
   async bind(sources:readonly ExternalSource[]):Promise<void>{
-    await this.close();
-    const groups=new Map<string,ExternalSource[]>();
+    const groups=new Map<string,ExternalSource[]>(),next:BoundConnection[]=[],values:Record<string,Sample>=Object.create(null);
     for(const source of sources){
       const list=groups.get(source.connection);if(list)list.push(source);else groups.set(source.connection,[source]);
-      this.values[source.id]={value:null,quality:'offline',time:this.now()};
+      values[source.id]={value:null,quality:'offline',time:this.now()};
     }
-    for(const [id,list] of groups){
-      const config=this.connections.get(id);if(!config)throw new AppError(`Server connection not configured: ${id}`,503);
-      const driver=this.registry.get(config.driver,'protocol'),session=await driver.connect(config);
-      const points=list.map(source=>({id:source.id,address:source.address,writable:source.writable}));
-      this.bound.push({config,session,points,sources:list,nextAt:0,pollMs:Math.min(...list.map(s=>s.pollMs))});
-    }
+    try{
+      for(const [id,list] of groups){
+        const config=this.connections.get(id);if(!config)throw new AppError(`Server connection not configured: ${id}`,503);
+        const driver=this.registry.get(config.driver,'protocol'),session=await driver.connect(config);
+        const points=list.map(source=>({id:source.id,address:source.address,writable:source.writable}));
+        next.push({config,session,points,sources:list,nextAt:0,pollMs:Math.min(...list.map(s=>s.pollMs))});
+      }
+    }catch(error){for(const group of next)await group.session.close();throw error;}
+    const previous=this.bound;this.bound=next;this.values=values;
+    for(const group of previous)await group.session.close();
   }
   async refresh(now=this.now()):Promise<void>{
     if(this.refreshing)return;
