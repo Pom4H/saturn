@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage } from 'node:http';
 import { readFile, realpath } from 'node:fs/promises';
 import { resolve, sep, extname } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 import { NodeSql } from './adapters/node-sql';
 import { GitRepository } from './adapters/git';
 import { Auth } from './adapters/auth';
@@ -10,7 +10,10 @@ import { Push } from './adapters/push';
 import { runReport } from './adapters/node-reports';
 import { Store } from './store';
 import { Service } from './service';
-import { AppError, requireRole } from './types';
+import { AppError, type WorkerJobKind } from './types';
+import { authorize, capabilities } from './server/policy';
+import { DriverRegistry, loadConnections, loadDriverModules } from './server/drivers';
+import { IndustrialGateway } from './server/gateway';
 import { demoFiles } from './demo/files';
 const prefix = '/plant';
 async function body(req: IncomingMessage): Promise<any> { if (!req.headers['content-type']?.startsWith('application/json'))
@@ -36,15 +39,34 @@ export async function startPlantServer(options: {
     root?: string;
     autoTick?: boolean;
     pushSubject?: string;
+    externalWorkers?: boolean;
+    workerTokens?: Record<string,WorkerJobKind[]>;
+    connectionsFile?: string;
+    driverModules?: string[];
 } = {}) {
+    const registry=new DriverRegistry();
+    await loadDriverModules(registry,options.driverModules??[]);
+    const gateway=new IndustrialGateway(registry,await loadConnections(options.connectionsFile));
     const store = new Store(new NodeSql(options.data ?? resolve('data-plant/plant.sqlite3')));
     const repository = await new GitRepository(options.repository ?? resolve('data-plant/project.git')).initialize();
-    const service = new Service(store, repository, { reportRunner: runReport });
+    const service = new Service(store, repository, { reportRunner: runReport,externalWorkers:options.externalWorkers,externalSamples:()=>gateway.snapshot(),bindSources:sources=>gateway.bind(sources??[]) });
     await service.start(demoFiles);
     const auth = new Auth(store), password = options.password ?? randomBytes(18).toString('base64url'), username = options.user ?? 'engineer';
     const created = auth.seed(username, password);
     const push = options.pushSubject ? new Push(store, options.pushSubject) : null;
     const root = await realpath(options.root ?? resolve('dist/plant'));
+    const workerTokens=new Map<string,ReadonlySet<WorkerJobKind>>();
+    for(const [token,kinds] of Object.entries(options.workerTokens??{})){
+        if(token.length<24||!Array.isArray(kinds)||kinds.some(k=>!['report','sql','wasm'].includes(k)))throw new AppError('Invalid worker token configuration');
+        workerTokens.set(createHash('sha256').update(token).digest('hex'),new Set(kinds));
+    }
+    const workerAccess=(req:IncomingMessage):ReadonlySet<WorkerJobKind>=>{
+        const token=/^Bearer ([A-Za-z0-9._~-]{24,512})$/.exec(String(req.headers.authorization??''))?.[1];
+        if(!token)throw new AppError('Worker authentication required',401);
+        const digest=createHash('sha256').update(token).digest(),hex=digest.toString('hex');
+        for(const [saved,kinds] of workerTokens){const bytes=Buffer.from(saved,'hex');if(bytes.length===digest.length&&timingSafeEqual(bytes,digest))return kinds;}
+        throw new AppError('Invalid worker token',401);
+    };
     const streams = new Set<import('node:http').ServerResponse>();
     let origin = options.publicUrl ? new URL(options.publicUrl).origin : '';
     const server = createServer(async (req, res) => {
@@ -96,6 +118,19 @@ export async function startPlantServer(options: {
                 html(200, await readFile(resolve(root, 'index.html'), 'utf8'));
                 return;
             }
+            if(path.startsWith(`${prefix}/worker/`)){
+                if(req.method!=='POST')throw new AppError('Method not allowed',405);
+                const allowed=workerAccess(req),action=path.slice(`${prefix}/worker/`.length),input=await body(req);
+                if(action==='claim'){
+                    const requested=Array.isArray(input.kinds)?input.kinds.filter((k:unknown):k is WorkerJobKind=>typeof k==='string'&&allowed.has(k as WorkerJobKind)):[...allowed];
+                    json(200,{job:service.claimWorker(requested,input.workerId)});return;
+                }
+                if(action==='complete'){
+                    service.completeWorker(input.jobId,input.workerId,input.result,typeof input.error==='string'?input.error:undefined);
+                    json(200,{ok:true});return;
+                }
+                throw new AppError('Worker endpoint not found',404);
+            }
             if (path.startsWith(`${prefix}/api/`)) {
                 const session = auth.session(req.headers.cookie), actor = session.actor;
                 if (req.method === 'POST' && req.headers['x-csrf-token'] !== session.csrf)
@@ -103,7 +138,7 @@ export async function startPlantServer(options: {
                 const action = path.slice(`${prefix}/api/`.length);
                 if (req.method === 'GET') {
                     if (action === 'session') {
-                        json(200, { ...await service.status(actor), csrf: session.csrf, push: push ? { publicKey: push.keys.publicKey } : null });
+                        json(200, { ...await service.status(actor), capabilities:capabilities(actor), csrf: session.csrf, push: push ? { publicKey: push.keys.publicKey } : null });
                         return;
                     }
                     if (action === 'project') {
@@ -111,7 +146,7 @@ export async function startPlantServer(options: {
                         return;
                     }
                     if (action === 'revisions') {
-                        requireRole(actor, 'engineer');
+                        authorize(actor,'project.source.read');
                         json(200, (await repository.log()).map(({ files, ...meta }) => meta));
                         return;
                     }
@@ -123,6 +158,8 @@ export async function startPlantServer(options: {
                         json(200, service.reports());
                         return;
                     }
+                    if(action==='jobs'){json(200,service.jobs(actor));return;}
+                    if(action==='drivers'){authorize(actor,'project.source.read');json(200,{drivers:registry.list(),connections:[...gateway.connections.keys()]});return;}
                     if (action === 'history') {
                         json(200, service.history((url.searchParams.get('signals') ?? '').split(',').filter(Boolean), Number(url.searchParams.get('from')), Number(url.searchParams.get('to'))));
                         return;
@@ -196,6 +233,10 @@ export async function startPlantServer(options: {
                         json(202, service.dispatch(input.reportId, input.inputs ?? {}, actor));
                         return;
                     }
+                    if(action==='job'){
+                        if(input.kind!=='sql'&&input.kind!=='wasm')throw new AppError('Invalid worker job');
+                        json(202,service.submitJob(input.kind,input.payload??{},actor));return;
+                    }
                     if (action === 'subscribe') {
                         if (!push)
                             throw new AppError('Configure SCADA_PUSH_SUBJECT to enable Web Push', 503);
@@ -265,6 +306,7 @@ export async function startPlantServer(options: {
     } timer = setTimeout(step, Math.max(0, service.project.stepMs - (performance.now() - started))); };
     if (options.autoTick !== false)
         timer = setTimeout(step, service.project.stepMs);
+    const ioControl=setInterval(()=>void gateway.refresh().catch(console.error),20);
     const control = options.autoTick === false ? undefined : setInterval(() => { try {
         service.schedule();
         void service.refreshRelease().catch(console.error);
@@ -274,5 +316,5 @@ export async function startPlantServer(options: {
         console.error(error);
     } }, 1000);
     return { server, service, auth, push, origin, initialPassword: created ? password : null, async close() { stopping = true; clearTimeout(timer); clearInterval(control); for (const stream of streams)
-            stream.destroy(); await new Promise<void>(resolve => server.close(() => resolve())); await service.idle(); store.db.close(); } };
+            stream.destroy(); await new Promise<void>(resolve => server.close(() => resolve())); await service.idle(); clearInterval(ioControl); await gateway.close(); store.db.close(); } };
 }
