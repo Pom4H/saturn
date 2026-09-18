@@ -1,8 +1,10 @@
-# Node.js + browser SCADA
+# Saturn runtime, PWA and deployment
 
-This implementation is a runnable **simulation/engineering workbench**, not an operational nuclear control system. It adds an isomorphic installation runtime to the existing editor. The old editor, its source-preserving edits, and the PR #11 recorder remain available; the new workbench reuses the component registry, SVG host, and CodeMirror rather than replacing those with a second renderer.
+This document describes the **MVP runtime** of Saturn: the authenticated Node installation and the autonomous browser PWA. Both execute the same validated Project, deterministic kernel, alarm evaluator, historian/report contracts and PLC state model through environment-specific adapters.
 
-The same `Kernel`, `Service`, alarm evaluator, historian queries, report renderer, and project compiler run in Node.js and a browser Worker. Native SQLite and SQLite WASM are adapters. The browser repository emulates the application-level commit/publish/rollback contract, not the Git wire format.
+Saturn is an open-source engineering SCADA, not a safety-certified protection system. Demo models are examples of the runtime contract; they are not the product definition and are not validated models of a real plant.
+
+The Node runtime provides durable SQLite history, native Git-backed project revisions, authenticated HTML/API/SSE, persistent report jobs and optional Web Push. The PWA uses a browser Worker, SQLite WASM/OPFS and local revision storage for evaluation, authoring and offline demonstrations. Browser suspension stops local execution; use the Node runtime for persistent installations.
 
 ## Operator controls and equipment views
 
