@@ -632,7 +632,7 @@ function bindStudioCanvas(kind:'view'|'report',host:HTMLElement,preferredFile:st
 }
 function selectStudioNode(kind:'view'|'report',node:HTMLElement,preferredFile:string){
     const host=kind==='view'?$('live-view'):$('report-visual');host.querySelectorAll('[data-studio-selected]').forEach(n=>n.removeAttribute('data-studio-selected'));node.dataset.studioSelected='true';
-    const nodeKind=node.dataset.studioKind as any,index=Number(node.dataset.studioIndex),source=widgetSource(files,preferredFile,nodeKind,index);
+    const nodeKind=node.dataset.studioKind as any,index=Number(node.dataset.studioIndex),source=node.dataset.studioHint?textSource(files,node.dataset.studioHint):widgetSource(files,preferredFile,nodeKind,index);
     studioSelection[kind]={kind:nodeKind,index,source};
     if(source)studioEditor(kind,source.file,source);
     renderStudioProperties(kind,node,source);
