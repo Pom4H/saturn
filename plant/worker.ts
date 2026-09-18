@@ -12,7 +12,7 @@ async function run(){
   const token=process.env.SATURN_WORKER_TOKEN;
   if(!token||token.length<24)throw new Error('SATURN_WORKER_TOKEN must be at least 24 characters');
   const workerId=process.env.SATURN_WORKER_ID??`worker-${process.pid}`;
-  const kinds=(process.env.SATURN_WORKER_CAPABILITIES??'report').split(',').map(x=>x.trim()).filter((x):x is WorkerJobKind=>['report','sql','wasm'].includes(x));
+  const kinds=(process.env.SATURN_WORKER_CAPABILITIES??'report').split(',').map(x=>x.trim()).filter((x):x is WorkerJobKind=>['report','database','wasm'].includes(x));
   if(!kinds.length)throw new Error('No SATURN_WORKER_CAPABILITIES');
   const registry=new DriverRegistry();installBuiltInServerDrivers(registry);await loadDriverModules(registry,driverModulesFromEnv());
   const connections=await loadConnections(process.env.SATURN_CONNECTIONS_FILE);
@@ -22,11 +22,11 @@ async function run(){
   };
   const execute=async(job:WorkerJob)=>{
     if(job.kind==='report')return runReport((job.payload as any).task as ReportTask);
-    if(job.kind==='sql'){
+    if(job.kind==='database'){
       const p=job.payload as any,connection=connections.get(String(p.connection));
       if(!connection)throw new AppError(`Worker connection not configured: ${p.connection}`);
       const driver=registry.get(connection.driver,'database');
-      return {rows:await driver.query(connection,{sql:String(p.sql),params:p.params,maxRows:Number(p.maxRows),timeoutMs:Number(p.timeoutMs)})};
+      return {rows:await driver.query(connection,{language:String(p.language),query:String(p.query),params:p.params,maxRows:Number(p.maxRows),timeoutMs:Number(p.timeoutMs),readOnly:true})};
     }
     if(job.kind==='wasm')return {value:await runWasmSandbox(job.payload as any)};
     throw new AppError('Unsupported worker job');
