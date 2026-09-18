@@ -1,3 +1,4 @@
+import { views } from './views';
 import { benchSystem, benchNodes, benchControllers, benchControls, benchModules, benchWires, benchAlarm } from './commissioning';
 import { plantWires, userWires } from './wiring';
 import { project, system, alarm, signal } from '@scada/plant';
@@ -9,10 +10,10 @@ import { auxiliarySystem, waterSystem, airSystem, auxiliary, controls, auxiliary
 import { servicesSystem, powerSystem, waterTreatment, services } from './services';
 import { trainingSystem, trainingNodes, trainingControls, trainingAlarms, trainingReport } from './training';
 import { reports } from './reports';
-// Educational topology inspired by Chernobyl Unit 4. Normalized coefficients are NOT reactor settings.
+// Abstract teaching installation. Normalized coefficients are not operating settings.
 // No scheduled explosion, accident label or timestamp is visible to equipment models.
-export default project('chernobyl-study', {
-    title: 'ЧАЭС · энергоблок 4',
+export default project('abstract-station', {
+    title: 'Станция · энергоблок A',
     overview: [
         { signal: 'CORE.power', label: 'Тепловыделение', unit: 'отн.' },
         { signal: 'core.temperature', label: 'Температура каналов', unit: 'отн.' },
@@ -21,10 +22,11 @@ export default project('chernobyl-study', {
         { signal: 'BUILDING.damage', label: 'Повреждение здания', unit: 'доля', alarmAbove: 0.05 },
     ],
     description: 'Учебная модель связанных процессов. Нормированные величины; не реконструкция аварии и не расчёт ядерной безопасности.',
+    views,
     controllers: benchControllers,
     connections: [...benchWires, ...plantWires, ...userWires],
     attachments: benchModules,
-    systems: [benchSystem,system('site', 'Чернобыльская АЭС'), system('unit4', 'Энергоблок 4', 'site'),
+    systems: [benchSystem,system('site', 'Абстрактная станция'), system('unit4', 'Энергоблок A', 'site'),
         coreSystem, groupA, groupB, coolingSystem, electricalSystem, steamSystem, safetySystem, buildingSystem, auxiliarySystem, waterSystem, airSystem, servicesSystem, powerSystem, waterTreatment, trainingSystem],
     simulations: [grid, pumpA, pumpB, reactor, ...channels, separatorA, separatorB, turbine, condenser, sensor, protection, building, ...auxiliary, ...services, ...trainingNodes, ...benchNodes],
     controls: [...controls, ...trainingControls, ...benchControls],

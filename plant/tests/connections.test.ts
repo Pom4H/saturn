@@ -91,3 +91,15 @@ test('a second virtual expansion is reachable by a two-conductor daisy chain, an
  p.connections!.find(w=>w.id==='level-input')!.to={device:'EXP-SECOND',port:'AI1'};validateProject(p);const a=new Kernel(p,'v','r',0);for(let i=0;i<30;i++)a.step();assert.equal(a.frame().samples['EXP-SECOND.channel1'].value,300);
  p.connections=p.connections!.filter(w=>w.id!=='module-b');validateProject(p);const b=new Kernel(p,'v','r',0);for(let i=0;i<30;i++)b.step();assert.equal(b.frame().samples['EXP-SECOND.channel1'].quality,'bad');
 });
+
+
+test('HMI observation is pure: repeated frames and a paused step do not scan PLCs',()=>{
+ const p=project(),k=new Kernel(p,'v','r',0);for(let i=0;i<15;i++)k.step();
+ const before=structuredClone(k.state),frame=k.frame();
+ for(let i=0;i<30;i++)assert.deepEqual(k.frame(),frame);
+ assert.deepEqual(k.state,before);
+ k.state.paused=true;const paused=structuredClone(k.state);k.step();assert.deepEqual(k.state,paused);
+ const restored=new Kernel(p,'v','r',0,k.state);assert.deepEqual(restored.frame(),k.frame());
+ // A view consumer cannot mutate the retained command buffer.
+ k.frame().displays!['SATURN-1'].splice(0);assert.deepEqual(k.state,paused);
+});

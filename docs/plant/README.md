@@ -107,3 +107,7 @@ slots and an actual Saturn `.fbdbin` → WASM → HMI path. Read
 and [third-party provenance](../../plant/vendor/saturn/PROVENANCE.md) before using
 artifacts. A compiled program is not a complete board firmware image, and
 `hardwareVerified` is deliberately false.
+
+## Shared controller and presentation update
+
+See [shared presentation DSL](presentation.md) and [Firmverse integration](toolchain-integration.md) for the current compiler, state ABI and HMI/report boundaries.

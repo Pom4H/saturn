@@ -176,6 +176,30 @@ try {
         assert.equal(Number(await bench.locator('#inspector [data-signal="SATURN-1.DO1"] b').innerText()),1);assert.match(await bench.locator('#plc-front .runtime-hmi').textContent(),/800/);
         await bench.locator('#view-3d').click();await bench.locator('#scene3d canvas').waitFor({state:'visible'});await bench.waitForTimeout(500);await bench.screenshot({path:evidence+'/commissioning-offline-3d.png',fullPage:true});
     });
+    await check('shared DSL panel renders identical frozen PLC values in live view and report while paused offline',async()=>{
+        await bench.locator('[data-tab="views"]').click();await bench.locator('#view-select').selectOption('bench-hmi');
+        await bench.waitForFunction(()=>document.querySelector('#live-view [data-view-value="input"]').textContent==='800');
+        const clock=await bench.locator('#clock').innerText();
+        await bench.screenshot({path:evidence+'/shared-live-panel.png',fullPage:true});
+        await bench.locator('[data-tab="reports"]').click();await bench.locator('[data-run="bench-state"]').click();
+        const row=bench.locator('#report-runs tr').filter({hasText:'bench-state'}).filter({has:bench.locator('.success')}).first();
+        await row.waitFor();await row.locator('[data-artifact]').click();
+        const report=bench.frameLocator('#report-preview');await report.locator('[data-view="bench-hmi"]').waitFor();
+        assert.equal(await report.locator('[data-view-value="input"]').innerText(),'800');
+        assert.equal(await report.locator('[data-view-value="output"]').innerText(),'1');
+        assert.equal(await bench.locator('#clock').innerText(),clock);
+        await bench.screenshot({path:evidence+'/shared-report-panel.png',fullPage:true});
+    });
+    await check('DSL operator actions use audited commands and telemetry preserves keyboard focus',async()=>{
+        await bench.locator('[data-tab="views"]').click();await bench.locator('#view-select').selectOption('bench-operator');
+        const button=bench.locator('#live-view [data-view-set="7"]');await button.click();
+        await button.focus();await bench.evaluate(()=>{window.focusedOperatorButton=document.activeElement;});
+        await bench.waitForTimeout(500);
+        assert.equal(await bench.evaluate(()=>window.focusedOperatorButton===document.activeElement),true);
+        await bench.locator('[data-tab="controls"]').click();
+        await bench.waitForFunction(()=>Number(document.querySelector('[data-control="BENCH-LEVEL"] [data-demand]').textContent)===7);
+        await bench.locator('[data-tab="events"]').click();await bench.waitForFunction(()=>document.querySelector('#event-list').textContent.includes('command.control'));
+    });
     await wiringContext.close();
     assert.deepEqual(errors, []);
     await writeFile(evidence + '/browser-summary.json', JSON.stringify({ checks, errors, browser: browser.version() }, null, 2));

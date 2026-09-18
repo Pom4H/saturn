@@ -1,3 +1,4 @@
+import { validatePresentation, presentationActions } from './presentation';
 import { compileController, inputPins } from './controller';
 import { validateConnections, terminals, connectionExpression } from './ports';
 import ts from '@typescript/typescript6';
@@ -368,7 +369,19 @@ export function validateProject(value: unknown): asserts value is Project {
         if (m.alarmAbove !== undefined)
             finite(m.alarmAbove, 'metric threshold');
     }
+    if(p.views&&(!Array.isArray(p.views)||p.views.length>32))throw new AppError('Presentation count budget');
+    const viewIds=new Set<string>();
+    for(const view of p.views??[]){
+        validatePresentation(view);if(viewIds.has(view.id))throw new AppError('Duplicate presentation');viewIds.add(view.id);
+        for(const expr of Object.values(view.bindings))checkExpr(expr);
+        for(const action of presentationActions(view.body)){
+            const control=p.controls?.find(c=>c.id===action.target);
+            if(!control||action.value<control.min||action.value>control.max)throw new AppError('Presentation command outside declared controls');
+        }
+    }
     for (const r of p.reports) {
+        if(r.view){validatePresentation(r.view,'report');for(const expr of Object.values(r.view.bindings)){checkExpr(expr);for(const ref of refs(expr))if(!r.signals.includes(ref))throw new AppError('Report view reads undeclared signal '+ref);}}
+
         if (!r.on || !Array.isArray(r.signals) || !r.signals.length || r.signals.some(s => !signals.has(s)))
             throw new AppError(`Report ${r.id}: invalid signals`);
         if (typeof r.sql !== 'string' || r.sql.length > 20000 || !r.columns?.length)

@@ -1,3 +1,5 @@
+import { bindPresentation, renderPresentation, presentationCss, type Presentation, type ViewNode } from './presentation';
+import type { Sample } from './types';
 import { AppError, type ReportTask, type ReportArtifact, type SqlDatabase } from './types';
 const limits = [[0, 59], [0, 23], [1, 31], [1, 12], [0, 7]];
 function fields(cron: string): Set<number>[] {
@@ -32,25 +34,8 @@ export function cronMatches(cron: string, time: number): boolean { let f = cronC
     cronCache.set(cron, f);
 } const d = new Date(time), values = [d.getUTCMinutes(), d.getUTCHours(), d.getUTCDate(), d.getUTCMonth() + 1, d.getUTCDay()]; if (!f[0].has(values[0]) || !f[1].has(values[1]) || !f[3].has(values[3]))
     return false; const parts = cron.trim().split(/\s+/), dom = f[2].has(values[2]), dow = f[4].has(values[4]); return parts[2].startsWith('*') || parts[4].startsWith('*') ? dom && dow : dom || dow; }
-export const escape = (v: unknown): string => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-export function chartSVG(rows: Record<string, unknown>[], x: string, y: string): string {
-    const points = rows.map((r, i) => ({ x: Number(r[x] ?? i), y: r[y] === null ? null : Number(r[y]) })).filter(p => Number.isFinite(p.x));
-    const good = points.filter(p => p.y !== null && Number.isFinite(p.y));
-    if (!good.length)
-        return '<p>Нет достоверных данных для графика.</p>';
-    const x0 = Math.min(...good.map(p => p.x)), x1 = Math.max(...good.map(p => p.x)), y0 = Math.min(0, ...good.map(p => p.y!)), y1 = Math.max(...good.map(p => p.y!));
-    let path = '', pen = false;
-    for (const p of points) {
-        if (p.y === null || !Number.isFinite(p.y)) {
-            pen = false;
-            continue;
-        }
-        const px = 50 + (p.x - x0) / Math.max(1, x1 - x0) * 680, py = 190 - (p.y - y0) / Math.max(.001, y1 - y0) * 160;
-        path += `${pen ? 'L' : 'M'}${px.toFixed(2)},${py.toFixed(2)} `;
-        pen = true;
-    }
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 220" role="img" aria-label="${escape(y)}"><path d="M50 20V190H740" fill="none" stroke="#8795a2"/><path d="${path}" fill="none" stroke="#087f8c" stroke-width="2"/><text x="3" y="28" font-size="12">${y1.toFixed(2)}</text><text x="3" y="192" font-size="12">${y0.toFixed(2)}</text></svg>`;
-}
+export { escape, chartSVG } from './graphics';
+import { escape, chartSVG } from './graphics';
 /** Runs ONLY against a fresh in-memory data capsule, never the operational database. */
 export function executeReport(task: ReportTask, db: SqlDatabase): ReportArtifact {
     try {
@@ -72,9 +57,15 @@ export function executeReport(task: ReportTask, db: SqlDatabase): ReportArtifact
         if (rows.length > 2000 || JSON.stringify(rows).length > 1000000)
             throw new AppError('Report result exceeds budget');
         const report = task.report;
-        const table = `<table><thead><tr>${report.columns.map(c => `<th>${escape(c.title)}${c.unit ? ` (${escape(c.unit)})` : ''}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr>${report.columns.map(c => `<td>${escape(typeof row[c.key] === 'number' ? Number(row[c.key]).toFixed(3) : row[c.key])}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
-        const chart = report.chart ? `<h2>${escape(report.chart.title)}</h2>${chartSVG(rows, report.chart.x, report.chart.y)}` : '';
-        const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; form-action 'none'; base-uri 'none'"><title>${escape(report.title)}</title><style>body{font:15px system-ui;color:#203040;max-width:1000px;margin:40px auto;padding:24px}h1{font-size:28px}table{width:100%;border-collapse:collapse}td,th{padding:12px;text-align:left;border-bottom:1px solid #d7dfe7}svg{width:100%;max-height:300px}small{color:#586675}@media print{body{margin:0}tr{break-inside:avoid}}</style></head><body><small>SCADA / СИМУЛЯЦИЯ / ${escape(task.id)}</small><h1>${escape(report.title)}</h1><p>${escape(new Date(task.from).toISOString())} — ${escape(new Date(task.to).toISOString())}</p>${table}${chart}<p><small>Ревизия ${escape(task.revision)} · Прогон ${escape(task.runId)} · ${escape(task.trigger)} · ${escape(task.actor)}. Интервалы неизвестного качества не равны нулю. Время данных — модельное.</small></p></body></html>`;
+        const defaultNodes:ViewNode[]=[{kind:'table',columns:report.columns}];
+        if(report.chart)defaultNodes.push({kind:'chart',...report.chart});
+        const view:Presentation=report.view??{id:report.id,title:report.title,bindings:{},body:{kind:'group',direction:'column',children:defaultNodes}};
+        const observations:Record<string,Sample>=Object.create(null);
+        for(const sample of task.data.samples){
+            if(report.signals.includes(sample.signal)&&sample.time<=task.to&&(!observations[sample.signal]||observations[sample.signal].time<=sample.time))observations[sample.signal]={value:sample.value,time:sample.time,quality:sample.quality==='good'?'good':'bad'};
+        }
+        const content=renderPresentation(view,{values:bindPresentation(view,observations,task.to),rows,interactive:false});
+        const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; form-action 'none'; base-uri 'none'"><title>${escape(report.title)}</title><style>body{font:15px system-ui;color:#203040;max-width:1000px;margin:40px auto;padding:24px}h1{font-size:28px}table{width:100%;border-collapse:collapse}td,th{padding:12px;text-align:left;border-bottom:1px solid #d7dfe7}svg{width:100%;max-height:300px}small{color:#586675}@media print{body{margin:0}tr{break-inside:avoid}}${presentationCss}</style></head><body><small>SCADA / СИМУЛЯЦИЯ / ${escape(task.id)}</small><h1>${escape(report.title)}</h1><p>${escape(new Date(task.from).toISOString())} — ${escape(new Date(task.to).toISOString())}</p>${content}<p><small>Ревизия ${escape(task.revision)} · Прогон ${escape(task.runId)} · ${escape(task.trigger)} · ${escape(task.actor)}. Интервалы неизвестного качества не равны нулю. Время данных — модельное.</small></p></body></html>`;
         return { html, rows };
     }
     finally {

@@ -1,3 +1,4 @@
+import './presentation.test';
 import './connections.test';
 import './stability.test';
 import './group-layout.test';
@@ -25,7 +26,7 @@ import type { Actor, AlarmState, ReportTask, Project, Frame } from '../types';
 const engineer: Actor = { id: 'engineer', role: 'engineer' }, viewer: Actor = { id: 'reader', role: 'viewer' };
 const project = () => compileProject(demoFiles);
 const makeService = async (files = demoFiles) => { const store = new Store(new NodeSql()); let serial = 0; const repo = new LocalRepository(store, () => `local:${++serial}`); const service = new Service(store, repo, { now: () => 1000000, uuid: () => `id-${++serial}`, reportRunner: async (task) => executeReport(task, new NodeSql()) }); await service.start(files); return service; };
-test('multi-file DSL compiles hierarchy and typed signal sources', () => { const p = project(); assert.equal(p.simulations.length, 46); assert.equal(p.systems.length, 18); assert.equal(p.reports.length, 3); assert.deepEqual(p.simulations.find(n => n.id === 'PUMP-A')!.inputs.voltage, { ref: 'GRID.voltage' }); });
+test('multi-file DSL compiles hierarchy and typed signal sources', () => { const p = project(); assert.equal(p.simulations.length, 46); assert.equal(p.systems.length, 18); assert.equal(p.reports.length, 4); assert.deepEqual(p.simulations.find(n => n.id === 'PUMP-A')!.inputs.voltage, { ref: 'GRID.voltage' }); });
 for (const [name, source] of Object.entries({ execute: 'globalThis.process.exit()', getter: 'const a={get b(){return 1;}};', prototype: 'const a={constructor: 1};', import: 'import { x } from "../../outside";', loop: 'while(true){}', function: 'const x=()=>1;' }))
     test(`DSL rejects ${name}`, () => assert.throws(() => compileProject({ ...demoFiles, 'plant.ts': source })));
 test('DSL rejects unknown signals and algebraic cycles', () => { assert.throws(() => compileProject({ ...demoFiles, 'core.ts': demoFiles['core.ts'].replace('"core.void"', '"missing.signal"') }), /Unknown signal/); assert.throws(() => compileProject({ ...demoFiles, 'core.ts': demoFiles['core.ts'].replace(/derived\("core.temperature",[^;]+;/, 'derived("core.temperature", signal("core.temperature"));') }), /cycle/); });

@@ -1,3 +1,4 @@
+import { benchView } from './views';
 import { report } from '@scada/plant';
 /** UTC cron and typed manual inputs. SQL sees only the declared signal data capsule. */
 export const thermalReport = report('thermal-balance', {
@@ -31,4 +32,11 @@ export const transientReport = report('transient', {
     columns: [{ key: 'time', title: 'Модельное время, UTC ms' }, { key: 'temperature', title: 'Температура', unit: 'отн.' }],
     chart: { x: 'time', y: 'temperature', title: 'Температура и разрывы качества' },
 });
-export const reports = [thermalReport, transientReport];
+export const benchReport = report('bench-state', {
+    title: 'Снимок PLC · общая панель HMI', on: {workflow_dispatch:{}},
+    signals: ['SATURN-1.AI1','SATURN-1.DO1'], window:60000,
+    sql: 'SELECT signal,time,value,quality FROM samples ORDER BY time',
+    columns: [{key:'signal',title:'Сигнал'},{key:'value',title:'Значение'}],
+    view: benchView,
+});
+export const reports = [thermalReport, transientReport, benchReport];

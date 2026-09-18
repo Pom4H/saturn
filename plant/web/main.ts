@@ -1,3 +1,4 @@
+import { bindPresentation, renderPresentation, presentationCss, presentationActions } from '../presentation';
 import { terminals, resolvePort, type Endpoint, type Connection as PhysicalConnection } from '../ports';
 import { appendConnection, addExpansionSource, removeConnection } from '../connection-edit';
 import { renderSaturnPlcSvg } from '../saturn-view';
@@ -59,6 +60,7 @@ function setupProject() {
     renderMetrics();
     renderControls();
     renderInventory();
+    setupViews();
 }
 function renderScene() {
     if (!scene)
@@ -138,6 +140,7 @@ function renderFrame(next: Frame) {
     scene?.setRuntime(observation);
     if (scene3d) { scene3d.paused = frame.paused; scene3d.setRuntime(observation); }
     refreshControls();
+    if(tab==='views')refreshView();
     const plcScreen=document.querySelector<SVGSVGElement>('#plc-front .runtime-hmi');if(plcScreen&&selected)drawHmiSvg(plcScreen,selected);
     if (scene)
         scene.paused = frame.paused;
@@ -224,6 +227,7 @@ async function updateTrend() { if (tab !== 'scheme' || !selected || failed)
 catch { /* Keep live values; history errors are shown in explicit report/history requests. */ } }
 function renderAlarms() { const list = frame.alarms.filter(a => a.raisedAt !== null).sort((a, b) => Number(b.active) - Number(a.active)); $('alarm-list').innerHTML = list.length ? list.map(a => { const rule = status.project.alarms.find(r => r.id === a.id); return `<div class="card ${a.active ? 'active' : ''}"><div class="card-header"><div><h3>${escape(rule?.title ?? a.id)}</h3><span class="badge ${a.active ? 'active' : ''}">${a.active ? 'Причина активна' : 'Причина исчезла'}</span> <span class="badge">${a.acknowledged ? 'Квитировано' : 'Не квитировано'}</span></div><button data-ack="${escape(a.id)}" ${a.acknowledged ? 'disabled' : ''}>Квитировать</button></div><p>Возникло: ${time(a.raisedAt)} · качество: ${escape(a.quality)}</p><p>Квитирование: ${escape(a.actor ?? '—')} · ${time(a.acknowledgedAt)} · Возврат: ${time(a.clearedAt)}</p></div>`; }).join('') : '<div class="empty">Активных и неквитированных алармов нет.</div>'; }
 async function refreshPanel() {
+    if(tab==='views')refreshView();
     if (tab === 'alarms')
         renderAlarms();
     if (tab === 'inventory') renderInventory();
@@ -407,6 +411,12 @@ document.addEventListener('click', e => {
     if (!button)
         return;
     const d = button.dataset;
+    if(d.viewCommand)void guard(async()=>{
+        const v=status.project.views?.find(v=>v.id===$<HTMLSelectElement>('view-select').value);
+        const action=v&&presentationActions(v.body).find(a=>a.target===d.viewCommand&&a.value===Number(d.viewSet));
+        if(!action)throw new Error('Unknown presentation action');
+        await command('operate',{target:action.target,value:action.value});
+    });
     if (d.operate) void guard(async () => { const input = document.querySelector<HTMLInputElement>(`[data-control-input="${CSS.escape(d.operate!)}"]`)!; await command('operate', { target: d.operate, value: Number(input.value) }); toast('Уставка принята. Фактический сигнал изменяется с заданной скоростью.'); });
     if (d.focusSystem) { document.querySelector<HTMLButtonElement>('[data-tab=scheme]')!.click(); focusSystem(d.focusSystem); }
     if (d.inspect) { const node = status.project.devices.find(n => n.id === d.inspect); if (node) { document.querySelector<HTMLButtonElement>('[data-tab=scheme]')!.click(); selectEquipment(node.id); focusSystem(node.system); } }
@@ -521,3 +531,25 @@ window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); }
 window.addEventListener('pagehide', () => { closed = true; scene3d?.dispose(); client?.close(); });
 
 void start();
+
+function setupViews(){
+    const style=$('presentation-style');style.textContent=presentationCss;
+    const select=$<HTMLSelectElement>('view-select'),previous=select.value;
+    select.replaceChildren(...(status.project.views??[]).map(v=>{const o=document.createElement('option');o.value=v.id;o.textContent=v.title;return o;}));
+    if([...select.options].some(o=>o.value===previous))select.value=previous;
+    select.onchange=()=>refreshView(true);refreshView(true);
+}
+function refreshView(rebuild=false){
+    const view=status.project.views?.find(v=>v.id===$<HTMLSelectElement>('view-select').value),host=$('live-view');
+    if(!view){host.textContent='Объявите view() в DSL проекта. Тот же panel() можно использовать в HMI и отчёте.';return;}
+    const values=bindPresentation(view,frame.samples,frame.time),interactive=!failed&&status.actor.role!=='viewer';
+    // Telemetry updates readouts in place: keyboard focus and operator buttons survive a scan.
+    if(rebuild||host.dataset.definition!==JSON.stringify(view)){host.innerHTML=renderPresentation(view,{values,interactive});host.dataset.definition=JSON.stringify(view);}
+    for(const node of host.querySelectorAll<HTMLElement>('[data-view-value]')){
+        const sample=values[node.dataset.viewValue!],valid=sample?.quality==='good'&&sample.value!==null;
+        node.textContent=valid?sample.value!.toFixed(Number(node.dataset.digits??2)):'—';
+        node.parentElement!.dataset.quality=valid?'good':'bad';
+        node.parentElement!.querySelector('small')!.textContent=(node.dataset.unit??'')+(valid?'':' · нет достоверных данных');
+    }
+    for(const button of host.querySelectorAll<HTMLButtonElement>('[data-view-command]'))button.disabled=!interactive;
+}

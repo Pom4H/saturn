@@ -1,4 +1,5 @@
-import type { Controller } from './controller';
+import type { Presentation, ViewNode } from './presentation';
+import type { Controller, PlcBlock } from './controller';
 import type { Endpoint, Connection, Attachment } from './ports';
 import { AppError, id, type Expr, type System, type Simulation, type Project, type Derived, type Device, type AlarmRule, type Report, type Layout, type HistoryPolicy, type Control } from './types';
 import { model, type builtInModels } from './models';
@@ -104,7 +105,7 @@ export function aggregate<T extends {
 
 /** Installed PLC profile. Program refs are terminal names, not arbitrary signal expressions. */
 export function plc<const O extends Record<string,Expr>>(name:string, options:Omit<Controller,'id'|'layout'|'profile'|'outputs'> & {at:Layout;outputs:O}) {
- const controller:Controller={id:id(name),profile:'saturn-fbd',system:options.system,layout:options.at,outputs:options.outputs,hmi:options.hmi};
+ const controller:Controller={id:id(name),profile:'saturn-fbd',system:options.system,layout:options.at,outputs:options.outputs,blocks:options.blocks,hmi:options.hmi};
  return Object.assign({controller},Object.fromEntries(Object.keys(options.outputs).map(k=>[k,signal(`${name}.${k}`)]))) as {controller:Controller}&{readonly[K in keyof O]:Expr};
 }
 export const pin=(name:string):Expr=>({ref:id(name)});
@@ -112,3 +113,16 @@ export const port=(device:string|{node:Simulation}|{controller:Controller}|Devic
 export const pipe=(name:string,from:Endpoint,to:Endpoint,options:Pick<Connection,'via'>={}):Connection=>({id:id(name),from,to,medium:'pipe',...options});
 export const cable=(name:string,from:Endpoint,to:Endpoint,options:Omit<Connection,'id'|'from'|'to'>):Connection=>({id:id(name),from,to,...options});
 export const expansion=(device:{node:Simulation},controller:{controller:Controller},slot:number):Attachment=>({device:device.node.id,controller:controller.controller.id,slot,profile:'virtual-io4'});
+
+/** Controller-local stable block identity; separate from a physical terminal. */
+export const block=(name:string):Expr=>({ref:id(name)});
+export const functionBlock=(type:PlcBlock['type'],inputs:Expr[],params:number[]=[]):PlcBlock=>({type,inputs,params});
+
+/** Shared report/live-HMI blueprint; binding environments are explicit at each use. */
+export const view=(name:string,options:Omit<Presentation,'id'>):Presentation=>({id:id(name),...options});
+export const panel=(children:ViewNode[],direction:'row'|'column'='column',title?:string):ViewNode=>({kind:'group',children,direction,...(title?{title}:{})});
+export const label=(text:string):ViewNode=>({kind:'text',text});
+export const readout=(label:string,binding:string,unit='',digits=2):ViewNode=>({kind:'value',label,binding,unit,digits});
+export const dataTable=(columns:Extract<ViewNode,{kind:'table'}>['columns']):ViewNode=>({kind:'table',columns});
+export const trend=(title:string,x:string,y:string):ViewNode=>({kind:'chart',title,x,y});
+export const commandButton=(label:string,target:string,value:number):ViewNode=>({kind:'action',label,target,value});

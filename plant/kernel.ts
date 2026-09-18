@@ -2,51 +2,8 @@ import { ControllerVM, inputPins, CONTROLLER_ABI } from './controller';
 import { connectionExpression, terminals, busConnected } from './ports';
 import { model } from './models';
 import { AppError, clone, finite, type Checkpoint, type Expr, type Frame, type Project, type Sample } from './types';
-export function evaluate(expr: Expr, read: (id: string) => Sample, time: number): Sample {
-    if (typeof expr === 'number' || typeof expr === 'boolean')
-        return { value: Number(expr), quality: 'good', time };
-    if ('ref' in expr)
-        return read(expr.ref);
-    const samples = expr.args.map(a => evaluate(a, read, time));
-    const bad = samples.find(s => s.quality !== 'good' || s.value === null);
-    if (bad)
-        return { value: null, quality: bad.quality === 'good' ? 'bad' : bad.quality, time };
-    const a = samples.map(s => s.value!);
-    let value: number;
-    switch (expr.op) {
-        case 'add':
-            value = a.reduce((x, y) => x + y, 0);
-            break;
-        case 'mul':
-            value = a.reduce((x, y) => x * y, 1);
-            break;
-        case 'sub':
-            value = a[0] - a[1];
-            break;
-        case 'div':
-            value = a[0] / a[1];
-            break;
-        case 'max':
-            value = Math.max(...a);
-            break;
-        case 'min':
-            value = Math.min(...a);
-            break;
-        case 'gt':
-            value = Number(a[0] > a[1]);
-            break;
-        case 'lt':
-            value = Number(a[0] < a[1]);
-            break;
-        case 'and':
-            value = Number(a.every(Boolean));
-            break;
-        case 'not':
-            value = Number(!a[0]);
-            break;
-    }
-    return { value: Number.isFinite(value) ? value : null, quality: Number.isFinite(value) ? 'good' : 'bad', time };
-}
+export { evaluate } from './expressions';
+import { evaluate } from './expressions';
 /** Ordered fixed-step, double-buffered state: equipment order cannot change a result. */
 export class Kernel {
     state: Checkpoint;
@@ -59,7 +16,8 @@ export class Kernel {
         this.state.plc ??= {};
         for(const c of project.controllers??[]) {
             const vm=new ControllerVM(c); this.controllers.set(c.id,vm);
-            this.state.plc[c.id] ??= {inputs:{},outputs:Object.fromEntries(Object.keys(c.outputs).map(k=>[k,0])),healthy:false,powered:false};
+            const saved=this.state.plc[c.id];if(saved?.snapshot)vm.restore(saved.snapshot);else if(checkpoint)throw new AppError('Missing controller runtime snapshot');
+            this.state.plc[c.id] ??= {inputs:{},outputs:Object.fromEntries(Object.keys(c.outputs).map(k=>[k,0])),healthy:false,powered:false,snapshot:vm.snapshot()};
         }
         this.state.controls ??= {};
         for (const c of project.controls ?? []) {
@@ -182,8 +140,9 @@ export class Kernel {
                 const powered=plus!==null&&minus!==null&&plus-minus>=12&&plus-minus<=24;
                 let healthy=powered&&common!==null&&minus!==null&&Math.abs(common-minus)<.001;
                 for(const name of vm.artifact.inputs){const v=read(name);if(v===null||!Number.isFinite(v)||v< -2147483648||v>2147483647)healthy=false;else inputs[name]=Math.round(v);}
-                const outputs=healthy?vm.scan(inputs,this.project.stepMs).outputs:Object.fromEntries(Object.keys(c.outputs).map(k=>[k,0]));
-                this.state.plc![c.id]={inputs,outputs,healthy,powered};
+                if(!powered&&this.state.plc![c.id].powered)vm.reset();
+                const scan=healthy?vm.scan(inputs,this.project.stepMs):{outputs:Object.fromEntries(Object.keys(c.outputs).map(k=>[k,0])),hmi:[]};
+                this.state.plc![c.id]={inputs,outputs:scan.outputs,display:scan.hmi,healthy,powered,snapshot:vm.snapshot()};
             }
             this.bad = bad;
             this.state.invalidModels = [...bad];
@@ -194,7 +153,9 @@ export class Kernel {
         return this.frame();
     }
     frame(): Frame { const displays:NonNullable<Frame['displays']>={};
-        for(const [id,vm] of this.controllers){const saved=this.state.plc![id];displays[id]=saved.healthy?vm.scan(saved.inputs,this.project.stepMs).hmi:[];}
+        // Observation must never advance the PLC. Every consumer sees the image
+        // produced by the last scan, including while paused or after restoration.
+        for(const id of this.controllers.keys()){const saved=this.state.plc![id];displays[id]=saved.healthy?clone(saved.display??[]):[];}
         return { displays, runId: this.state.runId, revision: this.state.revision, seq: this.state.seq, time: this.state.time, paused: this.state.paused, synthetic: true, samples: this.samples(), alarms: [] }; }
     operate(target: string, value: number): void {
         const c = this.project.controls?.find(c => c.id === target);

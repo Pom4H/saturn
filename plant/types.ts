@@ -1,3 +1,4 @@
+import type { Presentation } from './presentation';
 import type { Controller, ControllerState } from './controller';
 import type { Connection, Attachment } from './ports';
 import type { HmiDrawCommand } from './vendor/saturn/src/runtime';
@@ -80,6 +81,7 @@ export interface ReportInput {
     max: number;
 }
 export interface Report {
+    view?: Presentation;
     id: string;
     title: string;
     on: {
@@ -122,6 +124,7 @@ export interface Control {
 }
 export interface ControlState { requested: number; value: number; blocked: boolean }
 export interface Project {
+    views?: Presentation[];
     controllers?: Controller[];
     connections?: Connection[];
     attachments?: Attachment[];
