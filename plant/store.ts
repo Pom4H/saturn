@@ -31,7 +31,7 @@ export class Store {
     workerJobs(limit=100):WorkerJob[] {
         return this.db.all<any>('SELECT id,kind,actor,created_at AS createdAt,status,payload,result,error FROM worker_jobs ORDER BY created_at DESC LIMIT ?',[Math.min(limit,100)]).map(row=>({...row,payload:JSON.parse(row.payload),...(row.result?{result:JSON.parse(row.result)}:{})}));
     }
-    claimWorker(kinds:readonly WorkerJobKind[],workerId:string,now=Date.now(),leaseMs=30000):WorkerJob|null {
+    claimWorker(kinds:readonly WorkerJobKind[],workerId:string,now=Date.now(),leaseMs=60000):WorkerJob|null {
         if(!kinds.length)return null;
         return this.db.transaction(()=>{
             this.db.exec("UPDATE worker_jobs SET status='queued',worker_id=NULL,lease_until=NULL WHERE status='running' AND lease_until<?",[now]);
@@ -90,7 +90,7 @@ export class Store {
         for (const [key, value] of updates)
             this.last.set(key, value);
     }
-    policies(project: Project): Map<string, HistoryPolicy> { return new Map([...project.signals.filter(s => s.history).map(s => [s.id, s.history!] as const), ...project.simulations.flatMap(n => Object.entries(n.history ?? {}).map(([key, value]) => [`${n.id}.${key}`, value] as const))]); }
+    policies(project: Project): Map<string, HistoryPolicy> { return new Map([...(project.sources??[]).filter(s=>s.history).map(s=>[s.id,s.history!] as const), ...project.signals.filter(s => s.history).map(s => [s.id, s.history!] as const), ...project.simulations.flatMap(n => Object.entries(n.history ?? {}).map(([key, value]) => [`${n.id}.${key}`, value] as const))]); }
     pruneProject(project: Project, frame: Frame) { const policies = this.policies(project); this.db.transaction(() => { for (const name of Object.keys(frame.samples)) {
         const before = frame.time - (policies.get(name) ?? project.history).retention;
         this.db.exec('DELETE FROM samples WHERE run_id=? AND signal=? AND time<? AND time < COALESCE((SELECT MAX(time) FROM samples WHERE run_id=? AND signal=? AND time<?),-1)', [frame.runId, name, before, frame.runId, name, before]);
