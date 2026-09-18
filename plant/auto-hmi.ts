@@ -3,6 +3,7 @@ import { panel, label, readout, commandButton, navigate, animate, view, screen }
 import type { Presentation } from './presentation';
 
 const safe=(value:string)=>value.replace(/[^A-Za-z0-9_.-]/g,'_').slice(0,90);
+const source=<T extends object>(node:T,query:string)=>Object.assign(node,{sourceHint:query});
 const signalEntries=(p:Project,device:string):[string,Expr][]=>{
     const d=p.devices.find(x=>x.id===device);if(d&&Object.keys(d.signals).length)return Object.entries(d.signals);
     const sim=p.simulations.find(x=>x.id===device);
@@ -36,14 +37,14 @@ export function deriveHmi(p:Project,options:AutoHmiOptions={}):Presentation {
             const entries=signalEntries(p,device.id).slice(0,options.maxSignalsPerDevice??4);
             const values=entries.map(([name,expr],i)=>{
                 const binding=safe(device.id+'_'+name);bindings[binding]=expr;
-                const widget=readout(name,binding,'',2);
-                return i===0?animate(widget,binding,'opacity',{min:0,max:1,from:.55,to:1}):widget;
+                const widget=source(readout(name,binding,'',2),`'${device.id}'`);
+                return i===0?source(animate(widget,binding,'opacity',{min:0,max:1,from:.55,to:1}),`'${device.id}'`):widget;
             });
-            return panel(values.length?values:[label(device.type)],'column',device.id);
+            return source(panel(values.length?values:[label(device.type)],'column',device.id),`'${device.id}'`);
         });
         const commands=controls.slice(0,12).flatMap(c=>[
-            commandButton(c.title+' · min',c.id,c.min),
-            commandButton(c.title+' · max',c.id,c.max),
+            source(commandButton(c.title+' · min',c.id,c.min),`'${c.id}'`),
+            source(commandButton(c.title+' · max',c.id,c.max),`'${c.id}'`),
         ]);
         return screen(sys.id,sys.title,panel([
             label(sys.title),
