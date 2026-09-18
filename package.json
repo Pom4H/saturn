@@ -33,7 +33,10 @@
     "plant:typecheck": "tsc --noEmit -p tsconfig.plant.json",
     "plant:test": "node scripts/plant-test.mjs",
     "plant:test:browser": "node scripts/plant-e2e.mjs",
-    "plant:check": "npm run plant:build && npm run plant:typecheck && npm run plant:test"
+    "plant:check": "npm run plant:build && npm run plant:typecheck && npm run plant:test",
+    "saturn:node": "npm run plant:build && node --experimental-sqlite .plant/server.mjs",
+    "saturn:bun": "npm run plant:build && bun .plant/server.mjs",
+    "saturn:worker": "npm run plant:build && node .plant/worker.mjs"
   },
   "keywords": [
     "scada",
