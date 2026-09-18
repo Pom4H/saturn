@@ -1,7 +1,7 @@
 {
-  "name": "@pom4h/scada",
+  "name": "saturn-scada",
   "version": "0.1.0",
-  "description": "Source-first SCADA playground. Drag equipment, edit TypeScript, keep one source of truth.",
+  "description": "Saturn — open-source source-first SCADA with TypeScript DSL, derived HMI, reports, alarms, historian and Git-backed releases.",
   "scripts": {
     "build": "node scripts/build.mjs && node scripts/plant-build.mjs",
     "dev": "node scripts/dev.mjs",
@@ -35,7 +35,16 @@
     "plant:test:browser": "node scripts/plant-e2e.mjs",
     "plant:check": "npm run plant:build && npm run plant:typecheck && npm run plant:test"
   },
-  "keywords": [],
+  "keywords": [
+    "scada",
+    "hmi",
+    "industrial-automation",
+    "typescript",
+    "pwa",
+    "plc",
+    "historian",
+    "mit"
+  ],
   "author": "Roman Popov",
   "license": "MIT",
   "dependencies": {
