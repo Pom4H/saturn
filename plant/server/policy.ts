@@ -16,7 +16,8 @@ export type Capability =
   | 'job.read'
   | 'job.submit'
   | 'database.query'
-  | 'sandbox.run';
+  | 'sandbox.run'
+  | 'users.manage';
 
 const grants: Record<Actor['role'], ReadonlySet<Capability>> = {
   viewer: new Set<Capability>(['runtime.read','history.read','report.read']),
@@ -29,7 +30,7 @@ const grants: Record<Actor['role'], ReadonlySet<Capability>> = {
     'alarm.ack','control.operate','report.run',
     'project.source.read','project.commit','project.publish',
     'simulation.modify','firmware.build','job.read','job.submit',
-    'database.query','sandbox.run',
+    'database.query','sandbox.run','users.manage',
   ]),
 };
 
