@@ -1,4 +1,5 @@
 import { panel, label, readout, dataTable, trend, view, signal, report } from '@scada/plant';
+import { benchPanel } from './views';
 
 export const thermalReport = report('thermal-balance', {
     title: 'Тепловое состояние и полнота данных',
@@ -43,11 +44,8 @@ export const benchReportView = view('bench-report-view', {
     },
     body: panel([
         label('Состояние стенда'),
-        panel([
-            readout('Тестовый уровень', 'demand', 'V', 2),
-            readout('Вход AI1 x100', 'input', '', 0),
-            readout('Реле DO1', 'output', '', 0),
-        ], 'row', 'Основные параметры'),
+        benchPanel,
+        readout('Тестовый уровень', 'demand', 'V', 2),
         trend('Изменения за минуту', 'time', 'value'),
         dataTable([
             { key: 'time', title: 'Время' },
@@ -55,6 +53,7 @@ export const benchReportView = view('bench-report-view', {
             { key: 'value', title: 'Значение' },
             { key: 'quality', title: 'Качество' },
         ]),
+    ]),
     ]),
 });
 
