@@ -254,8 +254,9 @@ export class Service {
         return job;
     }
     completeWorker(jobId:string,workerId:string,result:unknown,error?:string):void {
-        const job=this.store.db.all<any>("SELECT id,kind,payload FROM worker_jobs WHERE id=?",[jobId])[0];
+        const job=this.store.db.all<any>("SELECT id,kind,payload,worker_id,status FROM worker_jobs WHERE id=?",[jobId])[0];
         if(!job)throw new AppError('Worker job not found',404);
+        if(job.status!=='running'||job.worker_id!==workerId)throw new AppError('Worker lease lost',409);
         if(job.kind==='report'){
             const reportId=String(JSON.parse(job.payload).reportId??'');
             if(error)this.store.db.exec("UPDATE reports SET status='failure',error=? WHERE id=?",[error.slice(0,500),reportId]);
