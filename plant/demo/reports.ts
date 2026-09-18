@@ -54,7 +54,6 @@ export const benchReportView = view('bench-report-view', {
             { key: 'quality', title: 'Качество' },
         ]),
     ]),
-    ]),
 });
 
 export const benchReport = report('bench-state', {
