@@ -15,11 +15,12 @@ const sqlite:DatabaseDriver={
   async query(config,query){
     const path=String(config.options.path??config.options.filename??'');
     if(!path)throw new AppError('sqlite connection needs options.path');
-    if(config.readOnly!==false&&!readOnlySql(query.sql))throw new AppError('Database connection is read-only');
+    if(query.language!=='sql')throw new AppError('SQLite driver supports SQL only');
+    if(config.readOnly!==false&&!readOnlySql(query.query))throw new AppError('Database connection is read-only');
     const db=new NodeSql(path);
     try{
       if(config.readOnly!==false)db.exec('PRAGMA query_only=ON; PRAGMA trusted_schema=OFF;');
-      return boundedRows(db.all<Record<string,unknown>>(`SELECT * FROM (${query.sql.replace(/;\s*$/,'')}) LIMIT ${query.maxRows+1}`,query.params as any),query.maxRows);
+      return boundedRows(db.all<Record<string,unknown>>(`SELECT * FROM (${query.query.replace(/;\s*$/,'')}) LIMIT ${query.maxRows+1}`,query.params as any),query.maxRows);
     }finally{db.close();}
   }
 };
@@ -99,10 +100,11 @@ function bunSqlDriver():DatabaseDriver|null {
   return {
     kind:'database',id:'bun-sql',schemes:['postgres','postgresql','mysql','mariadb','sqlite'],
     async query(config,query){
-      if(config.readOnly!==false&&!readOnlySql(query.sql))throw new AppError('Database connection is read-only');
+      if(query.language!=='sql')throw new AppError('Bun SQL driver supports SQL only');
+      if(config.readOnly!==false&&!readOnlySql(query.query))throw new AppError('Database connection is read-only');
       const options={...config.options};
       const sql=new BunRuntime.SQL(options);
-      const pending=sql.unsafe(query.sql,query.params??[]);
+      const pending=sql.unsafe(query.query,query.params??[]);
       const timer=setTimeout(()=>pending.cancel(),query.timeoutMs);
       try{return boundedRows(await pending,query.maxRows);}
       finally{clearTimeout(timer);await sql.close({timeout:1});}
