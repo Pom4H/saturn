@@ -11,7 +11,7 @@ function workerTokens():Record<string,WorkerJobKind[]>{
         return parsed;
     }
     const legacy=process.env.SATURN_WORKER_TOKEN;
-    return legacy?{[legacy]:['report','sql','wasm']}:{};
+    return legacy?{[legacy]:['report','database','wasm']}:{};
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     process.umask(0o077);
@@ -20,10 +20,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         host:process.env.HOST??'127.0.0.1',
         data:process.env.SATURN_DATABASE??process.env.SCADA_DATABASE,
         repository:process.env.SATURN_PROJECT_REPO??process.env.SCADA_PROJECT_REPO,
-        publicUrl:process.env.SATURN_PUBLIC_URL??process.env.SCADA_PUBLIC_URL,
+        publicUrl:process.env.SATURN_PUBLIC_URL||process.env.SCADA_PUBLIC_URL||undefined,
         user:process.env.SATURN_USER??process.env.SCADA_USER,
-        password:process.env.SATURN_PASSWORD??process.env.SCADA_PASSWORD,
-        pushSubject:process.env.SATURN_PUSH_SUBJECT??process.env.SCADA_PUSH_SUBJECT,
+        password:process.env.SATURN_PASSWORD||process.env.SCADA_PASSWORD||undefined,
+        pushSubject:process.env.SATURN_PUSH_SUBJECT||process.env.SCADA_PUSH_SUBJECT||undefined,
         externalWorkers:(process.env.SATURN_WORKERS??'inline')==='external',
         workerTokens:workerTokens(),
         connectionsFile:process.env.SATURN_CONNECTIONS_FILE,
