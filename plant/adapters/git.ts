@@ -5,6 +5,7 @@ import { resolve, join } from 'node:path';
 import { AppError, type Repository, type Revision } from '../types';
 import { validateFiles, projectPath } from '../compiler';
 const oid = (v: string) => /^[a-f0-9]{40,64}$/.test(v);
+const gitNull = process.platform === 'win32' ? 'NUL' : devNull;
 /** Immutable Git object I/O, no checkout, hooks, project execution or shell interpolation. */
 export class GitRepository implements Repository {
     readonly activeRef = 'refs/scada/plant/published';
@@ -15,9 +16,9 @@ export class GitRepository implements Repository {
     private git(args: string[], input?: string, extra: Record<string, string> = {}): Promise<string> {
         return new Promise((accept, reject) => {
             const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
-            const child = spawn('git', ['-c', `core.hooksPath=${devNull}`, '-c', 'core.fsmonitor=false', '-c', 'protocol.ext.allow=never', '-C', resolve(this.directory), ...args], { shell: false, env: { ...env, GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_NOSYSTEM: '1', ...extra }, stdio: ['pipe', 'pipe', 'pipe'] });
-            const chunks: Buffer[] = [];
-            let size = 0, settled = false;
+            const child = spawn('git', ['-c', `core.hooksPath=${gitNull}`, '-c', 'core.fsmonitor=false', '-c', 'protocol.ext.allow=never', '-C', resolve(this.directory), ...args], { shell: false, env: { ...env, GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_GLOBAL: gitNull, GIT_CONFIG_NOSYSTEM: '1', ...extra }, stdio: ['pipe', 'pipe', 'pipe'] });
+            const chunks: Buffer[] = [], errors: Buffer[] = [];
+            let size = 0, errorSize = 0, settled = false;
             const done = (error?: Error) => { if (settled)
                 return; settled = true; clearTimeout(timer); if (error)
                 reject(error);
@@ -36,10 +37,10 @@ export class GitRepository implements Repository {
             }
             else
                 chunks.push(b); });
-            child.stderr.resume();
+            child.stderr.on('data', b => { if (errorSize < 4096) { const left = 4096-errorSize; errors.push(Buffer.from(b).subarray(0,left)); errorSize += Math.min(left,b.length); } });
             child.stdin.on('error', () => { });
             child.on('error', () => done(new AppError('Git unavailable', 503)));
-            child.on('close', code => done(code === 0 ? undefined : new AppError('Git operation failed', 409)));
+            child.on('close', code => { if(code===0)return done(); const detail=Buffer.concat(errors).toString('utf8').replace(/[\r\n]+/g,' ').trim().slice(0,500); console.error(`Saturn Git ${args[0]??'command'} failed (${code}): ${detail||'no stderr'}`); done(new AppError('Git operation failed',409)); });
             child.stdin.end(input);
         });
     }
