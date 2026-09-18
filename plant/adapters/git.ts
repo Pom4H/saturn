@@ -98,7 +98,7 @@ export class GitRepository implements Repository {
         if (await this.head() !== expected)
             throw new AppError('Git revision changed', 409);
         const dir = await mkdtemp(join(tmpdir(), 'scada-plant-'));
-        const env = { GIT_INDEX_FILE: join(dir, 'index') };
+        const env = { GIT_INDEX_FILE: join(dir, 'index'), GIT_WORK_TREE: dir };
         try {
             if (expected)
                 await this.git(['read-tree', expected], undefined, env);
