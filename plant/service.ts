@@ -122,6 +122,8 @@ export class Service {
         }
         catch (error) {
             Object.assign(this, previous);
+            try { if(previous.project) await this.options.bindSources?.(previous.project.sources??[]); }
+            catch (restoreError) { this.healthy=false; this.releaseError='Release failed and previous industrial connections could not be restored'; throw restoreError; }
             this.releaseError = 'Release persistence failed; previous revision is still active';
             throw error;
         }
