@@ -27,10 +27,9 @@ jobs:
         with:
           bun-version: '1.4.2'
       - name: Run target deployment verification
-        shell: bash
         env:
           EVIDENCE: ${{ runner.temp }}/saturn-target-evidence
-        run: bash scripts/self-hosted-target.sh
+        run: node scripts/self-hosted-target.mjs
       - uses: actions/upload-artifact@v7.0.1
         if: always()
         with:
