@@ -1,9 +1,13 @@
 import { AppError } from './types';
-import { validatePresentation, type Presentation, type ViewNode } from './presentation';
+import { presentationScreens, validatePresentation, type Presentation, type ViewNode } from './presentation';
 import type { HmiScreenModel } from './vendor/saturn/src/types';
 /** Small controller screen backend. Unsupported nodes/overflow fail, never silently disappear. */
 export function presentationHmi(view:Presentation,bindings:Record<string,string>):HmiScreenModel {
+    return presentationHmiScreens(view,bindings)[0];
+}
+export function presentationHmiScreens(view:Presentation,bindings:Record<string,string>):HmiScreenModel[] {
     validatePresentation(view,'plc');
+    return presentationScreens(view).map((screen,screenIndex)=>{
     const elements:HmiScreenModel['elements']=[];
     const addText=(text:string,x:number,y:number,width:number,id:string,binding?:string)=>{
         if(text.length>Math.floor(width/8)||y+22>240)throw new AppError('Presentation exceeds the 320x240 PLC display');
@@ -30,6 +34,7 @@ export function presentationHmi(view:Presentation,bindings:Record<string,string>
             default:throw new AppError('Unsupported PLC presentation node');
         }
     };
-    layout(view.body,8,8,304);
-    return {id:view.id,title:view.title,screenType:'main',period:0,elements};
+    layout(screen.body,8,8,304);
+    return {id:screen.id,title:screen.title,screenType:screenIndex===0?'main':'manual',period:0,elements};
+    });
 }
