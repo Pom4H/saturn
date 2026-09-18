@@ -195,8 +195,10 @@ Not claimed by the MVP:
 - [HMI and reports](docs/plant/presentation.md)
 - [Server, PWA, Git releases and reports](docs/plant/README.md)
 - [PLC / Firmverse integration](docs/plant/toolchain-integration.md)
+- [Roadmap to 0.1](docs/roadmap.md)
 - [Security](SECURITY.md)
 - [Contributing](CONTRIBUTING.md)
+- [Third-party notices](THIRD_PARTY_NOTICES.md)
 
 Older editor/runtime experiments remain in the repository because parts of the MVP still reuse their component registry, source-preserving edits and test infrastructure. They are implementation history, not the product definition.
 
