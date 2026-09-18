@@ -7,6 +7,7 @@ on:
       - .github/workflows/self-hosted-target.yml
       - scripts/self-hosted-target.mjs
       - scripts/self-hosted-*.mjs
+      - scripts/plant-*.mjs
 
 permissions:
   contents: read
