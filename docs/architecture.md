@@ -1,62 +1,167 @@
-# Architecture
+# Saturn architecture
 
-The authored project is one TypeScript document. Equipment configuration is separate from server runs, commands, actual equipment state and sensor observations. A runtime frame never becomes a CodeMirror transaction, a local-storage write or a source edit.
+Saturn is built around one rule:
+
+> **Authored engineering intent has one source of truth; every visual/runtime surface is a projection or observation of it.**
+
+This avoids maintaining a separate HMI project, report layout database, deployment archive and simulation configuration for the same installation.
+
+## Layers
 
 ```mermaid
 flowchart TD
-  Author["TS document + visual edits"] --> Compiler["Bounded declarative compiler"]
-  Compiler --> Configuration["Validated equipment + ports"]
-  Configuration --> Server["Installed behaviors + installation rule"]
-  Server --> Storage["SQLite frames + commands + checkpoints"]
-  Server --> Stream["Ordered snapshots and updates"]
-  Stream --> Views["2D and lazy 3D views"]
-  Configuration --> Views
-  Storage --> Replay["Read-only history and replay"]
-  Replay --> Views
+  Source["Project TS files"] --> Compiler["Bounded TypeScript compiler"]
+  Compiler --> Project["Validated Project"]
+  Project --> Topology["Topology index"]
+  Topology --> Canvas["2D / 3D"]
+  Topology --> AutoHMI["Computed HMI"]
+  Project --> Kernel["Deterministic kernel"]
+  Project --> Reports["Report definitions"]
+  Project --> PLC["PLC target compiler"]
+  Kernel --> Samples["Signals + quality"]
+  Samples --> Canvas
+  Samples --> AutoHMI
+  Samples --> Historian["SQLite historian"]
+  Historian --> Reports
+  Project --> Git["Git revisions"]
+  Git --> Release["Explicit publish / rollback"]
+  PLC --> Runtime["Isolated target WASM"]
+  Runtime --> Samples
 ```
 
-## Contracts and ownership
+## 1. Project compiler
 
-| Layer | Source of truth | Files |
-|---|---|---|
-| Authored configuration | Exact TS, shared by code/drag/inspector/undo | `src/source.ts`, `src/main.ts` |
-| Component metadata | Installed definitions: fields, ports, signal units and commands | `src/core.ts`, `src/components/*/definition.ts` |
-| Behavior | Fixed-step installed server modules | `server/behavior.ts`, `server/models.ts`, component `behavior.ts` |
-| Installation | Explicit generic series rule connects published outputs | `server/engine.ts` |
-| Durable run | Manifest, initial conditions, seed, behavior versions, commands, observations, private events and checkpoint | `server/store.ts` |
-| Transport | Typed quality, run ID, sequence and model time | `src/runtime/protocol.ts`, `src/runtime/client.ts` |
-| Runtime workspace | Selected run, connection, local replay position; credentials only in memory | `src/runtime/workspace.ts` |
-| Geometry and presentation | Derived routes, SVG anatomy, spatial geometry, disposable animation phases | `src/geometry.ts`, `src/view.ts`, `src/view3d.ts` |
+Project source is not executed as JavaScript.
 
-`runtime({server, project, run?})` is data. Opening a file, decoding a shared URL or compiling source cannot connect, issue commands or execute uploaded code. The destination is displayed before an explicit connection. Credentials are provided separately in the connection panel and are never serialized into TS or a share link. Changing behavior/topology detaches the old run but preserves the same-server session; layout-only edits and temporary TS errors retain the run (invalid TS blocks commands); a configuration hash prevents overlaying incompatible equipment states. Transport settings and variable aliases do not affect that hash. The exact source is still retained in the private provenance manifest.
+`plant/compiler.ts` parses TypeScript AST and accepts an allow-listed declarative subset:
 
-The server runs one 100 ms step at a time and commits its frame, hidden checkpoint, events and accepted command atomically. Browsers can pause visuals or close without pausing execution. A closed stream makes observations unknown and shows loss of connection. An open heartbeat stream with no advancing model frames independently becomes stale; terminal run snapshots carry explicit completed/failed status. Reconnection obtains a complete latest snapshot; skipped time remains available in durable history. Frames from another run or malformed/out-of-order updates are rejected. Commands have idempotency IDs. Completing a recording is an explicit operator action.
+- named imports;
+- initialized `const` declarations;
+- literals, arrays and objects;
+- simple scalar arithmetic;
+- installed Saturn DSL calls.
 
-The diagnostic boundary is the public observation stream: measured signals, quality, observable mode/alarm and generic events. Pump impeller wear, random state, scenario label and behavior assumptions are exposed by the research endpoint only. New runs use neutral public labels; a researcher preparing blind datasets must also exclude any manually supplied revealing labels and project names. No diagnostic model is trained here.
+Loops, dynamic imports, functions, prototype access and arbitrary calls are rejected. Validation budgets bound file count, source size, expression depth and project cardinality.
 
-## Installing another equipment type
+The compiler produces `Project`, the stable internal contract used by all downstream layers.
 
-The running editor includes `filter` as a complete small extension, separate from the eight legacy components:
+## 2. Topology
 
-1. `src/components/filter/definition.ts` calls `registerComponent('filter', definition)` with versioned fields, physical port roles, units and command schemas.
-2. `src/components/filter/behavior.ts` exports a behavior module with `initialize`, `advance`, `output` and `command`. Outputs participate in the generic installation through `process.conductance`.
-3. `src/components/filter/visual.ts` registers both `registerSvgRenderer` and `register3dRenderer`. The 3D factory receives Three through its context; type-only imports keep Three out of the initial bundle.
-4. Composition roots import metadata (`src/components/installed.ts`), visuals (`src/visual-components.ts`) and register behavior (`server/models.ts`). These are installation lists, not compiler or renderer branches.
-5. Use `component("filter", "FLT-101", {x: 600, y: 200, resistance: 0.1})`. The existing compiler, inspector, palette, ports, source patcher and undo work from metadata.
+Systems, devices, controllers, ports and physical connections form one identity graph.
 
-A third-party package can use the same public registration functions. It is trusted installed code, not executable source sent by a browser. Registry duplicates and unsafe member names are rejected. The independent tests register an additional type and the server tests register another behavior without changing central algorithms. The shipped filter test verifies its effect on downstream flow and its `clean` command.
+2D and 3D do not maintain independent equipment records. A terminal has one semantic identity and target coordinates for each renderer. Selection, signals and routes refer to equipment/terminal IDs.
 
-2D and 3D use the same equipment IDs and runtime frames. Custom renderers receive observation accessors, phase/smoothing helpers and generic quality/alarm context. Missing values are `null`, never fabricated zero. Flow direction, measured RPM and alarms are independent. Alarm indication bypasses smoothing; parameter edits retain geometry and animation phase. Reduced motion freezes motion without stopping telemetry or removing quality indicators.
+Routing caches are disposable derived data.
 
-## Deliberate boundaries
+## 3. Computed HMI
 
-- The TS editor remains a bounded declarative subset, with at most 48 equipment items. It is not a general TypeScript runtime or a full language server.
-- Routing remains synchronous; A* now uses a heap rather than sorting the entire frontier for each step. Large layouts can still block an edit briefly.
-- The main 3D view derives a schematic placement from 2D coordinates. It supports orbit, selection and inspection; it is not a CAD layout editor and does not claim surveyed physical coordinates. The separate lab preserves metre-based transforms and port normals for future spatial authoring.
-- The server applies one source/one driver/one sink per directed series line; independent lines are supported. Branching, hydraulic conservation, head curves, interlock verification and PLC interfaces are not implemented. Unsupported graphs publish unknown flow and an event.
-- SQLite stores full frames for exact replay. This is a reproducible local scenario recorder, not a compressed multiyear historian. Partitioning, retention, calibration pipelines and independently held-out diagnostic datasets remain future work. Preserve position IDs and instance replacement events when building those datasets.
-- Access roles apply to the local server as a whole. There is no multi-tenant authorization or automatic migration of old behavior checkpoints. Behavior-version mismatch fails startup explicitly.
+`deriveHmi(project)` is a pure projection.
 
-See [wire contract](runtime-contract.md), [server guide](server-runtime.md), [DSL](dsl.md) and [runtime verification](runtime-validation.md).
+The implementation indexes the topology once, then creates a bounded screen graph. The shell caches this projection for the lifetime of a compiled Project object. Live frames update values and animation only; they do not rebuild the screen hierarchy.
 
-Git-backed project files, validated release activation and immutable run revisions are described in [Git projects](git-projects.md). Bounded history/overviews and the external typed SDK are described in [developer workflow](review-fixes.md).
+This distinction matters for large installations:
+
+```text
+project changed  -> rebuild HMI graph
+telemetry changed -> update bound values only
+```
+
+Manual presentation DSL can override or augment the generated interface. It is not required for basic navigation.
+
+## 4. Presentation model
+
+HMI and reports share `ViewNode`:
+
+- groups;
+- text;
+- values;
+- tables;
+- charts;
+- actions;
+- navigation;
+- signal-driven motion.
+
+Bindings are separate from layout. A report evaluates bindings only from its frozen data capsule; live HMI evaluates them from the current frame.
+
+Target capability is explicit. Web HMI can render richer widgets; PLC LCD compilation accepts only nodes supported by that target and fails on unsupported nodes.
+
+## 5. Deterministic runtime
+
+The kernel advances installed models on a fixed model clock. A frame read is observation-only.
+
+Runtime input, project revision, model versions and controller state are checkpointed explicitly. UI rendering, number of connected browsers and switching between 2D/3D/HMI must not advance simulation time.
+
+## 6. PLC target
+
+Saturn vendors a pinned portable Firmverse Saturn package.
+
+The shared compiler owns `.fbdbin` serialization. Each simulated PLC executes in an isolated WASM instance. Stateful block memory is saved through a versioned state ABI tied to the exact program/runtime.
+
+The MVP does not claim arbitrary PLC firmware compatibility or real-device flashing.
+
+## 7. Historian
+
+History is stored separately from project source.
+
+Each archived signal has:
+
+- deadband;
+- maximum confirmation interval;
+- retention.
+
+Quality transitions are always significant. Reports can query isolated copies of declared `samples` and `segments`; they never receive access to authentication tables or the operational database.
+
+## 8. Git releases
+
+Git is Saturn's release store, not its historian.
+
+A running installation has an immutable project revision. Publication changes the desired revision explicitly. Old report artifacts, events and runtime runs retain the revision they were created from.
+
+This makes rollback a source/release operation rather than destructive mutation of history.
+
+## 9. Adapters
+
+Shared logic avoids Node/DOM APIs.
+
+Adapters provide:
+
+- native SQLite vs SQLite WASM/OPFS;
+- native Git vs browser local revision emulation;
+- Node HTTP/auth/SSE vs browser Worker;
+- Web Push vs local browser notification;
+- web canvas vs procedural 3D renderer.
+
+## Performance rules
+
+Saturn prefers derived caches over additional persisted models.
+
+Current rules:
+
+- compiled Project changes invalidate Auto HMI; live frames do not;
+- TypeScript ASTs used for visual source links are cached until a file's source changes;
+- topology indexes are built once per HMI derivation instead of repeated linear scans;
+- visual telemetry patches values/animation without rebuilding the full presentation DOM;
+- 3D code is lazy-loaded;
+- route geometry recalculates only when topology/placement changes;
+- historian deadband reduces write volume without changing live semantics.
+
+## Trust boundaries
+
+Trusted installed code:
+
+- Saturn runtime;
+- model catalog;
+- renderers;
+- target compilers.
+
+Untrusted/authored project input:
+
+- bounded DSL files;
+- report SQL against isolated capsules;
+- operator values constrained by declared controls.
+
+The project compiler does not turn source into arbitrary executable application code.
+
+## MVP boundary
+
+The architecture is suitable for an open engineering SCADA MVP. It is not a safety certification argument. Site-specific redundancy, safety lifecycle evidence, deterministic fieldbus timing, HA and cybersecurity qualification remain deployment/product work beyond the current MVP.
