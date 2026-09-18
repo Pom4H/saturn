@@ -14,6 +14,7 @@ import { AppError, type WorkerJobKind } from './types';
 import { authorize, capabilities } from './server/policy';
 import { DriverRegistry, loadConnections, loadDriverModules } from './server/drivers';
 import { IndustrialGateway } from './server/gateway';
+import { installBuiltInServerDrivers } from './server/builtin-drivers';
 import { demoFiles } from './demo/files';
 const prefix = '/plant';
 async function body(req: IncomingMessage): Promise<any> { if (!req.headers['content-type']?.startsWith('application/json'))
@@ -45,6 +46,7 @@ export async function startPlantServer(options: {
     driverModules?: string[];
 } = {}) {
     const registry=new DriverRegistry();
+    installBuiltInServerDrivers(registry);
     await loadDriverModules(registry,options.driverModules??[]);
     const gateway=new IndustrialGateway(registry,await loadConnections(options.connectionsFile));
     const store = new Store(new NodeSql(options.data ?? resolve('data-plant/plant.sqlite3')));
