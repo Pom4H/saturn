@@ -254,6 +254,17 @@ export interface ReportArtifact {
     html: string;
     rows: Record<string, unknown>[];
 }
+export type WorkerJobKind = 'sql' | 'wasm';
+export interface WorkerJob {
+    id:string;
+    kind:WorkerJobKind;
+    actor:string;
+    createdAt:number;
+    status:'queued'|'running'|'success'|'failure';
+    payload:Record<string,unknown>;
+    result?:unknown;
+    error?:string;
+}
 export interface Actor {
     id: string;
     role: 'viewer' | 'operator' | 'engineer';
