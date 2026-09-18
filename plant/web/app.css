@@ -41,3 +41,32 @@
 .terminal-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.terminal-grid button{display:flex;flex-direction:column;align-items:flex-start;min-width:0;padding:7px;font-family:ui-monospace,monospace}.terminal-grid small{font-size:10px;opacity:.7}.terminal-panel h3{margin:18px 0 8px}.terminal-panel p,.connection-list{font-size:11px;overflow-wrap:anywhere}.connection-list{border-top:1px solid #d4e1e6;margin-top:14px}.connection-list p{padding:5px 0}#plc-front svg{width:100%;height:auto}#plc-front{margin:12px -8px}.ports circle{cursor:crosshair}.ports circle:hover,.ports circle:focus{stroke:#dc8749;outline:none;stroke-width:3}.node[data-kind="plant_saturn"] .ports circle{stroke-width:.8}.node[data-kind="plant_saturn"] .ports circle:hover{stroke-width:1.5}[data-connection]:focus path:first-of-type{stroke:#dd934e}.terminal-panel button[data-disconnect]{font-size:10px;padding:3px 6px}
 
 .legend-pipe{color:#7e9aa8}.legend-power{color:#836344}.legend-control{color:#148c8f}.legend-bus{color:#72628e}
+
+
+/* Visual DSL shell: code remains the source of truth; the canvas edits the same file map. */
+@media(min-width:900px){
+  #application>.tabs{position:fixed;z-index:15;top:57px;left:0;bottom:0;width:148px;display:flex;flex-direction:column;align-items:stretch;gap:2px;padding:18px 10px;background:#f8fafb;border-right:1px solid var(--line);border-bottom:0;overflow:auto}
+  #application>.tabs button{display:flex;align-items:center;gap:9px;text-align:left;border:0;background:transparent;padding:9px 10px;color:#47616f;font-size:12px}
+  #application>.tabs button i{width:17px;text-align:center;font-style:normal;color:#78909b}
+  #application>.tabs button.active{background:#eaf3f7;color:#0d6479}
+  #application>.titlebar,#application>.metrics,#application>main,#application>footer{margin-left:148px}
+}
+.studio-panel{padding:0!important;background:#f6f8f9;min-height:calc(100vh - 70px)}
+.studio-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;padding:14px 18px;background:#fff;border-bottom:1px solid var(--line)}
+.studio-head h2{font-size:20px;margin:2px 0 3px}.studio-head p{margin:0;font-size:11px}.studio-head-actions{display:flex;align-items:end;gap:10px}.studio-head-actions label{font-size:10px;color:var(--muted)}.studio-head-actions select{display:block;margin-top:4px;min-width:180px;padding:7px 9px}.studio-target{font:10px ui-monospace,monospace;border:1px solid var(--line);padding:7px 9px;background:#f8fbfc}
+.studio-layout{display:grid;grid-template-columns:minmax(330px,38%) minmax(460px,1fr) 248px;min-height:680px;height:calc(100vh - 172px);background:#eef3f5}
+.studio-code-pane,.studio-preview-pane,.studio-properties{min-width:0;background:#fff}
+.studio-code-pane{display:flex;flex-direction:column;border-right:1px solid var(--line)}
+.studio-pane-title{height:39px;display:flex;align-items:center;justify-content:space-between;padding:0 11px;border-bottom:1px solid var(--line);font-size:10px;color:var(--muted)}.studio-pane-title b{font:600 11px ui-monospace,monospace;color:#395766}
+.studio-code{flex:1;min-height:0;overflow:hidden}.studio-code .cm-editor{height:100%;font-size:11px}.studio-code .cm-scroller{line-height:1.55}
+.studio-preview-pane{display:flex;flex-direction:column;min-width:0}
+.studio-toolbar{height:39px;display:flex;align-items:center;gap:5px;padding:0 9px;border-bottom:1px solid var(--line);background:#fbfcfd}.studio-toolbar span{flex:1}.studio-toolbar button{font-size:10px;padding:5px 8px}
+.studio-screen-tabs{display:flex;gap:7px;padding:9px;border-bottom:1px solid var(--line);overflow:auto;background:#fff}.studio-screen-tabs button{min-width:92px;padding:9px 12px;background:#fbfcfd;font-size:10px}.studio-screen-tabs button.active{border-color:#1486a0;box-shadow:inset 0 -2px #1486a0;color:#0b6478}
+.studio-canvas{flex:1;min-height:0;overflow:auto;padding:20px;background-color:#f6f8f9;background-image:radial-gradient(#cfdae0 0.7px,transparent 0.7px);background-size:14px 14px}
+.studio-canvas>.presentation{max-width:760px;margin:0 auto;background:#fff;border:1px solid #d9e2e6;padding:18px;box-shadow:0 3px 18px #294a5b0c}
+.report-paper>.presentation{max-width:780px;min-height:520px}
+.presentation [data-studio-kind]{position:relative;cursor:pointer;outline:none}.presentation [data-studio-kind]:hover{box-shadow:0 0 0 1px #79b7c7 inset}.presentation [data-studio-selected=true]{box-shadow:0 0 0 2px #1787a1 inset!important}.presentation [data-studio-selected=true]::after{content:attr(data-studio-kind);position:absolute;right:4px;top:4px;font:8px ui-monospace,monospace;color:#0b6b7e;background:#e7f6f8;padding:2px 4px;pointer-events:none}
+.studio-properties{border-left:1px solid var(--line);padding:14px;overflow:auto}.studio-properties h3{font-size:14px;margin:10px 0}.studio-properties label{display:block;font-size:10px;color:var(--muted);margin:12px 0}.studio-properties input,.studio-properties select{display:block;width:100%;margin-top:5px;padding:7px;font-size:11px}.studio-properties .source-link{display:flex;align-items:center;justify-content:space-between;gap:5px;padding:7px 0;border-bottom:1px solid #edf1f3;font:10px ui-monospace,monospace}.studio-properties .source-link button{padding:4px 6px;font-size:9px}.studio-empty{font-size:11px;color:var(--muted);padding:18px 0}.studio-save-note{font-size:10px;color:#657d88;margin-top:14px;line-height:1.5}
+.studio-history{margin:14px 18px 30px;background:#fff;border:1px solid var(--line);padding:12px}.studio-history summary{cursor:pointer;font-size:12px;font-weight:600}
+@media(max-width:1180px){.studio-layout{grid-template-columns:minmax(300px,42%) 1fr}.studio-properties{grid-column:1/-1;border-left:0;border-top:1px solid var(--line);min-height:170px}.studio-layout{height:auto}.studio-code,.studio-canvas{min-height:520px}}
+@media(max-width:899px){#application>.titlebar,#application>.metrics,#application>main,#application>footer{margin-left:0}.studio-layout{display:flex;flex-direction:column}.studio-code,.studio-canvas{min-height:420px}.studio-head{align-items:flex-start;flex-direction:column}.studio-head-actions{width:100%;flex-wrap:wrap}}
