@@ -58,7 +58,7 @@ export const benchReportView = view('bench-report-view', {
 
 export const benchReport = report('bench-state', {
     title: 'Состояние стенда · HMI и журнал',
-    on: { workflow_dispatch: {}, schedule: [{ cron: '*/15 * * * *' }] },
+    on: { workflow_dispatch: {} },
     signals: ['SATURN-1.AI1', 'SATURN-1.DO1', 'BENCH-LEVEL.value'],
     window: 60000,
     sql: 'SELECT signal,time,value,quality FROM samples ORDER BY time',
