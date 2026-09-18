@@ -14,7 +14,7 @@ export interface StudioSource {
     args: { from: number; to: number }[];
 }
 const calls: Record<StudioNodeKind,string> = {
-    group:'panel', text:'label', value:'readout', table:'dataTable', chart:'trend', action:'commandButton',
+    group:'panel', text:'label', value:'readout', table:'dataTable', chart:'trend', action:'commandButton', navigate:'navigate', motion:'animate',
 };
 const sourceFile = (file:string, source:string) => ts.createSourceFile(file,source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
 function positions(file:string, source:string, call:string):StudioSource[] {
@@ -42,6 +42,7 @@ const argFor=(kind:StudioNodeKind,field:string):number|null=>{
     if(kind==='value')return field==='label'?0:field==='unit'?2:field==='digits'?3:null;
     if(kind==='chart'&&field==='title')return 0;
     if(kind==='action')return field==='label'?0:field==='value'?2:null;
+    if(kind==='navigate'&&field==='label')return 0;
     if(kind==='group'&&field==='title')return 2;
     return null;
 };
