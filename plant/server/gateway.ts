@@ -14,7 +14,14 @@ export class IndustrialGateway {
   private bound:BoundConnection[]=[];
   private refreshing=false;
   constructor(readonly registry:DriverRegistry,readonly connections:Map<string,ConnectionConfig>,readonly now=Date.now){}
-  snapshot():Record<string,Sample>{return this.values;}
+  snapshot():Record<string,Sample>{
+    const now=this.now(),out:Record<string,Sample>=Object.create(null);
+    for(const group of this.bound)for(const source of group.sources){
+      const sample=this.values[source.id]??{value:null,quality:'offline' as const,time:now};
+      out[source.id]=sample.quality==='good'&&now-sample.time>Math.max(source.pollMs*3,5000)?{...sample,quality:'stale'}:sample;
+    }
+    return out;
+  }
   async bind(sources:readonly ExternalSource[]):Promise<void>{
     const groups=new Map<string,ExternalSource[]>(),next:BoundConnection[]=[],values:Record<string,Sample>=Object.create(null);
     for(const source of sources){
