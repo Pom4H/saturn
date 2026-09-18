@@ -184,11 +184,26 @@ try {
         await bench.locator('[data-tab="reports"]').click();await bench.locator('[data-run="bench-state"]').click();
         const row=bench.locator('#report-runs tr').filter({hasText:'bench-state'}).filter({has:bench.locator('.success')}).first();
         await row.waitFor();await row.locator('[data-artifact]').click();
-        const report=bench.frameLocator('#report-preview');await report.locator('[data-view="bench-hmi"]').waitFor();
+        const report=bench.frameLocator('#report-preview');await report.locator('[data-view="bench-report-view"]').waitFor();
         assert.equal(await report.locator('[data-view-value="input"]').innerText(),'800');
         assert.equal(await report.locator('[data-view-value="output"]').innerText(),'1');
         assert.equal(await bench.locator('#clock').innerText(),clock);
         await bench.screenshot({path:evidence+'/shared-report-panel.png',fullPage:true});
+    });
+    await check('visual DSL studios bind widgets to code and edit the same TypeScript draft',async()=>{
+        await bench.locator('[data-tab="views"]').click();await bench.locator('#view-select').selectOption('bench-operator');await bench.waitForTimeout(250);
+        const action=bench.locator('#live-view [data-studio-kind="action"]').first();await action.click();
+        assert.match(await bench.locator('#view-code-range').innerText(),/views\.ts:/);
+        const label=bench.locator('#view-properties [data-studio-field="label"]');assert.ok(await label.count());
+        await label.fill('Уровень 3 V · тест');await label.blur();await bench.waitForTimeout(350);
+        assert.match(await bench.locator('#live-view').innerText(),/Уровень 3 V · тест/);
+        await bench.screenshot({path:evidence+'/visual-hmi-editor.png',fullPage:true});
+        await bench.locator('[data-tab="reports"]').click();await bench.locator('#report-studio-select').selectOption('bench-state');await bench.waitForTimeout(300);
+        const readout=bench.locator('#report-visual [data-studio-kind="value"]').first();await readout.click();
+        assert.match(await bench.locator('#report-code-range').innerText(),/reports\.ts:/);
+        assert.ok(await bench.locator('#report-properties [data-studio-field="label"]').count());
+        await bench.screenshot({path:evidence+'/visual-report-editor.png',fullPage:true});
+        await bench.locator('[data-tab="project"]').click();await bench.locator('#reload-project').click();await bench.waitForTimeout(250);
     });
     await check('DSL operator actions use audited commands and telemetry preserves keyboard focus',async()=>{
         await bench.locator('[data-tab="views"]').click();await bench.locator('#view-select').selectOption('bench-operator');
