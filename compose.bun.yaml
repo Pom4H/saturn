@@ -1,0 +1,7 @@
+services:
+  saturn:
+    build:
+      context: .
+      dockerfile: Dockerfile.bun
+    healthcheck:
+      test: ["CMD","bun","-e","fetch('http://127.0.0.1:4176/plant/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
