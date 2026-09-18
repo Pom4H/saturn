@@ -4,7 +4,7 @@ import { Kernel } from './kernel';
 import { acknowledge, updateAlarms } from './alarms';
 import { Store } from './store';
 import { cronMatches } from './workflows';
-import { AppError, clone, finite, id, type Actor, type AlarmState, type Event, type Frame, type Project, type Repository, type ReportTask, type ReportArtifact } from './types';
+import { AppError, clone, finite, id, type Actor, type AlarmState, type Event, type Frame, type Project, type Repository, type ReportTask, type ReportArtifact, type WorkerJob, type WorkerJobKind } from './types';
 import { authorize } from './server/policy';
 const engineering: Actor = { id: 'system', role: 'engineer' };
 const configuration = (p: Project) => JSON.stringify({ sources:p.sources??[],controllers:(p.controllers??[]).map(({layout,system,...c})=>c),connections:(p.connections??[]).map(({via,...w})=>w),attachments:p.attachments??[], simulations: p.simulations.map(({ layout, system, history, ...n }) => n).sort((a, b) => a.id.localeCompare(b.id)), signals: p.signals.map(({ unit, history, ...s }) => s), stepMs: p.stepMs, controls: p.controls ?? [] });
@@ -56,6 +56,7 @@ export class Service {
             }
         }
         this.store.db.exec("UPDATE reports SET status='queued' WHERE status='running'");
+        this.store.db.exec("UPDATE worker_jobs SET status='queued',worker_id=NULL,lease_until=NULL WHERE status='running'");
         if(!this.options.externalWorkers)void this.runJobs().catch(() => { this.healthy = false; this.emit(); });
     }
     subscribe(fn: (frame: Frame) => void) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
@@ -214,6 +215,51 @@ export class Service {
           expansions:(this.project.attachments??[]).filter(a=>a.controller===controllerId),
           limitations:['Program data for the pinned FBD runtime, not bootloader/HAL firmware','Virtual expansions are not compiled into physical Saturn addresses','No physical device deployment or electrical qualification has been performed'] };
     }
+    jobs(actor:Actor){ authorize(actor,'job.read'); return this.store.workerJobs(); }
+    submitJob(kind:Exclude<WorkerJobKind,'report'>,payload:Record<string,unknown>,actor:Actor){
+        authorize(actor,'job.submit');
+        if(kind==='sql'){
+            authorize(actor,'database.query');
+            if(typeof payload.connection!=='string'||typeof payload.sql!=='string'||payload.sql.length>50000)throw new AppError('Invalid SQL worker job');
+            const maxRows=finite(payload.maxRows??1000,'maxRows',1,5000),timeoutMs=finite(payload.timeoutMs??10000,'timeoutMs',100,30000);
+            payload={connection:payload.connection,sql:payload.sql,params:payload.params??[],maxRows,timeoutMs};
+        } else if(kind==='wasm'){
+            authorize(actor,'sandbox.run');
+            if(typeof payload.module!=='string'||payload.module.length>2_000_000||typeof payload.export!=='string'||!/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(payload.export))throw new AppError('Invalid WASM sandbox job');
+            const args=Array.isArray(payload.args)?payload.args:[];
+            if(args.length>32||args.some(v=>typeof v!=='number'||!Number.isFinite(v)))throw new AppError('Invalid WASM arguments');
+            payload={module:payload.module,export:payload.export,args,timeoutMs:finite(payload.timeoutMs??2000,'timeoutMs',50,10000)};
+        } else throw new AppError('Unknown worker job');
+        if(this.store.db.all("SELECT id FROM worker_jobs WHERE status IN ('queued','running')").length>=100)throw new AppError('Worker queue full',429);
+        const job:WorkerJob={id:this.uuid(),kind,actor:actor.id,createdAt:this.now(),status:'queued',payload};
+        this.store.enqueueWorker(job);return {id:job.id,status:'queued'};
+    }
+    claimWorker(kinds:readonly WorkerJobKind[],workerId:string):WorkerJob|null {
+        if(!/^[A-Za-z0-9_.-]{1,100}$/.test(workerId))throw new AppError('Invalid worker ID');
+        const job=this.store.claimWorker(kinds,workerId);
+        if(!job)return null;
+        if(job.kind==='report'){
+            const reportId=String(job.payload.reportId??''),row=this.store.db.all<{task:string}>("SELECT task FROM reports WHERE id=?",[reportId])[0];
+            if(!row){this.store.completeWorker(job.id,workerId,null,'Report task missing');return null;}
+            this.store.db.exec("UPDATE reports SET status='running' WHERE id=?",[reportId]);
+            job.payload={reportId,task:JSON.parse(row.task)};
+        }
+        return job;
+    }
+    completeWorker(jobId:string,workerId:string,result:unknown,error?:string):void {
+        const job=this.store.db.all<any>("SELECT id,kind,payload FROM worker_jobs WHERE id=?",[jobId])[0];
+        if(!job)throw new AppError('Worker job not found',404);
+        if(job.kind==='report'){
+            const reportId=String(JSON.parse(job.payload).reportId??'');
+            if(error)this.store.db.exec("UPDATE reports SET status='failure',error=? WHERE id=?",[error.slice(0,500),reportId]);
+            else {
+                const artifact=result as ReportArtifact;
+                if(!artifact||typeof artifact.html!=='string'||!Array.isArray(artifact.rows))throw new AppError('Invalid report artifact');
+                this.store.db.transaction(()=>{this.store.db.exec("UPDATE reports SET status='success',artifact=? WHERE id=?",[JSON.stringify(artifact),reportId]);const taskRow=this.store.db.all<{task:string}>('SELECT task FROM reports WHERE id=?',[reportId])[0];if(taskRow){const task=JSON.parse(taskRow.task) as ReportTask;if(task.report.notify)this.store.notify('report:'+reportId,this.now(),'report',reportId);}});
+            }
+        }
+        this.store.completeWorker(jobId,workerId,result,error);
+    }
     reports() { return this.store.db.all('SELECT id,report_id AS reportId,run_id AS runId,revision,trigger,actor,created_at AS createdAt,status,error FROM reports ORDER BY created_at DESC,rowid DESC LIMIT 100'); }
     reportArtifact(name: string) { const row = this.store.db.all<{
         artifact: string | null;
@@ -234,7 +280,10 @@ export class Service {
         const to = this.kernel.state.time, from = Math.max(this.kernel.state.epoch, to - report.window);
         return { id: this.uuid(), report: clone(report), revision: this.kernel.state.revision, runId: this.kernel.state.runId, trigger, actor: actor.id, createdAt: now, from, to, inputs: resolved, data: this.store.history(this.kernel.state.runId, report.signals, from, to, 50000) };
     }
-    private queue(task: ReportTask) { this.store.db.exec("INSERT INTO reports VALUES(?,?,?,?,?,?,?,'queued',?,NULL,NULL)", [task.id, task.report.id, task.runId, task.revision, task.trigger, task.actor, task.createdAt, JSON.stringify(task)]); }
+    private queue(task: ReportTask) {
+        this.store.db.exec("INSERT INTO reports VALUES(?,?,?,?,?,?,?,'queued',?,NULL,NULL)", [task.id, task.report.id, task.runId, task.revision, task.trigger, task.actor, task.createdAt, JSON.stringify(task)]);
+        if(this.options.externalWorkers)this.store.enqueueWorker({id:'report:'+task.id,kind:'report',actor:task.actor,createdAt:task.createdAt,status:'queued',payload:{reportId:task.id}});
+    }
     dispatch(reportId: string, inputs: Record<string, number>, actor: Actor) { authorize(actor,'report.run'); const report = this.project.reports.find(r => r.id === reportId); if (!report?.on.workflow_dispatch)
         throw new AppError('Manual trigger is disabled'); if (this.store.db.all("SELECT id FROM reports WHERE status IN ('queued','running')").length >= 8)
         throw new AppError('Report queue full', 429); const task = this.makeTask(reportId, 'workflow_dispatch', actor, inputs, this.now()); this.store.db.transaction(() => this.queue(task)); void this.runJobs().catch(() => { this.healthy = false; this.emit(); }); return { id: task.id, status: 'queued' }; }
