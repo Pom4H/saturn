@@ -23,6 +23,7 @@ let studioEditors: Partial<Record<'view'|'report',EditorView>>={}, studioFiles:P
 let studioSelection:Partial<Record<'view'|'report',{kind:any,index:number,source:StudioSource|null}>>={};
 let liveHmiScreen='';
 const autoHmiCache=new WeakMap<object,ReturnType<typeof deriveHmi>>();
+const autoHmiCache=new WeakMap<object,ReturnType<typeof deriveHmi>>();
 let registration: ServiceWorkerRegistration | undefined, pendingInstall: any, noticeEnabled = false, closed = false;
 const fmt = (v: number | null | undefined, digits = 2) => typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—';
 const time = (v: number | null | undefined) => v ? new Date(v).toLocaleString('ru-RU') : '—';
