@@ -1,5 +1,5 @@
-type Request={module:string;export:string;args:number[]};
-process.once('message',async(input:Request)=>{
+type SandboxRequest={module:string;export:string;args:number[]};
+process.once('message',async(input:SandboxRequest)=>{
   try{
     if(!input||typeof input.module!=='string'||typeof input.export!=='string'||!Array.isArray(input.args))throw new Error('Invalid sandbox request');
     const bytes=Buffer.from(input.module,'base64');
