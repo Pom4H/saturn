@@ -673,5 +673,5 @@ function applyStudioField(kind:'view'|'report',field:string,value:string|number)
 }
 $('view-build').onclick=()=>void guard(async()=>{const artifact=await client.request<any>('firmware',{controllerId:'SATURN-1',revision:frame.revision});toast(`Собрано: ${artifact.bytes??artifact.fbdbin?.length??0} байт · без загрузки в физический PLC`);});
 $('view-simulate').onclick=()=>toast('HMI показывает текущий детерминированный runtime.');
-$('report-run-now').onclick=()=>void guard(async()=>{const id=$<HTMLSelectElement>('report-studio-select').value;await client.request('report',{reportId:id,inputs:{}});await refreshPanel();toast('Отчёт поставлен в очередь.');});
+$('report-run-now').onclick=()=>void guard(async()=>{const history=document.querySelector<HTMLDetailsElement>('.studio-history');if(history)history.open=true;const id=$<HTMLSelectElement>('report-studio-select').value;await client.request('report',{reportId:id,inputs:{}});await refreshPanel();toast('Отчёт поставлен в очередь.');});
 $('report-preview-pdf').onclick=()=>toast('Визуальный canvas использует тот же presentation tree, что HTML/PDF-артефакт.');
