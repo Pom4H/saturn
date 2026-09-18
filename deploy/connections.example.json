@@ -1,0 +1,16 @@
+{
+  "connections": [
+    {
+      "id": "plc-main",
+      "driver": "modbus-tcp",
+      "readOnly": false,
+      "options": { "host": "192.0.2.10", "port": 502, "unitId": 1, "timeoutMs": 1500 }
+    },
+    {
+      "id": "historian-read",
+      "driver": "sqlite",
+      "readOnly": true,
+      "options": { "path": "/data/external-historian.sqlite3" }
+    }
+  ]
+}
