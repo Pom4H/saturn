@@ -59,7 +59,7 @@ export async function startPlantServer(options: {
     const root = await realpath(options.root ?? resolve('dist/plant'));
     const workerTokens=new Map<string,ReadonlySet<WorkerJobKind>>();
     for(const [token,kinds] of Object.entries(options.workerTokens??{})){
-        if(token.length<24||!Array.isArray(kinds)||kinds.some(k=>!['report','sql','wasm'].includes(k)))throw new AppError('Invalid worker token configuration');
+        if(token.length<24||!Array.isArray(kinds)||kinds.some(k=>!['report','database','wasm'].includes(k)))throw new AppError('Invalid worker token configuration');
         workerTokens.set(createHash('sha256').update(token).digest('hex'),new Set(kinds));
     }
     const workerAccess=(req:IncomingMessage):ReadonlySet<WorkerJobKind>=>{
@@ -236,7 +236,7 @@ export async function startPlantServer(options: {
                         return;
                     }
                     if(action==='job'){
-                        if(input.kind!=='sql'&&input.kind!=='wasm')throw new AppError('Invalid worker job');
+                        if(input.kind!=='database'&&input.kind!=='wasm')throw new AppError('Invalid worker job');
                         json(202,service.submitJob(input.kind,input.payload??{},actor));return;
                     }
                     if (action === 'subscribe') {
