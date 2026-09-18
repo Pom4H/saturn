@@ -1,0 +1,39 @@
+name: Saturn self-hosted target
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/visual-dsl-shell]
+    paths:
+      - .github/workflows/self-hosted-target.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: saturn-self-hosted-target
+  cancel-in-progress: true
+
+jobs:
+  target:
+    runs-on: self-hosted
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24.20.0'
+          cache: npm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.2'
+      - name: Run target deployment verification
+        shell: bash
+        env:
+          EVIDENCE: ${{ runner.temp }}/saturn-target-evidence
+        run: bash scripts/self-hosted-target.sh
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: saturn-self-hosted-target-evidence
+          path: ${{ runner.temp }}/saturn-target-evidence/
+          retention-days: 7
