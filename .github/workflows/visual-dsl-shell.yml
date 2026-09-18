@@ -1,11 +1,10 @@
-name: Visual DSL studio
+name: Saturn full verification
 on:
-  push:
-    branches: [feature/visual-dsl-shell]
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: visual-dsl-shell-${{ github.ref }}
+  group: saturn-full-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   verify:
