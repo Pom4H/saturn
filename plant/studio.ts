@@ -16,9 +16,16 @@ export interface StudioSource {
 const calls: Record<StudioNodeKind,string> = {
     group:'panel', text:'label', value:'readout', table:'dataTable', chart:'trend', action:'commandButton', navigate:'navigate', motion:'animate',
 };
-const sourceFile = (file:string, source:string) => ts.createSourceFile(file,source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
+interface ParsedStudioFile { source:string; ast:ts.SourceFile; calls:Map<string,StudioSource[]> }
+const parsed=new Map<string,ParsedStudioFile>();
+function parsedFile(file:string,source:string):ParsedStudioFile {
+    const cached=parsed.get(file);if(cached?.source===source)return cached;
+    const next={source,ast:ts.createSourceFile(file,source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS),calls:new Map<string,StudioSource[]>()};
+    parsed.set(file,next);return next;
+}
 function positions(file:string, source:string, call:string):StudioSource[] {
-    const sf=sourceFile(file,source), out:StudioSource[]=[];
+    const cached=parsedFile(file,source), hit=cached.calls.get(call);if(hit)return hit;
+    const sf=cached.ast, out:StudioSource[]=[];
     const visit=(node:ts.Node)=>{
         if(ts.isCallExpression(node)&&ts.isIdentifier(node.expression)&&node.expression.text===call){
             const start=sf.getLineAndCharacterOfPosition(node.getStart(sf)), end=sf.getLineAndCharacterOfPosition(node.getEnd());
@@ -26,7 +33,7 @@ function positions(file:string, source:string, call:string):StudioSource[] {
         }
         ts.forEachChild(node,visit);
     };
-    visit(sf); return out;
+    visit(sf);cached.calls.set(call,out);return out;
 }
 export function widgetSource(files:Record<string,string>,preferredFile:string,kind:StudioNodeKind,index:number):StudioSource|null {
     const call=calls[kind], order=[preferredFile,...Object.keys(files).filter(f=>f!==preferredFile&&f.endsWith('.ts'))];
@@ -57,7 +64,7 @@ export function textSource(files:Record<string,string>,query:string,preferredFil
     const order=[preferredFile,...Object.keys(files).filter(f=>f!==preferredFile&&f.endsWith('.ts'))].filter(Boolean);
     for(const file of order){
         const source=files[file], at=source?.indexOf(query)??-1; if(at<0)continue;
-        const sf=sourceFile(file,source), start=sf.getLineAndCharacterOfPosition(at), end=sf.getLineAndCharacterOfPosition(at+query.length);
+        const sf=parsedFile(file,source).ast, start=sf.getLineAndCharacterOfPosition(at), end=sf.getLineAndCharacterOfPosition(at+query.length);
         return {file,kind:'text',call:'text',index:0,from:at,to:at+query.length,startLine:start.line+1,endLine:end.line+1,args:[]};
     }
     return null;
