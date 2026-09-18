@@ -225,11 +225,12 @@ export class Service {
     jobs(actor:Actor){ authorize(actor,'job.read'); return this.store.workerJobs(); }
     submitJob(kind:Exclude<WorkerJobKind,'report'>,payload:Record<string,unknown>,actor:Actor){
         authorize(actor,'job.submit');
-        if(kind==='sql'){
+        if(kind==='database'){
             authorize(actor,'database.query');
-            if(typeof payload.connection!=='string'||typeof payload.sql!=='string'||payload.sql.length>50000||!/^\s*(select|with)\b/i.test(payload.sql)||payload.sql.includes(';'))throw new AppError('SQL worker jobs are read-only SELECT/WITH queries');
+            if(typeof payload.connection!=='string'||typeof payload.language!=='string'||!/^[A-Za-z][A-Za-z0-9_.-]{0,31}$/.test(payload.language)||typeof payload.query!=='string'||payload.query.length>50000)throw new AppError('Invalid database worker job');
+            if(payload.language.toLowerCase()==='sql'&&(!/^\s*(select|with)\b/i.test(payload.query)||payload.query.includes(';')))throw new AppError('SQL database jobs are read-only SELECT/WITH queries');
             const maxRows=finite(payload.maxRows??1000,'maxRows',1,5000),timeoutMs=finite(payload.timeoutMs??10000,'timeoutMs',100,30000);
-            payload={connection:payload.connection,sql:payload.sql,params:payload.params??[],maxRows,timeoutMs};
+            payload={connection:payload.connection,language:payload.language.toLowerCase(),query:payload.query,params:payload.params??[],maxRows,timeoutMs,readOnly:true};
         } else if(kind==='wasm'){
             authorize(actor,'sandbox.run');
             if(typeof payload.module!=='string'||payload.module.length>2_000_000||typeof payload.export!=='string'||!/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(payload.export))throw new AppError('Invalid WASM sandbox job');
