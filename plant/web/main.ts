@@ -417,8 +417,8 @@ document.addEventListener('click', e => {
         return;
     const d = button.dataset;
     if(d.viewCommand)void guard(async()=>{
-        const v=status.project.views?.find(v=>v.id===$<HTMLSelectElement>('view-select').value);
-        const action=v&&presentationActions(v.body).find(a=>a.target===d.viewCommand&&a.value===Number(d.viewSet));
+        const v=studioViewList(studioProject()).find(v=>v.id===$<HTMLSelectElement>('view-select').value);
+        const action=v&&presentationActions(v).find(a=>a.target===d.viewCommand&&a.value===Number(d.viewSet));
         if(!action)throw new Error('Unknown presentation action');
         await command('operate',{target:action.target,value:action.value});
     });
