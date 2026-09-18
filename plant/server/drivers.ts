@@ -21,10 +21,12 @@ export interface ProtocolDriver {
   connect(config:ConnectionConfig):Promise<ProtocolSession>;
 }
 export interface DatabaseQuery {
-  sql:string;
+  language:string;
+  query:string;
   params?:unknown[]|Record<string,unknown>;
   maxRows:number;
   timeoutMs:number;
+  readOnly:true;
 }
 export interface DatabaseDriver {
   kind:'database';
