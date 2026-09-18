@@ -46,10 +46,11 @@ export function presentationBody(view:Presentation,screen?:string):ViewNode {
     return screens.find(s=>s.id===id)?.body??screens[0].body;
 }
 export function validatePresentation(view:Presentation, target:'web'|'report'|'plc'='web'):void {
-    if(!view||!key(view.id)||!text(view.title)||!view.bindings||Array.isArray(view.bindings)||Object.keys(view.bindings).length>64)throw new AppError('Invalid presentation');
+    const bindingBudget=target==='plc'?64:512;
+    if(!view||!key(view.id)||!text(view.title)||!view.bindings||Array.isArray(view.bindings)||Object.keys(view.bindings).length>bindingBudget)throw new AppError('Invalid presentation');
     for(const k of Object.keys(view.bindings))if(!key(k))throw new AppError('Invalid presentation binding');
     const screens=presentationScreens(view);
-    if(screens.length>16)throw new AppError('Presentation screen budget');
+    if(screens.length>(target==='plc'?16:128))throw new AppError('Presentation screen budget');
     const ids=new Set<string>();
     for(const screen of screens){
         if(!key(screen.id)||!text(screen.title)||ids.has(screen.id))throw new AppError('Invalid presentation screen');
@@ -58,7 +59,7 @@ export function validatePresentation(view:Presentation, target:'web'|'report'|'p
     if(view.initial!==undefined&&!ids.has(view.initial))throw new AppError('Unknown initial presentation screen');
     let count=0;
     const visit=(node:ViewNode,depth:number):void=>{
-        if(!node||typeof node!=='object'||++count>256||depth>10)throw new AppError('Presentation exceeds structure budget');
+        if(!node||typeof node!=='object'||++count>(target==='plc'?256:512)||depth>10)throw new AppError('Presentation exceeds structure budget');
         switch(node.kind){
             case 'group':
                 if(!['row','column'].includes(node.direction)||!Array.isArray(node.children)||node.children.length>64||(node.title!==undefined&&!text(node.title)))throw new AppError('Invalid presentation group');
@@ -80,7 +81,7 @@ export function validatePresentation(view:Presentation, target:'web'|'report'|'p
         }
         if(target==='plc'&&!['group','text','value'].includes(node.kind))throw new AppError(`PLC display does not support ${node.kind}`);
     };
-    for(const screen of screens)visit(screen.body,0);
+    for(const screen of screens){count=0;visit(screen.body,0);}
 }
 /** Only supplied observations are visible. A report supplies a pinned capsule, never live state. */
 export function bindPresentation(view:Presentation,samples:Record<string,Sample>,time:number):Record<string,Sample>{
