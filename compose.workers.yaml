@@ -1,0 +1,73 @@
+services:
+  saturn:
+    environment:
+      SATURN_WORKERS: external
+      SATURN_WORKER_TOKENS: >-
+        {"${SATURN_REPORT_WORKER_TOKEN:-report-worker-token-change-this-0001}":["report"],
+         "${SATURN_DB_WORKER_TOKEN:-database-worker-token-change-this-0002}":["sql"],
+         "${SATURN_WASM_WORKER_TOKEN:-sandbox-worker-token-change-this-0003}":["wasm"]}
+
+  report-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["node",".plant/worker.mjs"]
+    restart: unless-stopped
+    environment:
+      SATURN_SERVER_URL: http://saturn:4176/plant/worker/
+      SATURN_WORKER_ID: report-1
+      SATURN_WORKER_CAPABILITIES: report
+      SATURN_WORKER_TOKEN: ${SATURN_REPORT_WORKER_TOKEN:-report-worker-token-change-this-0001}
+    depends_on:
+      saturn:
+        condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+
+  database-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["node",".plant/worker.mjs"]
+    restart: unless-stopped
+    environment:
+      SATURN_SERVER_URL: http://saturn:4176/plant/worker/
+      SATURN_WORKER_ID: database-1
+      SATURN_WORKER_CAPABILITIES: sql
+      SATURN_WORKER_TOKEN: ${SATURN_DB_WORKER_TOKEN:-database-worker-token-change-this-0002}
+      SATURN_CONNECTIONS_FILE: /run/saturn/connections.json
+      SATURN_DRIVER_MODULES: ${SATURN_DRIVER_MODULES:-}
+    volumes:
+      - ./deploy/connections.json:/run/saturn/connections.json:ro
+    depends_on:
+      saturn:
+        condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+
+  sandbox-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["node",".plant/worker.mjs"]
+    restart: unless-stopped
+    environment:
+      SATURN_SERVER_URL: http://saturn:4176/plant/worker/
+      SATURN_WORKER_ID: sandbox-1
+      SATURN_WORKER_CAPABILITIES: wasm
+      SATURN_WORKER_TOKEN: ${SATURN_WASM_WORKER_TOKEN:-sandbox-worker-token-change-this-0003}
+    depends_on:
+      saturn:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid,nodev
+    mem_limit: 192m
+    cpus: 0.50
+    pids_limit: 64
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
