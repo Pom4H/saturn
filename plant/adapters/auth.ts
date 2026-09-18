@@ -11,6 +11,26 @@ export class Auth {
     seed(id: string, password: string, role: Actor['role'] = 'engineer') { if (!/^[A-Za-z0-9_.@-]{1,100}$/.test(id) || password.length < 12)
         throw new AppError('Use a named user and a password of at least 12 characters'); if (this.store.db.all('SELECT id FROM users WHERE id=?', [id]).length)
         return false; const salt = randomBytes(16).toString('hex'); this.store.db.exec('INSERT INTO users VALUES(?,?,?,?)', [id, role, salt, scryptSync(password, salt, 32).toString('hex')]); return true; }
+    users(){ return this.store.db.all<{id:string;role:Actor['role']}>('SELECT id,role FROM users ORDER BY id'); }
+    create(id:string,password:string,role:Actor['role']) {
+        if(!['viewer','operator','engineer'].includes(role))throw new AppError('Invalid role');
+        if(!this.seed(id,password,role))throw new AppError('User already exists',409);
+        return {id,role};
+    }
+    setRole(id:string,role:Actor['role']){
+        if(!['viewer','operator','engineer'].includes(role))throw new AppError('Invalid role');
+        const current=this.store.db.all<{role:Actor['role']}>('SELECT role FROM users WHERE id=?',[id])[0];
+        if(!current)throw new AppError('User not found',404);
+        if(current.role==='engineer'&&role!=='engineer'&&this.store.db.all('SELECT id FROM users WHERE role=?',['engineer']).length<=1)throw new AppError('Cannot demote the last engineer',409);
+        this.store.db.transaction(()=>{this.store.db.exec('UPDATE users SET role=? WHERE id=?',[role,id]);this.store.db.exec('DELETE FROM sessions WHERE user_id=?',[id]);});
+        return {id,role};
+    }
+    remove(id:string){
+        const current=this.store.db.all<{role:Actor['role']}>('SELECT role FROM users WHERE id=?',[id])[0];
+        if(!current)throw new AppError('User not found',404);
+        if(current.role==='engineer'&&this.store.db.all('SELECT id FROM users WHERE role=?',['engineer']).length<=1)throw new AppError('Cannot delete the last engineer',409);
+        this.store.db.transaction(()=>{this.store.db.exec('DELETE FROM sessions WHERE user_id=?',[id]);this.store.db.exec('DELETE FROM users WHERE id=?',[id]);});
+    }
     login(user: string, password: string, remote: string) {
         if (typeof user !== 'string' || typeof password !== 'string' || user.length > 100 || password.length > 1024)
             throw new AppError('Invalid credentials', 401);
