@@ -1,4 +1,4 @@
-import { AppError, type SqlDatabase, type Checkpoint, type Frame, type Event, type AlarmState, type HistoryPolicy, type Revision, type Repository, type ReportData, type Project } from './types';
+import { AppError, type SqlDatabase, type Checkpoint, type Frame, type Event, type AlarmState, type HistoryPolicy, type Revision, type Repository, type ReportData, type Project, type WorkerJob, type WorkerJobKind } from './types';
 export class Store {
     private last = new Map<string, {
         time: number;
@@ -21,7 +21,30 @@ export class Store {
     CREATE TABLE IF NOT EXISTS commands(id TEXT PRIMARY KEY,payload TEXT NOT NULL,receipt TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS subscriptions(endpoint TEXT PRIMARY KEY,user_id TEXT NOT NULL,session_id TEXT NOT NULL,subscription TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS deliveries(event_id TEXT NOT NULL,endpoint TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'pending',attempts INTEGER NOT NULL DEFAULT 0,next_at INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(event_id,endpoint));
+    CREATE TABLE IF NOT EXISTS worker_jobs(id TEXT PRIMARY KEY,kind TEXT NOT NULL,actor TEXT NOT NULL,created_at INTEGER NOT NULL,status TEXT NOT NULL,payload TEXT NOT NULL,result TEXT,error TEXT,worker_id TEXT,lease_until INTEGER);
+    CREATE INDEX IF NOT EXISTS worker_jobs_queue ON worker_jobs(status,kind,created_at);
   `);
+    }
+    enqueueWorker(job:WorkerJob):void {
+        this.db.exec('INSERT INTO worker_jobs(id,kind,actor,created_at,status,payload) VALUES(?,?,?,?,?,?)',[job.id,job.kind,job.actor,job.createdAt,'queued',JSON.stringify(job.payload)]);
+    }
+    workerJobs(limit=100):WorkerJob[] {
+        return this.db.all<any>('SELECT id,kind,actor,created_at AS createdAt,status,payload,result,error FROM worker_jobs ORDER BY created_at DESC LIMIT ?',[Math.min(limit,100)]).map(row=>({...row,payload:JSON.parse(row.payload),...(row.result?{result:JSON.parse(row.result)}:{})}));
+    }
+    claimWorker(kinds:readonly WorkerJobKind[],workerId:string,now=Date.now(),leaseMs=30000):WorkerJob|null {
+        if(!kinds.length)return null;
+        return this.db.transaction(()=>{
+            this.db.exec("UPDATE worker_jobs SET status='queued',worker_id=NULL,lease_until=NULL WHERE status='running' AND lease_until<?",[now]);
+            const marks=kinds.map(()=>'?').join(','),row=this.db.all<any>(`SELECT * FROM worker_jobs WHERE status='queued' AND kind IN (${marks}) ORDER BY created_at LIMIT 1`,[...kinds])[0];
+            if(!row)return null;
+            this.db.exec("UPDATE worker_jobs SET status='running',worker_id=?,lease_until=? WHERE id=? AND status='queued'",[workerId,now+leaseMs,row.id]);
+            return {id:row.id,kind:row.kind,actor:row.actor,createdAt:row.created_at,status:'running',payload:JSON.parse(row.payload)} as WorkerJob;
+        });
+    }
+    completeWorker(id:string,workerId:string,result:unknown,error?:string):void {
+        const row=this.db.all<any>("SELECT worker_id,status FROM worker_jobs WHERE id=?",[id])[0];
+        if(!row||row.status!=='running'||row.worker_id!==workerId)throw new AppError('Worker lease lost',409);
+        this.db.exec("UPDATE worker_jobs SET status=?,result=?,error=?,worker_id=NULL,lease_until=NULL WHERE id=?",[error?'failure':'success',error?null:JSON.stringify(result??null),error?.slice(0,1000)??null,id]);
     }
     meta<T>(key: string, fallback: T): T { const row = this.db.all<{
         value: string;
