@@ -140,21 +140,23 @@ async function dockerTarget(){
   const docker=spawnSync('docker',['compose','version'],{encoding:'utf8'});
   if(docker.error||docker.status!==0){await writeFile(join(evidence,'docker-skipped.txt'),'Docker Compose unavailable on runner\n');return;}
   const project=`saturn-target-${process.env.GITHUB_RUN_ID??'local'}`,env={...process.env,SATURN_PORT:'4178',SATURN_PUBLIC_URL:'http://127.0.0.1:4178',SATURN_PASSWORD:password};
+  const compose=['compose','-f','compose.yaml','-f','compose.workers.yaml','-p',project];
   try{
-    await run('docker',['compose','-f','compose.yaml','-f','compose.workers.yaml','config'],{env,log:join(evidence,'compose-workers-rendered.txt')});
-    await run('docker',['compose','-p',project,'build','saturn'],{env,log:join(evidence,'docker-build.log')});
-    await run('docker',['compose','-p',project,'up','-d','saturn'],{env,log:join(evidence,'docker-up.log')});
+    await run('docker',[...compose,'config'],{env,log:join(evidence,'compose-workers-rendered.txt')});
+    await run('docker',[...compose,'build','saturn','report-worker'],{env,log:join(evidence,'docker-build.log')});
+    await run('docker',[...compose,'up','-d','saturn','report-worker'],{env,log:join(evidence,'docker-up.log')});
     try{
       await writeFile(join(evidence,'docker-health.json'),await waitHealth('http://127.0.0.1:4178/plant/api/health',60000)+'\n');
     }catch(error){
-      try{await run('docker',['compose','-p',project,'ps','-a'],{env,log:join(evidence,'docker-ps.txt')});}catch{}
-      try{await run('docker',['compose','-p',project,'logs','--no-color','saturn'],{env,log:join(evidence,'docker-server.log')});}catch{}
+      try{await run('docker',[...compose,'ps','-a'],{env,log:join(evidence,'docker-ps.txt')});}catch{}
+      try{await run('docker',[...compose,'logs','--no-color'],{env,log:join(evidence,'docker-server.log')});}catch{}
       throw error;
     }
     await smoke('scripts/self-hosted-server-smoke.mjs','http://127.0.0.1:4178/plant/',join(evidence,'docker-demo-signals.json'));
-    await run('docker',['compose','-p',project,'ps'],{env,log:join(evidence,'docker-ps.txt')});
+    await run('docker',[...compose,'ps'],{env,log:join(evidence,'docker-ps.txt')});
+    await run('docker',[...compose,'logs','--no-color','report-worker'],{env,log:join(evidence,'docker-report-worker.log')});
   }finally{
-    spawnSync('docker',['compose','-p',project,'down','-v','--remove-orphans'],{env,encoding:'utf8'});
+    spawnSync('docker',[...compose,'down','-v','--remove-orphans'],{env,encoding:'utf8'});
   }
 }
 
