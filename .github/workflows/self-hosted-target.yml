@@ -5,6 +5,8 @@ on:
     branches: [feature/visual-dsl-shell]
     paths:
       - .github/workflows/self-hosted-target.yml
+      - scripts/self-hosted-target.mjs
+      - scripts/self-hosted-*.mjs
 
 permissions:
   contents: read
