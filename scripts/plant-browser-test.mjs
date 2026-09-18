@@ -199,7 +199,7 @@ try {
         assert.match(await bench.locator('#live-view').innerText(),/Уровень 3 V · тест/);
         await bench.screenshot({path:evidence+'/visual-hmi-editor.png',fullPage:true});
         await bench.locator('[data-tab="reports"]').click();await bench.locator('#report-studio-select').selectOption('bench-state');await bench.waitForTimeout(300);
-        const readout=bench.locator('#report-visual [data-studio-kind="value"]').first();await readout.click();
+        const readout=bench.locator('#report-visual [data-studio-kind="chart"]').first();await readout.click();
         assert.match(await bench.locator('#report-code-range').innerText(),/reports\.ts:/);
         assert.ok(await bench.locator('#report-properties [data-studio-field="label"]').count());
         await bench.screenshot({path:evidence+'/visual-report-editor.png',fullPage:true});
