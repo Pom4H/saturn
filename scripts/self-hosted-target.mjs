@@ -70,6 +70,8 @@ await writeFile(join(evidence,'environment.txt'),[
   `git_source=${gitSource}`,
   `docker=${version('docker',['--version'])}`,
   `docker_compose=${version('docker',['compose','version'])}`,
+  `wsl=${process.platform==='win32'?version('wsl.exe',['--version']).replace(/\r?\n/g,' | '):'n/a'}`,
+  `ffmpeg=${version('ffmpeg',['-version']).split(/\r?\n/)[0]}`,
   `where_git=${process.platform==='win32'?version('where.exe',['git']):version('which',['git'])}`,
   `wsl=${process.platform==='win32'?version('wsl.exe',['--status']):'n/a'}`,
   `ffmpeg=${version('ffmpeg',['-version']).split(/\\r?\\n/)[0]}`,
