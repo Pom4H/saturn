@@ -9,21 +9,36 @@ const root=process.cwd(),temp=process.env.RUNNER_TEMP??tmpdir();
 const evidence=process.env.EVIDENCE??join(temp,'saturn-target-evidence');
 await rm(evidence,{recursive:true,force:true});await mkdir(evidence,{recursive:true});
 const password=randomBytes(18).toString('base64url'),reportToken=randomBytes(24).toString('base64url');
-const npm=process.platform==='win32'?'npm.cmd':'npm';
+const npm='npm';
+const command=(cmd,args=[])=>process.platform==='win32'&&cmd==='npm'?{cmd:'cmd.exe',args:['/d','/s','/c','npm',...args]}:{cmd,args};
 
 function findGit(){
   const probe=spawnSync(process.platform==='win32'?'where.exe':'which',['git'],{encoding:'utf8'});
   if(probe.status===0)return dirname(probe.stdout.trim().split(/\r?\n/)[0]);
   if(process.platform==='win32'){
-    for(const dir of ['C:\\Program Files\\Git\\cmd','C:\\Program Files\\Git\\bin',join(process.env.LOCALAPPDATA??'','Programs','Git','cmd')])
-      if(existsSync(join(dir,'git.exe')))return dir;
+    const candidates=[
+      'C:\\Program Files\\Git\\cmd','C:\\Program Files\\Git\\bin','C:\\Program Files (x86)\\Git\\cmd',
+      'C:\\tools\\Git\\cmd','C:\\tools\\git\\cmd',
+      join(process.env.LOCALAPPDATA??'','Programs','Git','cmd'),
+      join(process.env.USERPROFILE??'','scoop','apps','git','current','cmd'),
+    ];
+    for(const hive of ['HKLM\\SOFTWARE\\GitForWindows','HKCU\\SOFTWARE\\GitForWindows']){
+      const reg=spawnSync('reg.exe',['query',hive,'/v','InstallPath'],{encoding:'utf8'});
+      const path=/InstallPath\s+REG_SZ\s+(.+)$/mi.exec(reg.stdout??'')?.[1]?.trim();if(path)candidates.push(join(path,'cmd'),join(path,'bin'));
+    }
+    const desktop=join(process.env.LOCALAPPDATA??'','GitHubDesktop');
+    if(existsSync(desktop)){
+      const scan=spawnSync('cmd.exe',['/d','/s','/c',`dir /b /ad "${desktop}\\app-*"`],{encoding:'utf8'});
+      for(const name of (scan.stdout??'').split(/\r?\n/).filter(Boolean))candidates.push(join(desktop,name,'resources','app','git','cmd'));
+    }
+    for(const dir of candidates)if(existsSync(join(dir,'git.exe')))return dir;
   }
   return null;
 }
 const gitDir=findGit();if(gitDir)process.env.PATH=gitDir+delimiter+process.env.PATH;
 
 function version(cmd,args=[]){
-  const r=spawnSync(cmd,args,{encoding:'utf8',shell:false});
+  const spec=command(cmd,args),r=spawnSync(spec.cmd,spec.args,{encoding:'utf8',shell:false});
   return r.error?`unavailable: ${r.error.message}`:(r.stdout||r.stderr||'').trim()||`exit ${r.status}`;
 }
 await writeFile(join(evidence,'environment.txt'),[
@@ -42,8 +57,8 @@ process.stdout.write(await readFile(join(evidence,'environment.txt'),'utf8'));
 if(!gitDir)throw new Error('Git executable is required by the production project repository but was not found on the runner');
 
 async function run(cmd,args,options={}){
-  const log=options.log?createWriteStream(options.log):null;
-  const child=spawn(cmd,args,{cwd:root,env:{...process.env,...options.env},stdio:log?['ignore','pipe','pipe']:'inherit',shell:false});
+  const log=options.log?createWriteStream(options.log):null,spec=command(cmd,args);
+  const child=spawn(spec.cmd,spec.args,{cwd:root,env:{...process.env,...options.env},stdio:log?['ignore','pipe','pipe']:'inherit',shell:false});
   if(log){child.stdout.pipe(log);child.stderr.pipe(log);}
   const code=await new Promise((resolve,reject)=>{child.once('error',reject);child.once('exit',(code,signal)=>resolve(code??(signal?128:1)));});
   log?.end();
