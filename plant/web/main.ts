@@ -1,5 +1,6 @@
 import { bindPresentation, renderPresentation, presentationCss, presentationActions, presentationScreens } from '../presentation';
 import { widgetSource, patchWidget, lineLabel, textSource, type StudioSource } from '../studio';
+import { deriveHmi } from '../auto-hmi';
 import { terminals, resolvePort, type Endpoint, type Connection as PhysicalConnection } from '../ports';
 import { appendConnection, addExpansionSource, removeConnection } from '../connection-edit';
 import { renderSaturnPlcSvg } from '../saturn-view';
@@ -536,14 +537,15 @@ window.addEventListener('pagehide', () => { closed = true; scene3d?.dispose(); c
 
 void start();
 
+function studioViewList(project:any){return [deriveHmi(project),...(project.views??[])];}
 function setupViews(){
     const style=$('presentation-style');style.textContent=presentationCss;
-    const project=studioProject();
+    const project=studioProject(),viewList=studioViewList(project);
     const select=$<HTMLSelectElement>('view-select'),previous=select.value;
-    select.replaceChildren(...(project.views??[]).map(v=>{const o=document.createElement('option');o.value=v.id;o.textContent=v.title;return o;}));
+    select.replaceChildren(...viewList.map(v=>{const o=document.createElement('option');o.value=v.id;o.textContent=v.id==='auto-hmi'?'Авто · '+v.title:v.title;return o;}));
     if([...select.options].some(o=>o.value===previous))select.value=previous;
-    select.onchange=()=>{const view=project.views?.find(v=>v.id===select.value);liveHmiScreen=view?.initial??presentationScreens(view!)[0]?.id??'';refreshView(true);};
-    const view=project.views?.find(v=>v.id===select.value);if(view&&!liveHmiScreen)liveHmiScreen=view.initial??presentationScreens(view)[0].id;
+    select.onchange=()=>{const view=viewList.find(v=>v.id===select.value);liveHmiScreen=view?.initial??presentationScreens(view!)[0]?.id??'';refreshView(true);};
+    const view=viewList.find(v=>v.id===select.value);if(view&&!liveHmiScreen)liveHmiScreen=view.initial??presentationScreens(view)[0].id;
     renderHmiScreenTabs(view);
     const reports=$<HTMLSelectElement>('report-studio-select'),reportPrevious=reports.value;
     reports.replaceChildren(...project.reports.map(r=>{const o=document.createElement('option');o.value=r.id;o.textContent=r.title;return o;}));
@@ -584,7 +586,7 @@ function renderHmiScreenTabs(view:any){
 }
 function refreshView(rebuild=false){
     const project=studioProject(),select=$<HTMLSelectElement>('view-select');
-    const view=project.views?.find(v=>v.id===select.value),host=$('live-view');
+    const view=studioViewList(project).find(v=>v.id===select.value),host=$('live-view');
     if(!view){host.textContent='Объявите view() в DSL проекта.';return;}
     const values=bindPresentation(view,frame.samples,frame.time),interactive=!failed&&status.actor.role!=='viewer';
     if(rebuild||host.dataset.definition!==JSON.stringify(view)+liveHmiScreen){host.innerHTML=renderPresentation(view,{values,interactive,screen:liveHmiScreen});host.dataset.definition=JSON.stringify(view)+liveHmiScreen;}
