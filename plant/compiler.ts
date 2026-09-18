@@ -374,7 +374,7 @@ export function validateProject(value: unknown): asserts value is Project {
     for(const view of p.views??[]){
         validatePresentation(view);if(viewIds.has(view.id))throw new AppError('Duplicate presentation');viewIds.add(view.id);
         for(const expr of Object.values(view.bindings))checkExpr(expr);
-        for(const action of presentationActions(view.body)){
+        for(const action of presentationActions(view)){
             const control=p.controls?.find(c=>c.id===action.target);
             if(!control||action.value<control.min||action.value>control.max)throw new AppError('Presentation command outside declared controls');
         }
