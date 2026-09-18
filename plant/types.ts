@@ -34,6 +34,15 @@ export interface Simulation {
     layout: Layout;
     history?: Record<string, HistoryPolicy>;
 }
+export interface ExternalSource {
+    id:string;
+    connection:string;
+    address:string;
+    unit:string;
+    pollMs:number;
+    writable:boolean;
+    history?:HistoryPolicy;
+}
 export interface Derived {
     id: string;
     expression: Expr;
@@ -134,6 +143,7 @@ export interface Project {
     description: string;
     systems: System[];
     controls?: Control[];
+    sources?: ExternalSource[];
     simulations: Simulation[];
     signals: Derived[];
     devices: Device[];
