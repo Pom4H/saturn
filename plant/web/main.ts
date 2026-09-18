@@ -1,4 +1,5 @@
 import { bindPresentation, renderPresentation, presentationCss, presentationActions } from '../presentation';
+import { widgetSource, patchWidget, lineLabel, textSource, type StudioSource } from '../studio';
 import { terminals, resolvePort, type Endpoint, type Connection as PhysicalConnection } from '../ports';
 import { appendConnection, addExpansionSource, removeConnection } from '../connection-edit';
 import { renderSaturnPlcSvg } from '../saturn-view';
@@ -17,6 +18,8 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 const base = new URL('../', location.href), demo = location.pathname.endsWith('/demo/');
 let client: Connection, status: Status, frame: Frame, scene: SceneView, system = '', selected: string | null = null, tab = 'scheme', file = 'plant.ts', files: Record<string, string> = {}, head: string | null = null, dirty = false, validDraft = true, editor: EditorView, loadingEditor = false, failed = false;
 let scene3d: SceneView3D | undefined, viewMode: '2d' | '3d' = '2d', changingView = false;
+let studioEditors: Partial<Record<'view'|'report',EditorView>>={}, studioFiles:Partial<Record<'view'|'report',string>>={}, studioLoading=false;
+let studioSelection:Partial<Record<'view'|'report',{kind:any,index:number,source:StudioSource|null}>>={};
 let registration: ServiceWorkerRegistration | undefined, pendingInstall: any, noticeEnabled = false, closed = false;
 const fmt = (v: number | null | undefined, digits = 2) => typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—';
 const time = (v: number | null | undefined) => v ? new Date(v).toLocaleString('ru-RU') : '—';
@@ -534,22 +537,104 @@ void start();
 
 function setupViews(){
     const style=$('presentation-style');style.textContent=presentationCss;
+    const project=studioProject();
     const select=$<HTMLSelectElement>('view-select'),previous=select.value;
-    select.replaceChildren(...(status.project.views??[]).map(v=>{const o=document.createElement('option');o.value=v.id;o.textContent=v.title;return o;}));
+    select.replaceChildren(...(project.views??[]).map(v=>{const o=document.createElement('option');o.value=v.id;o.textContent=v.title;return o;}));
     if([...select.options].some(o=>o.value===previous))select.value=previous;
-    select.onchange=()=>refreshView(true);refreshView(true);
+    select.onchange=()=>refreshView(true);
+    const tabs=$('view-screen-tabs');tabs.innerHTML=(project.views??[]).map(v=>`<button data-studio-screen="${escape(v.id)}" class="${v.id===select.value?'active':''}">${escape(v.title)}</button>`).join('');
+    tabs.querySelectorAll<HTMLButtonElement>('[data-studio-screen]').forEach(b=>b.onclick=()=>{select.value=b.dataset.studioScreen!;refreshView(true);});
+    const reports=$<HTMLSelectElement>('report-studio-select'),reportPrevious=reports.value;
+    reports.replaceChildren(...project.reports.map(r=>{const o=document.createElement('option');o.value=r.id;o.textContent=r.title;return o;}));
+    if([...reports.options].some(o=>o.value===reportPrevious))reports.value=reportPrevious;
+    else if([...reports.options].some(o=>o.value==='bench-state'))reports.value='bench-state';
+    reports.onchange=()=>void refreshReportStudio(true);
+    refreshView(true);
+}
+function studioProject(){if(dirty&&validDraft){try{return compileProject(files);}catch{}}return status.project;}
+function markStudioDraft(path:string){
+    file=path;dirty=true;validDraft=false;$('draft-state').textContent='Несохранённый черновик';
+    try{sessionStorage.setItem(`scada-draft:${demo?'demo':'server'}`,JSON.stringify({files,head,file}));$('recover-draft').hidden=false;}catch{}
+    refreshActions();
+}
+function studioEditor(kind:'view'|'report',path:string,range?:StudioSource|null){
+    const host=$(kind==='view'?'view-code':'report-code');
+    if(!files[path]){host.textContent='Исходники доступны инженеру после загрузки проекта.';return;}
+    studioFiles[kind]=path;
+    const extensions=[basicSetup,javascript({typescript:true}),EditorView.updateListener.of(update=>{
+        if(!update.docChanged||studioLoading)return;
+        files[studioFiles[kind]!] = update.state.doc.toString();markStudioDraft(studioFiles[kind]!);
+        window.clearTimeout((studioEditor as any)[kind]);(studioEditor as any)[kind]=window.setTimeout(()=>{
+            try{compileProject(files);validDraft=true;refreshActions();setupViews();if(kind==='report')void refreshReportStudio(true);}
+            catch(e){validDraft=false;toast(e instanceof Error?e.message:String(e));}
+        },250);
+    })];
+    if(!studioEditors[kind])studioEditors[kind]=new EditorView({parent:host,state:EditorState.create({doc:files[path],extensions})});
+    else {studioLoading=true;studioEditors[kind]!.setState(EditorState.create({doc:files[path],extensions}));studioLoading=false;}
+    if(range){studioEditors[kind]!.dispatch({selection:{anchor:range.from,head:range.to},scrollIntoView:true});}
+    $(kind==='view'?'view-code-file':'report-code-file').textContent=path;
+    $(kind==='view'?'view-code-range':'report-code-range').textContent=range?lineLabel(range):'Источник DSL';
 }
 function refreshView(rebuild=false){
-    const view=status.project.views?.find(v=>v.id===$<HTMLSelectElement>('view-select').value),host=$('live-view');
-    if(!view){host.textContent='Объявите view() в DSL проекта. Тот же panel() можно использовать в HMI и отчёте.';return;}
+    const project=studioProject(),select=$<HTMLSelectElement>('view-select');
+    const view=project.views?.find(v=>v.id===select.value),host=$('live-view');
+    if(!view){host.textContent='Объявите view() в DSL проекта.';return;}
     const values=bindPresentation(view,frame.samples,frame.time),interactive=!failed&&status.actor.role!=='viewer';
-    // Telemetry updates readouts in place: keyboard focus and operator buttons survive a scan.
     if(rebuild||host.dataset.definition!==JSON.stringify(view)){host.innerHTML=renderPresentation(view,{values,interactive});host.dataset.definition=JSON.stringify(view);}
-    for(const node of host.querySelectorAll<HTMLElement>('[data-view-value]')){
-        const sample=values[node.dataset.viewValue!],valid=sample?.quality==='good'&&sample.value!==null;
-        node.textContent=valid?sample.value!.toFixed(Number(node.dataset.digits??2)):'—';
-        node.parentElement!.dataset.quality=valid?'good':'bad';
-        node.parentElement!.querySelector('small')!.textContent=(node.dataset.unit??'')+(valid?'':' · нет достоверных данных');
-    }
+    for(const node of host.querySelectorAll<HTMLElement>('[data-view-value]')){const sample=values[node.dataset.viewValue!],valid=sample?.quality==='good'&&sample.value!==null;node.textContent=valid?sample.value!.toFixed(Number(node.dataset.digits??2)):'—';node.parentElement!.dataset.quality=valid?'good':'bad';node.parentElement!.querySelector('small')!.textContent=(node.dataset.unit??'')+(valid?'':' · нет достоверных данных');}
     for(const button of host.querySelectorAll<HTMLButtonElement>('[data-view-command]'))button.disabled=!interactive;
+    document.querySelectorAll('#view-screen-tabs button').forEach(b=>b.classList.toggle('active',(b as HTMLElement).dataset.studioScreen===view.id));
+    bindStudioCanvas('view',host,'views.ts');
+    if(!studioEditors.view&&files['views.ts'])studioEditor('view','views.ts');
 }
+async function refreshReportStudio(rebuild=false){
+    if(!status||!frame)return;
+    const project=studioProject(),select=$<HTMLSelectElement>('report-studio-select'),report=project.reports.find(r=>r.id===select.value),host=$('report-visual');
+    if(!report){host.textContent='Выберите отчёт.';return;}
+    if(!report.view){host.innerHTML=`<div class="studio-empty"><b>${escape(report.title)}</b><p>Этот отчёт использует SQL/колонки без presentation view. Добавьте view:, чтобы редактировать компоновку визуально.</p></div>`;if(!studioEditors.report&&files['reports.ts'])studioEditor('report','reports.ts');return;}
+    let rows:Record<string,unknown>[]=[];
+    try{const data=await client.request<ReportData>('history',{signals:report.signals,from:Math.max(0,frame.time-report.window),to:frame.time});rows=data.samples as unknown as Record<string,unknown>[];}catch{}
+    const values=bindPresentation(report.view,frame.samples,frame.time);
+    host.innerHTML=renderPresentation(report.view,{values,rows,interactive:false});
+    bindStudioCanvas('report',host,'reports.ts');
+    if(!studioEditors.report&&files['reports.ts'])studioEditor('report','reports.ts');
+}
+function bindStudioCanvas(kind:'view'|'report',host:HTMLElement,preferredFile:string){
+    host.querySelectorAll<HTMLElement>('[data-studio-kind]').forEach(node=>{
+        node.onclick=e=>{e.stopPropagation();selectStudioNode(kind,node,preferredFile);};
+        node.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selectStudioNode(kind,node,preferredFile);}};
+    });
+}
+function selectStudioNode(kind:'view'|'report',node:HTMLElement,preferredFile:string){
+    const host=kind==='view'?$('live-view'):$('report-visual');host.querySelectorAll('[data-studio-selected]').forEach(n=>n.removeAttribute('data-studio-selected'));node.dataset.studioSelected='true';
+    const nodeKind=node.dataset.studioKind as any,index=Number(node.dataset.studioIndex),source=widgetSource(files,preferredFile,nodeKind,index);
+    studioSelection[kind]={kind:nodeKind,index,source};
+    if(source)studioEditor(kind,source.file,source);
+    renderStudioProperties(kind,node,source);
+}
+function renderStudioProperties(kind:'view'|'report',node:HTMLElement,source:StudioSource|null){
+    const host=$(kind==='view'?'view-properties':'report-properties'),k=node.dataset.studioKind!;
+    const value=(sel:string)=>node.querySelector<HTMLElement>(sel)?.textContent?.trim()??'';
+    let fields='';
+    if(k==='text')fields=studioField('text','Текст',node.textContent?.trim()??'');
+    if(k==='value')fields=studioField('label','Заголовок',value('span'))+studioField('unit','Единица',node.querySelector<HTMLElement>('strong')?.dataset.unit??'')+studioField('digits','Знаков',node.querySelector<HTMLElement>('strong')?.dataset.digits??'2','number');
+    if(k==='chart')fields=studioField('title','Заголовок',value('figcaption'));
+    if(k==='action')fields=studioField('label','Текст кнопки',node.textContent?.trim()??'')+studioField('value','Значение команды',node.dataset.viewSet??'0','number');
+    const firmware=kind==='view'?textSource(files,"plc('SATURN-1'",'commissioning.ts'):null;
+    host.innerHTML=`<p class="eyebrow">СВОЙСТВА ВИДЖЕТА</p><h3>${escape(k.toUpperCase())}</h3>${fields||'<p class="studio-empty">Структурный виджет редактируется кодом.</p>'}<h3>Связанные исходники</h3>${source?sourceLink(kind,source,'DSL'):''}${firmware?sourceLink(kind,firmware,'PLC · прошивка'):''}<p class="studio-save-note">Визуальная правка меняет TypeScript-черновик. Runtime не изменится до commit + публикации.</p>`;
+    host.querySelectorAll<HTMLInputElement>('[data-studio-field]').forEach(input=>input.onchange=()=>void guard(()=>applyStudioField(kind,input.dataset.studioField!,input.type==='number'?Number(input.value):input.value)));
+    host.querySelectorAll<HTMLButtonElement>('[data-source-file]').forEach(button=>button.onclick=()=>{const src=button.dataset.sourceFile===source?.file?source:firmware;if(src)studioEditor(kind,src.file,src);});
+}
+function studioField(name:string,title:string,value:string,type='text'){return `<label>${escape(title)}<input data-studio-field="${name}" type="${type}" value="${escape(value)}"></label>`;}
+function sourceLink(kind:'view'|'report',source:StudioSource,label:string){return `<div class="source-link"><span>${escape(label)} · ${escape(lineLabel(source))}</span><button data-source-file="${escape(source.file)}">К коду</button></div>`;}
+function applyStudioField(kind:'view'|'report',field:string,value:string|number){
+    const selection=studioSelection[kind];if(!selection?.source)throw new Error('Исходный диапазон не найден');
+    files=patchWidget(files,selection.source,field,value);markStudioDraft(selection.source.file);
+    const project=compileProject(files);validDraft=true;refreshActions();
+    studioLoading=true;studioEditor(kind,selection.source.file);studioLoading=false;
+    setupViews();if(kind==='report')void refreshReportStudio(true);toast('TypeScript обновлён. Сохраните commit, когда результат готов.');
+}
+$('view-build').onclick=()=>void guard(async()=>{const artifact=await client.request<any>('firmware',{controllerId:'SATURN-1',revision:frame.revision});toast(`Собрано: ${artifact.bytes??artifact.fbdbin?.length??0} байт · без загрузки в физический PLC`);});
+$('view-simulate').onclick=()=>toast('HMI показывает текущий детерминированный runtime.');
+$('report-run-now').onclick=()=>void guard(async()=>{const id=$<HTMLSelectElement>('report-studio-select').value;await client.request('report',{reportId:id,inputs:{}});await refreshPanel();toast('Отчёт поставлен в очередь.');});
+$('report-preview-pdf').onclick=()=>toast('Визуальный canvas использует тот же presentation tree, что HTML/PDF-артефакт.');
