@@ -11,15 +11,16 @@ export interface MotionSpec {
     to: number;
 }
 /** One serializable presentation tree. Bindings belong to each usage, not the widget. */
-export type ViewNode =
-    | { kind: 'group'; title?: string; direction: 'row'|'column'; children: ViewNode[] }
+export type ViewNode = (
+    { kind: 'group'; title?: string; direction: 'row'|'column'; children: ViewNode[] }
     | { kind: 'text'; text: string }
     | { kind: 'value'; label: string; binding: string; unit: string; digits: number }
     | { kind: 'table'; columns: {key:string;title:string;unit?:string}[] }
     | { kind: 'chart'; title: string; x: string; y: string }
     | { kind: 'action'; label: string; target: string; value: number }
     | { kind: 'navigate'; label: string; target: string }
-    | { kind: 'motion'; motion: MotionSpec; child: ViewNode };
+    | { kind: 'motion'; motion: MotionSpec; child: ViewNode }
+) & { sourceHint?: string };
 export interface PresentationScreen { id:string; title:string; body:ViewNode }
 export interface Presentation {
     id: string;
@@ -94,7 +95,7 @@ export function presentationActions(value:ViewNode|Presentation):Extract<ViewNod
 export function renderPresentation(view:Presentation,context:PresentationContext):string {
     validatePresentation(view);const rows=context.rows??[],counts:Record<string,number>={};
     if(rows.length>2000)throw new AppError('Presentation row budget');
-    const meta=(node:ViewNode)=>{const index=counts[node.kind]??0;counts[node.kind]=index+1;return ` data-studio-kind="${node.kind}" data-studio-index="${index}" tabindex="0"`;};
+    const meta=(node:ViewNode)=>{const index=counts[node.kind]??0;counts[node.kind]=index+1;return ` data-studio-kind="${node.kind}" data-studio-index="${index}"${node.sourceHint?` data-studio-hint="${escape(node.sourceHint)}"`:''} tabindex="0"`;};
     const render=(node:ViewNode):string=>{
         const studio=meta(node);
         switch(node.kind){
