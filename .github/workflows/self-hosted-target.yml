@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   target:
-    runs-on: self-hosted
+    runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7.0.1
@@ -27,6 +27,7 @@ jobs:
         with:
           bun-version: '1.4.2'
       - name: Run target deployment verification
+        shell: cmd
         env:
           EVIDENCE: ${{ runner.temp }}/saturn-target-evidence
         run: node scripts/self-hosted-target.mjs
