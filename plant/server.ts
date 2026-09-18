@@ -94,7 +94,7 @@ export async function startPlantServer(options: {
                 return;
             }
             if (path === `${prefix}/api/health` && req.method === 'GET') {
-                json(service.healthy ? 200 : 503, { status: service.healthy ? 'ok' : 'storage-unavailable', mode: 'simulation', releaseError: !!service.releaseError });
+                json(service.healthy ? 200 : 503, { status: service.healthy ? 'ok' : 'storage-unavailable', mode: service.project.sources?.length ? 'live' : 'simulation', runtime:(process.versions as any).bun?'bun':'node', releaseError: !!service.releaseError });
                 return;
             }
             if (path === `${prefix}/api/login` && req.method === 'POST') {
