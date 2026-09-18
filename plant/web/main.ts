@@ -22,6 +22,7 @@ let scene3d: SceneView3D | undefined, viewMode: '2d' | '3d' = '2d', changingView
 let studioEditors: Partial<Record<'view'|'report',EditorView>>={}, studioFiles:Partial<Record<'view'|'report',string>>={}, studioLoading=false;
 let studioSelection:Partial<Record<'view'|'report',{kind:any,index:number,source:StudioSource|null}>>={};
 let liveHmiScreen='';
+const autoHmiCache=new WeakMap<object,ReturnType<typeof deriveHmi>>();
 let registration: ServiceWorkerRegistration | undefined, pendingInstall: any, noticeEnabled = false, closed = false;
 const fmt = (v: number | null | undefined, digits = 2) => typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—';
 const time = (v: number | null | undefined) => v ? new Date(v).toLocaleString('ru-RU') : '—';
@@ -537,7 +538,7 @@ window.addEventListener('pagehide', () => { closed = true; scene3d?.dispose(); c
 
 void start();
 
-function studioViewList(project:any){return [deriveHmi(project),...(project.views??[])];}
+function studioViewList(project:any){let auto=autoHmiCache.get(project);if(!auto){auto=deriveHmi(project);autoHmiCache.set(project,auto);}return [auto,...(project.views??[])];}
 function setupViews(){
     const style=$('presentation-style');style.textContent=presentationCss;
     const project=studioProject(),viewList=studioViewList(project);
