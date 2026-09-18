@@ -2,8 +2,8 @@
  * Browser-native Saturn-PLC front-panel view.
  *
  * The geometry is intentionally kept in the Saturn profile instead of the
- * vendor-neutral core. It mirrors the reference front panel used by
- * lanmon-design and exposes terminal anchors to topology editors.
+ * vendor-neutral core. It mirrors the reference Saturn PLC front panel and
+ * exposes terminal anchors to topology editors.
  */
 
 export type SaturnTerminalSignal = "digital" | "analog" | "temperature";
