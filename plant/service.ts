@@ -4,7 +4,8 @@ import { Kernel } from './kernel';
 import { acknowledge, updateAlarms } from './alarms';
 import { Store } from './store';
 import { cronMatches } from './workflows';
-import { AppError, clone, finite, id, requireRole, type Actor, type AlarmState, type Event, type Frame, type Project, type Repository, type ReportTask, type ReportArtifact } from './types';
+import { AppError, clone, finite, id, type Actor, type AlarmState, type Event, type Frame, type Project, type Repository, type ReportTask, type ReportArtifact } from './types';
+import { authorize } from './server/policy';
 const engineering: Actor = { id: 'system', role: 'engineer' };
 const configuration = (p: Project) => JSON.stringify({ controllers:(p.controllers??[]).map(({layout,system,...c})=>c),connections:(p.connections??[]).map(({via,...w})=>w),attachments:p.attachments??[], simulations: p.simulations.map(({ layout, system, history, ...n }) => n).sort((a, b) => a.id.localeCompare(b.id)), signals: p.signals.map(({ unit, history, ...s }) => s), stepMs: p.stepMs, controls: p.controls ?? [] });
 export class Service {
@@ -86,9 +87,9 @@ export class Service {
         }
         return this.emit();
     }
-    async save(files: Record<string, string>, expected: string | null, message: string, actor: Actor) { requireRole(actor, 'engineer'); validateFiles(files); compileProject(files); if (typeof message !== 'string' || !message.trim() || message.length > 200)
+    async save(files: Record<string, string>, expected: string | null, message: string, actor: Actor) { authorize(actor, 'project.commit'); validateFiles(files); compileProject(files); if (typeof message !== 'string' || !message.trim() || message.length > 200)
         throw new AppError('Commit message required (1..200 characters)'); return this.repository.commit(files, expected, message, actor.id); }
-    async publish(revision: string, expected: string | null, actor: Actor) { requireRole(actor, 'engineer'); const snapshot = await this.repository.read(revision); compileProject(snapshot.files); await this.repository.publish(revision, expected); await this.apply(revision, actor); return this.status(actor); }
+    async publish(revision: string, expected: string | null, actor: Actor) { authorize(actor, 'project.publish'); const snapshot = await this.repository.read(revision); compileProject(snapshot.files); await this.repository.publish(revision, expected); await this.apply(revision, actor); return this.status(actor); }
     /** Git desired ref is durable first; SQLite applied checkpoint is authoritative for visible state.
      * A crash between them is reconciled by start(), retaining the last good checkpoint on rejection. */
     async apply(revision: string, actor: Actor) {
@@ -115,7 +116,7 @@ export class Service {
         }
         this.emit();
     }
-    async rollback(revision: string, expected: string | null, actor: Actor) { requireRole(actor, 'engineer'); const old = await this.repository.read(revision); const commit = await this.save(old.files, expected, `Restore ${revision}`, actor); return this.publish(commit.id, await this.repository.desired(), actor); }
+    async rollback(revision: string, expected: string | null, actor: Actor) { authorize(actor, 'project.publish'); const old = await this.repository.read(revision); const commit = await this.save(old.files, expected, `Restore ${revision}`, actor); return this.publish(commit.id, await this.repository.desired(), actor); }
     command(payload: {
         id: string;
         revision: string;
@@ -125,7 +126,6 @@ export class Service {
         parameter?: string;
         value?: number;
     }, actor: Actor) {
-        requireRole(actor, 'operator');
         if (!this.healthy)
             throw new AppError('Runtime storage unavailable', 503);
         id(payload.id);
@@ -146,24 +146,28 @@ export class Service {
         try {
             switch (payload.action) {
                 case 'operate':
+                    authorize(actor,'control.operate');
                     if (payload.runId !== this.kernel.state.runId) throw new AppError('Simulation run changed', 409);
                     this.kernel.operate(payload.target!, payload.value!);
                     event = this.event('command.control', payload.target!, JSON.stringify({ requested: payload.value, actual: this.kernel.state.controls![payload.target!].value }), actor);
                     break;
                 case 'set':
-                    requireRole(actor, 'engineer');
+                    authorize(actor,'simulation.modify');
                     this.kernel.setParameter(payload.target!, payload.parameter!, payload.value!);
                     event = this.event('command.parameter', payload.target!, `${payload.parameter}=${payload.value}`, actor);
                     break;
                 case 'pause':
+                    authorize(actor,'runtime.pause');
                     this.kernel.state.paused = true;
                     event = this.event('command.pause', 'simulation', 'Simulation paused', actor);
                     break;
                 case 'resume':
+                    authorize(actor,'runtime.pause');
                     this.kernel.state.paused = false;
                     event = this.event('command.resume', 'simulation', 'Simulation resumed', actor);
                     break;
                 case 'ack':
+                    authorize(actor,'alarm.ack');
                     acknowledge(this.alarms, payload.target!, actor, this.kernel.state.time);
                     event = this.event('alarm.acknowledged', payload.target!, 'Acknowledged', actor);
                     break;
@@ -185,7 +189,7 @@ export class Service {
             throw error;
         }
     }
-    async restart(actor: Actor) { requireRole(actor, 'engineer'); const state = this.kernel.state; const old = this.kernel; this.kernel = new Kernel(this.project, state.revision, this.uuid(), this.now()); const alarms = this.alarms; this.alarms = {}; try {
+    async restart(actor: Actor) { authorize(actor,'simulation.modify'); const state = this.kernel.state; const old = this.kernel; this.kernel = new Kernel(this.project, state.revision, this.uuid(), this.now()); const alarms = this.alarms; this.alarms = {}; try {
         this.persist([this.event('simulation.restart', this.project.id, 'New simulation run', actor)]);
     }
     catch (error) {
@@ -195,9 +199,9 @@ export class Service {
     } this.healthy = true; return this.emit(); }
     history(signals: string[], from: number, to: number) { finite(from, 'from', 0, Number.MAX_SAFE_INTEGER); finite(to, 'to', from, this.kernel.state.time); return this.store.history(this.kernel.state.runId, signals, from, to); }
     async status(actor: Actor) { return { actor, mode: 'simulation', project: this.project, frame: this.frame(), head: await this.repository.head(), desired: await this.repository.desired(), healthy: this.healthy, releaseError: this.releaseError, overrides: clone(this.kernel.state.overrides) }; }
-    async files(actor: Actor) { requireRole(actor, 'engineer'); const head = await this.repository.head(); return head ? this.repository.read(head) : null; }
+    async files(actor: Actor) { authorize(actor,'project.source.read'); const head = await this.repository.head(); return head ? this.repository.read(head) : null; }
     firmware(controllerId:string, revision:string, actor:Actor) {
-        requireRole(actor,'engineer');if(revision!==this.kernel.state.revision)throw new AppError('Project revision changed',409);
+        authorize(actor,'firmware.build');if(revision!==this.kernel.state.revision)throw new AppError('Project revision changed',409);
         const c=this.project.controllers?.find(c=>c.id===controllerId);if(!c)throw new AppError('Unknown PLC',404);
         const artifact=compileController(c);
         return { ...artifact,fbdbin:Array.from(artifact.fbdbin),revision,controllerId,
@@ -226,7 +230,7 @@ export class Service {
         return { id: this.uuid(), report: clone(report), revision: this.kernel.state.revision, runId: this.kernel.state.runId, trigger, actor: actor.id, createdAt: now, from, to, inputs: resolved, data: this.store.history(this.kernel.state.runId, report.signals, from, to, 50000) };
     }
     private queue(task: ReportTask) { this.store.db.exec("INSERT INTO reports VALUES(?,?,?,?,?,?,?,'queued',?,NULL,NULL)", [task.id, task.report.id, task.runId, task.revision, task.trigger, task.actor, task.createdAt, JSON.stringify(task)]); }
-    dispatch(reportId: string, inputs: Record<string, number>, actor: Actor) { requireRole(actor, 'operator'); const report = this.project.reports.find(r => r.id === reportId); if (!report?.on.workflow_dispatch)
+    dispatch(reportId: string, inputs: Record<string, number>, actor: Actor) { authorize(actor,'report.run'); const report = this.project.reports.find(r => r.id === reportId); if (!report?.on.workflow_dispatch)
         throw new AppError('Manual trigger is disabled'); if (this.store.db.all("SELECT id FROM reports WHERE status IN ('queued','running')").length >= 8)
         throw new AppError('Report queue full', 429); const task = this.makeTask(reportId, 'workflow_dispatch', actor, inputs, this.now()); this.store.db.transaction(() => this.queue(task)); void this.runJobs().catch(() => { this.healthy = false; this.emit(); }); return { id: task.id, status: 'queued' }; }
     schedule(now = this.now()) {
