@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { panel, label, readout, view, pin, block, functionBlock, dataTable, commandButton } from '../dsl';
-import { bindPresentation, renderPresentation, validatePresentation } from '../presentation';
+import { panel, label, readout, view, pin, block, functionBlock, dataTable, commandButton, screen, navigate, animate } from '../dsl';
+import { bindPresentation, renderPresentation, validatePresentation, presentationActions } from '../presentation';
+import { deriveHmi } from '../auto-hmi';
 import { presentationHmi } from '../presentation-hmi';
 import { ControllerVM, compileController } from '../controller';
 import { Kernel } from '../kernel';
@@ -16,6 +17,20 @@ test('one DSL subtree is shared by live HMI, richer report and the compiled cont
  assert.equal(report.body.kind,'group');assert.deepEqual(v.body,(report.body as Extract<typeof report.body,{kind:'group'}>).children[1]);
  assert.deepEqual(v.body,p.controllers![0].hmi.view!.body);
  const vm=new ControllerVM(p.controllers![0]),result=vm.scan({AI1:700},100);assert.equal(result.outputs.DO1,1);assert.ok(result.hmi.some(c=>c.type==='text'&&c.text==='700'));
+});
+test('topology deterministically derives an HMI screen graph and operator actions',()=>{
+ const p=project(),h=deriveHmi(p);validatePresentation(h);
+ assert.equal(h.screens?.length,p.systems.length);assert.ok(h.screens?.some(s=>s.id==='commissioning'));
+ assert.ok(presentationActions(h).some(a=>a.target==='BENCH-LEVEL'));
+});
+test('HMI presentation supports screen transitions and signal-driven animation metadata',()=>{
+ const v=view('multi',{title:'Multi',bindings:{x:pin('value')},body:label('fallback'),screens:[
+   screen('main','Main',panel([navigate('Diagnostics','diag')])),
+   screen('diag','Diagnostics',panel([animate(readout('X','x','',0),'x','rotate',{min:0,max:100,from:0,to:90}),navigate('Back','main')]))
+ ],initial:'main'});
+ validatePresentation(v);
+ const html=renderPresentation(v,{values:bindPresentation(v,{value:{value:50,quality:'good',time:0}},0),interactive:true,screen:'diag'});
+ assert.match(html,/data-view-screen="main"/);assert.match(html,/data-view-motion="x"/);assert.match(html,/data-motion-property="rotate"/);
 });
 test('presentation escapes content, preserves bad quality and disables commands in report mode',()=>{
  const v=view('escape',{title:'Example',bindings:{a:pin('value')},body:panel([label('<script>x</script>'),readout('X','a'),commandButton('Start','control',1)])});
