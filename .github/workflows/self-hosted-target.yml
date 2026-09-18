@@ -8,6 +8,8 @@ on:
       - scripts/self-hosted-target.mjs
       - scripts/self-hosted-*.mjs
       - scripts/plant-*.mjs
+      - plant/adapters/git.ts
+      - server/project.ts
 
 permissions:
   contents: read
