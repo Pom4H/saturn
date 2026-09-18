@@ -17,6 +17,7 @@ export interface GitProjectOptions {
 }
 export class ProjectError extends Error { constructor(message: string, public status = 400) { super(message); } }
 const oid = (value: string) => /^[a-f0-9]{40,64}$/.test(value);
+const gitNull = process.platform === 'win32' ? 'NUL' : devNull;
 const text = (bytes: Buffer) => new TextDecoder('utf-8', { fatal: true }).decode(bytes);
 /** Git object reads, one validated in-memory snapshot, one durable last-good ref. No checkout/pull/hooks/eval. */
 export class GitProject {
@@ -43,8 +44,8 @@ export class GitProject {
   private git(args: string[], input?: string, extraEnv: Record<string, string> = {}): Promise<Buffer> {
     const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
     return new Promise((accept, reject) => {
-      const child = spawn('git', ['-c', `core.hooksPath=${devNull}`, '-c', 'core.fsmonitor=false', '-c', 'protocol.ext.allow=never', '-C', resolve(this.options.repository), ...args], {
-        shell: false, windowsHide: true, env: { ...env, GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: devNull, ...extraEnv }, stdio: ['pipe', 'pipe', 'pipe'],
+      const child = spawn('git', ['-c', `core.hooksPath=${gitNull}`, '-c', 'core.fsmonitor=false', '-c', 'protocol.ext.allow=never', '-C', resolve(this.options.repository), ...args], {
+        shell: false, windowsHide: true, env: { ...env, GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: gitNull, ...extraEnv }, stdio: ['pipe', 'pipe', 'pipe'],
       });
       const output: Buffer[] = []; let size = 0, failed = false;
       const timer = setTimeout(() => { failed = true; child.kill('SIGKILL'); reject(new ProjectError('Git operation timed out', 503)); }, 15_000);
