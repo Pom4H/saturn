@@ -9,7 +9,7 @@ export class Kernel {
     state: Checkpoint;
     private bad = new Set<string>();
     private controllers = new Map<string,ControllerVM>();
-    constructor(readonly project: Project, revision: string, runId: string, epoch: number, checkpoint?: Checkpoint) {
+    constructor(readonly project: Project, revision: string, runId: string, epoch: number, checkpoint?: Checkpoint, readonly externalSamples:()=>Record<string,Sample>=()=>Object.create(null)) {
         this.state = checkpoint ? clone(checkpoint) : { runId, revision, epoch, time: epoch, seq: 0, paused: false, overrides: {}, modelVersions: Object.fromEntries(project.simulations.map(n => [n.model, model(n.model).version])), controls: Object.fromEntries((project.controls ?? []).map(c => [c.id, { requested: c.initial, value: c.initial, blocked: false }])), states: Object.fromEntries(project.simulations.map(n => [n.id, model(n.model).initialize(n.parameters)])) };
         if(checkpoint&&(project.controllers?.length??0)>0&&checkpoint.controllerAbi!==CONTROLLER_ABI)throw new AppError('Controller checkpoint ABI mismatch');
         this.state.controllerAbi=CONTROLLER_ABI;
@@ -39,7 +39,7 @@ export class Kernel {
     } return p; }
     samples(): Record<string, Sample> {
         this.bad=new Set(this.state.invalidModels??[]);
-        const output: Record<string, Sample> = Object.create(null);
+        const output: Record<string, Sample> = Object.assign(Object.create(null), this.externalSamples());
         for (const c of this.project.controls ?? []) {
             const state = this.state.controls![c.id];
             for (const key of ['value', 'requested', 'blocked'] as const)
