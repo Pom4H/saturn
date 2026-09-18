@@ -231,7 +231,7 @@ export function validateProject(value: unknown): asserts value is Project {
     for (const k of ['systems', 'simulations', 'signals', 'devices', 'alarms', 'reports'] as const)
         if (!Array.isArray(p[k]) || p[k].length > 512)
             throw new AppError(`Invalid ${k}`);
-    if (!p.systems.length || !p.simulations.length || typeof p.description !== 'string' || p.description.length > 2000)
+    if (!p.systems.length || (!p.simulations.length && !(p.sources?.length) && !(p.controllers?.length)) || typeof p.description !== 'string' || p.description.length > 2000)
         throw new AppError('Empty installation or invalid description');
     if (p.simulations.length > 256 || p.reports.length > 32)
         throw new AppError('Project size limit');
