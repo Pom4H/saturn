@@ -161,6 +161,7 @@ export async function startPlantServer(options: {
                         return;
                     }
                     if(action==='jobs'){json(200,service.jobs(actor));return;}
+                    if(action==='users'){authorize(actor,'users.manage');json(200,auth.users());return;}
                     if(action==='drivers'){authorize(actor,'project.source.read');json(200,{drivers:registry.list(),connections:[...gateway.connections.keys()]});return;}
                     if (action === 'history') {
                         json(200, service.history((url.searchParams.get('signals') ?? '').split(',').filter(Boolean), Number(url.searchParams.get('from')), Number(url.searchParams.get('to'))));
@@ -238,6 +239,14 @@ export async function startPlantServer(options: {
                     if(action==='job'){
                         if(input.kind!=='database'&&input.kind!=='wasm')throw new AppError('Invalid worker job');
                         json(202,service.submitJob(input.kind,input.payload??{},actor));return;
+                    }
+                    if(action==='user'){
+                        authorize(actor,'users.manage');
+                        if(input.operation==='create')json(201,auth.create(input.id,input.password,input.role));
+                        else if(input.operation==='role')json(200,auth.setRole(input.id,input.role));
+                        else if(input.operation==='delete'){auth.remove(input.id);json(200,{ok:true});}
+                        else throw new AppError('Unknown user operation');
+                        return;
                     }
                     if (action === 'subscribe') {
                         if (!push)
