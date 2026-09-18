@@ -11,8 +11,9 @@ import { executeReport } from '../workflows';
 import { NodeSql } from '../adapters/node-sql';
 import type { ReportTask } from '../types';
 const project=()=>compileProject(demoFiles);
-test('one DSL tree is shared by live HMI, report and the compiled controller screen',()=>{
- const p=project(),v=p.views![0];assert.deepEqual(v.body,p.reports.find(r=>r.id==='bench-state')!.view!.body);
+test('one DSL subtree is shared by live HMI, richer report and the compiled controller screen',()=>{
+ const p=project(),v=p.views![0],report=p.reports.find(r=>r.id==='bench-state')!.view!;
+ assert.equal(report.body.kind,'group');assert.deepEqual(v.body,(report.body as Extract<typeof report.body,{kind:'group'}>).children[1]);
  assert.deepEqual(v.body,p.controllers![0].hmi.view!.body);
  const vm=new ControllerVM(p.controllers![0]),result=vm.scan({AI1:700},100);assert.equal(result.outputs.DO1,1);assert.ok(result.hmi.some(c=>c.type==='text'&&c.text==='700'));
 });
