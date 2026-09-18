@@ -65,7 +65,7 @@ export async function startPlantServer(options: {
     const workerAccess=(req:IncomingMessage):ReadonlySet<WorkerJobKind>=>{
         const token=/^Bearer ([A-Za-z0-9._~-]{24,512})$/.exec(String(req.headers.authorization??''))?.[1];
         if(!token)throw new AppError('Worker authentication required',401);
-        const digest=createHash('sha256').update(token).digest(),hex=digest.toString('hex');
+        const digest=createHash('sha256').update(token).digest();
         for(const [saved,kinds] of workerTokens){const bytes=Buffer.from(saved,'hex');if(bytes.length===digest.length&&timingSafeEqual(bytes,digest))return kinds;}
         throw new AppError('Invalid worker token',401);
     };
@@ -87,7 +87,7 @@ export async function startPlantServer(options: {
             catch {
                 throw new AppError('Malformed URL');
             }
-            if (req.method === 'POST' && req.headers.origin !== origin)
+            if (req.method === 'POST' && !path.startsWith(`${prefix}/worker/`) && req.headers.origin !== origin)
                 throw new AppError('Cross-origin write blocked', 403);
             if (path === '/') {
                 res.writeHead(302, { Location: `${prefix}/app/`, 'Cache-Control': 'no-store' }).end();
