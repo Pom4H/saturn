@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends git ca-certific
  && rm -rf /var/lib/apt/lists/* \
  && useradd --uid 10001 --create-home --home-dir /home/saturn saturn
 WORKDIR /app
+RUN mkdir -p /data && chown saturn:saturn /data
 COPY --from=build --chown=saturn:saturn /app/.plant ./.plant
 COPY --from=build --chown=saturn:saturn /app/dist ./dist
 COPY --from=build --chown=saturn:saturn /app/node_modules ./node_modules
