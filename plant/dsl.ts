@@ -59,7 +59,7 @@ export const report = (name: string, options: Omit<Report, 'id' | 'notify'> & {
     notify?: boolean;
 }): Report => ({ id: id(name), notify: true, ...options });
 export function project(name: string, options: Omit<Project, 'id' | 'version' | 'simulations' | 'devices' | 'stepMs' | 'seed' | 'history' | 'controls' | 'controllers'> & {
-    simulations: {
+    simulations?: {
         node: Simulation;
     }[];
     devices?: Device[];
@@ -69,7 +69,7 @@ export function project(name: string, options: Omit<Project, 'id' | 'version' | 
     seed?: number;
     history?: Project['history'];
 }): Project {
-    const simulations = options.simulations.map(ref => ref.node);
+    const simulations = (options.simulations ?? []).map(ref => ref.node);
     if (simulations.some(x => !x))
         throw new AppError('project.simulations expects simulation() references');
     const controllers = (options.controllers ?? []).map(c=>c.controller);
