@@ -4,7 +4,7 @@ services:
       SATURN_WORKERS: external
       SATURN_WORKER_TOKENS: >-
         {"${SATURN_REPORT_WORKER_TOKEN:-report-worker-token-change-this-0001}":["report"],
-         "${SATURN_DB_WORKER_TOKEN:-database-worker-token-change-this-0002}":["sql"],
+         "${SATURN_DB_WORKER_TOKEN:-database-worker-token-change-this-0002}":["database"],
          "${SATURN_WASM_WORKER_TOKEN:-sandbox-worker-token-change-this-0003}":["wasm"]}
 
   report-worker:
@@ -29,13 +29,13 @@ services:
   database-worker:
     build:
       context: .
-      dockerfile: Dockerfile
-    command: ["node",".plant/worker.mjs"]
+      dockerfile: Dockerfile.bun
+    command: ["bun",".plant/worker.mjs"]
     restart: unless-stopped
     environment:
       SATURN_SERVER_URL: http://saturn:4176/plant/worker/
       SATURN_WORKER_ID: database-1
-      SATURN_WORKER_CAPABILITIES: sql
+      SATURN_WORKER_CAPABILITIES: database
       SATURN_WORKER_TOKEN: ${SATURN_DB_WORKER_TOKEN:-database-worker-token-change-this-0002}
       SATURN_CONNECTIONS_FILE: /run/saturn/connections.json
       SATURN_DRIVER_MODULES: ${SATURN_DRIVER_MODULES:-}
