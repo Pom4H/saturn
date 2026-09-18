@@ -7,7 +7,7 @@ import { cronMatches } from './workflows';
 import { AppError, clone, finite, id, type Actor, type AlarmState, type Event, type Frame, type Project, type Repository, type ReportTask, type ReportArtifact } from './types';
 import { authorize } from './server/policy';
 const engineering: Actor = { id: 'system', role: 'engineer' };
-const configuration = (p: Project) => JSON.stringify({ controllers:(p.controllers??[]).map(({layout,system,...c})=>c),connections:(p.connections??[]).map(({via,...w})=>w),attachments:p.attachments??[], simulations: p.simulations.map(({ layout, system, history, ...n }) => n).sort((a, b) => a.id.localeCompare(b.id)), signals: p.signals.map(({ unit, history, ...s }) => s), stepMs: p.stepMs, controls: p.controls ?? [] });
+const configuration = (p: Project) => JSON.stringify({ sources:p.sources??[],controllers:(p.controllers??[]).map(({layout,system,...c})=>c),connections:(p.connections??[]).map(({via,...w})=>w),attachments:p.attachments??[], simulations: p.simulations.map(({ layout, system, history, ...n }) => n).sort((a, b) => a.id.localeCompare(b.id)), signals: p.signals.map(({ unit, history, ...s }) => s), stepMs: p.stepMs, controls: p.controls ?? [] });
 export class Service {
     kernel!: Kernel;
     project!: Project;
@@ -23,6 +23,9 @@ export class Service {
         now?: () => number;
         uuid?: () => string;
         reportRunner: (task: ReportTask) => Promise<ReportArtifact>;
+        externalSamples?:()=>Record<string,import('./types').Sample>;
+        bindSources?:(sources:Readonly<Project['sources']>)=>Promise<void>;
+        externalWorkers?:boolean;
     }) { }
     private now() { return (this.options.now ?? Date.now)(); }
     private uuid() { return (this.options.uuid ?? (() => crypto.randomUUID()))(); }
@@ -37,7 +40,8 @@ export class Service {
         if (saved) {
             validateProject(saved.project);
             this.project = saved.project;
-            this.kernel = new Kernel(this.project, saved.state.revision, saved.state.runId, saved.state.epoch, saved.state);
+            await this.options.bindSources?.(this.project.sources??[]);
+            this.kernel = new Kernel(this.project, saved.state.revision, saved.state.runId, saved.state.epoch, saved.state,this.options.externalSamples);
             this.alarms = saved.alarms;
         }
         const desired = await this.repository.desired() ?? head;
@@ -52,7 +56,7 @@ export class Service {
             }
         }
         this.store.db.exec("UPDATE reports SET status='queued' WHERE status='running'");
-        void this.runJobs().catch(() => { this.healthy = false; this.emit(); });
+        if(!this.options.externalWorkers)void this.runJobs().catch(() => { this.healthy = false; this.emit(); });
     }
     subscribe(fn: (frame: Frame) => void) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
     frame(): Frame { const frame = this.kernel.frame(); frame.alarms = clone(Object.values(this.alarms)); if (!this.healthy)
@@ -98,7 +102,8 @@ export class Service {
         const checkpoint = compatible ? clone(this.kernel.state) : undefined;
         if (checkpoint)
             checkpoint.revision = revision;
-        const kernel = new Kernel(project, revision, checkpoint?.runId ?? this.uuid(), checkpoint?.epoch ?? this.now(), checkpoint);
+        await this.options.bindSources?.(project.sources??[]);
+        const kernel = new Kernel(project, revision, checkpoint?.runId ?? this.uuid(), checkpoint?.epoch ?? this.now(), checkpoint,this.options.externalSamples);
         const alarms = compatible && JSON.stringify(this.project.alarms) === JSON.stringify(project.alarms) ? clone(this.alarms) : {};
         const previous = { kernel: this.kernel, project: this.project, alarms: this.alarms };
         this.kernel = kernel;
@@ -189,7 +194,7 @@ export class Service {
             throw error;
         }
     }
-    async restart(actor: Actor) { authorize(actor,'simulation.modify'); const state = this.kernel.state; const old = this.kernel; this.kernel = new Kernel(this.project, state.revision, this.uuid(), this.now()); const alarms = this.alarms; this.alarms = {}; try {
+    async restart(actor: Actor) { authorize(actor,'simulation.modify'); const state = this.kernel.state; const old = this.kernel; this.kernel = new Kernel(this.project, state.revision, this.uuid(), this.now(),undefined,this.options.externalSamples); const alarms = this.alarms; this.alarms = {}; try {
         this.persist([this.event('simulation.restart', this.project.id, 'New simulation run', actor)]);
     }
     catch (error) {
@@ -246,7 +251,7 @@ export class Service {
             const task = this.makeTask(report.id, 'schedule', engineering, {}, now);
             this.store.db.transaction(() => { this.store.db.exec('INSERT INTO schedule_slots VALUES(?,?)', [key, slot]); this.queue(task); });
         }
-        void this.runJobs().catch(() => { this.healthy = false; this.emit(); });
+        if(!this.options.externalWorkers)void this.runJobs().catch(() => { this.healthy = false; this.emit(); });
     }
     runJobs(): Promise<void> { if (this.jobPromise)
         return this.jobPromise; this.jobPromise = this.workJobs().finally(() => this.jobPromise = null); return this.jobPromise; }
