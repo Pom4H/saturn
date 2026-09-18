@@ -220,7 +220,7 @@ export class Service {
         authorize(actor,'job.submit');
         if(kind==='sql'){
             authorize(actor,'database.query');
-            if(typeof payload.connection!=='string'||typeof payload.sql!=='string'||payload.sql.length>50000)throw new AppError('Invalid SQL worker job');
+            if(typeof payload.connection!=='string'||typeof payload.sql!=='string'||payload.sql.length>50000||!/^\s*(select|with)\b/i.test(payload.sql)||payload.sql.includes(';'))throw new AppError('SQL worker jobs are read-only SELECT/WITH queries');
             const maxRows=finite(payload.maxRows??1000,'maxRows',1,5000),timeoutMs=finite(payload.timeoutMs??10000,'timeoutMs',100,30000);
             payload={connection:payload.connection,sql:payload.sql,params:payload.params??[],maxRows,timeoutMs};
         } else if(kind==='wasm'){
