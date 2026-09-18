@@ -139,7 +139,7 @@ async function bunTarget(){
 async function dockerTarget(){
   const docker=spawnSync('docker',['compose','version'],{encoding:'utf8'});
   if(docker.error||docker.status!==0){await writeFile(join(evidence,'docker-skipped.txt'),'Docker Compose unavailable on runner\n');return;}
-  const project=`saturn-target-${process.env.GITHUB_RUN_ID??'local'}`,env={...process.env,SATURN_PORT:'4178',SATURN_PASSWORD:password};
+  const project=`saturn-target-${process.env.GITHUB_RUN_ID??'local'}`,env={...process.env,SATURN_PORT:'4178',SATURN_PUBLIC_URL:'http://127.0.0.1:4178',SATURN_PASSWORD:password};
   try{
     await run('docker',['compose','-f','compose.yaml','-f','compose.workers.yaml','config'],{env,log:join(evidence,'compose-workers-rendered.txt')});
     await run('docker',['compose','-p',project,'build','saturn'],{env,log:join(evidence,'docker-build.log')});
