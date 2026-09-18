@@ -1,0 +1,100 @@
+{
+  "environment": {
+    "node": "v22.16.0",
+    "nativeSqlite": "3.49.1",
+    "wasmSqlite": "3.53.4",
+    "browser": "153.0.8010.12"
+  },
+  "nativeTests": 33,
+  "legacyChecks": {
+    "tests": 93,
+    "externalTypedConsumer": true,
+    "browserSuitesRerun": false
+  },
+  "browser": {
+    "checks": [
+      "persistent browser Worker starts with SQLite WASM and live equipment",
+      "service worker installs and only public demo resources enter cache",
+      "Node and browser execute identical counterfactuals and SQLite report semantics",
+      "system decomposition and sensor observation actually update the SVG",
+      "manual report runs SQL in a separate browser worker and renders HTML",
+      "draft validation, CAS commit and explicit publication use the same project files",
+      "explicit rollback creates a new revision without deleting reports",
+      "public browser alarm notification and acknowledgement follow emergent state",
+      "offline PWA reload resumes persisted state, report artifacts and local revisions",
+      "a second tab cannot silently become another database writer",
+      "mobile layout has no horizontal document overflow",
+      "server HTML is authenticated, session login and remote SSE update without local simulation"
+    ],
+    "errors": [],
+    "browser": "153.0.8010.12"
+  },
+  "parity": {
+    "node": {
+      "baseline": {
+        "peak": 1.042615817667857,
+        "damage": 0,
+        "structure": 0,
+        "residual": 5.329070518200751e-15
+      },
+      "cooling-loss": {
+        "peak": 8.565096238559175,
+        "damage": 1,
+        "structure": 1,
+        "residual": 4.263256414560601e-14
+      },
+      "feedback-removed": {
+        "peak": 1.5298821365125332,
+        "damage": 0,
+        "structure": 0,
+        "residual": 1.0658141036401503e-14
+      },
+      "fast-protection": {
+        "peak": 1.9153376577546684,
+        "damage": 0,
+        "structure": 0,
+        "residual": 1.0658141036401503e-14
+      }
+    },
+    "browser": {
+      "baseline": {
+        "peak": 1.042615817667857,
+        "damage": 0,
+        "structure": 0,
+        "residual": 5.329070518200751e-15
+      },
+      "cooling-loss": {
+        "peak": 8.565096238559175,
+        "damage": 1,
+        "structure": 1,
+        "residual": 4.263256414560601e-14
+      },
+      "feedback-removed": {
+        "peak": 1.5298821365125332,
+        "damage": 0,
+        "structure": 0,
+        "residual": 1.0658141036401503e-14
+      },
+      "fast-protection": {
+        "peak": 1.9153376577546684,
+        "damage": 0,
+        "structure": 0,
+        "residual": 1.0658141036401503e-14
+      }
+    },
+    "sql": [
+      {
+        "signal": "flow",
+        "average": 17.5,
+        "maximum": 20,
+        "coverage": 80
+      }
+    ]
+  },
+  "notVerified": [
+    "External Web Push delivery to a physical phone",
+    "iOS installation and notification delivery",
+    "Full historical Chernobyl/RBMK physics",
+    "Production hardening, scale and multiyear retention"
+  ]
+}

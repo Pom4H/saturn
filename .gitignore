@@ -25,3 +25,7 @@ runtime-playwright-report/
 
 .dist-next-*/
 .dist-previous-*/
+
+.plant/
+data-plant/
+plant-test-results/

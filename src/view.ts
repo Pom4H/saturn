@@ -1,3 +1,5 @@
+import { connectionStyles } from './connection-style';
+import { groupFill, groupStroke, groupAccent, groupTitleLines } from './group-style';
 import { catalog, simulate, type Equipment, type Scene, type Point } from './core';
 import { layout, tapPoint, type Route } from './geometry';
 import { numeric, type RuntimeFrame, type Signal, type Quality, type Alarm } from './runtime/protocol';
@@ -26,6 +28,8 @@ export function registerSvgRenderer(kind: string, renderer: SvgRenderer) {
 }
 /** Three is supplied by the lazy 3D host; installing a package does not load WebGL. */
 export interface Renderer3DContext extends VisualState {
+  /** Request a frame after asynchronous texture/model preparation. */
+  invalidate?: () => void;
   THREE: typeof Three;
   equipment: Equipment;
   materials: { steel: Three.Material; dark: Three.Material; teal: Three.Material; fluid: Three.Material };
@@ -96,6 +100,8 @@ export class SceneView {
   routes = new Map<string, Route>(); warnings: string[] = [];
   selected: string | null = null; paused = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   flows = new Map<string, number | null>(); notes: string[] = [];
+  private groupLayer: SVGGElement; private groupKey = ''; private focusedGroup: string | null = null;
+  onGroupFocus?: (id: string) => void;
   private layers: SVGGElement; private updates: ((dt: number) => void)[] = [];
   // Disposable render cache only. The TypeScript document remains authoritative.
   private geometryKey = '';
@@ -116,6 +122,7 @@ export class SceneView {
       const gradient = el(defs, 'linearGradient', { id: this.id(id), x1: 0, y1: 0, x2: 1, y2: 0 });
       stops.forEach((color, i) => el(gradient, 'stop', { offset: i / 2, 'stop-color': color }));
     }
+    this.groupLayer = el(svg, 'g', { 'data-groups': '', 'pointer-events': 'none' });
     this.layers = el(svg, 'g', { 'data-scene': '' });
     this.motionQuery.addEventListener('change', this.motionChanged);
     svg.addEventListener('keydown', event => {
@@ -164,20 +171,57 @@ export class SceneView {
   setCamera(c: typeof this.camera) { this.camera = c; this.svg.setAttribute('viewBox', `${c.x} ${c.y} ${c.width} ${c.height}`); }
   point(clientX: number, clientY: number): Point { const matrix = this.svg.getScreenCTM(); return matrix ? new DOMPoint(clientX, clientY).matrixTransform(matrix.inverse()) : { x: 0, y: 0 }; }
   fit() {
-    const b = this.layers.getBBox(); if (!b.width || !b.height) { this.setCamera({ x: 0, y: 0, width: 1400, height: 600 }); return; }
+    this.focusGroup(null);
+    const b = this.scene.groups?.length ? this.groupLayer.getBBox() : this.layers.getBBox(); if (!b.width || !b.height) { this.setCamera({ x: 0, y: 0, width: 1400, height: 600 }); return; }
     this.setCamera({ x: b.x - 46, y: b.y - 44, width: b.width + 92, height: b.height + 88 });
   }
   zoom(factor: number) { const c = this.camera; const width = Math.max(220, Math.min(12000, c.width * factor)), height = width / c.width * c.height; this.setCamera({ x: c.x + (c.width - width) / 2, y: c.y + (c.height - height) / 2, width, height }); }
   select(id: string | null) { this.selected = id; this.layers.querySelectorAll('[data-node], [data-edge]').forEach(n => n.classList.toggle('selected', id !== null && (n.getAttribute('data-node') === id || n.getAttribute('data-edge') === id))); }
   setSelected(id: string | null) { this.select(id); }
+  focusGroup(id: string | null) {
+    this.focusedGroup = id;
+    this.groupLayer.querySelectorAll<SVGGElement>('[data-group]').forEach(g => {
+      const selected = g.dataset.group === id;
+      g.classList.toggle('focused', selected);
+      g.querySelector('[data-outline]')?.setAttribute('stroke', selected ? groupAccent : groupStroke);
+      g.querySelector('[data-outline]')?.setAttribute('stroke-width', selected ? '2' : '1');
+      g.querySelector('[role="button"]')?.setAttribute('aria-pressed', String(selected));
+    });
+  }
+  fitGroup(id: string) {
+    const group = this.scene.groups?.find(g => g.id === id); if (!group) return;
+    this.focusGroup(id);
+    this.setCamera({ x: group.x - 28, y: group.y - 28, width: group.width + 56, height: group.height + 56 });
+  }
+  private renderGroups() {
+    const groups = this.scene.groups ?? [], key = JSON.stringify(groups);
+    if (key === this.groupKey) return;
+    this.groupKey = key; this.groupLayer.replaceChildren();
+    for (const group of groups) {
+      const g = el(this.groupLayer, 'g', { 'data-group': group.id, 'data-parent': group.parent ?? '', 'data-depth': group.depth });
+      el(g, 'rect', { x: group.x, y: group.y, width: group.width, height: group.height, rx: 6,
+        fill: groupFill(group.depth), stroke: groupStroke, 'stroke-width': 1, 'vector-effect': 'non-scaling-stroke', 'data-outline': '' });
+      const header = el(g, 'g', { role: 'button', tabindex: 0, 'aria-label': `Приблизить: ${group.title}, приборов: ${group.count}`, 'pointer-events': 'all', cursor: 'pointer' });
+      el(header, 'title', {}, group.title);
+      el(header, 'rect', { x: group.x + 1, y: group.y + 1, width: group.width - 2, height: 66, fill: 'transparent' });
+      el(header, 'text', { x: group.x + 18, y: group.y + 20, fill: '#65808d', 'font-family': 'ui-monospace,monospace', 'font-size': 11 }, `${group.id.toUpperCase()} · ${group.count}`);
+      groupTitleLines(group.title, group.width).forEach((text, i) => el(header, 'text', { x: group.x + 18, y: group.y + 42 + i * 20,
+        fill: '#325c6d', 'font-size': 17, 'font-family': 'ui-sans-serif,system-ui,sans-serif', 'font-weight': 600 }, text));
+      const focus = () => { this.fitGroup(group.id); this.onGroupFocus?.(group.id); };
+      header.addEventListener('click', e => { e.stopPropagation(); focus(); });
+      header.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); focus(); } });
+    }
+    this.focusGroup(this.focusedGroup);
+  }
   render(scene: Scene) {
     this.scene = scene;
+    this.renderGroups();
     this.flows = observedFlows(scene, this.runtime); this.notes = this.runtime ? [] : simulate(scene).notes;
     // Parameters/quality do not change routing. Keep DOM nodes and animation
     // closures alive; refresh only the derived props they read on the next frame.
     const key = JSON.stringify([
       scene.nodes.map(n => [n.id, n.kind, n.tap, n.props.x, n.props.y, n.props.at, n.props.offset]),
-      scene.links,
+      scene.links, scene.connections,
     ]);
     if (key === this.geometryKey) {
       for (const n of scene.nodes) this.renderedNodes.get(n.id)!.props = { ...n.props };
@@ -192,6 +236,13 @@ export class SceneView {
     for (const id of this.visual.keys()) if (!scene.nodes.some(n => n.id === id)) this.visual.delete(id);
     const geometry = layout(scene); this.routes = geometry.routes; this.warnings = geometry.warnings;
     this.layers.replaceChildren(); const pipes = el(this.layers, 'g'), devices = el(this.layers, 'g'), instruments = el(this.layers, 'g');
+    for(const wire of scene.connections??[]) {
+      const style=connectionStyles[wire.medium],d=wire.points.map((p,i)=>`${i?'L':'M'}${p.x} ${p.y}`).join(' ');
+      const g=el(pipes,'g',{'data-connection':wire.id,'data-medium':wire.medium,'data-valid':String(wire.valid),tabindex:0});
+      el(g,'title',{},`${wire.from.device}.${wire.from.port} → ${wire.to.device}.${wire.to.port}${wire.error?' · '+wire.error:''}`);
+      el(g,'path',{d,fill:'none',stroke:wire.valid?style.color:'#c45544','stroke-width':style.width,'stroke-linejoin':'round','stroke-linecap':'butt'});
+      el(g,'path',{d,fill:'none',stroke:style.inner,'stroke-width':Math.max(1,style.width-4),'stroke-dasharray':wire.valid?style.dash:'6 4','pointer-events':'none'});
+    }
     for (const edge of scene.links) {
       const route = this.routes.get(edge.id)!;
       const g = el(pipes, 'g', { 'data-edge': edge.id, class: `edge${route.valid ? '' : ' invalid'}`, tabindex: 0, role: 'button', 'aria-label': `Труба ${edge.from.node} → ${edge.to.node}` });
@@ -310,7 +361,7 @@ export class SceneView {
     hit.setAttribute('aria-hidden', 'true');
     const ports = el(g, 'g', { class: 'ports' });
     for (const [name, p] of Object.entries(d.ports)) {
-      const port = el(ports, 'circle', { cx: p.x, cy: p.y, r: 7, fill: '#f5fafb', stroke: '#159aac', 'stroke-width': 2.5, 'data-port': name, 'data-owner': n.id, 'data-role': p.role, tabindex: 0, role: 'button', 'aria-label': `${n.id}.${name}` });
+      const port = el(ports, 'circle', { cx: p.x, cy: p.y, r: n.kind==='plant_saturn'?2.8:5, fill: '#f5fafb', stroke: '#159aac', 'stroke-width': 2.5, 'data-port': name, 'data-owner': n.id, 'data-role': p.role, tabindex: 0, role: 'button', 'aria-label': `${n.id}.${name}` });
       el(port, 'title', {}, `${name} · ${p.role === 'out' ? 'начать соединение' : 'вход'}`);
     }
   }

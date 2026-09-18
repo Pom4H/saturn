@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Source-first SCADA playground. Drag equipment, edit TypeScript, keep one source of truth.",
   "scripts": {
-    "build": "node scripts/build.mjs",
+    "build": "node scripts/build.mjs && node scripts/plant-build.mjs",
     "dev": "node scripts/dev.mjs",
     "preview": "node scripts/serve.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.lab.json && tsc --noEmit -p tsconfig.server.json",
@@ -27,7 +27,13 @@
     "runtime:bench": "node scripts/runtime-qa-benchmark.mjs",
     "runtime:animation": "node scripts/runtime-qa-animation.mjs",
     "test:review": "node scripts/review-test.mjs",
-    "test:consumer": "node scripts/consumer-test.mjs"
+    "test:consumer": "node scripts/consumer-test.mjs",
+    "plant:build": "node scripts/plant-build.mjs",
+    "plant": "npm run plant:build && node --experimental-sqlite .plant/server.mjs",
+    "plant:typecheck": "tsc --noEmit -p tsconfig.plant.json",
+    "plant:test": "node scripts/plant-test.mjs",
+    "plant:test:browser": "node scripts/plant-e2e.mjs",
+    "plant:check": "npm run plant:build && npm run plant:typecheck && npm run plant:test"
   },
   "keywords": [],
   "author": "Roman Popov",
@@ -41,9 +47,11 @@
     "@codemirror/state": "6.7.4",
     "@codemirror/view": "6.43.11",
     "@lezer/highlight": "1.2.3",
+    "@sqlite.org/sqlite-wasm": "3.53.4-build1",
     "@typescript/typescript6": "6.0.2",
     "codemirror": "6.0.2",
-    "three": "0.185.1"
+    "three": "0.185.1",
+    "web-push": "3.6.7"
   },
   "private": true,
   "type": "module",
@@ -52,17 +60,19 @@
     "url": "https://github.com/Pom4H/scada.git"
   },
   "engines": {
-    "node": ">=24.20.0 <25"
+    "node": ">=22.16.0 <23 || >=24.20.0 <25"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
     "@types/node": "24.13.3",
     "@types/three": "0.185.0",
+    "@types/web-push": "3.6.4",
     "esbuild": "0.28.2",
     "typescript": "7.0.2"
   },
   "exports": {
     "./core": "./src/core.ts",
-    "./sdk": "./src/sdk.ts"
+    "./sdk": "./src/sdk.ts",
+    "./plant": "./plant/dsl.ts"
   }
 }
