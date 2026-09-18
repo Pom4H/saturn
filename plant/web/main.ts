@@ -23,6 +23,7 @@ let studioEditors: Partial<Record<'view'|'report',EditorView>>={}, studioFiles:P
 let studioSelection:Partial<Record<'view'|'report',{kind:any,index:number,source:StudioSource|null}>>={};
 let liveHmiScreen='', renderedStudioScreen='';
 let renderedStudioView:object|undefined;
+let studioValueNodes:HTMLElement[]=[],studioCommandNodes:HTMLButtonElement[]=[],studioScreenNodes:HTMLButtonElement[]=[],studioMotionNodes:HTMLElement[]=[];
 const autoHmiCache=new WeakMap<object,ReturnType<typeof deriveHmi>>();
 let studioDraftRevision=0,studioCompiledRevision=-1,studioCompiledProject:Status['project']|undefined;
 let registration: ServiceWorkerRegistration | undefined, pendingInstall: any, noticeEnabled = false, closed = false;
@@ -600,14 +601,23 @@ function refreshView(rebuild=false){
     const view=studioViewList(project).find(v=>v.id===select.value),host=$('live-view');
     if(!view){host.textContent='Объявите view() в DSL проекта.';return;}
     const values=bindPresentation(view,frame.samples,frame.time),interactive=!failed&&status.actor.role!=='viewer';
-    if(rebuild||renderedStudioView!==view||renderedStudioScreen!==liveHmiScreen){host.innerHTML=renderPresentation(view,{values,interactive,screen:liveHmiScreen});renderedStudioView=view;renderedStudioScreen=liveHmiScreen;}
-    for(const node of host.querySelectorAll<HTMLElement>('[data-view-value]')){const sample=values[node.dataset.viewValue!],valid=sample?.quality==='good'&&sample.value!==null;node.textContent=valid?sample.value!.toFixed(Number(node.dataset.digits??2)):'—';node.parentElement!.dataset.quality=valid?'good':'bad';node.parentElement!.querySelector('small')!.textContent=(node.dataset.unit??'')+(valid?'':' · нет достоверных данных');}
-    for(const button of host.querySelectorAll<HTMLButtonElement>('[data-view-command]'))button.disabled=!interactive;
-    for(const button of host.querySelectorAll<HTMLButtonElement>('[data-view-screen]')){button.disabled=!interactive;button.onclick=e=>{e.stopPropagation();liveHmiScreen=button.dataset.viewScreen!;refreshView(true);};}
-    applyPresentationMotion(host,values);
-    renderHmiScreenTabs(view);
-    bindStudioCanvas('view',host,'views.ts');
-    if(!studioEditors.view&&files['views.ts'])studioEditor('view','views.ts');
+    const changed=rebuild||renderedStudioView!==view||renderedStudioScreen!==liveHmiScreen;
+    if(changed){
+        host.innerHTML=renderPresentation(view,{values,interactive,screen:liveHmiScreen});
+        renderedStudioView=view;renderedStudioScreen=liveHmiScreen;
+        studioValueNodes=[...host.querySelectorAll<HTMLElement>('[data-view-value]')];
+        studioCommandNodes=[...host.querySelectorAll<HTMLButtonElement>('[data-view-command]')];
+        studioScreenNodes=[...host.querySelectorAll<HTMLButtonElement>('[data-view-screen]')];
+        studioMotionNodes=[...host.querySelectorAll<HTMLElement>('[data-view-motion]')];
+        for(const button of studioScreenNodes)button.onclick=e=>{e.stopPropagation();liveHmiScreen=button.dataset.viewScreen!;refreshView(true);};
+        bindStudioCanvas('view',host,'views.ts');
+        renderHmiScreenTabs(view);
+        if(!studioEditors.view&&files['views.ts'])studioEditor('view','views.ts');
+    }
+    for(const node of studioValueNodes){const sample=values[node.dataset.viewValue!],valid=sample?.quality==='good'&&sample.value!==null;node.textContent=valid?sample.value!.toFixed(Number(node.dataset.digits??2)):'—';node.parentElement!.dataset.quality=valid?'good':'bad';node.parentElement!.querySelector('small')!.textContent=(node.dataset.unit??'')+(valid?'':' · нет достоверных данных');}
+    for(const button of studioCommandNodes)button.disabled=!interactive;
+    for(const button of studioScreenNodes)button.disabled=!interactive;
+    applyPresentationMotion(studioMotionNodes,values);
 }
 async function refreshReportStudio(rebuild=false){
     if(!status||!frame)return;
@@ -621,8 +631,8 @@ async function refreshReportStudio(rebuild=false){
     bindStudioCanvas('report',host,'reports.ts');
     if(!studioEditors.report&&files['reports.ts'])studioEditor('report','reports.ts');
 }
-function applyPresentationMotion(host:HTMLElement,values:Record<string,any>){
-    for(const node of host.querySelectorAll<HTMLElement>('[data-view-motion]')){
+function applyPresentationMotion(nodes:readonly HTMLElement[],values:Record<string,any>){
+    for(const node of nodes){
         const sample=values[node.dataset.viewMotion!],value=sample?.quality==='good'&&typeof sample.value==='number'?sample.value:null;
         const min=Number(node.dataset.motionMin),max=Number(node.dataset.motionMax),from=Number(node.dataset.motionFrom),to=Number(node.dataset.motionTo);
         const t=value===null?0:Math.max(0,Math.min(1,(value-min)/(max-min))),v=from+(to-from)*t;
