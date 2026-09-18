@@ -14,3 +14,9 @@ Use `scope: "layout"` for purely visual fields. Add typed SDK consumer and metad
 
 
 For the isomorphic workbench also run `npm run plant:check` and `npm run plant:test:browser`. Keep Node/DOM/OPFS imports in the respective adapters, not the shared kernel. Store only authored files in revisions; runtime observations are not source edits. Reports execute in disposable data capsules, never the operational database. PWA caches must exclude authenticated resources. Increment installed model versions when state semantics change. Do not label normalized causal tests as historical or nuclear-safety validation. See `docs/plant/`.
+
+## Repository boundary
+
+This repository is the standalone MIT-licensed Saturn SCADA product. Do not add migration adapters, importers, wire-compatibility layers, customer schemas or historical product-specific formats to the core tree. Keep those in the repository that owns the external system.
+
+The deliberate vendor-specific exception is the Saturn PLC controller target under `plant/vendor/saturn` and the pinned PLC toolchain it requires. That code is a supported hardware target, not a legacy SCADA compatibility layer.
