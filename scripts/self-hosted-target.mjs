@@ -70,6 +70,9 @@ await writeFile(join(evidence,'environment.txt'),[
   `git_source=${gitSource}`,
   `docker=${version('docker',['--version'])}`,
   `docker_compose=${version('docker',['compose','version'])}`,
+  `where_git=${process.platform==='win32'?version('where.exe',['git']):version('which',['git'])}`,
+  `wsl=${process.platform==='win32'?version('wsl.exe',['--status']):'n/a'}`,
+  `ffmpeg=${version('ffmpeg',['-version']).split(/\\r?\\n/)[0]}`,
 ].join('\n')+'\n');
 process.stdout.write(await readFile(join(evidence,'environment.txt'),'utf8'));
 if(!gitDir)throw new Error('Git executable is required by the production project repository but was not found on the runner');
