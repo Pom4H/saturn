@@ -1,4 +1,4 @@
-import type { Presentation, ViewNode } from './presentation';
+import type { MotionSpec, Presentation, PresentationScreen, ViewNode } from './presentation';
 import type { Controller, PlcBlock } from './controller';
 import type { Endpoint, Connection, Attachment } from './ports';
 import { AppError, id, type Expr, type System, type Simulation, type Project, type Derived, type Device, type AlarmRule, type Report, type Layout, type HistoryPolicy, type Control } from './types';
@@ -126,3 +126,7 @@ export const readout=(label:string,binding:string,unit='',digits=2):ViewNode=>({
 export const dataTable=(columns:Extract<ViewNode,{kind:'table'}>['columns']):ViewNode=>({kind:'table',columns});
 export const trend=(title:string,x:string,y:string):ViewNode=>({kind:'chart',title,x,y});
 export const commandButton=(label:string,target:string,value:number):ViewNode=>({kind:'action',label,target,value});
+export const screen=(name:string,title:string,body:ViewNode):PresentationScreen=>({id:id(name),title,body});
+export const navigate=(label:string,target:string):ViewNode=>({kind:'navigate',label,target:id(target)});
+export const animate=(child:ViewNode,binding:string,property:MotionSpec['property'],range:Partial<Omit<MotionSpec,'binding'|'property'>>={}):ViewNode=>({kind:'motion',child,motion:{binding:id(binding),property,min:0,max:1,from:0,to:1,...range}});
+
