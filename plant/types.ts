@@ -264,7 +264,7 @@ export interface ReportArtifact {
     html: string;
     rows: Record<string, unknown>[];
 }
-export type WorkerJobKind = 'sql' | 'wasm';
+export type WorkerJobKind = 'report' | 'sql' | 'wasm';
 export interface WorkerJob {
     id:string;
     kind:WorkerJobKind;
