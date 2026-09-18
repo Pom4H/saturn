@@ -263,8 +263,16 @@ export function validateProject(value: unknown): asserts value is Project {
     unique(p.reports.map(r => r.id));
     if (p.controls !== undefined && (!Array.isArray(p.controls) || p.controls.length > 128))
         throw new AppError('At most 128 controls');
+    if (p.sources !== undefined && (!Array.isArray(p.sources) || p.sources.length > 2048))
+        throw new AppError('At most 2048 external signals');
     unique([...(p.controls ?? []).map(c => c.id), ...(p.controllers??[]).map(c=>c.id), ...p.simulations.map(n => n.id)]);
-    const signals = unique([...(p.controls ?? []).flatMap(c => ['value', 'requested', 'blocked'].map(k => `${c.id}.${k}`)), ...p.simulations.flatMap(n => Object.keys(model(n.model).outputs).map(k => `${n.id}.${k}`)), ...(p.controllers??[]).flatMap(c=>[...Object.keys(c.outputs),...Object.keys(inputPins),'healthy','powered'].map(k=>`${c.id}.${k}`)), ...p.signals.map(s => s.id)]);
+    unique((p.sources??[]).map(x=>x.id));
+    for(const source of p.sources??[]){
+        if(typeof source.connection!=='string'||!source.connection||source.connection.length>128||typeof source.address!=='string'||!source.address||source.address.length>500||typeof source.unit!=='string'||source.unit.length>32)throw new AppError('Invalid external signal');
+        finite(source.pollMs,'external pollMs',20,86400000);
+        if(typeof source.writable!=='boolean')throw new AppError('Invalid external writable flag');
+    }
+    const signals = unique([...(p.sources??[]).map(x=>x.id), ...(p.controls ?? []).flatMap(c => ['value', 'requested', 'blocked'].map(k => `${c.id}.${k}`)), ...p.simulations.flatMap(n => Object.keys(model(n.model).outputs).map(k => `${n.id}.${k}`)), ...(p.controllers??[]).flatMap(c=>[...Object.keys(c.outputs),...Object.keys(inputPins),'healthy','powered'].map(k=>`${c.id}.${k}`)), ...p.signals.map(s => s.id)]);
     let expressions = 0;
     const checkExpr = (e: Expr, depth = 0): void => { if (++expressions > 20000)
         throw new AppError('Signal expression budget'); if (depth > 32)
@@ -353,6 +361,9 @@ export function validateProject(value: unknown): asserts value is Project {
     const history = (h: Project['history']) => { finite(h.deadband, 'deadband', 0, 1e6); finite(h.maxInterval, 'maxInterval', p.stepMs, 86400000); finite(h.retention, 'retention', 60000, 10 * 365 * 86400000); };
     history(p.history);
     for (const s of p.signals)
+        if (s.history)
+            history(s.history);
+    for (const s of p.sources ?? [])
         if (s.history)
             history(s.history);
     for (const n of p.simulations)
