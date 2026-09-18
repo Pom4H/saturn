@@ -22,6 +22,10 @@ import { Auth } from '../adapters/auth';
 import { Push, allowedPushEndpoint } from '../adapters/push';
 import { startPlantServer } from '../server';
 import { runReport } from '../adapters/node-reports';
+import { runWasmSandbox } from '../adapters/node-wasm-sandbox';
+import { DriverRegistry } from '../server/drivers';
+import { IndustrialGateway } from '../server/gateway';
+import { authorize, capabilities } from '../server/policy';
 import type { Actor, AlarmState, ReportTask, Project, Frame } from '../types';
 const engineer: Actor = { id: 'engineer', role: 'engineer' }, viewer: Actor = { id: 'reader', role: 'viewer' };
 const project = () => compileProject(demoFiles);
@@ -142,4 +146,58 @@ test('PLC artifact export checks engineer role, revision and target, and include
 });
 test('layout-only edits preserve the run and compiled program',async()=>{
  const s=await makeService();try{for(let i=0;i<20;i++)s.tick();const old=s.frame(),files={...demoFiles,'commissioning.ts':demoFiles['commissioning.ts'].replace('x:760,y:3100','x:765,y:3100')};const head=await s.repository.head(),commit=await s.save(files,head,'Move PLC',engineer);await s.publish(commit.id,await s.repository.desired(),engineer);assert.equal(s.frame().runId,old.runId);assert.deepEqual(s.frame().displays,old.displays);}finally{s.store.db.close();}
+});
+
+
+test('production project may consist only of external industrial tags',()=>{
+ const files={'plant.ts':`
+import {project,system,external,derived,signal,alarm} from '@scada/plant';
+const process=system('process','Process');
+const temp=external('TEMP',{connection:'opc-main',address:'ns=2;s=TEMP',unit:'C',pollMs:250});
+const high=derived('TEMP.high',{op:'gt',args:[signal('TEMP'),80]},'bool');
+export default project('live',{title:'Live',description:'External-only project',systems:[process],sources:[temp],signals:[high],devices:[],alarms:[alarm('hot',{title:'Hot',signal:signal('TEMP'),above:80,clearBelow:75})],reports:[]});
+`};
+ const p=compileProject(files);assert.equal(p.simulations.length,0);assert.equal(p.sources?.[0].id,'TEMP');
+ const k=new Kernel(p,'r','run',0,undefined,()=>({TEMP:{value:42,quality:'good',time:0}}));
+ assert.equal(k.frame().samples.TEMP.value,42);assert.equal(k.frame().samples['TEMP.high'].value,0);
+});
+
+test('industrial gateway swaps sessions atomically and propagates quality',async()=>{
+ const registry=new DriverRegistry();let closed=0,now=1000;
+ registry.register({kind:'protocol',id:'fake-protocol',schemes:['fake'],async connect(config){if(config.options.fail)throw new Error('connect');return {async read(points){return Object.fromEntries(points.map(p=>[p.id,{value:12.5,quality:'good' as const,time:now}]))},close(){closed++;}};}});
+ const configs=new Map([['main',{id:'main',driver:'fake-protocol',options:{}}]]);
+ const gateway=new IndustrialGateway(registry,configs,()=>now);
+ await gateway.bind([{id:'TEMP',connection:'main',address:'tag',unit:'C',pollMs:100,writable:false}]);
+ await gateway.refresh(now);assert.equal(gateway.snapshot().TEMP.value,12.5);
+ now=7000;assert.equal(gateway.snapshot().TEMP.quality,'stale');
+ const failing=new Map([['main',{id:'main',driver:'fake-protocol',options:{fail:true}}]]);
+ const next=new IndustrialGateway(registry,failing,()=>now);
+ await assert.rejects(next.bind([{id:'X',connection:'main',address:'x',unit:'',pollMs:100,writable:false}]));
+ assert.equal(closed,0);await gateway.close();assert.equal(closed,1);
+});
+
+test('server capabilities and user roles are authoritative',()=>{
+ const store=new Store(new NodeSql()),auth=new Auth(store);auth.seed('root','password-for-root-user','engineer');
+ auth.create('ops','password-for-operator','operator');
+ assert.ok(capabilities({id:'ops',role:'operator'}).includes('control.operate'));
+ assert.throws(()=>authorize({id:'ops',role:'operator'},'project.publish'),/permission/);
+ const login=auth.login('ops','password-for-operator','local');auth.setRole('ops','viewer');
+ assert.throws(()=>auth.session(`scada_session=${login.token}`),/expired/);
+ assert.throws(()=>auth.setRole('root','viewer'),/last engineer/);
+ assert.throws(()=>auth.remove('root'),/last engineer/);
+ store.db.close();
+});
+
+test('durable worker queue leases and rejects late completion',()=>{
+ const store=new Store(new NodeSql());store.enqueueWorker({id:'j1',kind:'database',actor:'engineer',createdAt:1,status:'queued',payload:{connection:'db'}});
+ const first=store.claimWorker(['database'],'w1',1000,100);assert.equal(first?.id,'j1');
+ assert.equal(store.claimWorker(['database'],'w2',1050,100),null);
+ const second=store.claimWorker(['database'],'w2',1200,100);assert.equal(second?.id,'j1');
+ assert.throws(()=>store.completeWorker('j1','w1',{rows:[]}),/lease/);
+ store.completeWorker('j1','w2',{rows:[]});assert.equal(store.workerJobs()[0].status,'success');store.db.close();
+});
+
+test('WASM sandbox executes no-import modules in a killed child process',async()=>{
+ const module=Buffer.from('0061736d010000000105016000017f0302010007060102666e00000a06010400412a0b','hex').toString('base64');
+ assert.equal(await runWasmSandbox({module,export:'fn',args:[],timeoutMs:1000}),42);
 });
