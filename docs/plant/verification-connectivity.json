@@ -1,0 +1,109 @@
+{
+  "base": "7c9e5c3be001c52a2ab7a5311104b3f4b3d79e48",
+  "environment": {
+    "node": "v22.16.0",
+    "nativeSqlite": "3.49.1",
+    "wasmSqlite": "3.53.4",
+    "browser": "153.0.8010.12",
+    "webgl": "Software WebGL under Xvfb, actual HTTP and Workers"
+  },
+  "scope": {
+    "devices": 47,
+    "simulationInstances": 46,
+    "plcs": 1,
+    "systems": 18,
+    "installedModels": 30,
+    "operatorControls": 7,
+    "physicalConnections": 23,
+    "pipes": 5,
+    "cables": 18,
+    "virtualModules": 1
+  },
+  "checks": {
+    "native": 86,
+    "browser": 24,
+    "legacy": 93,
+    "typecheck": true,
+    "externalTypedConsumer": true,
+    "standaloneArchive": {
+      "archive": "scada-terminal-demo.zip",
+      "devices": 47,
+      "connections": 23,
+      "offline": true,
+      "restoredClock": true,
+      "wasmHmi": true,
+      "webgl": true,
+      "errors": []
+    },
+    "legacyBreakdown": {
+      "core": 38,
+      "behavior": 9,
+      "apiClient": 17,
+      "adversarial": 14,
+      "lab": 7,
+      "review": 8
+    }
+  },
+  "browserChecks": [
+    "persistent browser Worker starts with SQLite WASM and live equipment",
+    "service worker installs and only public demo resources enter cache",
+    "Node and browser execute identical equations, control/interlock traces and SQL reports",
+    "one canvas keeps all equipment DOM nodes while nested groups only change the camera",
+    "backplate headers are keyboard navigable and retain cross-system equipment",
+    "subsystem focus and sensor observation update the same SVG",
+    "operator panel sends ramped commands without editing the project",
+    "equipment inventory searches and focuses the matching subsystem",
+    "real WebGL 3D shares selection and signal identity with the 2D view",
+    "3D overview and backplates use all equipment and retain selection when changing view",
+    "manual report runs SQL in a separate browser worker and renders HTML",
+    "draft validation, CAS commit and explicit publication use the same project files",
+    "explicit rollback creates a new revision without deleting reports",
+    "public browser alarm notification and acknowledgement follow emergent state",
+    "offline PWA reload resumes persisted state, report artifacts and local revisions",
+    "offline installation loads the lazy 3D bundle from the public cache",
+    "a second tab cannot silently become another database writer",
+    "mobile 2D and 3D have no horizontal document overflow",
+    "authenticated Node receives operator commands and publishes SSE without a local simulation",
+    "all 23 pipe and cable endpoints hit the rendered terminal centers after camera transforms",
+    "Saturn inspector executes the same compiled WASM program, downloads exact CRC-tested bytes and renders its HMI",
+    "clicking two terminals and removing a connection only edits a validated source draft",
+    "commissioning bench renders exact 3D terminal routes and Saturn front-panel HMI",
+    "offline PWA restores compiled PLC outputs, terminal wiring and HMI without a server"
+  ],
+  "browserErrors": [],
+  "controller": {
+    "source": "Pom4H/open-device",
+    "commit": "007ada38d2cce27b37413f38952ca11b919842c1",
+    "wasmBytes": 37453,
+    "wasmSha256": "a81887ad182cf07bee0566e5d38785f608ee65ea6043362d8545023633a26750",
+    "programBytes": 228,
+    "programSha256": "7d4fa793b986f59bd3f22213577aafdabb02da1d40d74efdebd3f833d3960178",
+    "programDownloadedAndCompared": true,
+    "nodeBrowserParity": true,
+    "compiledHmi": true,
+    "hardwareVerified": false,
+    "target": "saturn-fbd/combinational-v1"
+  },
+  "connectionChecks": [
+    "2D endpoints and actual Saturn terminal centers coincide within 0.2 screen pixels after camera transforms",
+    "3D terminal geometry and route endpoints share exact metadata",
+    "Power polarity, medium/family, source direction, occupancy and unknown terminals are validated",
+    "Routing avoids bodies and makes height transitions outside endpoint stubs",
+    "Loss of power/common or required input produces bad quality and relay deenergization",
+    "Virtual modules require correct ownership, DC and both bus conductors; daisy chains are tested",
+    "Virtual unconnected AI channels remain unknown; physical module maps are not invented"
+  ],
+  "testHarnessFixes": [
+    "Render invalidations coalesced into one animation frame; async texture completion requests a redraw",
+    "Rollback assertion identifies its manual report instead of incorrectly requiring only one report across a UTC cron boundary"
+  ],
+  "boundaries": [
+    "The commissioning bench is isolated from reactor operations",
+    "No physical-controller flashing, HAL/bootloader firmware, hardware acceptance test or real expansion register map",
+    "Combinational FBD subset only; stateful blocks require a versioned serialization ABI",
+    "Physical routes are not a hydraulic/electrical circuit solver or electrical design approval",
+    "Full NPP inventory, validated reactor physics and NPP safety qualification are absent",
+    "Legacy browser suites and external push delivery to a physical phone were not rerun",
+    "Local tests and source-transfer checks are different; no merge or deployment"
+  ]
+}

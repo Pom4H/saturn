@@ -1,3 +1,5 @@
+import type { Controller } from './controller';
+import type { Endpoint, Connection, Attachment } from './ports';
 import { AppError, id, type Expr, type System, type Simulation, type Project, type Derived, type Device, type AlarmRule, type Report, type Layout, type HistoryPolicy, type Control } from './types';
 import { model, type builtInModels } from './models';
 export interface ControlRef { control: Control; value: Expr; requested: Expr; blocked: Expr }
@@ -54,12 +56,13 @@ export const alarm = (name: string, options: Omit<AlarmRule, 'id' | 'notify' | '
 export const report = (name: string, options: Omit<Report, 'id' | 'notify'> & {
     notify?: boolean;
 }): Report => ({ id: id(name), notify: true, ...options });
-export function project(name: string, options: Omit<Project, 'id' | 'version' | 'simulations' | 'devices' | 'stepMs' | 'seed' | 'history' | 'controls'> & {
+export function project(name: string, options: Omit<Project, 'id' | 'version' | 'simulations' | 'devices' | 'stepMs' | 'seed' | 'history' | 'controls' | 'controllers'> & {
     simulations: {
         node: Simulation;
     }[];
     devices?: Device[];
     controls?: ControlRef[];
+    controllers?: {controller:Controller}[];
     stepMs?: number;
     seed?: number;
     history?: Project['history'];
@@ -67,8 +70,9 @@ export function project(name: string, options: Omit<Project, 'id' | 'version' | 
     const simulations = options.simulations.map(ref => ref.node);
     if (simulations.some(x => !x))
         throw new AppError('project.simulations expects simulation() references');
+    const controllers = (options.controllers ?? []).map(c=>c.controller);
     const devices = options.devices ?? simulations.map(s => ({ id: s.id, type: model(s.model).visual, system: s.system, layout: s.layout, signals: Object.fromEntries(Object.keys(model(s.model).outputs).map(k => [k, signal(`${s.id}.${k}`)])) }));
-    return { version: 1, id: id(name), stepMs: 100, seed: 1, history: { deadband: .001, maxInterval: 10000, retention: 86400000 }, ...options, simulations, devices, controls: (options.controls ?? []).map(c => c.control) };
+    return { version: 1, id: id(name), stepMs: 100, seed: 1, history: { deadband: .001, maxInterval: 10000, retention: 86400000 }, ...options, simulations, controllers, devices: [...devices, ...controllers.map(c=>({id:c.id,type:'saturn',system:c.system,layout:c.layout,signals:Object.fromEntries([...Object.keys(c.outputs),'healthy','powered'].map(k=>[k,signal(`${c.id}.${k}`)]))}))], controls: (options.controls ?? []).map(c => c.control) };
 }
 /** Repeated equipment is expanded to ordinary stable-ID nodes before runtime execution. */
 export function bank<K extends keyof ModelCatalog>(prefix: string, kind: K, options: Options<ModelCatalog[K]> & {
@@ -97,3 +101,14 @@ export function aggregate<T extends {
         return max(...args);
     throw new AppError('Unknown aggregate operation');
 }
+
+/** Installed PLC profile. Program refs are terminal names, not arbitrary signal expressions. */
+export function plc<const O extends Record<string,Expr>>(name:string, options:Omit<Controller,'id'|'layout'|'profile'|'outputs'> & {at:Layout;outputs:O}) {
+ const controller:Controller={id:id(name),profile:'saturn-fbd',system:options.system,layout:options.at,outputs:options.outputs,hmi:options.hmi};
+ return Object.assign({controller},Object.fromEntries(Object.keys(options.outputs).map(k=>[k,signal(`${name}.${k}`)]))) as {controller:Controller}&{readonly[K in keyof O]:Expr};
+}
+export const pin=(name:string):Expr=>({ref:id(name)});
+export const port=(device:string|{node:Simulation}|{controller:Controller}|Device,name:string):Endpoint=>({device:typeof device==='string'?id(device):'node' in device?device.node.id:'controller' in device?device.controller.id:device.id,port:name});
+export const pipe=(name:string,from:Endpoint,to:Endpoint,options:Pick<Connection,'via'>={}):Connection=>({id:id(name),from,to,medium:'pipe',...options});
+export const cable=(name:string,from:Endpoint,to:Endpoint,options:Omit<Connection,'id'|'from'|'to'>):Connection=>({id:id(name),from,to,...options});
+export const expansion=(device:{node:Simulation},controller:{controller:Controller},slot:number):Attachment=>({device:device.node.id,controller:controller.controller.id,slot,profile:'virtual-io4'});

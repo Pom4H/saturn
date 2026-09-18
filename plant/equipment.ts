@@ -1,3 +1,7 @@
+import { terminals, footprint } from './ports';
+import { routeConnections } from './routing';
+import { renderSaturnPlcSvg } from './saturn-view';
+import { drawHmiSvg, setDisplays } from './hmi-view';
 import { groupLayout } from './group-layout';
 import { createPlantModel } from './visual3d';
 import { registerComponent, catalog, type Equipment, type Scene } from '../src/core';
@@ -9,7 +13,7 @@ import type { Project, Frame, Expr } from './types';
 const metalStroke = '#526f7a', water = '#10a6b5', fuel = '#d39b51';
 type Draw = (c: SvgRendererContext) => void;
 const body = (c: SvgRendererContext, x = 15, y = 10, w = 120, h = 66) => el(c.root, 'rect', { x, y, width: w, height: h, rx: 8, fill: c.paint('metal'), stroke: metalStroke, 'stroke-width': 2 });
-const shaft = (c: SvgRendererContext) => el(c.root, 'path', { d: 'M0 49H25 M125 49H150', stroke: metalStroke, 'stroke-width': 12, fill: 'none' });
+const shaft = (c: SvgRendererContext) => el(c.root, 'path', { d: 'M0 48H25 M125 48H150', stroke: metalStroke, 'stroke-width': 12, fill: 'none' });
 const rotor = (c: SvgRendererContext, key: string) => { const g = el(c.root, 'g'); for (let i = 0; i < 6; i++)
     el(g, 'path', { d: 'M0 0 Q20 -14 26 0 L7 6Z', fill: '#385866', transform: `rotate(${i * 60})` }); el(g, 'circle', { r: 7, fill: '#cad9dd', stroke: metalStroke }); c.onUpdate(dt => { g.setAttribute('transform', `translate(75 45) rotate(${c.phase('rotor', (c.number(key, dt) ?? 0) * .3, dt) % 360})`); }); };
 const shapes: Record<string, Draw> = {
@@ -84,17 +88,26 @@ const shapes: Record<string, Draw> = {
         el(c.root, 'rect', { x: 24 + i * 28, y: 37, width: 18, height: 38, fill: '#486b77' }); },
 };
 export const svgVisualKinds = () => Object.keys(shapes);
+Object.assign(shapes, {
+ dcSupply:(c:SvgRendererContext)=>{body(c,26,12,100,75);el(c.root,'text',{x:76,y:52,'text-anchor':'middle',fill:metalStroke,'font-size':20},'24 V');for(let i=0;i<4;i++)el(c.root,'path',{d:`M38 ${64+i*4}h75`,stroke:metalStroke});},
+ transmitter:(c:SvgRendererContext)=>{body(c,47,22,55,49);el(c.root,'circle',{cx:75,cy:45,r:18,fill:water,opacity:.4});el(c.root,'path',{d:'M75 72v19',stroke:metalStroke,'stroke-width':8});},
+ contactor:(c:SvgRendererContext)=>{body(c,24,9,102,77);el(c.root,'path',{d:'M39 24v15h32V24 M100 20v20m0 20v20',stroke:metalStroke,'stroke-width':4,fill:'none'});const contact=el(c.root,'path',{d:'M100 40v20',stroke:water,'stroke-width':4});c.onUpdate(()=>contact.setAttribute('transform',`rotate(${(c.number('closed')??0)>.8?0:35} 100 40)`));},
+ indicator:(c:SvgRendererContext)=>{body(c,34,18,81,65);const lamp=el(c.root,'circle',{cx:75,cy:48,r:23,fill:water,stroke:metalStroke,'stroke-width':5});c.onUpdate(()=>lamp.setAttribute('opacity',String(.2+.8*(c.number('brightness')??0))));},
+ ioModule:(c:SvgRendererContext)=>{body(c,20,8,120,82);el(c.root,'text',{x:80,y:38,'font-size':16,'text-anchor':'middle',fill:metalStroke},'AI4');el(c.root,'text',{x:80,y:61,'font-size':10,'text-anchor':'middle',fill:metalStroke},'VIRTUAL');},
+ junction:(c:SvgRendererContext)=>{el(c.root,'path',{d:'M0 48H150 M75 48V85',stroke:metalStroke,'stroke-width':17,fill:'none'});el(c.root,'path',{d:'M0 48H150 M75 48V85',stroke:'#c9e2e7','stroke-width':11,fill:'none'});},
+ saturn:(c:SvgRendererContext)=>{const shell=el(c.root,'g',{});shell.innerHTML=renderSaturnPlcSvg({defsPrefix:'saturn-'+c.equipment.id});const svg=shell.querySelector('svg')!;svg.setAttribute('width','310');svg.setAttribute('height','170');const screen=svg.querySelector<SVGSVGElement>('.runtime-hmi')!;c.onUpdate(()=>drawHmiSvg(screen,c.equipment.id));},
+});
 const installed = new Set<string>();
 export function installEquipment() {
-    for (const spec of models()) {
+    for (const spec of [...models(),{visual:'saturn',title:'Saturn PLC · FBD',outputs:{healthy:'лог.',powered:'лог.'}}]) {
         if (!shapes[spec.visual]) throw new Error(`Missing SVG anatomy: ${spec.visual}`);
         const kind = `plant_${spec.visual}`;
         if (installed.has(kind))
             continue;
         installed.add(kind);
         if (!catalog[kind])
-            registerComponent(kind, { version: '1.0.0', label: spec.title, width: 150, height: 118, fields: { x: { label: 'X', scope: 'layout', default: 0 }, y: { label: 'Y', scope: 'layout', default: 0 } }, ports: {}, signals: Object.fromEntries(Object.entries(spec.outputs).map(([k, unit]) => [k, { label: k, unit, type: 'number' }])) });
-        registerSvgRenderer(kind, c => { shapes[spec.visual](c); const key = Object.keys(spec.outputs)[0]; const text = el(c.root, 'text', { x: 75, y: 111, 'text-anchor': 'middle', 'font-family': 'ui-monospace,monospace', 'font-size': 15, fill: '#214d5f' }); c.onUpdate(dt => { const value = c.number(key, dt); text.textContent = value === null ? '—' : `${value.toFixed(2)} ${spec.outputs[key]}`; }); });
+            registerComponent(kind, { version: '1.0.0', label: spec.title, ...footprint(spec.visual), fields: { x: { label: 'X', scope: 'layout', default: 0 }, y: { label: 'Y', scope: 'layout', default: 0 } }, ports: Object.fromEntries(Object.entries(terminals(spec.visual)).map(([name,t])=>[name,{x:t.x,y:t.y,direction:t.side,role:t.role==='source'?'out':'in'}])), signals: Object.fromEntries(Object.entries(spec.outputs).map(([k, unit]) => [k, { label: k, unit, type: 'number' }])) });
+        registerSvgRenderer(kind, c => { shapes[spec.visual](c); if(spec.visual==='saturn')return; const key = Object.keys(spec.outputs)[0]; const text = el(c.root, 'text', { x: 75, y: 111, 'text-anchor': 'middle', 'font-family': 'ui-monospace,monospace', 'font-size': 15, fill: '#214d5f' }); c.onUpdate(dt => { const value = c.number(key, dt); text.textContent = value === null ? '—' : `${value.toFixed(2)} ${(spec.outputs as Record<string,string>)[key]}`; }); });
         register3dRenderer(kind, c => createPlantModel(c, spec.visual, Object.keys(spec.outputs)[0]));
     }
 }
@@ -104,10 +117,12 @@ export function sceneFor(project: Project): Scene {
     return {
         nodes: project.devices.map((n): Equipment => ({ id: n.id, kind: `plant_${n.type}`, variable: n.id, props: { ...n.layout, quality: 'good', alarm: 'none' } })),
         links: [],
+        connections: routeConnections(project),
         groups: groupLayout(project, type => catalog[`plant_${type}`]),
     };
 }
 export function visualFrame(project: Project, frame: Frame): RuntimeFrame {
+    setDisplays(frame.displays??{});
     const equipment: RuntimeFrame['equipment'] = {};
     const derived = new Map(project.signals.map(s => [s.id, s.expression]));
     const expand = (expr: Expr): string[] => references(expr).flatMap(ref => derived.has(ref) ? expand(derived.get(ref)!) : [ref]);

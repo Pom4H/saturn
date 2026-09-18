@@ -11,6 +11,7 @@ export function trainingProject() {
     p.devices = p.devices.filter(n => n.system === 'training');
     p.controls = p.controls?.filter(c => c.system === 'training');
     p.systems = [{id:'training',title:'Thermal lab'}];
+    p.controllers=[];p.connections=[];p.attachments=[];
     p.signals = []; p.reports = p.reports.filter(r => r.id === 'lab-recovery');
     p.alarms = p.alarms.filter(r => r.id.startsWith('lab-')); p.overview = [];
     return p;

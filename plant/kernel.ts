@@ -1,3 +1,5 @@
+import { ControllerVM, inputPins, CONTROLLER_ABI } from './controller';
+import { connectionExpression, terminals, busConnected } from './ports';
 import { model } from './models';
 import { AppError, clone, finite, type Checkpoint, type Expr, type Frame, type Project, type Sample } from './types';
 export function evaluate(expr: Expr, read: (id: string) => Sample, time: number): Sample {
@@ -49,8 +51,16 @@ export function evaluate(expr: Expr, read: (id: string) => Sample, time: number)
 export class Kernel {
     state: Checkpoint;
     private bad = new Set<string>();
+    private controllers = new Map<string,ControllerVM>();
     constructor(readonly project: Project, revision: string, runId: string, epoch: number, checkpoint?: Checkpoint) {
         this.state = checkpoint ? clone(checkpoint) : { runId, revision, epoch, time: epoch, seq: 0, paused: false, overrides: {}, modelVersions: Object.fromEntries(project.simulations.map(n => [n.model, model(n.model).version])), controls: Object.fromEntries((project.controls ?? []).map(c => [c.id, { requested: c.initial, value: c.initial, blocked: false }])), states: Object.fromEntries(project.simulations.map(n => [n.id, model(n.model).initialize(n.parameters)])) };
+        if(checkpoint&&(project.controllers?.length??0)>0&&checkpoint.controllerAbi!==CONTROLLER_ABI)throw new AppError('Controller checkpoint ABI mismatch');
+        this.state.controllerAbi=CONTROLLER_ABI;
+        this.state.plc ??= {};
+        for(const c of project.controllers??[]) {
+            const vm=new ControllerVM(c); this.controllers.set(c.id,vm);
+            this.state.plc[c.id] ??= {inputs:{},outputs:Object.fromEntries(Object.keys(c.outputs).map(k=>[k,0])),healthy:false,powered:false};
+        }
         this.state.controls ??= {};
         for (const c of project.controls ?? []) {
             const saved = this.state.controls[c.id];
@@ -70,6 +80,7 @@ export class Kernel {
             p[k] = v;
     } return p; }
     samples(): Record<string, Sample> {
+        this.bad=new Set(this.state.invalidModels??[]);
         const output: Record<string, Sample> = Object.create(null);
         for (const c of this.project.controls ?? []) {
             const state = this.state.controls![c.id];
@@ -81,8 +92,15 @@ export class Kernel {
             const observed = spec.observe(this.state.states[n.id], this.parameters(n));
             for (const k of Object.keys(spec.outputs)) {
                 const v = observed[k];
-                output[`${n.id}.${k}`] = { value: !this.bad.has(n.id) && Number.isFinite(v) ? v : null, quality: this.bad.has(n.id) || !Number.isFinite(v) ? 'bad' : 'good', time: this.state.time };
+                const unwired = n.model==='io-module'&&!this.project.connections?.some(w=>w.to.device===n.id&&terminals('ioModule')[w.to.port]?.input===k);
+                output[`${n.id}.${k}`] = { value: !unwired && !this.bad.has(n.id) && Number.isFinite(v) ? v : null, quality: unwired || this.bad.has(n.id) || !Number.isFinite(v) ? 'bad' : 'good', time: this.state.time };
             }
+        }
+        for(const c of this.project.controllers??[]) {
+            const saved=this.state.plc![c.id];
+            for(const key of Object.keys(inputPins)) output[`${c.id}.${key}`]={value:saved.healthy&&saved.inputs[key]!==undefined?saved.inputs[key]:null,quality:saved.healthy&&saved.inputs[key]!==undefined?'good':'bad',time:this.state.time};
+            for(const [key,value] of Object.entries(saved.outputs)) output[`${c.id}.${key}`]={value:saved.healthy?value:null,quality:saved.healthy?'good':'bad',time:this.state.time};
+            for(const key of ['healthy','powered'] as const) output[`${c.id}.${key}`]={value:Number(saved[key]),quality:'good',time:this.state.time};
         }
         const derived = new Map(this.project.signals.map(s => [s.id, s]));
         const read = (id: string): Sample => { if (output[id])
@@ -92,14 +110,38 @@ export class Kernel {
             read(s.id);
         return output;
     }
+    private referenceValue(id:string,port:string,samples:Record<string,Sample>):number|null {
+        const wire=this.project.connections?.find(w=>w.to.device===id&&w.to.port===port);
+        const expr=wire&&connectionExpression(this.project,wire);if(!wire||expr===undefined)return null;
+        const v=evaluate(expr,key=>samples[key]??{value:null,quality:'bad',time:this.state.time},this.state.time);
+        return v.quality==='good'&&v.value!==null?v.value*(wire.scale??1):null;
+    }
+    private referenceHealthy(id:string,type:string,samples:Record<string,Sample>):boolean {
+        if(['transmitter','contactor','indicator'].includes(type)) {
+            const common=this.referenceValue(id,'common',samples);return common!==null&&Math.abs(common)<.001;
+        }
+        if(type!=='ioModule')return true;
+        const a=this.project.attachments?.find(a=>a.device===id);if(!a)return false;
+        const plus=this.referenceValue(id,'plus',samples),minus=this.referenceValue(id,'minus',samples);
+        if(plus===null||minus===null||plus-minus<12||plus-minus>24)return false;
+        const bus=(module:string,plc:string)=>busConnected(this.project,{device:id,port:module},{device:a.controller,port:plc});
+        return !!bus('busA','RS-A')&&!!bus('busB','RS-B')&&samples[a.controller+'.powered']?.value===1;
+    }
     step(): Frame {
         if (!this.state.paused) {
             const samples = this.samples(), next: Checkpoint['states'] = {}, bad = new Set<string>();
             for (const n of this.project.simulations) {
                 const inputs: Record<string, number> = {};
-                let valid = true;
-                for (const [key, expr] of Object.entries(n.inputs)) {
-                    const s = evaluate(expr, id => samples[id] ?? { value: null, quality: 'bad', time: this.state.time }, this.state.time);
+                const type=this.project.devices.find(d=>d.id===n.id)!.type;
+                let valid = this.referenceHealthy(n.id,type,samples);
+                const bindings={...n.inputs};
+                for(const w of this.project.connections??[]) if(w.to.device===n.id){
+                    const device=this.project.devices.find(d=>d.id===n.id)!;const target=terminals(device.type)[w.to.port];
+                    const expression=connectionExpression(this.project,w);if(target.input&&expression!==undefined)bindings[target.input]={op:'mul',args:[expression,w.scale??1]};
+                }
+                for (const [key, expr] of Object.entries(bindings)) {
+                    let s = evaluate(expr, id => samples[id] ?? { value: null, quality: 'bad', time: this.state.time }, this.state.time);
+                    if((s.quality!=='good'||s.value===null)){const device=this.project.devices.find(d=>d.id===n.id);const port=device&&Object.values(terminals(device.type)).find(t=>t.input===key&&t.failValue!==undefined);if(port)s={value:port.failValue!,quality:'good',time:this.state.time};}
                     if (s.quality !== 'good' || s.value === null) {
                         valid = false;
                         break;
@@ -107,7 +149,7 @@ export class Kernel {
                     inputs[key] = s.value;
                 }
                 if (!valid) {
-                    next[n.id] = this.state.states[n.id];
+                    next[n.id] = n.model==='contactor'?model(n.model).advance(this.state.states[n.id],{coil:0,supply:0},this.parameters(n),this.project.stepMs/1000):this.state.states[n.id];
                     bad.add(n.id);
                     continue;
                 }
@@ -127,6 +169,22 @@ export class Kernel {
                 else { const delta = state.requested - state.value, limit = c.rate * this.project.stepMs / 1000;
                     state.value += Math.sign(delta) * Math.min(Math.abs(delta), limit); }
             }
+            for(const c of this.project.controllers??[]) {
+                const vm=this.controllers.get(c.id)!,inputs:Record<string,number>={};
+                const read=(port:string)=>{
+                    const wire=this.project.connections?.find(w=>w.to.device===c.id&&w.to.port===port);
+                    const expression=wire&&connectionExpression(this.project,wire);
+                    if(!wire||expression===undefined)return null;
+                    const v=evaluate(expression,id=>samples[id]??{value:null,quality:'bad',time:this.state.time},this.state.time);
+                    return v.quality==='good'&&v.value!==null?v.value*(wire.scale??1):null;
+                };
+                const plus=read('DC+'),minus=read('DC-'),common=read('COM1');
+                const powered=plus!==null&&minus!==null&&plus-minus>=12&&plus-minus<=24;
+                let healthy=powered&&common!==null&&minus!==null&&Math.abs(common-minus)<.001;
+                for(const name of vm.artifact.inputs){const v=read(name);if(v===null||!Number.isFinite(v)||v< -2147483648||v>2147483647)healthy=false;else inputs[name]=Math.round(v);}
+                const outputs=healthy?vm.scan(inputs,this.project.stepMs).outputs:Object.fromEntries(Object.keys(c.outputs).map(k=>[k,0]));
+                this.state.plc![c.id]={inputs,outputs,healthy,powered};
+            }
             this.bad = bad;
             this.state.invalidModels = [...bad];
             this.state.states = next;
@@ -135,7 +193,9 @@ export class Kernel {
         }
         return this.frame();
     }
-    frame(): Frame { return { runId: this.state.runId, revision: this.state.revision, seq: this.state.seq, time: this.state.time, paused: this.state.paused, synthetic: true, samples: this.samples(), alarms: [] }; }
+    frame(): Frame { const displays:NonNullable<Frame['displays']>={};
+        for(const [id,vm] of this.controllers){const saved=this.state.plc![id];displays[id]=saved.healthy?vm.scan(saved.inputs,this.project.stepMs).hmi:[];}
+        return { displays, runId: this.state.runId, revision: this.state.revision, seq: this.state.seq, time: this.state.time, paused: this.state.paused, synthetic: true, samples: this.samples(), alarms: [] }; }
     operate(target: string, value: number): void {
         const c = this.project.controls?.find(c => c.id === target);
         if (!c) throw new AppError('Unknown operator control');

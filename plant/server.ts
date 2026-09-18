@@ -171,6 +171,7 @@ export async function startPlantServer(options: {
                         json(200, { ok: true });
                         return;
                     }
+                    if (action === 'firmware') { json(200, service.firmware(input.controllerId,input.revision,actor)); return; }
                     if (action === 'command') {
                         json(200, service.command(input, actor));
                         return;

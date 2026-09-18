@@ -70,6 +70,7 @@ scope.onmessage = async (e) => {
             throw new AppError('Runtime is not ready', 503);
         let result: unknown;
         switch (action) {
+            case 'firmware': result=service.firmware(input.controllerId,input.revision,actor);break;
             case 'session':
                 result = await service.status(actor);
                 break;

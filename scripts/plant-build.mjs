@@ -13,6 +13,7 @@ await mkdir('dist/plant/assets', { recursive: true });
 await build({ ...options, entryPoints: { app: 'plant/web/main.ts', worker: 'plant/adapters/browser-worker.ts', 'browser-report-worker': 'plant/adapters/browser-report-worker.ts', login: 'plant/web/login.ts' }, outdir: 'dist/plant/assets', platform: 'browser', minify: true, sourcemap: false, legalComments: 'linked', splitting: true, chunkNames: 'chunks/[name]-[hash]', loader: { '.wasm': 'file' } });
 await cp('node_modules/@sqlite.org/sqlite-wasm/dist/sqlite3.wasm', 'dist/plant/assets/sqlite3.wasm');
 await cp('node_modules/@sqlite.org/sqlite-wasm/dist/sqlite3.wasm', 'dist/plant/assets/chunks/sqlite3.wasm');
+await writeFile('dist/plant/assets/THIRD-PARTY.txt', 'Saturn profile adapted from Pom4H/open-device 007ada38d2cce27b37413f38952ca11b919842c1\n\n'+await readFile('plant/vendor/saturn/LICENSE','utf8')+'\n\nFBD WASM runtime\n'+await readFile('plant/vendor/saturn/RUNTIME-LICENSE','utf8'));
 await cp('plant/web/app.css', 'dist/plant/assets/app.css');
 await cp('plant/web/manifest.webmanifest', 'dist/plant/manifest.webmanifest');
 await cp('plant/web/icon.svg', 'dist/plant/assets/icon.svg');
@@ -29,7 +30,7 @@ manifest.scope = '../';
 for (const icon of manifest.icons)
     icon.src = '.' + icon.src;
 await writeFile('dist/plant/demo/manifest.webmanifest', JSON.stringify(manifest));
-const assets = ['demo/', 'demo/manifest.webmanifest', ...(await readdir('dist/plant/assets', { recursive: true })).filter(p => /\.(js|css|wasm|svg|png)$/.test(p)).map(p => 'assets/' + p.replaceAll('\\', '/'))];
+const assets = ['demo/', 'demo/manifest.webmanifest', ...(await readdir('dist/plant/assets', { recursive: true })).filter(p => /\.(js|css|wasm|svg|png|txt)$/.test(p)).map(p => 'assets/' + p.replaceAll('\\', '/'))];
 const hash = createHash('sha256');
 for (const asset of assets)
     hash.update(await readFile('dist/plant/' + (asset === 'demo/' ? 'demo/index.html' : asset)));

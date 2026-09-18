@@ -97,3 +97,13 @@ The Chernobyl-inspired model, assumptions and counterfactual results are documen
 ## Unified visualization and extended equipment
 
 See [unified canvas, equipment coverage, and isolated recovery exercises](unified-canvas.md). The latest example adds nested backplates, nine generic equipment models with matching SVG/3D anatomy, and a separately wired fictional thermal training loop. See `verification-unified.json` for the latest run; the earlier verification files refer to earlier revisions.
+
+## Physical terminals and Saturn target
+
+The commissioning extension adds explicit pipe, power, control and bus routes,
+shared SVG/3D terminal anchors, source-preserving wire edits, virtual expansion
+slots and an actual Saturn `.fbdbin` → WASM → HMI path. Read
+[connectivity, target limits and the NPP completeness audit](connectivity-plc.md)
+and [third-party provenance](../../plant/vendor/saturn/PROVENANCE.md) before using
+artifacts. A compiled program is not a complete board firmware image, and
+`hardwareVerified` is deliberately false.

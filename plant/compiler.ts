@@ -1,3 +1,5 @@
+import { compileController, inputPins } from './controller';
+import { validateConnections, terminals, connectionExpression } from './ports';
 import ts from '@typescript/typescript6';
 import * as dsl from './dsl';
 import { model, models } from './models';
@@ -251,14 +253,17 @@ export function validateProject(value: unknown): asserts value is Project {
             parent = p.systems.find(g => g.id === parent)?.parent;
         }
     }
+    if(!Array.isArray(p.controllers??[])||(p.controllers?.length??0)>4) throw new AppError('At most four PLC runtimes');
+    unique([...(p.controllers??[]).map(c=>c.id), ...p.simulations.map(n => n.id)]);
+    for(const c of p.controllers??[]) { if(!groups.has(c.system))throw new AppError('PLC system missing');compileController(c); }
     unique(p.simulations.map(n => n.id));
     unique(p.devices.map(n => n.id));
     unique(p.alarms.map(a => a.id));
     unique(p.reports.map(r => r.id));
     if (p.controls !== undefined && (!Array.isArray(p.controls) || p.controls.length > 128))
         throw new AppError('At most 128 controls');
-    unique([...(p.controls ?? []).map(c => c.id), ...p.simulations.map(n => n.id)]);
-    const signals = unique([...(p.controls ?? []).flatMap(c => ['value', 'requested', 'blocked'].map(k => `${c.id}.${k}`)), ...p.simulations.flatMap(n => Object.keys(model(n.model).outputs).map(k => `${n.id}.${k}`)), ...p.signals.map(s => s.id)]);
+    unique([...(p.controls ?? []).map(c => c.id), ...(p.controllers??[]).map(c=>c.id), ...p.simulations.map(n => n.id)]);
+    const signals = unique([...(p.controls ?? []).flatMap(c => ['value', 'requested', 'blocked'].map(k => `${c.id}.${k}`)), ...p.simulations.flatMap(n => Object.keys(model(n.model).outputs).map(k => `${n.id}.${k}`)), ...(p.controllers??[]).flatMap(c=>[...Object.keys(c.outputs),...Object.keys(inputPins),'healthy','powered'].map(k=>`${c.id}.${k}`)), ...p.signals.map(s => s.id)]);
     let expressions = 0;
     const checkExpr = (e: Expr, depth = 0): void => { if (++expressions > 20000)
         throw new AppError('Signal expression budget'); if (depth > 32)
@@ -312,6 +317,12 @@ export function validateProject(value: unknown): asserts value is Project {
         finite(n.layout.x, 'x', -5000, 10000);
         finite(n.layout.y, 'y', -5000, 10000);
     }
+    validateConnections(p);
+    for(const w of p.connections??[]) {
+        const expression=connectionExpression(p,w);if(expression!==undefined)checkExpr(expression);
+        const dst=p.devices.find(d=>d.id===w.to.device)!;const terminal=terminals(dst.type)[w.to.port];
+        if(terminal.input) { const sim=p.simulations.find(n=>n.id===dst.id);if(!sim||!(terminal.input in model(sim.model).inputs))throw new AppError('Port input has no model binding: '+w.id); }
+    }
     const visited = new Set<string>(), active = new Set<string>(), derived = new Map(p.signals.map(s => [s.id, s]));
     function visit(name: string) { if (visited.has(name))
         return; if (active.has(name))
@@ -324,7 +335,7 @@ export function validateProject(value: unknown): asserts value is Project {
     for (const d of p.devices) {
         if (!groups.has(d.system))
             throw new AppError('Device has unknown system');
-        if (typeof d.type !== 'string' || !models().some(m => m.visual === d.type))
+        if (typeof d.type !== 'string' || !(d.type==='saturn'||models().some(m => m.visual === d.type)))
             throw new AppError('Invalid device type');
         finite(d.layout.x, 'device x', -5000, 10000);
         finite(d.layout.y, 'device y', -5000, 10000);

@@ -1,3 +1,4 @@
+import './connections.test';
 import './stability.test';
 import './group-layout.test';
 import './control.test';
@@ -24,7 +25,7 @@ import type { Actor, AlarmState, ReportTask, Project, Frame } from '../types';
 const engineer: Actor = { id: 'engineer', role: 'engineer' }, viewer: Actor = { id: 'reader', role: 'viewer' };
 const project = () => compileProject(demoFiles);
 const makeService = async (files = demoFiles) => { const store = new Store(new NodeSql()); let serial = 0; const repo = new LocalRepository(store, () => `local:${++serial}`); const service = new Service(store, repo, { now: () => 1000000, uuid: () => `id-${++serial}`, reportRunner: async (task) => executeReport(task, new NodeSql()) }); await service.start(files); return service; };
-test('multi-file DSL compiles hierarchy and typed signal sources', () => { const p = project(); assert.equal(p.simulations.length, 41); assert.equal(p.systems.length, 17); assert.equal(p.reports.length, 3); assert.deepEqual(p.simulations.find(n => n.id === 'PUMP-A')!.inputs.voltage, { ref: 'GRID.voltage' }); });
+test('multi-file DSL compiles hierarchy and typed signal sources', () => { const p = project(); assert.equal(p.simulations.length, 46); assert.equal(p.systems.length, 18); assert.equal(p.reports.length, 3); assert.deepEqual(p.simulations.find(n => n.id === 'PUMP-A')!.inputs.voltage, { ref: 'GRID.voltage' }); });
 for (const [name, source] of Object.entries({ execute: 'globalThis.process.exit()', getter: 'const a={get b(){return 1;}};', prototype: 'const a={constructor: 1};', import: 'import { x } from "../../outside";', loop: 'while(true){}', function: 'const x=()=>1;' }))
     test(`DSL rejects ${name}`, () => assert.throws(() => compileProject({ ...demoFiles, 'plant.ts': source })));
 test('DSL rejects unknown signals and algebraic cycles', () => { assert.throws(() => compileProject({ ...demoFiles, 'core.ts': demoFiles['core.ts'].replace('"core.void"', '"missing.signal"') }), /Unknown signal/); assert.throws(() => compileProject({ ...demoFiles, 'core.ts': demoFiles['core.ts'].replace(/derived\("core.temperature",[^;]+;/, 'derived("core.temperature", signal("core.temperature"));') }), /cycle/); });
@@ -105,6 +106,9 @@ test('HTTP auth, CSRF, private HTML, SQL reports, SSE and revocation', async () 
     assert.equal(report.status, 202);
     await app.service.idle();
     assert.equal(app.service.reports()[0].status, 'success');
+    const firmware=await fetch(base+'api/firmware',{method:'POST',headers:{Cookie:cookie,Origin:app.origin,'content-type':'application/json','x-csrf-token':login.csrf},body:JSON.stringify({controllerId:'SATURN-1',revision:app.service.frame().revision})});
+    assert.equal(firmware.status,200);const program=await firmware.json() as any;assert.equal(program.hardwareVerified,false);assert.ok(program.fbdbin.length>100);
+    assert.equal((await fetch(base+'api/firmware',{method:'POST',headers:{Cookie:cookie,Origin:app.origin,'content-type':'application/json'},body:'{}'})).status,403);
     const logout = await fetch(base + 'api/logout', { method: 'POST', headers: { Cookie: cookie, Origin: app.origin, 'content-type': 'application/json', 'x-csrf-token': login.csrf }, body: '{}' });
     assert.equal(logout.status, 200);
     assert.equal((await fetch(base + 'api/session', { headers: { Cookie: cookie } })).status, 401);
@@ -130,4 +134,11 @@ test('native SQL runaway is terminated in its isolated process without stopping 
     t.report.sql = 'SELECT count(*) AS total FROM samples a, samples b, samples c, samples d';
     await assert.rejects(runReport(t, 300), /budget/);
     assert.equal((await runReport(task())).rows[0].coverage, 80);
+});
+
+test('PLC artifact export checks engineer role, revision and target, and includes a hardware qualification boundary',async()=>{
+ const s=await makeService();try{assert.throws(()=>s.firmware('SATURN-1',s.frame().revision,viewer),/permission/);assert.throws(()=>s.firmware('SATURN-1','stale',engineer),/revision/);assert.throws(()=>s.firmware('absent',s.frame().revision,engineer),/Unknown/);const a=s.firmware('SATURN-1',s.frame().revision,engineer);assert.equal(a.hardwareVerified,false);assert.ok(a.fbdbin.length>100);assert.equal(a.expansions[0].profile,'virtual-io4');assert.match(a.runtimeHash,/^[a-f0-9]{64}$/);}finally{s.store.db.close();}
+});
+test('layout-only edits preserve the run and compiled program',async()=>{
+ const s=await makeService();try{for(let i=0;i<20;i++)s.tick();const old=s.frame(),files={...demoFiles,'commissioning.ts':demoFiles['commissioning.ts'].replace('x:760,y:3100','x:765,y:3100')};const head=await s.repository.head(),commit=await s.save(files,head,'Move PLC',engineer);await s.publish(commit.id,await s.repository.desired(),engineer);assert.equal(s.frame().runId,old.runId);assert.deepEqual(s.frame().displays,old.displays);}finally{s.store.db.close();}
 });

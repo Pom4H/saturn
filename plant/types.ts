@@ -1,3 +1,6 @@
+import type { Controller, ControllerState } from './controller';
+import type { Connection, Attachment } from './ports';
+import type { HmiDrawCommand } from './vendor/saturn/src/runtime';
 /** Portable contracts. No DOM, Node, filesystem, SQL driver or network imports. */
 export type Scalar = number | boolean | string;
 export type Quality = 'good' | 'bad' | 'stale' | 'offline';
@@ -119,6 +122,9 @@ export interface Control {
 }
 export interface ControlState { requested: number; value: number; blocked: boolean }
 export interface Project {
+    controllers?: Controller[];
+    connections?: Connection[];
+    attachments?: Attachment[];
     version: 1;
     id: string;
     title: string;
@@ -157,6 +163,8 @@ export interface ModelSpec {
     observe(s: Readonly<Record<string, number>>, p: Readonly<Record<string, number>>): Record<string, number>;
 }
 export interface Checkpoint {
+    plc?: Record<string,ControllerState>;
+    controllerAbi?: string;
     runId: string;
     revision: string;
     seq: number;
@@ -170,6 +178,7 @@ export interface Checkpoint {
     invalidModels?: string[];
 }
 export interface Frame {
+    displays?: Record<string,HmiDrawCommand[]>;
     runId: string;
     revision: string;
     seq: number;

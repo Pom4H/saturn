@@ -1,3 +1,4 @@
+export {runPlcTrace} from './plc-trace';
 import { compileProject } from '../compiler';
 import { demoFiles } from '../demo/files';
 import { Kernel } from '../kernel';
@@ -32,3 +33,4 @@ export function runCounterfactuals() {
 export { runControlTrace } from './control-trace';
 
 export {runTrainingSuite} from './stability-trace';
+export {compileController,plcFixture} from './plc-trace';

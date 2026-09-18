@@ -1,3 +1,4 @@
+import { connectionStyles } from './connection-style';
 import { groupFill, groupStroke, groupAccent, groupTitleLines } from './group-style';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -81,6 +82,7 @@ export class SceneView3D {
   paused = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   selected: string | null = null;
   onSelect?: (id: string | null) => void;
+  onPortSelect?: (id:string,port:string)=>void;
   onOverview?: () => void;
   private frame: RuntimeFrame | null = null;
   private renderer: THREE.WebGLRenderer;
@@ -108,6 +110,7 @@ export class SceneView3D {
   private geometryKey = '';
   private resizeObserver: ResizeObserver;
   private raf = 0;
+  private needsDraw = true;
   private last = 0;
   private motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
   private raycaster = new THREE.Raycaster();
@@ -154,18 +157,22 @@ export class SceneView3D {
       if (e.clientY - rect.top > drawingHeight) return;
       this.raycaster.setFromCamera(new THREE.Vector2((e.clientX - rect.left) / rect.width * 2 - 1, -(e.clientY - rect.top) / drawingHeight * 2 + 1), this.camera);
       let object: THREE.Object3D | undefined = this.raycaster.intersectObjects(this.equipmentLayer.children, true)[0]?.object;
+      const terminal=object?.userData.terminal;
       while (object && !object.userData.equipmentId) object = object.parent ?? undefined;
-      const id = object?.userData.equipmentId ?? null; this.select(id); this.onSelect?.(id);
+      const id = object?.userData.equipmentId ?? null; this.select(id); this.onSelect?.(id); if(id&&terminal)this.onPortSelect?.(id,terminal);
     });
     const animate = (now: number) => {
       const dt = Math.min(.1, this.last ? (now - this.last) / 1000 : 0); this.last = now;
-      if (host.clientWidth && host.clientHeight && !host.hidden) { this.advance(this.paused || this.motionQuery.matches ? 0 : dt); this.draw(); }
+      if (host.clientWidth && host.clientHeight && !host.hidden && !document.hidden) {
+        const moving = !this.paused && !this.motionQuery.matches;
+        if (moving || this.needsDraw) { this.advance(moving ? dt : 0); this.needsDraw = false; this.paint(); }
+      }
       this.raf = requestAnimationFrame(animate);
     };
     this.resize(); this.raf = requestAnimationFrame(animate);
   }
   private context(equipment: Equipment): Renderer3DContext {
-    return { THREE, equipment, materials,
+    return { THREE, equipment, materials, invalidate: () => this.draw(),
       signal: key => observation(this.scene, this.frame, equipment.id, key), quality: key => observationQuality(this.scene, this.frame, equipment.id, key),
       alarm: () => observationAlarm(this.scene, this.frame, equipment.id), mode: () => this.frame?.equipment[equipment.id]?.facts.mode ?? 'preview',
       number: (key, dt = 0) => {
@@ -180,12 +187,12 @@ export class SceneView3D {
   }
   render(scene: Scene) {
     this.scene = scene; this.flows = observedFlows(scene, this.frame); this.renderGroups();
-    const geometryKey = JSON.stringify([scene.nodes.map(n => [n.id, n.kind, n.props.x, n.props.y, n.tap, n.props.at, n.props.offset]), scene.links, !!scene.groups?.length]);
+    const geometryKey = JSON.stringify([scene.nodes.map(n => [n.id, n.kind, n.props.x, n.props.y, n.tap, n.props.at, n.props.offset]), scene.links, scene.connections, !!scene.groups?.length]);
     if (geometryKey === this.geometryKey) { for (const n of scene.nodes) this.objects.get(n.id)!.equipment.props = { ...n.props }; this.advance(0); this.draw(); return; }
     this.geometryKey = geometryKey;
     const previous = this.objects, hadModels = previous.size > 0, trackPhases = new Map(this.tracks.map(track => [track.id, track.phase]));
     this.objects = new Map(); this.equipmentLayer.clear(); this.leaders.replaceChildren(); this.labels.replaceChildren(this.leaders);
-    this.pipeLayer.traverse(object => { if (object instanceof THREE.Mesh) object.geometry.dispose(); }); this.pipeLayer.clear(); this.tracks = [];
+    this.pipeLayer.traverse(object => { if (object instanceof THREE.Mesh) {object.geometry.dispose();if(object.userData.ownedConnectionMaterial)(object.material as THREE.Material).dispose();} }); this.pipeLayer.clear(); this.tracks = [];
     const routes = layout(scene).routes;
     for (const original of scene.nodes) {
       let object = previous.get(original.id);
@@ -209,6 +216,21 @@ export class SceneView3D {
       this.objects.set(equipment.id, { equipment, model, label, text, state, leader });
     }
     for (const { model } of previous.values()) { model.dispose?.(); model.root.traverse(object => { if (object instanceof THREE.Mesh) object.geometry.dispose(); }); }
+    // Batch connection segments by material. Geometry is static until topology/layout changes.
+    const connectionBatches=new Map<string,{style:(typeof connectionStyles)[keyof typeof connectionStyles];valid:boolean;segments:[THREE.Vector3,THREE.Vector3][]}>();
+    for(const wire of scene.connections??[]) {
+      const key=wire.medium+':'+wire.valid;
+      if(!connectionBatches.has(key))connectionBatches.set(key,{style:connectionStyles[wire.medium],valid:wire.valid,segments:[]});
+      const batch=connectionBatches.get(key)!;
+      for(let i=1;i<wire.points.length;i++) {const a=wire.points[i-1],b=wire.points[i],from=v(a.x/100,-a.y/100,a.z),to=v(b.x/100,-b.y/100,b.z);if(from.distanceTo(to)>.00001)batch.segments.push([from,to]);}
+    }
+    for(const {style,valid,segments} of connectionBatches.values()) {
+      if(!segments.length)continue;
+      const geometry=new THREE.CylinderGeometry(style.radius,style.radius,1,8),material=new THREE.MeshStandardMaterial({color:valid?style.color:'#c45544',metalness:.25,roughness:.5});
+      const mesh=new THREE.InstancedMesh(geometry,material,segments.length),matrix=new THREE.Matrix4(),rotation=new THREE.Quaternion(),axis=v(0,1,0);
+      segments.forEach(([from,to],i)=>{const delta=to.clone().sub(from),length=delta.length();rotation.setFromUnitVectors(axis,delta.normalize());matrix.compose(from.clone().add(to).multiplyScalar(.5),rotation,v(1,length,1));mesh.setMatrixAt(i,matrix);});
+      mesh.instanceMatrix.needsUpdate=true;mesh.userData.ownedConnectionMaterial=true;this.pipeLayer.add(mesh);
+    }
     for (const edge of scene.links) {
       const a = this.objects.get(edge.from.node), b = this.objects.get(edge.to.node);
       const start = a?.model.ports.get(edge.from.port)?.clone().add(a.model.root.position), end = b?.model.ports.get(edge.to.port)?.clone().add(b.model.root.position);
@@ -326,7 +348,10 @@ export class SceneView3D {
   }
   zoom(factor: number) { const offset = this.camera.position.clone().sub(this.controls.target); this.camera.position.copy(this.controls.target).add(offset.multiplyScalar(factor)); this.controls.update(); this.draw(); }
   private resize() { const width = this.host.clientWidth, height = this.host.clientHeight; if (!width || !height) return; const bottom = width <= 650 ? 77 : 0, drawingHeight = Math.max(1, height - bottom); this.renderer.setSize(width, height, false); this.renderer.setViewport(0, bottom, width, drawingHeight); this.camera.aspect = width / drawingHeight; this.camera.updateProjectionMatrix(); this.draw(); }
-  private draw() {
+  /** Coalesce camera, selection, layout and telemetry invalidations into one GPU submission.
+   * Never render synchronously inside a click/resize callback (especially on software GL). */
+  private draw() { this.needsDraw = true; }
+  private paint() {
     if (!this.host.clientWidth || !this.host.clientHeight || this.host.hidden) return;
     this.renderer.render(this.world, this.camera);
     const width = this.host.clientWidth, height = this.host.clientHeight, compact = width <= 650;
@@ -369,12 +394,12 @@ export class SceneView3D {
     }
     this.draw();
   }
-  inspect() { return { groups: this.scene.groups ?? [], focusedGroup: this.focusedGroup, runId: this.frame?.runId ?? null, seq: this.frame?.seq ?? null, triangles: this.renderer.info.render.triangles, calls: this.renderer.info.render.calls, equipment: [...this.objects.values()].map(({ equipment, model }) => ({ id: equipment.id, instanceId: this.frame?.equipment[equipment.id]?.instanceId ?? null, signals: this.frame?.equipment[equipment.id]?.signals ?? null, alarm: observationAlarm(this.scene, this.frame, equipment.id), metrics: model.metrics?.() ?? {}, ports: Object.fromEntries([...model.ports].map(([key, point]) => [key, point.clone().add(model.root.position).toArray()])) })), flows: this.tracks.map(({ id, phase, value }) => ({ id, phase, value })) }; }
+  inspect() { return { connections: this.scene.connections ?? [], groups: this.scene.groups ?? [], focusedGroup: this.focusedGroup, runId: this.frame?.runId ?? null, seq: this.frame?.seq ?? null, triangles: this.renderer.info.render.triangles, calls: this.renderer.info.render.calls, equipment: [...this.objects.values()].map(({ equipment, model }) => ({ id: equipment.id, instanceId: this.frame?.equipment[equipment.id]?.instanceId ?? null, signals: this.frame?.equipment[equipment.id]?.signals ?? null, alarm: observationAlarm(this.scene, this.frame, equipment.id), metrics: model.metrics?.() ?? {}, ports: Object.fromEntries([...model.ports].map(([key, point]) => [key, point.clone().add(model.root.position).toArray()])) })), flows: this.tracks.map(({ id, phase, value }) => ({ id, phase, value })) }; }
   private clearGeometry() {
     for (const child of this.signalLayer.children) (child as THREE.Line).geometry.dispose();
     this.signalLayer.clear();
     for (const { model } of this.objects.values()) model.dispose?.();
-    for (const layer of [this.equipmentLayer, this.pipeLayer]) { layer.traverse(object => { if (object instanceof THREE.Mesh) object.geometry.dispose(); }); layer.clear(); }
+    for (const layer of [this.equipmentLayer, this.pipeLayer]) { layer.traverse(object => { if (object instanceof THREE.Mesh) {object.geometry.dispose();if(object.userData.ownedConnectionMaterial)(object.material as THREE.Material).dispose();} }); layer.clear(); }
     this.objects.clear(); this.tracks = []; this.leaders.replaceChildren(); this.labels.replaceChildren(this.leaders);
   }
   dispose() { cancelAnimationFrame(this.raf); this.resizeObserver.disconnect(); this.controls.dispose(); this.clearGroups(); this.clearGeometry(); this.world.traverse(object => { if (object instanceof THREE.Mesh) object.geometry.dispose(); }); this.signalMaterial.dispose(); this.renderer.dispose(); this.host.replaceChildren(); }

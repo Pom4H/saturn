@@ -1,3 +1,4 @@
+import { connectionStyles } from './connection-style';
 import { groupFill, groupStroke, groupAccent, groupTitleLines } from './group-style';
 import { catalog, simulate, type Equipment, type Scene, type Point } from './core';
 import { layout, tapPoint, type Route } from './geometry';
@@ -27,6 +28,8 @@ export function registerSvgRenderer(kind: string, renderer: SvgRenderer) {
 }
 /** Three is supplied by the lazy 3D host; installing a package does not load WebGL. */
 export interface Renderer3DContext extends VisualState {
+  /** Request a frame after asynchronous texture/model preparation. */
+  invalidate?: () => void;
   THREE: typeof Three;
   equipment: Equipment;
   materials: { steel: Three.Material; dark: Three.Material; teal: Three.Material; fluid: Three.Material };
@@ -218,7 +221,7 @@ export class SceneView {
     // closures alive; refresh only the derived props they read on the next frame.
     const key = JSON.stringify([
       scene.nodes.map(n => [n.id, n.kind, n.tap, n.props.x, n.props.y, n.props.at, n.props.offset]),
-      scene.links,
+      scene.links, scene.connections,
     ]);
     if (key === this.geometryKey) {
       for (const n of scene.nodes) this.renderedNodes.get(n.id)!.props = { ...n.props };
@@ -233,6 +236,13 @@ export class SceneView {
     for (const id of this.visual.keys()) if (!scene.nodes.some(n => n.id === id)) this.visual.delete(id);
     const geometry = layout(scene); this.routes = geometry.routes; this.warnings = geometry.warnings;
     this.layers.replaceChildren(); const pipes = el(this.layers, 'g'), devices = el(this.layers, 'g'), instruments = el(this.layers, 'g');
+    for(const wire of scene.connections??[]) {
+      const style=connectionStyles[wire.medium],d=wire.points.map((p,i)=>`${i?'L':'M'}${p.x} ${p.y}`).join(' ');
+      const g=el(pipes,'g',{'data-connection':wire.id,'data-medium':wire.medium,'data-valid':String(wire.valid),tabindex:0});
+      el(g,'title',{},`${wire.from.device}.${wire.from.port} → ${wire.to.device}.${wire.to.port}${wire.error?' · '+wire.error:''}`);
+      el(g,'path',{d,fill:'none',stroke:wire.valid?style.color:'#c45544','stroke-width':style.width,'stroke-linejoin':'round','stroke-linecap':'butt'});
+      el(g,'path',{d,fill:'none',stroke:style.inner,'stroke-width':Math.max(1,style.width-4),'stroke-dasharray':wire.valid?style.dash:'6 4','pointer-events':'none'});
+    }
     for (const edge of scene.links) {
       const route = this.routes.get(edge.id)!;
       const g = el(pipes, 'g', { 'data-edge': edge.id, class: `edge${route.valid ? '' : ' invalid'}`, tabindex: 0, role: 'button', 'aria-label': `Труба ${edge.from.node} → ${edge.to.node}` });
@@ -351,7 +361,7 @@ export class SceneView {
     hit.setAttribute('aria-hidden', 'true');
     const ports = el(g, 'g', { class: 'ports' });
     for (const [name, p] of Object.entries(d.ports)) {
-      const port = el(ports, 'circle', { cx: p.x, cy: p.y, r: 7, fill: '#f5fafb', stroke: '#159aac', 'stroke-width': 2.5, 'data-port': name, 'data-owner': n.id, 'data-role': p.role, tabindex: 0, role: 'button', 'aria-label': `${n.id}.${name}` });
+      const port = el(ports, 'circle', { cx: p.x, cy: p.y, r: n.kind==='plant_saturn'?2.8:5, fill: '#f5fafb', stroke: '#159aac', 'stroke-width': 2.5, 'data-port': name, 'data-owner': n.id, 'data-role': p.role, tabindex: 0, role: 'button', 'aria-label': `${n.id}.${name}` });
       el(port, 'title', {}, `${name} · ${p.role === 'out' ? 'начать соединение' : 'вход'}`);
     }
   }

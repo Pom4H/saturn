@@ -1,3 +1,6 @@
+import { terminals, footprint } from './ports';
+import { drawHmiCanvas, getDisplay } from './hmi-view';
+import { renderSaturnPlcSvg } from './saturn-view';
 import type * as THREE from 'three';
 import type { EquipmentModel3D, Renderer3DContext } from '../src/view';
 
@@ -25,7 +28,8 @@ export function createPlantModel(c: Renderer3DContext, visual: string, readout: 
         const n = mesh(new T.TorusGeometry(radius, tube, 6, 24), m, x, y, z); if (axis === 'y') n.rotation.x = Math.PI / 2; return n;
     };
     const base = (width = 1.15) => { box(width, .75, .09, dark, 0, 0, .05); for (const x of [-width * .35, width * .35]) box(.1, .6, .15, steel, x, 0, .15); };
-    const ports = new Map<string, THREE.Vector3>();
+    const ports = new Map<string, THREE.Vector3>(), portNormals=new Map<string,THREE.Vector3>();
+    const textureDisposers:(()=>void)[]=[];
     const flanges = (z = .65) => { for (const x of [-.63, .63]) { cylinder(.12, .28, steel, x, 0, z, 'x'); cylinder(.17, .05, dark, x * 1.1, 0, z, 'x'); } };
     const rotating = (key: string, z: number, radius = .25) => {
         const rotor = new T.Group(); rotor.position.set(0, -.26, z); rotor.userData.part = 'rotor'; root.add(rotor);
@@ -158,12 +162,57 @@ export function createPlantModel(c: Renderer3DContext, visual: string, readout: 
             const meter=box(.035,.04,1,teal,.32,-.38,.65);meter.userData.part='temperature';
             update.push(dt=>{const v=c.number('temperature',dt);meter.visible=v!==null;const h=Math.min(.6,Math.max(.001,(v??0)*.18));meter.scale.z=h;meter.position.z=.34+h/2;});top=1.65;break;
         }
+        case 'dcSupply':
+            base();box(1,.7,.8,steel,0,0,.6);for(let i=0;i<5;i++)box(.8,.02,.04,dark,0,-.36,.38+i*.1);top=1.4;break;
+        case 'transmitter':
+            base(.7);cylinder(.22,.25,steel,0,0,.4);cylinder(.3,.14,dark,0,-.13,.78,'y');cylinder(.22,.15,teal,0,-.2,.78,'y');break;
+        case 'contactor': {
+            base();box(.95,.6,.6,steel,0,0,.5);box(.4,.64,.5,dark,-.2,0,.55);const blade=box(.04,.3,.06,copper,.24,0,.87);update.push(()=>{blade.rotation.z=(c.number('closed')??0)>.8?0:.8;});break;
+        }
+        case 'indicator': {base(.8);cylinder(.27,.2,dark,0,0,.5);const light=cylinder(.23,.15,teal,0,0,.67);update.push(()=>{light.scale.setScalar(.7+.3*(c.number('brightness')??0));});break;}
+        case 'ioModule':
+            base();box(1.1,.65,.8,steel,0,0,.55);box(.7,.04,.4,dark,0,-.35,.68);for(let i=0;i<4;i++)cylinder(.04,.03,teal,(i-1.5)*.16,-.38,.6,'y');break;
+        case 'junction': base();cylinder(.12,1.5,steel,0,.11,.65,'x');cylinder(.12,.4,steel,0,-.1,.65,'y');break;
+        case 'saturn': {
+            box(3,1,.65,dark,0,.1,.5);box(3,.96,.08,steel,0,.1,.88);
+            if(typeof document!=='undefined') {
+                const canvas=document.createElement('canvas');canvas.width=1240;canvas.height=680;
+                const texture=new T.CanvasTexture(canvas);texture.colorSpace=T.SRGBColorSpace;
+                const faceMaterial=new T.MeshBasicMaterial({map:texture,transparent:true,side:T.DoubleSide});owned.push(faceMaterial);
+                mesh(new T.PlaneGeometry(3.1,1.7),faceMaterial,0,.1,.995);
+                const img=new Image();img.onload=()=>{canvas.getContext('2d')?.drawImage(img,0,0,1240,680);texture.needsUpdate=true;c.invalidate?.();};
+                img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(renderSaturnPlcSvg({defsPrefix:'face-'+c.equipment.id}));
+                const hmi=document.createElement('canvas');hmi.width=320;hmi.height=240;
+                const screen=new T.CanvasTexture(hmi);screen.colorSpace=T.SRGBColorSpace;
+                const screenMaterial=new T.MeshBasicMaterial({map:screen,side:T.DoubleSide});owned.push(screenMaterial);
+                mesh(new T.PlaneGeometry(1.11,.79),screenMaterial,0,.1,1.02);
+                let key='';update.push(()=>{const next=JSON.stringify(getDisplay(c.equipment.id));if(next!==key){key=next;drawHmiCanvas(hmi,c.equipment.id);screen.needsUpdate=true;}});
+                // Textures are separate GPU resources, retained until the device is disposed.
+                textureDisposers.push(()=>{img.onload=null;texture.dispose();screen.dispose();});
+            }
+            top=1.65;break;
+        }
         default: throw new Error(`No installed 3D anatomy for ${visual}`);
     }
+    const size=footprint(visual);
+    for(const [name,p] of Object.entries(terminals(visual))){
+        const point=new T.Vector3((p.x-size.width/2)/100,-(p.y-size.height/2)/100,p.z);
+        const normal=({left:new T.Vector3(-1,0,0),right:new T.Vector3(1,0,0),up:new T.Vector3(0,1,0),down:new T.Vector3(0,-1,0)})[p.side];
+        ports.set(name,point);portNormals.set(name,normal);
+        const socket=mesh(new T.SphereGeometry(visual==='saturn'?.027:.047,8,6),p.medium==='pipe'?steel:p.medium==='power'?copper:teal,point.x,point.y,point.z);
+        socket.userData.terminal=name;socket.userData.endpoint=point.toArray();
+        if(visual!=='saturn') {
+            const length=p.medium==='pipe'?.48:.18, start=point.clone().addScaledVector(normal,-length),middle=start.clone().add(point).multiplyScalar(.5);
+            const nozzle=mesh(new T.CylinderGeometry(p.medium==='pipe'?.085:.028,p.medium==='pipe'?.085:.028,length,10),p.medium==='pipe'?steel:dark,middle.x,middle.y,middle.z);
+            nozzle.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),normal);
+            if(p.medium==='pipe'){const flange=mesh(new T.TorusGeometry(.11,.024,5,12),dark,point.x,point.y,point.z);flange.quaternion.setFromUnitVectors(new T.Vector3(0,0,1),normal);}
+        }
+
+    }
     let disposed = false;
-    return { root, ports, readout, labelAnchor: new T.Vector3(0, 0, top),
+    return { root, ports, portNormals, readout, labelAnchor: new T.Vector3(0, 0, top),
         update: dt => { for (const fn of update) fn(dt); },
         metrics: () => ({ value: c.number(readout) }),
-        dispose() { if (disposed) return; disposed = true; for (const instance of instances) instance.dispose(); for (const g of geometries) g.dispose(); for (const m of owned) m.dispose(); },
+        dispose() { if (disposed) return; disposed = true; for(const dispose of textureDisposers)dispose(); for (const instance of instances) instance.dispose(); for (const g of geometries) g.dispose(); for (const m of owned) m.dispose(); },
     };
 }

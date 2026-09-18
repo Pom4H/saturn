@@ -23,7 +23,7 @@ async function service() {
 const payload = (s: Service, target = 'MAKEUP', value = .2) => ({ id: 'input-1', action: 'operate', revision: s.frame().revision, runId: s.frame().runId, target, value });
 
 test('DSL exposes operator controls as ordinary referenced signals', () => {
-    const p = source(); assert.equal(p.controls?.length, 6);
+    const p = source(); assert.equal(p.controls?.length, 7);
     assert.deepEqual(p.simulations.find(n => n.id === 'AUX-VALVE')!.inputs.demand, { ref: 'DRAW.value' });
     assert.equal(new Kernel(p, 'r', 'run', 0).frame().samples['MAKEUP.requested'].value, .08);
 });

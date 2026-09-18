@@ -1,3 +1,7 @@
+import { terminals, resolvePort, type Endpoint, type Connection as PhysicalConnection } from '../ports';
+import { appendConnection, addExpansionSource, removeConnection } from '../connection-edit';
+import { renderSaturnPlcSvg } from '../saturn-view';
+import { drawHmiSvg } from '../hmi-view';
 import type { SceneView3D } from '../../src/view3d';
 import { EditorState } from '@codemirror/state';
 import { EditorView, basicSetup } from 'codemirror';
@@ -134,6 +138,7 @@ function renderFrame(next: Frame) {
     scene?.setRuntime(observation);
     if (scene3d) { scene3d.paused = frame.paused; scene3d.setRuntime(observation); }
     refreshControls();
+    const plcScreen=document.querySelector<SVGSVGElement>('#plc-front .runtime-hmi');if(plcScreen&&selected)drawHmiSvg(plcScreen,selected);
     if (scene)
         scene.paused = frame.paused;
     if (selected)
@@ -145,6 +150,50 @@ function renderFrame(next: Frame) {
         renderAlarms();
     refreshActions();
 }
+
+let pendingTerminal:Endpoint|null=null;
+function download(name:string,data:BlobPart,type:string){const url=URL.createObjectURL(new Blob([data],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function appendTerminalPanel(){
+ $('inspector').querySelector('.terminal-panel')?.remove();
+ if(!selected)return;const project=dirty&&validDraft?compileProject(files):status.project;const device=project.devices.find(d=>d.id===selected);if(!device)return;
+ const section=document.createElement('section');section.className='terminal-panel';
+ section.innerHTML=`<h3>Соединения · клеммы</h3><p>Выберите источник, затем вход на схеме или здесь. Соединение создаёт черновик DSL; публикация отдельная.</p><p id="connection-start"></p><div class="terminal-grid">${Object.entries(terminals(device.type)).map(([name,t])=>`<button data-connect-device="${escape(device.id)}" data-connect-port="${escape(name)}" title="${escape(t.family)} · ${t.role}"><b>${escape(name)}</b><small>${escape(t.medium)} · ${escape(t.family)}</small></button>`).join('')}</div><div class="connection-list">${(project.connections??[]).filter(w=>w.from.device===selected||w.to.device===selected).map(w=>`<p><b>${escape(w.medium)}</b> ${escape(w.from.device+'.'+w.from.port)} → ${escape(w.to.device+'.'+w.to.port)} <button data-disconnect="${escape(w.id)}">Отключить</button></p>`).join('')}</div>`;
+ $('inspector').append(section);const state=$('connection-start');state.textContent=pendingTerminal?`Источник: ${pendingTerminal.device}.${pendingTerminal.port}`:'';
+}
+function renderPlcInspector(){
+ const c=status.project.controllers?.find(c=>c.id===selected);if(!c){$('inspector').textContent=selected;return;}
+ const modules=(status.project.attachments??[]).filter(m=>m.controller===c.id);
+ $('inspector').innerHTML=`<p class="eyebrow">SATURN · FBD / WASM</p><h2>${escape(c.id)}</h2><div id="plc-front">${renderSaturnPlcSvg({defsPrefix:'inspector-'+c.id})}</div><div class="signals">${[...Object.keys(c.outputs),'healthy','powered'].map(k=>`<div class="signal-row" data-signal="${escape(c.id+'.'+k)}"><span>${escape(k)}</span><b>—</b></div>`).join('')}</div><button id="build-plc" ${status.actor.role!=='engineer'?'disabled':''}>Собрать .fbdbin + HMI</button><p class="model-limit">Программа для установленного FBD-runtime. Не прошивка загрузчика/HAL. Виртуальные модули не подтверждают совместимость с аппаратурой.</p><h3>Клеммы входов</h3><div class="signals">${Object.keys(terminals('saturn')).filter(k=>/^DI|^AI/.test(k)).map(k=>`<div class="signal-row" data-signal="${escape(c.id+'.'+k)}"><span>${escape(k)}</span><b>—</b></div>`).join('')}</div><h3>Модули расширения</h3>${modules.map(m=>`<p>Слот ${m.slot} · ${escape(m.device)} · ${escape(m.profile)}</p>`).join('')||'<p>Нет подключённых модулей</p>'}<button id="build-manifest">Скачать манифест сборки</button><button id="attach-module" ${status.actor.role!=='engineer'?'disabled':''}>Добавить виртуальный AI4</button>`;
+ $('build-plc').onclick=()=>void guard(async()=>{const artifact=await client.request<any>('firmware',{controllerId:c.id,revision:frame.revision});download(c.id+'.fbdbin',new Uint8Array(artifact.fbdbin),'application/octet-stream');toast('Собраны программа и HMI. Манифест скачивается отдельно. Аппаратная загрузка не выполнялась.');});
+ $('build-manifest').onclick=()=>void guard(async()=>{const {fbdbin,...manifest}=await client.request<any>('firmware',{controllerId:c.id,revision:frame.revision});download(c.id+'-build.json',JSON.stringify(manifest,null,2),'application/json');});
+ $('attach-module').onclick=()=>void guard(()=>attachModule(c.id));
+ appendTerminalPanel();renderFrame(frame);
+}
+function chooseTerminal(e:Endpoint){
+ if(status.actor.role!=='engineer')throw new Error('Подключения изменяет инженер');
+ const project=dirty?compileProject(files):status.project,{terminal}=resolvePort(project,e);
+ if(!pendingTerminal){if(terminal.role==='sink')throw new Error('Сначала выберите выход источника');pendingTerminal=e;toast(`Источник ${e.device}.${e.port}. Выберите совместимый вход.`);selectEquipment(e.device);return;}
+ if(pendingTerminal.device===e.device&&pendingTerminal.port===e.port){pendingTerminal=null;toast('Соединение отменено');return;}
+ const start=pendingTerminal,source=resolvePort(project,start).terminal;
+ const wire:PhysicalConnection={id:'W-'+crypto.randomUUID().slice(0,8),from:start,to:e,medium:source.medium};
+ files=appendConnection(files,wire);pendingTerminal=null;dirty=true;validDraft=true;file='wiring.ts';populateFiles();setEditor();refreshActions();
+ sessionStorage.setItem(`scada-draft:${demo?'demo':'server'}`,JSON.stringify({files,head,file}));
+ const preview=sceneFor(compileProject(files));scene.render(preview);scene3d?.render(preview);appendTerminalPanel();toast('Соединение проверено и добавлено в wiring.ts. Сохраните commit и опубликуйте.');
+}
+function attachModule(controllerId:string){
+ const project=compileProject(files),controller=project.controllers?.find(c=>c.id===controllerId);if(!controller)throw new Error('Контроллер отсутствует в черновике');
+ const slots=new Set((project.attachments??[]).filter(a=>a.controller===controllerId).map(a=>a.slot));let slot=1;while(slots.has(slot))slot++;if(slot>8)throw new Error('Свободных слотов нет');
+ // Deliberately explicit module authoring. The base program never guesses physical expansion addresses.
+ const fileName='expansion-'+slot+'.ts';if(files[fileName])throw new Error('Файл модуля уже существует');
+ const moduleId=controllerId+'-AI4-'+slot;
+ const source=`import { simulation } from '@scada/plant';
+export const module = simulation(${JSON.stringify(moduleId)}, 'io-module', {system:${JSON.stringify(controller.system)},at:{x:${controller.layout.x+400+(slot-1)*190},y:${controller.layout.y+650}}});
+`;
+ // Insert into the explicit project arrays via the existing bounded AST helper.
+ const result=addExpansionSource(files,controllerId,moduleId,fileName,source,slot);files=result;dirty=true;validDraft=true;file=fileName;populateFiles();setEditor();refreshActions();toast('Модуль и слот добавлены в черновик. Подключите питание и обе жилы RS-485, затем опубликуйте.');
+}
+document.addEventListener('click',e=>{const remove=(e.target as Element).closest<HTMLElement>('[data-disconnect]');if(remove){void guard(()=>{if(status.actor.role!=='engineer')throw new Error('Нужны права инженера');files=removeConnection(files,remove.dataset.disconnect!);dirty=true;validDraft=true;file='wiring.ts';populateFiles();setEditor();refreshActions();scene.render(sceneFor(compileProject(files)));scene3d?.render(sceneFor(compileProject(files)));appendTerminalPanel();toast('Отключение в черновике. Сохраните и опубликуйте.');});return;}const target=(e.target as Element).closest<HTMLElement>('[data-connect-port],#diagram [data-port]');if(!target)return;e.stopPropagation();void guard(()=>chooseTerminal({device:target.dataset.connectDevice??target.dataset.owner!,port:target.dataset.connectPort??target.dataset.port!}));});
+$('diagram').addEventListener('keydown',e=>{const target=(e.target as Element).closest<HTMLElement>('[data-port]');if(target&&(e.key==='Enter'||e.key===' ')){e.preventDefault();void guard(()=>chooseTerminal({device:target.dataset.owner!,port:target.dataset.port!}));}});
 function renderInspector() {
     $('inspector').hidden = !selected;
     document.querySelector('.workspace')!.classList.toggle('has-selection', !!selected);
@@ -153,12 +202,10 @@ function renderInspector() {
         return;
     }
     const n = status.project.simulations.find(n => n.id === selected);
-    if (!n) {
-        $('inspector').textContent = selected;
-        return;
-    }
+    if (!n) { renderPlcInspector(); return; }
     const spec = model(n.model);
     $('inspector').innerHTML = `<p class="eyebrow">${escape(n.model)} / ${escape(spec.version)}</p><h2>${escape(n.id)}</h2><p>${escape(spec.title)}</p><div class="signals">${Object.entries(spec.outputs).map(([key, unit]) => `<div class="signal-row" data-signal="${escape(n.id + '.' + key)}"><span title="${escape(unit)}">${escape(key)}</span><b>—</b></div>`).join('')}</div><svg id="small-trend" class="trend" viewBox="0 0 400 130"></svg><div class="parameters"><h3>Параметры модели</h3><p>Изменения — команды текущего прогона; исходник проекта не меняется.</p>${Object.entries(spec.parameters).map(([key, d]) => `<label class="parameter"><span>${escape(key)}</span><input type="number" data-param="${escape(key)}" value="${status.overrides[`${n.id}.${key}`] ?? n.parameters[key]}" min="${d.min}" max="${d.max}" step="any"><button data-set="${escape(key)}" ${status.actor.role !== 'engineer' ? 'disabled' : ''} title="Применить">↵</button></label>`).join('')}</div><p class="model-limit">Условная модель. Числа не являются настройками реального оборудования.</p>`;
+    appendTerminalPanel();
     renderFrame(frame);
     void updateTrend();
 }
@@ -334,7 +381,7 @@ $('restart').onclick = () => void guard(async () => { if (!confirm('Начать
 $('fit').onclick = () => focusSystem('');
 $('zoom-in').onclick = () => viewMode === '3d' ? scene3d?.zoom(.8) : scene.zoom(.8);
 $('zoom-out').onclick = () => viewMode === '3d' ? scene3d?.zoom(1.25) : scene.zoom(1.25);
-$('diagram').addEventListener('click', e => { const target = (e.target as Element).closest('[data-node]'); if (target) selectEquipment(target.getAttribute('data-node')); });
+$('diagram').addEventListener('click', e => { if((e.target as Element).closest('[data-port]'))return; const target = (e.target as Element).closest('[data-node]'); if (target) selectEquipment(target.getAttribute('data-node')); });
 $('diagram').addEventListener('wheel', e => { e.preventDefault(); scene?.zoom(e.deltaY > 0 ? 1.08 : .92); }, { passive: false });
 let pan: {
     x: number;
@@ -406,6 +453,7 @@ async function setView(mode: '2d' | '3d') {
             try { scene3d = new SceneView3D($('scene3d')); }
             catch (e) { $('scene3d').hidden = true; throw new Error(`3D не запустился: ${e instanceof Error ? e.message : String(e)}. 2D продолжает работать.`); }
             scene3d.onSelect = selectEquipment;
+            scene3d.onPortSelect = (device,port)=>void guard(()=>chooseTerminal({device,port}));
             scene3d.onOverview = () => focusSystem('');
         }
         viewMode = mode; $('diagram').hidden = mode === '3d'; $('scene3d').hidden = mode !== '3d';
@@ -436,6 +484,7 @@ function renderControls() {
     </article>`).join('')}</div></section>`;
     }).join('') || '<p>В этом проекте управляющие сигналы не объявлены.</p>';
     refreshControls();
+    const plcScreen=document.querySelector<SVGSVGElement>('#plc-front .runtime-hmi');if(plcScreen&&selected)drawHmiSvg(plcScreen,selected);
 }
 function refreshControls() {
     if (!status || !frame) return;
@@ -456,9 +505,13 @@ function refreshControls() {
 function renderInventory() {
     if (!status) return;
     const q = $<HTMLInputElement>('equipment-search').value.toLocaleLowerCase('ru');
-    const rows = status.project.simulations.filter(n => `${n.id} ${model(n.model).title} ${n.system}`.toLocaleLowerCase('ru').includes(q));
-    $('coverage').textContent = `${status.project.simulations.length} приборов · ${new Set(status.project.simulations.map(n => n.model)).size} моделей · ${status.project.systems.length} подсистем · ${status.project.controls?.length ?? 0} управляющих сигналов. Все модели учебные, без валидации по реальной АЭС.`;
-    $('inventory-list').innerHTML = `<div class="table-scroll"><table><thead><tr><th>Прибор</th><th>Подсистема</th><th>Модель / версия</th><th>Входы → выходы</th><th>Представления</th></tr></thead><tbody>${rows.map(n => { const m = model(n.model); return `<tr><td><button data-inspect="${escape(n.id)}">${escape(n.id)}</button></td><td>${escape(status.project.systems.find(s => s.id === n.system)?.title ?? n.system)}</td><td>${escape(m.title)}<br><small>${escape(n.model)} / ${escape(m.version)}</small></td><td>${Object.keys(n.inputs).length} → ${Object.keys(m.outputs).length}</td><td>2D / 3D · схема</td></tr>`; }).join('')}</tbody></table></div>`;
+    const entries=status.project.devices.map(d=>{
+        const n=status.project.simulations.find(n=>n.id===d.id),m=n&&model(n.model);
+        const c=status.project.controllers?.find(c=>c.id===d.id);
+        return {device:d,title:m?.title??'Saturn PLC · FBD/WASM',version:m?`${n!.model} / ${m.version}`:'saturn-fbd/combinational-v1',inputs:n?Object.keys(n.inputs).length:Object.keys(terminals('saturn')).filter(k=>/^DI|^AI/.test(k)).length,outputs:m?Object.keys(m.outputs).length:Object.keys(c?.outputs??{}).length};
+    }).filter(e=>`${e.device.id} ${e.title} ${e.device.system}`.toLocaleLowerCase('ru').includes(q));
+    $('coverage').textContent = `${status.project.devices.length} приборов · ${status.project.controllers?.length??0} PLC · ${status.project.systems.length} подсистем · ${status.project.connections?.length??0} физических соединений. Учебная комплектация, не проверенная ведомость АЭС.`;
+    $('inventory-list').innerHTML = `<div class="table-scroll"><table><thead><tr><th>Прибор</th><th>Подсистема</th><th>Модель / версия</th><th>Входы → выходы</th><th>Представления</th></tr></thead><tbody>${entries.map(e=>`<tr><td><button data-inspect="${escape(e.device.id)}">${escape(e.device.id)}</button></td><td>${escape(status.project.systems.find(s=>s.id===e.device.system)?.title??e.device.system)}</td><td>${escape(e.title)}<br><small>${escape(e.version)}</small></td><td>${e.inputs} → ${e.outputs}</td><td>2D / 3D · ${e.device.type==='saturn'?'SVG/HMI + WASM':'схема'}</td></tr>`).join('')}</tbody></table></div>`;
 }
 $('view-2d').onclick = () => void guard(() => setView('2d'));
 $('diagram').addEventListener('keydown', e => { if (e.key.toLowerCase() === 'f') { e.preventDefault(); focusSystem(''); } });

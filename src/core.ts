@@ -60,7 +60,8 @@ export interface Endpoint { node: string; port: string }
 export interface Link { id: string; from: Endpoint; to: Endpoint; variable?: string }
 /** Derived grouping underlay; never equipment, a signal source or runtime state. */
 export interface SceneGroup { id: string; title: string; parent?: string; depth: number; x: number; y: number; width: number; height: number; count: number }
-export interface Scene { nodes: Equipment[]; links: Link[]; groups?: SceneGroup[] }
+export interface SceneConnection {id:string;medium:'pipe'|'power'|'control'|'bus';from:{device:string;port:string};to:{device:string;port:string};points:{x:number;y:number;z:number}[];valid:boolean;error?:string}
+export interface Scene { connections?:SceneConnection[]; nodes: Equipment[]; links: Link[]; groups?: SceneGroup[] }
 export const directionVector: Record<Direction, Point> = { left: { x: -1, y: 0 }, right: { x: 1, y: 0 }, up: { x: 0, y: -1 }, down: { x: 0, y: 1 } };
 export function defaults(kind: Kind): Record<string, Value> { return Object.fromEntries(Object.entries(catalog[kind].fields).map(([key, f]) => [key, f.default])); }
 export function worldPort(node: Equipment, port: string): Point & { direction: Direction } {

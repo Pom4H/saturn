@@ -1,3 +1,4 @@
+import { compileController } from './controller';
 import { compileProject, validateFiles, validateProject } from './compiler';
 import { Kernel } from './kernel';
 import { acknowledge, updateAlarms } from './alarms';
@@ -5,7 +6,7 @@ import { Store } from './store';
 import { cronMatches } from './workflows';
 import { AppError, clone, finite, id, requireRole, type Actor, type AlarmState, type Event, type Frame, type Project, type Repository, type ReportTask, type ReportArtifact } from './types';
 const engineering: Actor = { id: 'system', role: 'engineer' };
-const configuration = (p: Project) => JSON.stringify({ simulations: p.simulations.map(({ layout, system, history, ...n }) => n).sort((a, b) => a.id.localeCompare(b.id)), signals: p.signals.map(({ unit, history, ...s }) => s), stepMs: p.stepMs, controls: p.controls ?? [] });
+const configuration = (p: Project) => JSON.stringify({ controllers:(p.controllers??[]).map(({layout,system,...c})=>c),connections:(p.connections??[]).map(({via,...w})=>w),attachments:p.attachments??[], simulations: p.simulations.map(({ layout, system, history, ...n }) => n).sort((a, b) => a.id.localeCompare(b.id)), signals: p.signals.map(({ unit, history, ...s }) => s), stepMs: p.stepMs, controls: p.controls ?? [] });
 export class Service {
     kernel!: Kernel;
     project!: Project;
@@ -195,6 +196,15 @@ export class Service {
     history(signals: string[], from: number, to: number) { finite(from, 'from', 0, Number.MAX_SAFE_INTEGER); finite(to, 'to', from, this.kernel.state.time); return this.store.history(this.kernel.state.runId, signals, from, to); }
     async status(actor: Actor) { return { actor, mode: 'simulation', project: this.project, frame: this.frame(), head: await this.repository.head(), desired: await this.repository.desired(), healthy: this.healthy, releaseError: this.releaseError, overrides: clone(this.kernel.state.overrides) }; }
     async files(actor: Actor) { requireRole(actor, 'engineer'); const head = await this.repository.head(); return head ? this.repository.read(head) : null; }
+    firmware(controllerId:string, revision:string, actor:Actor) {
+        requireRole(actor,'engineer');if(revision!==this.kernel.state.revision)throw new AppError('Project revision changed',409);
+        const c=this.project.controllers?.find(c=>c.id===controllerId);if(!c)throw new AppError('Unknown PLC',404);
+        const artifact=compileController(c);
+        return { ...artifact,fbdbin:Array.from(artifact.fbdbin),revision,controllerId,
+          connections:(this.project.connections??[]).filter(w=>w.from.device===controllerId||w.to.device===controllerId),
+          expansions:(this.project.attachments??[]).filter(a=>a.controller===controllerId),
+          limitations:['Program data for the pinned FBD runtime, not bootloader/HAL firmware','Virtual expansions are not compiled into physical Saturn addresses','No physical device deployment or electrical qualification has been performed'] };
+    }
     reports() { return this.store.db.all('SELECT id,report_id AS reportId,run_id AS runId,revision,trigger,actor,created_at AS createdAt,status,error FROM reports ORDER BY created_at DESC,rowid DESC LIMIT 100'); }
     reportArtifact(name: string) { const row = this.store.db.all<{
         artifact: string | null;
