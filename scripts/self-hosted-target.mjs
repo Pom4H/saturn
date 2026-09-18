@@ -144,7 +144,13 @@ async function dockerTarget(){
     await run('docker',['compose','-f','compose.yaml','-f','compose.workers.yaml','config'],{env,log:join(evidence,'compose-workers-rendered.txt')});
     await run('docker',['compose','-p',project,'build','saturn'],{env,log:join(evidence,'docker-build.log')});
     await run('docker',['compose','-p',project,'up','-d','saturn'],{env,log:join(evidence,'docker-up.log')});
-    await writeFile(join(evidence,'docker-health.json'),await waitHealth('http://127.0.0.1:4178/plant/api/health',60000)+'\n');
+    try{
+      await writeFile(join(evidence,'docker-health.json'),await waitHealth('http://127.0.0.1:4178/plant/api/health',60000)+'\n');
+    }catch(error){
+      try{await run('docker',['compose','-p',project,'ps','-a'],{env,log:join(evidence,'docker-ps.txt')});}catch{}
+      try{await run('docker',['compose','-p',project,'logs','--no-color','saturn'],{env,log:join(evidence,'docker-server.log')});}catch{}
+      throw error;
+    }
     await smoke('scripts/self-hosted-server-smoke.mjs','http://127.0.0.1:4178/plant/',join(evidence,'docker-demo-signals.json'));
     await run('docker',['compose','-p',project,'ps'],{env,log:join(evidence,'docker-ps.txt')});
   }finally{
