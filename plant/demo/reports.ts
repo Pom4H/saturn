@@ -1,6 +1,5 @@
-import { benchView } from './views';
-import { report } from '@scada/plant';
-/** UTC cron and typed manual inputs. SQL sees only the declared signal data capsule. */
+import { panel, label, readout, dataTable, trend, view, signal, report } from '@scada/plant';
+
 export const thermalReport = report('thermal-balance', {
     title: 'Тепловое состояние и полнота данных',
     on: {
@@ -23,6 +22,7 @@ export const thermalReport = report('thermal-balance', {
         { key: 'coverage', title: 'Полнота', unit: '%' },
     ],
 });
+
 export const transientReport = report('transient', {
     title: 'Переходный процесс · температура каналов',
     on: { workflow_dispatch: {} },
@@ -32,11 +32,45 @@ export const transientReport = report('transient', {
     columns: [{ key: 'time', title: 'Модельное время, UTC ms' }, { key: 'temperature', title: 'Температура', unit: 'отн.' }],
     chart: { x: 'time', y: 'temperature', title: 'Температура и разрывы качества' },
 });
-export const benchReport = report('bench-state', {
-    title: 'Снимок PLC · общая панель HMI', on: {workflow_dispatch:{}},
-    signals: ['SATURN-1.AI1','SATURN-1.DO1'], window:60000,
-    sql: 'SELECT signal,time,value,quality FROM samples ORDER BY time',
-    columns: [{key:'signal',title:'Сигнал'},{key:'value',title:'Значение'}],
-    view: benchView,
+
+// Report and live HMI use the same presentation primitives; only the data capsule differs.
+export const benchReportView = view('bench-report-view', {
+    title: 'Отчёт · состояние стенда',
+    bindings: {
+        input: signal('SATURN-1.AI1'),
+        output: signal('SATURN-1.DO1'),
+        demand: signal('BENCH-LEVEL.value'),
+    },
+    body: panel([
+        label('Состояние стенда'),
+        panel([
+            readout('Тестовый уровень', 'demand', 'V', 2),
+            readout('Вход AI1 x100', 'input', '', 0),
+            readout('Реле DO1', 'output', '', 0),
+        ], 'row', 'Основные параметры'),
+        trend('Изменения за минуту', 'time', 'value'),
+        dataTable([
+            { key: 'time', title: 'Время' },
+            { key: 'signal', title: 'Сигнал' },
+            { key: 'value', title: 'Значение' },
+            { key: 'quality', title: 'Качество' },
+        ]),
+    ]),
 });
+
+export const benchReport = report('bench-state', {
+    title: 'Состояние стенда · HMI и журнал',
+    on: { workflow_dispatch: {}, schedule: [{ cron: '*/15 * * * *' }] },
+    signals: ['SATURN-1.AI1', 'SATURN-1.DO1', 'BENCH-LEVEL.value'],
+    window: 60000,
+    sql: 'SELECT signal,time,value,quality FROM samples ORDER BY time',
+    columns: [
+        { key: 'time', title: 'Время' },
+        { key: 'signal', title: 'Сигнал' },
+        { key: 'value', title: 'Значение' },
+        { key: 'quality', title: 'Качество' },
+    ],
+    view: benchReportView,
+});
+
 export const reports = [thermalReport, transientReport, benchReport];
