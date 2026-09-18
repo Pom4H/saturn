@@ -1,0 +1,23 @@
+# syntax=docker/dockerfile:1.7
+FROM node:24-bookworm-slim AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run plant:build && npm prune --omit=dev
+
+FROM node:24-bookworm-slim AS runtime
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates tini \
+ && rm -rf /var/lib/apt/lists/* \
+ && useradd --uid 10001 --create-home --home-dir /home/saturn saturn
+WORKDIR /app
+COPY --from=build --chown=saturn:saturn /app/.plant ./.plant
+COPY --from=build --chown=saturn:saturn /app/dist ./dist
+COPY --from=build --chown=saturn:saturn /app/node_modules ./node_modules
+COPY --from=build --chown=saturn:saturn /app/package.json /app/LICENSE /app/THIRD_PARTY_NOTICES.md ./
+ENV HOST=0.0.0.0 PORT=4176 SATURN_DATABASE=/data/saturn.sqlite3 SATURN_PROJECT_REPO=/data/project.git
+VOLUME ["/data"]
+EXPOSE 4176
+USER saturn
+ENTRYPOINT ["/usr/bin/tini","--"]
+CMD ["node","--experimental-sqlite",".plant/server.mjs"]
