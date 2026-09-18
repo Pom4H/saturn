@@ -85,10 +85,11 @@ export function validatePresentation(view:Presentation, target:'web'|'report'|'p
 export function bindPresentation(view:Presentation,samples:Record<string,Sample>,time:number):Record<string,Sample>{
     return Object.fromEntries(Object.entries(view.bindings).map(([name,expr])=>[name,evaluate(expr,id=>samples[id]??{value:null,quality:'bad',time},time)]));
 }
-export function presentationActions(node:ViewNode):Extract<ViewNode,{kind:'action'}>[] {
-    if(node.kind==='group')return node.children.flatMap(presentationActions);
-    if(node.kind==='motion')return presentationActions(node.child);
-    return node.kind==='action'?[node]:[];
+export function presentationActions(value:ViewNode|Presentation):Extract<ViewNode,{kind:'action'}>[] {
+    if('bindings' in value)return presentationScreens(value).flatMap(screen=>presentationActions(screen.body));
+    if(value.kind==='group')return value.children.flatMap(presentationActions);
+    if(value.kind==='motion')return presentationActions(value.child);
+    return value.kind==='action'?[value]:[];
 }
 export function renderPresentation(view:Presentation,context:PresentationContext):string {
     validatePresentation(view);const rows=context.rows??[],counts:Record<string,number>={};
