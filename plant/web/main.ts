@@ -1,4 +1,4 @@
-import { bindPresentation, renderPresentation, presentationCss, presentationActions } from '../presentation';
+import { bindPresentation, renderPresentation, presentationCss, presentationActions, presentationScreens } from '../presentation';
 import { widgetSource, patchWidget, lineLabel, textSource, type StudioSource } from '../studio';
 import { terminals, resolvePort, type Endpoint, type Connection as PhysicalConnection } from '../ports';
 import { appendConnection, addExpansionSource, removeConnection } from '../connection-edit';
@@ -20,6 +20,7 @@ let client: Connection, status: Status, frame: Frame, scene: SceneView, system =
 let scene3d: SceneView3D | undefined, viewMode: '2d' | '3d' = '2d', changingView = false;
 let studioEditors: Partial<Record<'view'|'report',EditorView>>={}, studioFiles:Partial<Record<'view'|'report',string>>={}, studioLoading=false;
 let studioSelection:Partial<Record<'view'|'report',{kind:any,index:number,source:StudioSource|null}>>={};
+let liveHmiScreen='';
 let registration: ServiceWorkerRegistration | undefined, pendingInstall: any, noticeEnabled = false, closed = false;
 const fmt = (v: number | null | undefined, digits = 2) => typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—';
 const time = (v: number | null | undefined) => v ? new Date(v).toLocaleString('ru-RU') : '—';
@@ -541,9 +542,9 @@ function setupViews(){
     const select=$<HTMLSelectElement>('view-select'),previous=select.value;
     select.replaceChildren(...(project.views??[]).map(v=>{const o=document.createElement('option');o.value=v.id;o.textContent=v.title;return o;}));
     if([...select.options].some(o=>o.value===previous))select.value=previous;
-    select.onchange=()=>refreshView(true);
-    const tabs=$('view-screen-tabs');tabs.innerHTML=(project.views??[]).map(v=>`<button data-studio-screen="${escape(v.id)}" class="${v.id===select.value?'active':''}">${escape(v.title)}</button>`).join('');
-    tabs.querySelectorAll<HTMLButtonElement>('[data-studio-screen]').forEach(b=>b.onclick=()=>{select.value=b.dataset.studioScreen!;refreshView(true);});
+    select.onchange=()=>{const view=project.views?.find(v=>v.id===select.value);liveHmiScreen=view?.initial??presentationScreens(view!)[0]?.id??'';refreshView(true);};
+    const view=project.views?.find(v=>v.id===select.value);if(view&&!liveHmiScreen)liveHmiScreen=view.initial??presentationScreens(view)[0].id;
+    renderHmiScreenTabs(view);
     const reports=$<HTMLSelectElement>('report-studio-select'),reportPrevious=reports.value;
     reports.replaceChildren(...project.reports.map(r=>{const o=document.createElement('option');o.value=r.id;o.textContent=r.title;return o;}));
     if([...reports.options].some(o=>o.value===reportPrevious))reports.value=reportPrevious;
@@ -575,15 +576,23 @@ function studioEditor(kind:'view'|'report',path:string,range?:StudioSource|null)
     $(kind==='view'?'view-code-file':'report-code-file').textContent=path;
     $(kind==='view'?'view-code-range':'report-code-range').textContent=range?lineLabel(range):'Источник DSL';
 }
+function renderHmiScreenTabs(view:any){
+    const tabs=$('view-screen-tabs');if(!view){tabs.replaceChildren();return;}
+    const screens=presentationScreens(view);if(!screens.some(s=>s.id===liveHmiScreen))liveHmiScreen=view.initial??screens[0].id;
+    tabs.innerHTML=screens.map(s=>`<button data-studio-screen="${escape(s.id)}" class="${s.id===liveHmiScreen?'active':''}">${escape(s.title)}</button>`).join('');
+    tabs.querySelectorAll<HTMLButtonElement>('[data-studio-screen]').forEach(b=>b.onclick=()=>{liveHmiScreen=b.dataset.studioScreen!;refreshView(true);});
+}
 function refreshView(rebuild=false){
     const project=studioProject(),select=$<HTMLSelectElement>('view-select');
     const view=project.views?.find(v=>v.id===select.value),host=$('live-view');
     if(!view){host.textContent='Объявите view() в DSL проекта.';return;}
     const values=bindPresentation(view,frame.samples,frame.time),interactive=!failed&&status.actor.role!=='viewer';
-    if(rebuild||host.dataset.definition!==JSON.stringify(view)){host.innerHTML=renderPresentation(view,{values,interactive});host.dataset.definition=JSON.stringify(view);}
+    if(rebuild||host.dataset.definition!==JSON.stringify(view)+liveHmiScreen){host.innerHTML=renderPresentation(view,{values,interactive,screen:liveHmiScreen});host.dataset.definition=JSON.stringify(view)+liveHmiScreen;}
     for(const node of host.querySelectorAll<HTMLElement>('[data-view-value]')){const sample=values[node.dataset.viewValue!],valid=sample?.quality==='good'&&sample.value!==null;node.textContent=valid?sample.value!.toFixed(Number(node.dataset.digits??2)):'—';node.parentElement!.dataset.quality=valid?'good':'bad';node.parentElement!.querySelector('small')!.textContent=(node.dataset.unit??'')+(valid?'':' · нет достоверных данных');}
     for(const button of host.querySelectorAll<HTMLButtonElement>('[data-view-command]'))button.disabled=!interactive;
-    document.querySelectorAll('#view-screen-tabs button').forEach(b=>b.classList.toggle('active',(b as HTMLElement).dataset.studioScreen===view.id));
+    for(const button of host.querySelectorAll<HTMLButtonElement>('[data-view-screen]')){button.disabled=!interactive;button.onclick=e=>{e.stopPropagation();liveHmiScreen=button.dataset.viewScreen!;refreshView(true);};}
+    applyPresentationMotion(host,values);
+    renderHmiScreenTabs(view);
     bindStudioCanvas('view',host,'views.ts');
     if(!studioEditors.view&&files['views.ts'])studioEditor('view','views.ts');
 }
@@ -598,6 +607,20 @@ async function refreshReportStudio(rebuild=false){
     host.innerHTML=renderPresentation(report.view,{values,rows,interactive:false});
     bindStudioCanvas('report',host,'reports.ts');
     if(!studioEditors.report&&files['reports.ts'])studioEditor('report','reports.ts');
+}
+function applyPresentationMotion(host:HTMLElement,values:Record<string,any>){
+    for(const node of host.querySelectorAll<HTMLElement>('[data-view-motion]')){
+        const sample=values[node.dataset.viewMotion!],value=sample?.quality==='good'&&typeof sample.value==='number'?sample.value:null;
+        const min=Number(node.dataset.motionMin),max=Number(node.dataset.motionMax),from=Number(node.dataset.motionFrom),to=Number(node.dataset.motionTo);
+        const t=value===null?0:Math.max(0,Math.min(1,(value-min)/(max-min))),v=from+(to-from)*t;
+        node.style.removeProperty('animation');
+        switch(node.dataset.motionProperty){
+            case 'opacity':node.style.opacity=String(v);node.style.transform='';break;
+            case 'scale':node.style.transform=`scale(${v})`;node.style.opacity='';break;
+            case 'rotate':node.style.transform=`rotate(${v}deg)`;node.style.opacity='';break;
+            case 'pulse':node.style.animation=value!==null&&t>.5?`pv-pulse ${Math.max(.35,1.4-v*.8)}s ease-in-out infinite`:'none';break;
+        }
+    }
 }
 function bindStudioCanvas(kind:'view'|'report',host:HTMLElement,preferredFile:string){
     host.querySelectorAll<HTMLElement>('[data-studio-kind]').forEach(node=>{
@@ -620,6 +643,7 @@ function renderStudioProperties(kind:'view'|'report',node:HTMLElement,source:Stu
     if(k==='value')fields=studioField('label','Заголовок',value('span'))+studioField('unit','Единица',node.querySelector<HTMLElement>('strong')?.dataset.unit??'')+studioField('digits','Знаков',node.querySelector<HTMLElement>('strong')?.dataset.digits??'2','number');
     if(k==='chart')fields=studioField('title','Заголовок',value('figcaption'));
     if(k==='action')fields=studioField('label','Текст кнопки',node.textContent?.trim()??'')+studioField('value','Значение команды',node.dataset.viewSet??'0','number');
+    if(k==='navigate')fields=studioField('label','Текст перехода',node.textContent?.trim()??'');
     const firmware=kind==='view'?textSource(files,"plc('SATURN-1'",'commissioning.ts'):null;
     host.innerHTML=`<p class="eyebrow">СВОЙСТВА ВИДЖЕТА</p><h3>${escape(k.toUpperCase())}</h3>${fields||'<p class="studio-empty">Структурный виджет редактируется кодом.</p>'}<h3>Связанные исходники</h3>${source?sourceLink(kind,source,'DSL'):''}${firmware?sourceLink(kind,firmware,'PLC · прошивка'):''}<p class="studio-save-note">Визуальная правка меняет TypeScript-черновик. Runtime не изменится до commit + публикации.</p>`;
     host.querySelectorAll<HTMLInputElement>('[data-studio-field]').forEach(input=>input.onchange=()=>void guard(()=>applyStudioField(kind,input.dataset.studioField!,input.type==='number'?Number(input.value):input.value)));
