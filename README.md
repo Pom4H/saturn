@@ -1,129 +1,209 @@
-# SCADA playground
+# Saturn
 
-## Node.js / offline PWA workbench
+**Saturn is an open-source, source-first SCADA for building industrial monitoring and control projects as code.**  
+MIT licensed. The authored project is a bounded TypeScript DSL; the visual shell, HMI, reports, alarms, historian and deployment metadata are projections of the same project model.
 
-The new installation workbench runs the same process models, signal expressions, alarms, historian and report workflows in Node.js and a browser Worker. SQLite is native on the server and WASM/OPFS in the demo. Git-backed server releases and local browser revisions support explicit publication and rollback.
+> Status: **MVP in active development.** Saturn is an engineering/runtime platform, not a certified safety system. Do not use it as the sole protection layer for hazardous equipment.
+
+## Why Saturn
+
+Traditional SCADA projects often split configuration across proprietary editors, report designers, PLC tools, databases and deployment archives. Saturn keeps the authored intent in reviewable source files and derives the operator experience from it.
+
+- **Project as code.** Systems, equipment, signals, controls, alarms, reports and PLC bindings live in a declarative TypeScript subset.
+- **Computed HMI.** The system hierarchy becomes screens and navigation; equipment/signals become widgets; controls become commands. Manual HMI DSL is an override, not a second model.
+- **Visual + code editing.** Report/HMI editors show TypeScript beside the visual projection. Selecting a widget jumps to the source declaration; supported property edits patch the same TS draft.
+- **2D and 3D from one identity graph.** Equipment IDs, terminals, routes, signals and selection are shared.
+- **Historian and reports.** SQLite-backed history, alarm lifecycle, manual/cron report jobs, shared HMI/report presentation primitives.
+- **Git-backed releases.** Draft, commit, publish and rollback are explicit operations. Runtime history is not rewritten when project source changes.
+- **Isomorphic demo/runtime.** Node.js server for persistent authenticated operation; browser Worker + SQLite WASM/OPFS for an installable offline PWA demo.
+- **PLC toolchain integration.** Saturn can compile and execute the supported Saturn/Firmverse FBD target in isolated WASM instances and render its HMI. Hardware flashing is not part of the MVP.
+
+## Quick start
+
+Requirements: Node.js 24 LTS is the primary development toolchain. The plant runtime is also tested on supported Node 22 builds.
 
 ```sh
+git clone https://github.com/Pom4H/scada.git
+cd scada
 npm ci
 npm run plant
 ```
 
-Open `http://127.0.0.1:4176/plant/app/` (initial password printed once), or `/plant/demo/` (autonomous public demo). `npm run build` includes the static PWA under `dist/plant/`. Nothing is automatically deployed.
+Open:
 
-[Run, PWA, authentication and Web Push](docs/plant/README.md) · [Installation/report DSL](docs/plant/dsl.md) · [Chernobyl-inspired model and explicit limitations](docs/plant/model.md).
+- authenticated server: `http://127.0.0.1:4176/plant/app/`
+- autonomous PWA demo: `http://127.0.0.1:4176/plant/demo/`
 
-**The accident demonstration is a normalized coupled-process model, not a full or validated historical Chernobyl/RBMK simulation.** Remote Web Push requires server configuration and device permission; the offline demo cannot execute continuously while the browser is closed.
+A new local server prints the initial engineer password once. Save it.
 
-Run `npm run plant:check` and `npm run plant:test:browser` for the new workbench. The existing editor and its tests below are retained.
+For development checks:
 
-[Open the editor](https://pom4h.github.io/scada/) · [DSL reference](docs/dsl.md) · [Architecture](docs/architecture.md) · [Experimental 3D lab and catalog](docs/3d-foundation.md)
+```sh
+npm run plant:check
+npm run check
+npx playwright install --with-deps chromium-headless-shell
+xvfb-run -a npm run plant:test:browser
+```
 
-A browser workbench for designing animated SCADA diagrams in TypeScript. Code, canvas and property inspector edit **one TS document per scene**. A server can also deliver a Git-backed project containing scenes and reference files. The editor works as a static site. The optional local Node server adds durable synthetic equipment runs, authenticated signals, history and replay. No hardware connection is included.
+## Project model
+
+A Saturn project is a set of UTF-8 files with `plant.ts` as the entry point. Saturn parses a bounded declarative TypeScript subset; project source is **not** evaluated as arbitrary JavaScript.
 
 ```ts
-import { tank, pump, valve, outlet, connect } from "@scada/core";
+import {
+  project, system, simulation, control, alarm, report,
+  signal, derived, panel, readout, trend
+} from '@scada/plant';
 
-const source = tank("T-101", { x: 40, y: 250, level: 64 });
-const motor = pump("P-101", { x: 325, y: 338, rpm: 1500 });
-const gate = valve("V-101", { x: 700, y: 142, opening: 76 });
-const process = outlet("OUT", { x: 1000, y: 224 });
+const cooling = system('cooling', 'Cooling');
 
-connect(source.outlet, motor.inlet);
-connect(motor.outlet, gate.inlet);
-connect(gate.outlet, process.inlet);
+const pump = simulation('P-101', 'pump', {
+  system: 'cooling',
+  at: { x: 260, y: 180 },
+  inputs: { voltage: signal('GRID.voltage'), resistance: 0.3 },
+  parameters: { inertia: 6 },
+});
+
+const flow = derived('cooling.flow', pump.flow, 'm3/h');
+
+const speed = control('P-101-speed', {
+  title: 'Pump speed',
+  system: 'cooling',
+  unit: '%',
+  min: 0,
+  max: 100,
+  initial: 60,
+  rate: 10,
+  step: 1,
+});
+
+const lowFlow = alarm('low-flow', {
+  title: 'Low flow',
+  signal: flow,
+  above: -1,
+  clearBelow: -2,
+  delay: 1000,
+  priority: 'warning',
+  notify: true,
+});
+
+export default project('demo', {
+  title: 'Example installation',
+  systems: [cooling],
+  simulations: [pump],
+  controls: [speed],
+  signals: [flow],
+  alarms: [lowFlow],
+  reports: [],
+});
 ```
 
-Drag `P-101`: its literal `x` and `y` change in the editor. Change `opening`: the same property changes in TypeScript. A complete drag is one undo operation. Comments, surrounding code, quote style and unrelated properties survive these source edits. Code is never reconstructed from SVG or a separately saved JSON model.
+The exact available models and typed metadata are defined by the installed model catalog. Unsupported topology or invalid signal references fail validation instead of silently producing guessed values.
 
-## Using the editor
+## HMI is a projection of topology
 
-Select equipment to edit its position, process parameters, quality and alarm. Drag equipment to move it; hold Alt for one-unit placement instead of the ten-unit grid. Click **Connect**, then an output and an input port. Select a pipe to add a pressure or temperature tap. Add equipment from the palette; Delete removes the selected item and dependent connections/taps. Undo and redo work across both code and visual edits.
+Saturn does not require a second hand-maintained screen model for every subsystem.
 
-Scroll to zoom; drag empty space or Space-drag to pan; **Fit** or F fits the scene. The code-pane divider is draggable and keyboard-accessible. On a phone, use the Code / Diagram / Properties tabs. Zoom in to work on small equipment, then Fit to see the whole circuit.
+By default:
 
-Projects are saved locally as TypeScript. Export `.ts` for version control or transfer; import opens that exact source. Share copies a link with source encoded in its fragment: the optional selected server/run is included without credentials. Server recordings retain their original configuration separately. **HTML export** creates a standalone, animated, read-only diagram with the source embedded. Never put credentials or sensitive plant data in a public share link.
-
-Syntax errors keep the last valid preview visible and block visual changes until the code is fixed. Computed properties such as `x: GRID * 3` are shown read-only in the inspector; the editor does not guess how to invert a formula.
-
-## Local development
-
-Node.js **24 LTS** (exact tested version in `.nvmrc`):
-
-```sh
-npm ci
-npm run dev
+```text
+systems       -> screens + navigation
+devices       -> equipment groups
+signals       -> values / state
+controls      -> operator actions
+alarms        -> alarm state
+connections   -> physical topology
 ```
 
-Open **http://localhost:4173/scada/**. These commands also work in Windows PowerShell. `npm run dev` watches source changes, preserves the last valid build on errors, and reloads the browser after a successful build.
+`deriveHmi(project)` creates the screen graph deterministically. The visual shell can still add explicit `screen()`, `navigate()`, `animate()`, `panel()`, `readout()` and `commandButton()` declarations when a project needs a specialized operator view.
 
-The runtime server requires Node 24 and its built-in SQLite module. CI installs the pinned dependency tree using `package-lock.json` and `npm ci`.
+Signal-driven motion currently supports bounded `opacity`, `scale`, `rotate` and `pulse`. Animation state is derived from telemetry, not hidden UI state.
 
-```sh
-npm run check                       # builds, strict TS, core, server/API, challenge and 3D tests
-npx playwright install --with-deps chromium webkit
-npm run test:e2e                    # editor Chromium/WebKit + runtime Chromium tests
+## Reports and HMI share a presentation model
+
+The same bounded presentation tree is used by live HMI and immutable report artifacts:
+
+```ts
+const body = panel([
+  readout('Flow', 'flow', 'm3/h', 1),
+  trend('Last hour', 'time', 'flow'),
+]);
 ```
 
-For browser runtimes that deliberately disallow HTTP navigation, `SCADA_INJECT=1` injects the same built assets into an opaque-origin Chromium page. It skips the two tests that require an HTTP origin. CI never uses this mode.
+A live HMI binds it to current samples and may expose audited commands. A report binds it only to its pinned data capsule and disables commands. Target-specific backends are explicit: a small PLC LCD supports only widgets its runtime can actually encode.
 
-The optional equipment lab runs with `npm run lab` on **http://127.0.0.1:4174/**. It demonstrates three procedural 3D components, shared 2D/3D signal state, and a searchable index of 478 P&ID symbol names. It is separate from the editor and uses synthetic data. See the [architecture and harness instructions](docs/3d-foundation.md) and [review evidence](docs/evidence-3d/README.md).
+## Runtime architecture
 
-## A complete recorded scenario
-
-```sh
-npm ci
-npm run demo
+```text
+Project files
+    |
+    v
+Bounded TS compiler
+    |
+    v
+Validated Project --------------------------+
+    |                                       |
+    +--> topology --> 2D / 3D / Auto HMI    |
+    +--> models ----> deterministic Kernel  |
+    +--> alarms ----> alarm lifecycle       |
+    +--> history ---> SQLite historian      |
+    +--> reports ---> isolated SQL capsule  |
+    +--> PLC -------> Firmverse compiler/WASM
+    |
+    v
+Git revision -> explicit publish -> runtime revision
 ```
 
-Open **http://127.0.0.1:4175/scada/**. Choose **Сервер · деградация насоса**, then copy the **OPERATOR token** printed by your local server into the separate token field and click **Подключиться**. The token is kept in memory only.
+The UI never turns runtime telemetry back into source edits. Visual authoring changes the project draft; live operator commands change runtime state and are journaled separately.
 
-1. Select **Деградация насоса** and click **Новый прогон**. The measured flow falls and vibration rises while RPM stays independent. The demo example accelerates wear so the warning appears within roughly half a minute.
-2. Click **Поделиться**. Open that link in another browser and connect with the server's **VIEW token**. Both clients see one run; closing a tab or pausing animation does not stop it.
-3. Select the pump, click **Обслужить**, and observe the maintenance delay and recovery. **Заменить** creates another installed instance at the same equipment position. These are server commands, not edits to initial parameters.
-4. Click **Завершить запись**, then **История**. Scrub, play and pause the saved frames. **В эфир** returns to current server state.
-5. Create a **Нормальная работа** run from the same source. Select a reference run and click **Сравнить** to overlay recorded flow against model time. Public run names stay neutral so they do not reveal a diagnostic answer.
+## MVP scope
 
-Use **2D / 3D** to inspect the same IDs and observations. Three is fetched on the first 3D request. The 3D view provides orbit and selection; placement is still authored in 2D/TS. **В TS** explicitly writes destination/project/run metadata. Editing equipment configuration requires a matching run; incoming telemetry never changes source or undo.
+Included in the current MVP:
 
-Recordings survive server restart in `data/runs.sqlite`. Keep the database and its WAL together or stop the server before copying it. After a restart the model continues from its saved checkpoint without inventing progress during downtime. Generated tokens change on restart; environment variables can provide stable tokens. See [server usage and model assumptions](docs/server-runtime.md), [extension contract](docs/architecture.md), and [actual verification/evidence](docs/runtime-validation.md).
+- multi-file project DSL and validation;
+- hierarchical systems and equipment;
+- 2D canvas and lazy 3D view;
+- typed physical terminals and routed pipe/power/control/bus connections;
+- deterministic installed process models and replay checkpoints;
+- bounded operator controls and interlocks;
+- alarm lifecycle, acknowledgement and optional Web Push;
+- SQLite historian with per-signal deadband/retention policies;
+- manual and UTC-cron reports;
+- shared HMI/report presentation DSL;
+- computed HMI screen graph;
+- visual HMI/report studio linked back to TypeScript source;
+- Git-backed commit/publish/rollback;
+- authenticated Node server and autonomous PWA demo;
+- supported Saturn/Firmverse FBD compile/execute/HMI path.
 
-## What is included
+Not claimed by the MVP:
 
-Tank, round pump, regulating valve, flanged inline flowmeter, heat exchanger, process outlet, pressure gauge and temperature sensor, plus a separately installed filter package; quality/alarm states; port-aware obstacle routing; real rotor and rectangular water-flow animations; a sampled flow trend; source-preserving AST edits; code completion, diagnostics, formatting and a shared undo history; file and HTML export; URL sharing; responsive layout; lazy spatial view, server-side synthetic behavior, SQLite recordings, playback/comparison, CI and explicit Pages deployment.
+- SIL/IEC 61508/IEC 61511 certification;
+- automatic import of arbitrary vendor PLC projects;
+- general-purpose IEC 61131-3 runtime;
+- engineering approval of cable sizing, protection coordination or hydraulic networks;
+- complete CAD/P&ID authoring;
+- multi-tenant enterprise identity/ACL administration;
+- hardware flashing or commissioning of physical PLCs;
+- a validated digital twin of any real nuclear or process plant.
 
-This is a **declarative TypeScript subset**, interpreted from the TypeScript AST. It does not execute arbitrary JavaScript. It accepts named imports, `const`, DSL calls, literal property objects and scalar expressions. See the [language contract](docs/dsl.md).
+## Documentation
 
-## Simulation boundary
+- [Getting started](docs/getting-started.md)
+- [Architecture](docs/architecture.md)
+- [Project DSL](docs/plant/dsl.md)
+- [HMI and reports](docs/plant/presentation.md)
+- [Server, PWA, Git releases and reports](docs/plant/README.md)
+- [PLC / Firmverse integration](docs/plant/toolchain-integration.md)
+- [Security](SECURITY.md)
+- [Contributing](CONTRIBUTING.md)
 
-This workbench does not control equipment. The preview uses an explicitly simplified series-circuit model, not hydraulic simulation: one source, one pump, one outlet, no branches. Flow follows signed RPM and valve opening. A closed valve blocks the whole connected circuit; the independently powered rotor can keep spinning. A dry tank or trip blocks flow; uncertain quality makes flow unknown rather than presenting a guessed measurement. Incomplete or unsupported topologies produce diagnostics. Separate circuits are calculated independently.
+Older editor/runtime experiments remain in the repository because parts of the MVP still reuse their component registry, source-preserving edits and test infrastructure. They are implementation history, not the product definition.
 
-Pressure, temperature, level and vibration are demonstration samples. There is no fluid conservation, head curve, PLC protocol, PID controller, interlock verification or safety certification. Do not use this preview as an operational control or safety system.
+## License
 
-## GitHub Pages
+Saturn is released under the [MIT License](LICENSE).
 
-Pushes and pull requests run checks. Pages publishing requires an explicit manual `workflow_dispatch` on main, after the same checks; merging a change does not deploy it. Pages hosts the static editor only, not the Node runtime. It uploads Playwright reports and screenshots even on failures. Paths are relative, so the build works below `/scada/` as well as on a custom domain.
+Third-party code and generated target assets retain their own licenses and provenance; see the vendor directories before redistributing derived binaries.
 
-For forks, select **Settings → Pages → Source → GitHub Actions**, then run **Check and deploy**. The first deployment requires Pages to be enabled by a repository administrator; ordinary workflow tokens may not be permitted to enable a new site.
-
-## Toolchain and updates
-
-The project is checked with TypeScript 7. The browser-side DSL parser uses Microsoft's `@typescript/typescript6` compatibility package for the JavaScript Compiler API. Test/build tools are development dependencies. Dependabot groups monthly npm and Actions updates rather than opening a PR per package.
-
-Parameter and quality changes retain existing SVG nodes and animation phases. Routing is recalculated only when topology, positions or tap placement change. This cache is disposable; the only saved project is still `scene.ts`.
-
-MIT © Roman Popov. See [CONTRIBUTING](CONTRIBUTING.md) and [SECURITY](SECURITY.md).
-
-## Git projects and developer workflow
-
-An authenticated server can deliver the project files, scene and exact Git
-revision directly to the editor. Committed changes hot-reload through the same
-validated mechanism in development and production. Invalid releases preserve
-the last good version; active runs keep their original revision. Local drafts
-are never overwritten automatically. Optional operator commits use Git
-compare-and-swap and require explicit writable-server configuration.
-
-See [Git project setup, remote tracking and API](docs/git-projects.md),
-[reliability fixes, signal history and SDK](docs/review-fixes.md),
-[standalone project example](examples/git-project) and
-[external SDK consumer](examples/consumer).
+© 2026 Roman Popov
