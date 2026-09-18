@@ -21,9 +21,10 @@ let client: Connection, status: Status, frame: Frame, scene: SceneView, system =
 let scene3d: SceneView3D | undefined, viewMode: '2d' | '3d' = '2d', changingView = false;
 let studioEditors: Partial<Record<'view'|'report',EditorView>>={}, studioFiles:Partial<Record<'view'|'report',string>>={}, studioLoading=false;
 let studioSelection:Partial<Record<'view'|'report',{kind:any,index:number,source:StudioSource|null}>>={};
-let liveHmiScreen='';
+let liveHmiScreen='', renderedStudioScreen='';
+let renderedStudioView:object|undefined;
 const autoHmiCache=new WeakMap<object,ReturnType<typeof deriveHmi>>();
-const autoHmiCache=new WeakMap<object,ReturnType<typeof deriveHmi>>();
+let studioDraftRevision=0,studioCompiledRevision=-1,studioCompiledProject:Status['project']|undefined;
 let registration: ServiceWorkerRegistration | undefined, pendingInstall: any, noticeEnabled = false, closed = false;
 const fmt = (v: number | null | undefined, digits = 2) => typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—';
 const time = (v: number | null | undefined) => v ? new Date(v).toLocaleString('ru-RU') : '—';
@@ -556,9 +557,17 @@ function setupViews(){
     reports.onchange=()=>void refreshReportStudio(true);
     refreshView(true);
 }
-function studioProject(){if(dirty&&validDraft){try{return compileProject(files);}catch{}}return status.project;}
+function studioProject(){
+    if(dirty&&validDraft){
+        if(studioCompiledRevision!==studioDraftRevision||!studioCompiledProject){
+            studioCompiledProject=compileProject(files);studioCompiledRevision=studioDraftRevision;
+        }
+        return studioCompiledProject;
+    }
+    return status.project;
+}
 function markStudioDraft(path:string){
-    file=path;dirty=true;validDraft=false;$('draft-state').textContent='Несохранённый черновик';
+    file=path;dirty=true;validDraft=false;studioDraftRevision++;studioCompiledRevision=-1;$('draft-state').textContent='Несохранённый черновик';
     try{sessionStorage.setItem(`scada-draft:${demo?'demo':'server'}`,JSON.stringify({files,head,file}));$('recover-draft').hidden=false;}catch{}
     refreshActions();
 }
@@ -570,7 +579,7 @@ function studioEditor(kind:'view'|'report',path:string,range?:StudioSource|null)
         if(!update.docChanged||studioLoading)return;
         files[studioFiles[kind]!] = update.state.doc.toString();markStudioDraft(studioFiles[kind]!);
         window.clearTimeout((studioEditor as any)[kind]);(studioEditor as any)[kind]=window.setTimeout(()=>{
-            try{compileProject(files);validDraft=true;refreshActions();setupViews();if(kind==='report')void refreshReportStudio(true);}
+            try{studioCompiledProject=compileProject(files);studioCompiledRevision=studioDraftRevision;validDraft=true;refreshActions();setupViews();if(kind==='report')void refreshReportStudio(true);}
             catch(e){validDraft=false;toast(e instanceof Error?e.message:String(e));}
         },250);
     })];
@@ -591,7 +600,7 @@ function refreshView(rebuild=false){
     const view=studioViewList(project).find(v=>v.id===select.value),host=$('live-view');
     if(!view){host.textContent='Объявите view() в DSL проекта.';return;}
     const values=bindPresentation(view,frame.samples,frame.time),interactive=!failed&&status.actor.role!=='viewer';
-    if(rebuild||host.dataset.definition!==JSON.stringify(view)+liveHmiScreen){host.innerHTML=renderPresentation(view,{values,interactive,screen:liveHmiScreen});host.dataset.definition=JSON.stringify(view)+liveHmiScreen;}
+    if(rebuild||renderedStudioView!==view||renderedStudioScreen!==liveHmiScreen){host.innerHTML=renderPresentation(view,{values,interactive,screen:liveHmiScreen});renderedStudioView=view;renderedStudioScreen=liveHmiScreen;}
     for(const node of host.querySelectorAll<HTMLElement>('[data-view-value]')){const sample=values[node.dataset.viewValue!],valid=sample?.quality==='good'&&sample.value!==null;node.textContent=valid?sample.value!.toFixed(Number(node.dataset.digits??2)):'—';node.parentElement!.dataset.quality=valid?'good':'bad';node.parentElement!.querySelector('small')!.textContent=(node.dataset.unit??'')+(valid?'':' · нет достоверных данных');}
     for(const button of host.querySelectorAll<HTMLButtonElement>('[data-view-command]'))button.disabled=!interactive;
     for(const button of host.querySelectorAll<HTMLButtonElement>('[data-view-screen]')){button.disabled=!interactive;button.onclick=e=>{e.stopPropagation();liveHmiScreen=button.dataset.viewScreen!;refreshView(true);};}
@@ -658,7 +667,7 @@ function sourceLink(kind:'view'|'report',source:StudioSource,label:string){retur
 function applyStudioField(kind:'view'|'report',field:string,value:string|number){
     const selection=studioSelection[kind];if(!selection?.source)throw new Error('Исходный диапазон не найден');
     files=patchWidget(files,selection.source,field,value);markStudioDraft(selection.source.file);
-    const project=compileProject(files);validDraft=true;refreshActions();
+    studioCompiledProject=compileProject(files);studioCompiledRevision=studioDraftRevision;validDraft=true;refreshActions();
     studioLoading=true;studioEditor(kind,selection.source.file);studioLoading=false;
     setupViews();if(kind==='report')void refreshReportStudio(true);toast('TypeScript обновлён. Сохраните commit, когда результат готов.');
 }
