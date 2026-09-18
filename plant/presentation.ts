@@ -45,16 +45,18 @@ export function presentationActions(node:ViewNode):Extract<ViewNode,{kind:'actio
     return node.kind==='group'?node.children.flatMap(presentationActions):node.kind==='action'?[node]:[];
 }
 export function renderPresentation(view:Presentation,context:PresentationContext):string {
-    validatePresentation(view);const rows=context.rows??[];
+    validatePresentation(view);const rows=context.rows??[],counts:Record<string,number>={};
     if(rows.length>2000)throw new AppError('Presentation row budget');
+    const meta=(node:ViewNode)=>{const index=counts[node.kind]??0;counts[node.kind]=index+1;return ` data-studio-kind="${node.kind}" data-studio-index="${index}" tabindex="0"`;};
     const render=(node:ViewNode):string=>{
+        const studio=meta(node);
         switch(node.kind){
-            case 'group':return `<section class="pv-group pv-${node.direction}">${node.title?`<h3>${escape(node.title)}</h3>`:''}<div class="pv-children">${node.children.map(render).join('')}</div></section>`;
-            case 'text':return `<p class="pv-text">${escape(node.text)}</p>`;
-            case 'value':{const s=context.values[node.binding],valid=s?.quality==='good'&&s.value!==null&&Number.isFinite(s.value);return `<div class="pv-value" data-quality="${valid?'good':'bad'}"><span>${escape(node.label)}</span><strong data-view-value="${escape(node.binding)}" data-digits="${node.digits}" data-unit="${escape(node.unit)}">${valid?s.value!.toFixed(node.digits):'—'}</strong><small>${escape(node.unit)}${valid?'':' · нет достоверных данных'}</small></div>`;}
-            case 'table':return `<div class="pv-scroll"><table><thead><tr>${node.columns.map(c=>`<th>${escape(c.title)}${c.unit?` (${escape(c.unit)})`:''}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${node.columns.map(c=>`<td>${escape(typeof row[c.key]==='number'?Number(row[c.key]).toFixed(3):row[c.key])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
-            case 'chart':return `<figure><figcaption>${escape(node.title)}</figcaption>${chartSVG(rows,node.x,node.y)}</figure>`;
-            case 'action':return `<button type="button" data-view-command="${escape(node.target)}" data-view-set="${node.value}"${context.interactive?'':' disabled aria-label="Команда недоступна в снимке отчёта"'}>${escape(node.label)}</button>`;
+            case 'group':return `<section class="pv-group pv-${node.direction}"${studio}>${node.title?`<h3>${escape(node.title)}</h3>`:''}<div class="pv-children">${node.children.map(render).join('')}</div></section>`;
+            case 'text':return `<p class="pv-text"${studio}>${escape(node.text)}</p>`;
+            case 'value':{const s=context.values[node.binding],valid=s?.quality==='good'&&s.value!==null&&Number.isFinite(s.value);return `<div class="pv-value" data-quality="${valid?'good':'bad'}" data-studio-binding="${escape(node.binding)}"${studio}><span>${escape(node.label)}</span><strong data-view-value="${escape(node.binding)}" data-digits="${node.digits}" data-unit="${escape(node.unit)}">${valid?s.value!.toFixed(node.digits):'—'}</strong><small>${escape(node.unit)}${valid?'':' · нет достоверных данных'}</small></div>`; }
+            case 'table':return `<div class="pv-scroll"${studio}><table><thead><tr>${node.columns.map(c=>`<th>${escape(c.title)}${c.unit?` (${escape(c.unit)})`:''}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${node.columns.map(c=>`<td>${escape(typeof row[c.key]==='number'?Number(row[c.key]).toFixed(3):row[c.key])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+            case 'chart':return `<figure${studio}><figcaption>${escape(node.title)}</figcaption>${chartSVG(rows,node.x,node.y)}</figure>`;
+            case 'action':return `<button type="button" data-view-command="${escape(node.target)}" data-view-set="${node.value}" data-studio-target="${escape(node.target)}"${studio}${context.interactive?'':' disabled aria-label="Команда недоступна в снимке отчёта"'}>${escape(node.label)}</button>`;
         }
     };return `<article class="presentation" data-view="${escape(view.id)}">${render(view.body)}</article>`;
 }
