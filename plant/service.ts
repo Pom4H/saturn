@@ -24,7 +24,7 @@ export class Service {
         uuid?: () => string;
         reportRunner: (task: ReportTask) => Promise<ReportArtifact>;
         externalSamples?:()=>Record<string,import('./types').Sample>;
-        bindSources?:(sources:Readonly<Project['sources']>)=>Promise<void>;
+        bindSources?:(sources:readonly import('./types').ExternalSource[])=>Promise<void>;
         externalWorkers?:boolean;
     }) { }
     private now() { return (this.options.now ?? Date.now)(); }
@@ -57,7 +57,12 @@ export class Service {
         }
         this.store.db.exec("UPDATE reports SET status='queued' WHERE status='running'");
         this.store.db.exec("UPDATE worker_jobs SET status='queued',worker_id=NULL,lease_until=NULL WHERE status='running'");
-        if(!this.options.externalWorkers)void this.runJobs().catch(() => { this.healthy = false; this.emit(); });
+        if(this.options.externalWorkers){
+            for(const row of this.store.db.all<{id:string;actor:string;created_at:number}>("SELECT id,actor,created_at FROM reports WHERE status='queued'")){
+                const workerId='report:'+row.id;
+                if(!this.store.db.all('SELECT id FROM worker_jobs WHERE id=?',[workerId]).length)this.store.enqueueWorker({id:workerId,kind:'report',actor:row.actor,createdAt:row.created_at,status:'queued',payload:{reportId:row.id}});
+            }
+        }else void this.runJobs().catch(() => { this.healthy = false; this.emit(); });
     }
     subscribe(fn: (frame: Frame) => void) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
     frame(): Frame { const frame = this.kernel.frame(); frame.alarms = clone(Object.values(this.alarms)); if (!this.healthy)
@@ -204,7 +209,7 @@ export class Service {
         throw error;
     } this.healthy = true; return this.emit(); }
     history(signals: string[], from: number, to: number) { finite(from, 'from', 0, Number.MAX_SAFE_INTEGER); finite(to, 'to', from, this.kernel.state.time); return this.store.history(this.kernel.state.runId, signals, from, to); }
-    async status(actor: Actor) { return { actor, mode: 'simulation', project: this.project, frame: this.frame(), head: await this.repository.head(), desired: await this.repository.desired(), healthy: this.healthy, releaseError: this.releaseError, overrides: clone(this.kernel.state.overrides) }; }
+    async status(actor: Actor) { return { actor, mode: (this.project.sources?.length?'live':'simulation'), project: this.project, frame: this.frame(), head: await this.repository.head(), desired: await this.repository.desired(), healthy: this.healthy, releaseError: this.releaseError, overrides: clone(this.kernel.state.overrides) }; }
     async files(actor: Actor) { authorize(actor,'project.source.read'); const head = await this.repository.head(); return head ? this.repository.read(head) : null; }
     firmware(controllerId:string, revision:string, actor:Actor) {
         authorize(actor,'firmware.build');if(revision!==this.kernel.state.revision)throw new AppError('Project revision changed',409);
@@ -286,7 +291,7 @@ export class Service {
     }
     dispatch(reportId: string, inputs: Record<string, number>, actor: Actor) { authorize(actor,'report.run'); const report = this.project.reports.find(r => r.id === reportId); if (!report?.on.workflow_dispatch)
         throw new AppError('Manual trigger is disabled'); if (this.store.db.all("SELECT id FROM reports WHERE status IN ('queued','running')").length >= 8)
-        throw new AppError('Report queue full', 429); const task = this.makeTask(reportId, 'workflow_dispatch', actor, inputs, this.now()); this.store.db.transaction(() => this.queue(task)); void this.runJobs().catch(() => { this.healthy = false; this.emit(); }); return { id: task.id, status: 'queued' }; }
+        throw new AppError('Report queue full', 429); const task = this.makeTask(reportId, 'workflow_dispatch', actor, inputs, this.now()); this.store.db.transaction(() => this.queue(task)); if(!this.options.externalWorkers)void this.runJobs().catch(() => { this.healthy = false; this.emit(); }); return { id: task.id, status: 'queued' }; }
     schedule(now = this.now()) {
         const slot = Math.floor(now / 60000) * 60000;
         for (const report of this.project.reports) {
