@@ -1,7 +1,7 @@
 import type { MotionSpec, Presentation, PresentationScreen, ViewNode } from './presentation';
 import type { Controller, PlcBlock } from './controller';
 import type { Endpoint, Connection, Attachment } from './ports';
-import { AppError, id, type Expr, type System, type Simulation, type Project, type Derived, type Device, type AlarmRule, type Report, type Layout, type HistoryPolicy, type Control } from './types';
+import { AppError, id, type Expr, type System, type Simulation, type Project, type Derived, type Device, type AlarmRule, type Report, type Layout, type HistoryPolicy, type Control, type ExternalSource } from './types';
 import { model, type builtInModels } from './models';
 export interface ControlRef { control: Control; value: Expr; requested: Expr; blocked: Expr }
 export const control = (name: string, options: Omit<Control, 'id' | 'unit' | 'step'> & Partial<Pick<Control, 'unit' | 'step'>>): ControlRef => ({
@@ -47,6 +47,7 @@ export function simulation<K extends keyof ModelCatalog>(name: string, kind: K, 
     const spec = model(kind), node: Simulation = { id: id(name), model: kind, system: options.system, parameters: { ...Object.fromEntries(Object.entries(spec.parameters).map(([k, v]) => [k, v.default])), ...options.parameters }, inputs: { ...spec.inputs, ...options.inputs }, layout: options.at, ...(options.history ? { history: options.history } : {}) };
     return Object.assign({ node }, Object.fromEntries(Object.keys(spec.outputs).map(k => [k, signal(`${name}.${k}`)]))) as SimRef<ModelCatalog[K]>;
 }
+export const external = (name:string, options:Omit<ExternalSource,'id'|'unit'|'pollMs'|'writable'> & Partial<Pick<ExternalSource,'unit'|'pollMs'|'writable'>>):ExternalSource => ({id:id(name),unit:'',pollMs:1000,writable:false,...options});
 export const derived = (name: string, expression: Expr, unit = 'отн.', history?: HistoryPolicy): Derived => ({ id: id(name), expression, unit, ...(history ? { history } : {}) });
 export const equipment = (name: string, type: string, options: {
     system: string;
