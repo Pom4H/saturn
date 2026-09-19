@@ -1,0 +1,72 @@
+:root {
+  color-scheme: dark;
+  --shell-bg: #111315;
+  --shell-panel: #1b1d1f;
+  --shell-raised: #222426;
+  --shell-border: #303235;
+  --shell-text: #e4e4e7;
+  --shell-muted: #989ca3;
+  --shell-hover: #2c2e31;
+  --shell-selection: #343e49;
+  --shell-accent: #a8d8e4;
+  --code-keyword: #bb9af7; --code-string: #a4c88c; --code-number: #e6b27d; --code-comment: #858891; --code-function: #91b3e8; --code-property: #9dc8cf;
+  --bg: var(--shell-bg); --panel: var(--shell-panel); --line: var(--shell-border); --text: var(--shell-text); --muted: var(--shell-muted); --accent: var(--shell-accent);
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+:root[data-theme=light] { color-scheme: light; --shell-bg: #fafafa; --shell-panel: #f7f7f8; --shell-raised: #fff; --shell-border: #e6e6e9; --shell-text: #26292e; --shell-muted: #686c73; --shell-hover: #ececee; --shell-selection: #d8e4ef; --shell-accent: #206c83; --code-keyword: #8151b4; --code-string: #47742b; --code-number: #9b5b18; --code-comment: #767980; --code-function: #2b62a8; --code-property: #27727d; }
+@media(prefers-color-scheme: light) { :root[data-theme=system] { color-scheme: light; --shell-bg: #fafafa; --shell-panel: #f7f7f8; --shell-raised: #fff; --shell-border: #e6e6e9; --shell-text: #26292e; --shell-muted: #686c73; --shell-hover: #ececee; --shell-selection: #d8e4ef; --shell-accent: #206c83; --code-keyword: #8151b4; --code-string: #47742b; --code-number: #9b5b18; --code-comment: #767980; --code-function: #2b62a8; --code-property: #27727d; } }
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, input, select { font: inherit; }
+button, a { color: inherit; }
+button { cursor: pointer; background: none; border: 0; }
+a { text-decoration: none; }
+button:hover, a:hover { color: var(--accent); }
+button:disabled { opacity: .4; cursor: not-allowed; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+h1, h2, h3, p { margin: 0; }
+[hidden] { display: none !important; }
+.symbols { display: none; }
+.skip-link { position: fixed; top: -70px; left: 15px; z-index: 100; background: var(--panel); padding: 12px; }
+.skip-link:focus { top: 10px; }
+.site-header { height: 60px; display: flex; justify-content: space-between; align-items: center; margin: 0 30px; }
+.brand { display: flex; gap: 8px; align-items: center; font-size: 17px; font-weight: 600; }
+.brand img { border-radius: 7px; }
+.site-header>div { display: flex; align-items: center; gap: 24px; font-size: 12px; color: var(--muted); }
+.hero { padding: 27px 20px 33px; text-align: center; }
+.hero h1 { font-size: clamp(32px, 3.4vw, 48px); font-weight: 550; letter-spacing: -1.8px; line-height: 1.15; }
+.hero p { font-size: 15px; color: var(--muted); margin-top: 13px; }
+.shell-stage { margin: 0 20px 25px; }
+.shell-frame { height: clamp(560px, calc(100svh - 230px), 880px); }
+.primary { background: var(--shell-text); color: var(--shell-bg); border: 1px solid transparent; border-radius: 5px; padding: 8px 13px; font-size: 12px; }
+.primary:hover { background: var(--shell-muted); color: var(--shell-bg); }
+.shell-fullscreen { overflow: hidden; }
+.shell-fullscreen .site-header, .shell-fullscreen .hero { visibility: hidden; }
+.shell-fullscreen .shell { position: fixed; inset: 0; width: 100%; height: 100dvh; border-radius: 0; z-index: 30; }
+.shell-fullscreen #studio-flat { touch-action: none; }
+.shell-fullscreen #studio-svg { touch-action: none; }
+dialog { width: min(420px, calc(100% - 32px)); padding: 25px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--text); }
+dialog::backdrop { background: #060b10bc; }
+.dialog-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+.dialog-heading h2 { font-size: 22px; font-weight: 500; }
+.dialog-heading button { font-size: 25px; color: var(--muted); }
+dialog label { font-size: 12px; display: block; color: var(--muted); margin-bottom: 8px; }
+dialog input, dialog select { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 5px; color: var(--text); padding: 10px; margin-bottom: 20px; font-size: 13px; }
+dialog .primary { width: 100%; }
+.dialog-error { color: #e5ae92; margin-bottom: 15px; font-size: 12px; }
+#shell-toast, .studio-install-notice { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 60; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); padding: 13px 18px; max-width: min(540px,92vw); color: var(--text); font-size: 13px; line-height: 1.5; }
+.studio-install-notice { padding-right: 40px; }
+.studio-install-notice button { position: absolute; top: 7px; right: 10px; font-size: 22px; }
+@media(max-width:700px) {
+  .site-header { margin: 0 16px; height: 53px; }
+  .site-header>div { gap: 16px; font-size: 11px; }
+  .hero { padding: 17px 16px 26px; }
+  .hero h1 { font-size: 32px; letter-spacing: -1px; }
+  .hero p { font-size: 12px; margin-top: 9px; }
+  .shell-stage { margin: 0 8px 16px; }
+  .shell-frame { height: max(540px, calc(100svh - 180px)); }
+}

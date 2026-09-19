@@ -115,7 +115,7 @@ export class SceneView3D {
   private motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
   private raycaster = new THREE.Raycaster();
   private down: { x: number; y: number } | null = null;
-  constructor(public host: HTMLElement) {
+  constructor(public host: HTMLElement, options: { landing?: boolean } = {}) {
     host.classList.add('scene3d');
     this.canvas = document.createElement('canvas'); this.canvas.tabIndex = 0;
     this.canvas.setAttribute('aria-label', '3D схема. Стрелки меняют ракурс, плюс и минус — масштаб, F — вписать. Оборудование можно выбрать клавишей Tab.');
@@ -126,16 +126,17 @@ export class SceneView3D {
     host.replaceChildren(this.canvas, this.labels, this.alert, note);
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, alpha: false });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-    this.renderer.setClearColor(0xf0f5f6); this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.setClearColor(options.landing ? 0x0c0c0f : 0xf0f5f6); this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.15;
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.world.add(new THREE.HemisphereLight(0xe8f7ff, 0x8c9497, 2.4));
     const key = new THREE.DirectionalLight(0xffffff, 3.5); key.position.set(-4, -7, 12); key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024); Object.assign(key.shadow.camera, { left: -20, right: 20, top: 20, bottom: -20, near: .5, far: 45 }); key.shadow.bias = -.0003; this.world.add(key);
-    const floor = addMesh(this.world, new THREE.PlaneGeometry(160, 160), new THREE.MeshStandardMaterial({ color: 0xe6edef, roughness: .9 }), v(0, 0, -.025)); floor.castShadow = false; floor.renderOrder = -1000;
-    const grid = new THREE.GridHelper(100, 100, 0xc4d3d9, 0xd8e2e6); grid.rotation.x = Math.PI / 2; grid.position.z = -.015; grid.renderOrder = -999; this.world.add(grid);
+    const floor = addMesh(this.world, new THREE.PlaneGeometry(160, 160), new THREE.MeshStandardMaterial({ color: options.landing ? 0x0c0c0f : 0xe6edef, roughness: .9 }), v(0, 0, -.025)); floor.castShadow = false; floor.renderOrder = -1000;
+    const grid = new THREE.GridHelper(100, 100, options.landing ? 0x292333 : 0xc4d3d9, options.landing ? 0x19151e : 0xd8e2e6); grid.rotation.x = Math.PI / 2; grid.position.z = -.015; grid.renderOrder = -999; this.world.add(grid);
     this.world.add(this.groupLayer, this.pipeLayer, this.equipmentLayer, this.signalLayer); this.camera.up.set(0, 0, 1);
     this.controls = new OrbitControls(this.camera, this.canvas); this.controls.enableDamping = false; this.controls.minDistance = 2; this.controls.maxDistance = 240; this.controls.maxPolarAngle = Math.PI / 2 - .015;
+    if (options.landing) { this.controls.enabled = false; this.canvas.style.touchAction = 'pan-y'; }
     this.controls.addEventListener('change', () => this.draw());
     this.resizeObserver = new ResizeObserver(() => this.resize()); this.resizeObserver.observe(host);
     this.canvas.addEventListener('keydown', event => {
@@ -260,7 +261,7 @@ export class SceneView3D {
     this.advance(0); this.draw();
   }
   private advance(dt: number) {
-    const alerts: string[] = [];
+    const alerts: string[] = []; let unavailable = 0;
     for (const { equipment, model, label, text, state } of this.objects.values()) {
       model.update(dt);
       const quality = observationQuality(this.scene, this.frame, equipment.id), alarm = observationAlarm(this.scene, this.frame, equipment.id);
@@ -270,9 +271,12 @@ export class SceneView3D {
       state.textContent = [alarmLabel[alarm], quality !== 'good' ? 'Нет данных' : ''].filter(Boolean).join(' · ');
       label.dataset.quality = quality; label.dataset.alarm = alarm; label.dataset.instanceId = this.frame?.equipment[equipment.id]?.instanceId ?? '';
       if (alarm !== 'none') alerts.push(`${equipment.id} · ${alarmLabel[alarm]}`);
-      else if (quality !== 'good') alerts.push(`${equipment.id} · Нет данных`);
+      else if (quality !== 'good') unavailable++;
     }
-    this.alert.textContent = alerts.join('   ·   '); this.alert.hidden = !alerts.length;
+    const sourcePreview = this.frame?.runId === 'draft';
+    this.alert.dataset.preview = String(sourcePreview);
+    const summary = [...alerts.slice(0, 3), ...(alerts.length > 3 ? [`Ещё тревог: ${alerts.length - 3}`] : []), ...(unavailable ? [`Нет данных: ${unavailable}`] : [])];
+    this.alert.textContent = sourcePreview ? 'Предпросмотр · телеметрия не подключена' : summary.join(' · '); this.alert.hidden = !sourcePreview && !summary.length;
     for (const track of this.tracks) {
       track.value = this.flows.get(track.id) ?? null;
       track.phase = ((track.phase + (track.value ?? 0) / 24 * .2 * dt) % 1 + 1) % 1;
@@ -337,6 +341,7 @@ export class SceneView3D {
     this.fitBounds(bounds);
   }
   private fitBounds(bounds: THREE.Box3) {
+    this.resize(); // Fit against the current pane, including a just-opened editor or inspector.
     const center = bounds.getCenter(v()), direction = v(-.45, -1, .73).normalize(), right = v(0, 0, 1).cross(direction).normalize(), up = direction.clone().cross(right).normalize();
     const tanV = Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2), tanH = tanV * this.camera.aspect;
     let distance = 3;

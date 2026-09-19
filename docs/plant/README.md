@@ -10,6 +10,8 @@ The current extension adds four declared operator signals, a coupled auxiliary s
 
 ## Run
 
+[Пошаговый запуск своего сервера: локально, Linux/systemd, HTTPS и PWA](self-hosting.md).
+
 ```sh
 npm ci
 npm run plant

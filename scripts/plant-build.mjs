@@ -3,6 +3,7 @@ import { build } from 'esbuild';
 import { readFile, writeFile, mkdir, cp, readdir, rm } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
+import { buildSite } from './site-build.mjs';
 const raw = { name: 'project-source', setup(b) { b.onResolve({ filter: /\?raw$/ }, a => ({ path: resolve(a.resolveDir, a.path.slice(0, -4)), namespace: 'raw' })); b.onLoad({ filter: /.*/, namespace: 'raw' }, async (a) => ({ contents: await readFile(a.path, 'utf8'), loader: 'text' })); } };
 export const options = { bundle: true, format: 'esm', target: 'es2022', sourcemap: true, plugins: [raw] };
 await mkdir('.plant', { recursive: true });
@@ -39,6 +40,7 @@ for (const asset of assets)
 const sw = (await readFile('plant/web/sw.js', 'utf8')).replace('__VERSION__', hash.digest('hex').slice(0, 16)).replace('__ASSETS__', JSON.stringify(assets));
 await writeFile('dist/plant/sw.js', sw);
 console.log('Built Node server and installable /plant/demo/');
+await buildSite('dist/plant/site');
 
 await cp('LICENSE', 'dist/plant/LICENSE');
 await cp('catalog/licenses/drawio-Apache-2.0.txt', 'dist/plant/Apache-2.0.txt');

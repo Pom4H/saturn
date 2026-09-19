@@ -1,0 +1,100 @@
+{
+  "checkedAt": "2026-09-19T10:07:52.504Z",
+  "packages": [
+    {
+      "name": "dockview",
+      "version": "8.3.1",
+      "published": "2026-09-10T20:57:01.982Z",
+      "license": "MIT",
+      "dependencies": {
+        "dockview-core": "^8.3.1"
+      },
+      "peerDependencies": {}
+    },
+    {
+      "name": "dockview-core",
+      "version": "8.3.1",
+      "published": "2026-09-10T20:51:47.060Z",
+      "license": "MIT",
+      "dependencies": {},
+      "peerDependencies": {}
+    },
+    {
+      "name": "@lumino/widgets",
+      "version": "2.9.0",
+      "published": "2026-07-03T13:30:05.029Z",
+      "license": "BSD-3-Clause",
+      "dependencies": {
+        "@lumino/algorithm": "^2.0.5",
+        "@lumino/commands": "^2.3.4",
+        "@lumino/coreutils": "^2.2.3",
+        "@lumino/disposable": "^2.1.6",
+        "@lumino/domutils": "^2.0.5",
+        "@lumino/dragdrop": "^2.1.9",
+        "@lumino/keyboard": "^2.0.5",
+        "@lumino/messaging": "^2.0.5",
+        "@lumino/properties": "^2.0.5",
+        "@lumino/signaling": "^2.1.6",
+        "@lumino/virtualdom": "^2.0.5"
+      },
+      "peerDependencies": {}
+    },
+    {
+      "name": "@lumino/commands",
+      "version": "2.3.4",
+      "published": "2026-07-03T13:29:01.313Z",
+      "license": "BSD-3-Clause",
+      "dependencies": {
+        "@lumino/algorithm": "^2.0.5",
+        "@lumino/coreutils": "^2.2.3",
+        "@lumino/disposable": "^2.1.6",
+        "@lumino/domutils": "^2.0.5",
+        "@lumino/keyboard": "^2.0.5",
+        "@lumino/signaling": "^2.1.6",
+        "@lumino/virtualdom": "^2.0.5"
+      },
+      "peerDependencies": {}
+    },
+    {
+      "name": "golden-layout",
+      "version": "2.6.0",
+      "published": "2022-09-26T06:57:06.116Z",
+      "license": "MIT",
+      "dependencies": {},
+      "peerDependencies": {}
+    },
+    {
+      "name": "flexlayout-react",
+      "version": "0.11.0",
+      "published": "2026-09-11T19:34:20.039Z",
+      "license": "MIT",
+      "dependencies": {},
+      "peerDependencies": {
+        "react": "^18.0.0 || ^19.0.0",
+        "react-dom": "^18.0.0 || ^19.0.0"
+      }
+    },
+    {
+      "name": "@awesome.me/webawesome",
+      "version": "3.13.0",
+      "published": "2026-09-16T18:15:03.571Z",
+      "license": "MIT",
+      "dependencies": {
+        "lit": "^3.2.1",
+        "marked": "^11.2.0",
+        "nanoid": "^5.1.5",
+        "@lit/react": "^1.0.8",
+        "@lit/context": "^1.1.6",
+        "@lit-labs/ssr": "^4.1.0",
+        "@ctrl/tinycolor": "4.1.0",
+        "@floating-ui/dom": "^1.6.13",
+        "@konnorr/qr-creator": "^1.0.1",
+        "@lit-labs/ssr-client": "^1.1.8",
+        "@shoelace-style/localize": "^3.2.3",
+        "composed-offset-position": "^0.0.6",
+        "@shoelace-style/animations": "^1.2.0"
+      },
+      "peerDependencies": {}
+    }
+  ]
+}
