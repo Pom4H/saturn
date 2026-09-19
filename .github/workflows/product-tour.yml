@@ -23,10 +23,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run plant:build
+      - run: npm run site:check
+      - run: npm run site:test:browser
       - run: node scripts/product-tour.mjs
       - uses: actions/upload-artifact@v7.0.1
         if: always()
         with:
           name: saturn-product-tour
-          path: product-tour/
+          path: |
+            product-tour/
+            test-results/site-studio/
           retention-days: 14
