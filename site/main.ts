@@ -1,4 +1,5 @@
 import './styles.css';
+import './i18n';
 import './studio.css';
 import { mountProjectPicker } from './project-picker';
 mountProjectPicker();
