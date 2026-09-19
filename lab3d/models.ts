@@ -16,7 +16,12 @@ const greyFluid = new THREE.MeshPhysicalMaterial({
   color: 0x819199, roughness: .28, metalness: 0, transmission: .18,
   transparent: true, opacity: .48, ior: 1.333, thickness: .12, depthWrite: false,
 });
-const sharedMaterials = new Set<THREE.Material>([steel, lightSteel, dark, teal, amber, fluid, greyFluid]);
+const glass = new THREE.MeshPhysicalMaterial({
+  color: 0xd9f5fb, roughness: .06, metalness: 0, transmission: .86,
+  transparent: true, opacity: .22, ior: 1.46, thickness: .08,
+  clearcoat: .35, clearcoatRoughness: .06, depthWrite: false,
+});
+const sharedMaterials = new Set<THREE.Material>([steel, lightSteel, dark, teal, amber, fluid, greyFluid, glass]);
 const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 function mesh(parent: THREE.Object3D, geometry: THREE.BufferGeometry, material: THREE.Material, position = v(0, 0, 0)) {
   const object = new THREE.Mesh(geometry, material); object.position.copy(position);
@@ -158,4 +163,4 @@ export function createModel(asset: Asset): Model {
   if (!builder) throw new Error(`No 3D renderer for ${asset.type}`);
   return builder(asset);
 }
-export const materials = { steel, dark, teal, fluid, greyFluid };
+export const materials = { steel, dark, teal, fluid, greyFluid, glass };
