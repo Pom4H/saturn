@@ -15,7 +15,7 @@ export function mountProjectPicker() {
   function sync() {
     name.textContent = source.selectedOptions[0]?.textContent ?? 'Проект';
     trigger.title = name.textContent;
-    trigger.disabled = !source.options.length;
+    trigger.disabled = !source.options.length || document.getElementById('studio-shell')?.dataset.runtimeOnly === 'true';
     if (isOpen()) render();
   }
   function position() {
