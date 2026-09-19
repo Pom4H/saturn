@@ -60,6 +60,18 @@ export function runtimeProjection(project: Project, frame: Frame) {
   installEquipment();
   return { project, scene: sceneFor(project), runtime: visualFrame(project, frame), objects: new Map<string, SourceObject>() };
 }
+
+/**
+ * Cheap authoring preview: layout is derived again from the already compiled
+ * project, so routed installation connections and group bounds move in the same
+ * frame as the device. No source text or runtime state is mutated.
+ */
+export function previewPlantPosition(project: Project, id: string, x: number, y: number) {
+  const devices = project.devices.map(device => device.id === id
+    ? { ...device, layout: { ...device.layout, x, y } }
+    : device);
+  return sceneFor({ ...project, devices });
+}
 export function nestedStarter() {
   const files = { ...starter };
   files['systems/pumping.ts'] = files['equipment.ts']; delete files['equipment.ts'];
