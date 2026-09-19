@@ -16,8 +16,8 @@ export class GitRepository implements Repository {
         return new Promise((accept, reject) => {
             const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
             const child = spawn('git', ['-c', `core.hooksPath=${devNull}`, '-c', 'core.fsmonitor=false', '-c', 'protocol.ext.allow=never', '--git-dir', resolve(this.directory), '-C', resolve(this.directory), ...args], { shell: false, env: { ...env, GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_NOSYSTEM: '1', ...extra }, stdio: ['pipe', 'pipe', 'pipe'] });
-            const chunks: Buffer[] = [];
-            let size = 0, settled = false;
+            const chunks: Buffer[] = [], stderr: Buffer[] = [];
+            let size = 0, stderrSize = 0, settled = false;
             const done = (error?: Error) => { if (settled)
                 return; settled = true; clearTimeout(timer); if (error)
                 reject(error);
@@ -36,10 +36,13 @@ export class GitRepository implements Repository {
             }
             else
                 chunks.push(b); });
-            child.stderr.resume();
+            child.stderr.on('data', b => { stderrSize += b.length; if (stderrSize <= 16384) stderr.push(b); });
             child.stdin.on('error', () => { });
-            child.on('error', () => done(new AppError('Git unavailable', 503)));
-            child.on('close', code => done(code === 0 ? undefined : new AppError('Git operation failed', 409)));
+            child.on('error', error => { console.error('Git spawn failed:', args[0] ?? '(none)', error.message); done(new AppError('Git unavailable', 503)); });
+            child.on('close', code => {
+                if (code !== 0) console.error('Git command failed:', args[0] ?? '(none)', 'exit', code, Buffer.concat(stderr).toString('utf8').trim());
+                done(code === 0 ? undefined : new AppError('Git operation failed', 409));
+            });
             child.stdin.end(input);
         });
     }
