@@ -6,5 +6,5 @@ export function serverAppUrl(value: string): string {
   let path = url.pathname.replace(/\/(app\/?|login)$/, '/');
   if (path === '/') path = '/plant/';
   if (!path.endsWith('/')) path += '/';
-  url.pathname = path + 'app/'; return url.href;
+  url.pathname = path + 'login'; return url.href;
 }
