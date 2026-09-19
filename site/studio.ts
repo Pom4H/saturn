@@ -199,7 +199,11 @@ export async function mountStudio() {
     renderTree(); renderMeta(); setSurface('scene'); syncPanels(); updatePause(); syncTelemetry();
     if (compact.matches) {
       setMode('2d');
-      const group = plant.scene.groups?.[0];
+      const groups = plant.scene.groups ?? [];
+      const controlSystem = session.project.controls?.[0]?.system;
+      const group = groups.find(item => item.id === controlSystem)
+        ?? groups.filter(item => item.count > 0 && item.count <= 8).sort((a, b) => a.count - b.count || a.width * a.height - b.width * b.height)[0]
+        ?? groups.at(-1);
       if (group) view.fitGroup(group.id); else fitScene();
     } else fitScene();
     spatial?.fit(); renderRuntimeControls(); renderRuntimeAlarms();
