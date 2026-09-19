@@ -105,7 +105,7 @@ try {
   await pause(1100);
   await page.locator('#runtime-alarms').click();
   await pause(1200);
-  await page.locator('[data-shell-view=scene]').last().click();
+  await page.locator('[data-shell-view="scene"]:visible').click();
   await page.locator('#studio-fit').click();
   await pause(1400);
 
