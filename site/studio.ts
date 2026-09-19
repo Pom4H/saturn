@@ -155,7 +155,7 @@ export async function mountStudio() {
       const edit = document.createElement('div'); edit.className = 'runtime-control-edit';
       const input = document.createElement('input'); input.type = 'number'; input.min = String(control.min); input.max = String(control.max); input.step = String(control.step); input.value = typeof requested?.value === 'number' ? String(requested.value) : String(control.initial); input.setAttribute('aria-label', control.title);
       const button = document.createElement('button'); button.textContent = 'Применить';
-      button.disabled = serverSession.actor.role === 'viewer' || !good || blocked || telemetry.state !== 'live';
+      button.disabled = serverSession.actor.role === 'viewer' || !good || blocked || !['live', 'paused'].includes(shell.dataset.telemetry ?? '');
       input.disabled = button.disabled;
       button.onclick = () => void (async () => { try { if (!input.checkValidity()) { input.reportValidity(); return; } await runtimeCommand('operate', { target: control.id, value: Number(input.value) }); toast('Уставка принята'); } catch (e) { toast(e instanceof Error ? e.message : String(e)); } })();
       edit.append(input, button);
@@ -178,7 +178,7 @@ export async function mountStudio() {
       const text = document.createElement('div'), title = document.createElement('strong'), meta = document.createElement('small');
       title.textContent = rule?.title ?? alarm.id; meta.textContent = `${rule?.priority ?? 'alarm'} · ${alarm.active ? 'активен' : 'снят'}${alarm.acknowledged ? ' · подтверждён' : ''}`; text.append(title, meta);
       const time = document.createElement('small'); time.textContent = alarm.raisedAt ? new Date(alarm.raisedAt).toLocaleTimeString('ru-RU') : '—';
-      const ack = document.createElement('button'); ack.textContent = alarm.acknowledged ? 'Подтверждён' : 'Подтвердить'; ack.disabled = alarm.acknowledged || serverSession.actor.role === 'viewer' || telemetry.state !== 'live';
+      const ack = document.createElement('button'); ack.textContent = alarm.acknowledged ? 'Подтверждён' : 'Подтвердить'; ack.disabled = alarm.acknowledged || serverSession.actor.role === 'viewer' || !['live', 'paused'].includes(shell.dataset.telemetry ?? '');
       ack.onclick = () => void (async () => { try { await runtimeCommand('ack', { target: alarm.id }); toast('Аларм подтверждён'); } catch (e) { toast(e instanceof Error ? e.message : String(e)); } })();
       row.append(text, time, ack); host.append(row);
     }
