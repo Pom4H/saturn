@@ -25,17 +25,51 @@ function primitiveModel(context: Renderer3DContext, kind: string): EquipmentMode
     ports.set(key, p); tubeBetween(root, v(0, 0, .75), p, .11, materials.steel);
   }
   if (kind === 'valve') {
-    addMesh(root, new THREE.SphereGeometry(.32, 24, 16), materials.teal, v(0, 0, .75));
-    tubeBetween(root, v(0, 0, .8), v(0, 0, 1.3), .06, materials.steel);
-    addMesh(root, new THREE.BoxGeometry(.5, .35, .22), materials.dark, v(0, 0, 1.3));
-    const indicator = addMesh(root, new THREE.BoxGeometry(.34, .055, .045), materials.fluid, v(0, 0, 1.46));
-    return { root, ports, labelAnchor: v(0, 0, 1.75), update: dt => { const opening = context.number('opening', dt); indicator.visible = opening !== null; indicator.rotation.z = (opening ?? 0) / 100 * Math.PI / 2; }, metrics: () => ({ opening: numeric(context.signal('opening')) }) };
+    // Compact flanged control valve: body, bonnet, stem and handwheel remain
+    // recognizable from the default oblique operator camera.
+    for (const x of [-width / 2 + .08, width / 2 - .08]) {
+      const flange = addMesh(root, new THREE.CylinderGeometry(.24, .24, .08, 24), materials.steel, v(x, 0, .75));
+      flange.rotation.z = Math.PI / 2;
+    }
+    const leftBody = addMesh(root, new THREE.ConeGeometry(.34, .19, .52, 24), materials.teal, v(-.20, 0, .75));
+    leftBody.rotation.z = -Math.PI / 2;
+    const rightBody = addMesh(root, new THREE.ConeGeometry(.34, .19, .52, 24), materials.teal, v(.20, 0, .75));
+    rightBody.rotation.z = Math.PI / 2;
+    tubeBetween(root, v(0, 0, .84), v(0, 0, 1.34), .055, materials.steel);
+    addMesh(root, new THREE.CylinderGeometry(.16, .20, .18, 24), materials.steel, v(0, 0, 1.12));
+    const wheel = addMesh(root, new THREE.TorusGeometry(.28, .035, 10, 32), materials.dark, v(0, 0, 1.43));
+    const indicator = addMesh(root, new THREE.BoxGeometry(.40, .045, .035), materials.fluid, v(0, 0, 1.43));
+    return { root, ports, labelAnchor: v(0, 0, 1.82), update: dt => {
+      const opening = context.number('opening', dt); indicator.visible = opening !== null; wheel.visible = opening !== null;
+      indicator.rotation.z = (opening ?? 0) / 100 * Math.PI / 2;
+    }, metrics: () => ({ opening: numeric(context.signal('opening')) }) };
   }
-  if (kind === 'flowmeter' || kind === 'pressure' || kind === 'temperature') {
-    addMesh(root, new THREE.CylinderGeometry(.32, .32, .18, 32), materials.steel, v(0, 0, .9));
-    const glass = addMesh(root, new THREE.CircleGeometry(.26, 32), materials.dark, v(0, -.095, .9)); glass.rotation.x = Math.PI / 2;
-    if (!ports.size) { tubeBetween(root, v(0, 0, .1), v(0, 0, .65), .04, materials.steel); }
-    return { root, ports, labelAnchor: v(0, 0, 1.48), update: () => {} };
+  if (kind === 'flowmeter') {
+    const body = addMesh(root, new THREE.CylinderGeometry(.30, .30, .62, 28), materials.steel, v(0, 0, .75)); body.rotation.z = Math.PI / 2;
+    for (const x of [-.36, .36]) { const flange = addMesh(root, new THREE.CylinderGeometry(.35, .35, .07, 28), materials.dark, v(x, 0, .75)); flange.rotation.z = Math.PI / 2; }
+    addMesh(root, new THREE.BoxGeometry(.42, .34, .28), materials.dark, v(0, 0, 1.14));
+    const window = addMesh(root, new THREE.BoxGeometry(.30, .025, .13), materials.glass ?? materials.fluid, v(0, -.18, 1.15));
+    window.renderOrder = 3;
+    return { root, ports, labelAnchor: v(0, 0, 1.62), update: () => {} };
+  }
+  if (kind === 'pressure') {
+    tubeBetween(root, v(0, 0, .08), v(0, 0, .62), .038, materials.steel);
+    const caseMesh = addMesh(root, new THREE.CylinderGeometry(.34, .34, .16, 36), materials.steel, v(0, 0, .92)); caseMesh.rotation.x = Math.PI / 2;
+    const face = addMesh(root, new THREE.CircleGeometry(.285, 36), materials.glass ?? materials.dark, v(0, -.086, .92)); face.rotation.x = Math.PI / 2; face.renderOrder = 4;
+    const needle = addMesh(root, new THREE.BoxGeometry(.025, .018, .22), materials.teal, v(0, -.102, .98)); needle.rotation.x = Math.PI / 2;
+    return { root, ports, labelAnchor: v(0, 0, 1.48), update: dt => {
+      const value = context.number('value', dt); needle.visible = value !== null;
+      needle.rotation.z = THREE.MathUtils.degToRad(-125 + Math.min(16, Math.max(0, value ?? 0)) / 16 * 250);
+    } };
+  }
+  if (kind === 'temperature') {
+    tubeBetween(root, v(0, 0, .06), v(0, 0, .60), .032, materials.steel);
+    addMesh(root, new THREE.CapsuleGeometry(.12, .58, 8, 18), materials.steel, v(0, 0, .98));
+    const column = addMesh(root, new THREE.CapsuleGeometry(.035, .42, 6, 12), materials.fluid, v(0, -.125, .97));
+    return { root, ports, labelAnchor: v(0, 0, 1.58), update: dt => {
+      const value = context.number('value', dt); column.visible = value !== null;
+      const normalized = Math.min(1, Math.max(0, ((value ?? -40) + 40) / 190)); column.scale.z = .35 + normalized * .65;
+    } };
   }
   if (kind === 'outlet') {
     const arrow = addMesh(root, new THREE.ConeGeometry(.24, .48, 4), materials.teal, v(.18, 0, .75)); arrow.rotation.z = -Math.PI / 2;
@@ -84,6 +118,8 @@ export class SceneView3D {
   onSelect?: (id: string | null) => void;
   onPortSelect?: (id:string,port:string)=>void;
   onOverview?: () => void;
+  canMove?: (id: string) => boolean;
+  onMove?: (id: string, x: number, y: number, commit: boolean) => void;
   private frame: RuntimeFrame | null = null;
   private renderer: THREE.WebGLRenderer;
   private world = new THREE.Scene();
@@ -114,7 +150,10 @@ export class SceneView3D {
   private last = 0;
   private motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
   private raycaster = new THREE.Raycaster();
-  private down: { x: number; y: number } | null = null;
+  private ground = new THREE.Plane(v(0, 0, 1), 0);
+  private down: { x: number; y: number; id: string | null; moved: boolean; offset?: THREE.Vector3; layoutX?: number; layoutY?: number } | null = null;
+  private note!: HTMLDivElement;
+  private messages = { preview: 'Preview · telemetry disconnected', noData: 'No data', moreAlarms: 'More alarms' };
   constructor(public host: HTMLElement, options: { landing?: boolean } = {}) {
     host.classList.add('scene3d');
     this.canvas = document.createElement('canvas'); this.canvas.tabIndex = 0;
@@ -122,8 +161,8 @@ export class SceneView3D {
     this.labels = document.createElement('div'); this.labels.className = 'scene3d-labels';
     this.leaders = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); this.leaders.classList.add('scene3d-leaders'); this.leaders.setAttribute('aria-hidden', 'true'); this.labels.appendChild(this.leaders);
     this.alert = document.createElement('div'); this.alert.className = 'scene3d-alert'; this.alert.setAttribute('role', 'status'); this.alert.hidden = true;
-    const note = document.createElement('div'); note.className = 'scene3d-note'; note.textContent = 'Пространственная схема · размещение из 2D';
-    host.replaceChildren(this.canvas, this.labels, this.alert, note);
+    this.note = document.createElement('div'); this.note.className = 'scene3d-note'; this.note.textContent = '3D';
+    host.replaceChildren(this.canvas, this.labels, this.alert, this.note);
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, alpha: false });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.setClearColor(options.landing ? 0x0c0c0f : 0xf0f5f6); this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -136,7 +175,7 @@ export class SceneView3D {
     const grid = new THREE.GridHelper(100, 100, options.landing ? 0x292333 : 0xc4d3d9, options.landing ? 0x19151e : 0xd8e2e6); grid.rotation.x = Math.PI / 2; grid.position.z = -.015; grid.renderOrder = -999; this.world.add(grid);
     this.world.add(this.groupLayer, this.pipeLayer, this.equipmentLayer, this.signalLayer); this.camera.up.set(0, 0, 1);
     this.controls = new OrbitControls(this.camera, this.canvas); this.controls.enableDamping = false; this.controls.minDistance = 2; this.controls.maxDistance = 240; this.controls.maxPolarAngle = Math.PI / 2 - .015;
-    if (options.landing) { this.controls.enabled = false; this.canvas.style.touchAction = 'pan-y'; }
+    this.setEmbedded(Boolean(options.landing));
     this.controls.addEventListener('change', () => this.draw());
     this.resizeObserver = new ResizeObserver(() => this.resize()); this.resizeObserver.observe(host);
     this.canvas.addEventListener('keydown', event => {
@@ -151,17 +190,61 @@ export class SceneView3D {
       if (event.key.toLowerCase() === 'f') { this.fit(); this.onOverview?.(); event.preventDefault(); event.stopPropagation(); }
       if (event.key === 'Escape') { this.select(null); this.onSelect?.(null); }
     });
-    this.canvas.addEventListener('pointerdown', e => { this.down = { x: e.clientX, y: e.clientY }; });
-    this.canvas.addEventListener('pointerup', e => {
-      if (!this.down || Math.hypot(e.clientX - this.down.x, e.clientY - this.down.y) > 5) return;
-      const rect = this.canvas.getBoundingClientRect(), drawingHeight = rect.height - (rect.width <= 650 ? 77 : 0);
-      if (e.clientY - rect.top > drawingHeight) return;
-      this.raycaster.setFromCamera(new THREE.Vector2((e.clientX - rect.left) / rect.width * 2 - 1, -(e.clientY - rect.top) / drawingHeight * 2 + 1), this.camera);
-      let object: THREE.Object3D | undefined = this.raycaster.intersectObjects(this.equipmentLayer.children, true)[0]?.object;
-      const terminal=object?.userData.terminal;
-      while (object && !object.userData.equipmentId) object = object.parent ?? undefined;
-      const id = object?.userData.equipmentId ?? null; this.select(id); this.onSelect?.(id); if(id&&terminal)this.onPortSelect?.(id,terminal);
+    this.canvas.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      this.host.dataset.interacted = 'true';
+      const picked = this.pick(e.clientX, e.clientY), id = picked.id;
+      this.down = { x: e.clientX, y: e.clientY, id, moved: false };
+      if (!id || !this.canMove?.(id)) return;
+      const point = this.groundPoint(e.clientX, e.clientY), object = this.objects.get(id);
+      if (!point || !object) return;
+      this.down.offset = object.model.root.position.clone().sub(point);
+      this.down.layoutX = object.equipment.tap ? object.model.root.position.x * 100 - 33 : Number(object.equipment.props.x);
+      this.down.layoutY = object.equipment.tap ? -object.model.root.position.y * 100 : Number(object.equipment.props.y);
+      this.controls.enabled = false;
+      this.canvas.setPointerCapture(e.pointerId);
+      e.preventDefault();
     });
+    this.canvas.addEventListener('pointermove', e => {
+      const drag = this.down;
+      if (!drag?.id || !drag.offset || !this.canMove?.(drag.id)) return;
+      if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 3) return;
+      const point = this.groundPoint(e.clientX, e.clientY), object = this.objects.get(drag.id);
+      if (!point || !object) return;
+      drag.moved = true;
+      const world = point.add(drag.offset), definition = catalog[object.equipment.kind], centered = !!this.scene.groups?.length;
+      const x = object.equipment.tap ? world.x * 100 - 33 : world.x * 100 - (centered ? definition.width / 2 : 0);
+      const y = object.equipment.tap ? -world.y * 100 : -world.y * 100 - (centered ? definition.height / 2 : 0);
+      this.onMove?.(drag.id, Math.round(x), Math.round(y), false);
+      e.preventDefault();
+    });
+    this.canvas.addEventListener('pointerup', e => {
+      const drag = this.down; this.down = null;
+      if (!drag) return;
+      if (drag.offset) {
+        this.controls.enabled = true;
+        if (this.canvas.hasPointerCapture(e.pointerId)) this.canvas.releasePointerCapture(e.pointerId);
+        if (drag.moved && drag.id) {
+          const point = this.groundPoint(e.clientX, e.clientY), object = this.objects.get(drag.id);
+          if (point && object) {
+            const world = point.add(drag.offset), definition = catalog[object.equipment.kind], centered = !!this.scene.groups?.length;
+            const x = object.equipment.tap ? world.x * 100 - 33 : world.x * 100 - (centered ? definition.width / 2 : 0);
+            const y = object.equipment.tap ? -world.y * 100 : -world.y * 100 - (centered ? definition.height / 2 : 0);
+            this.onMove?.(drag.id, Math.round(x), Math.round(y), true);
+          }
+          return;
+        }
+      }
+      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 5) return;
+      const picked = this.pick(e.clientX, e.clientY), id = picked.id;
+      this.select(id); this.onSelect?.(id); if(id&&picked.terminal)this.onPortSelect?.(id,picked.terminal);
+    });
+    this.canvas.addEventListener('pointercancel', e => {
+      const drag = this.down; this.down = null; this.controls.enabled = true;
+      if (this.canvas.hasPointerCapture(e.pointerId)) this.canvas.releasePointerCapture(e.pointerId);
+      if (drag?.moved && drag.id && drag.layoutX !== undefined && drag.layoutY !== undefined) this.onMove?.(drag.id, drag.layoutX, drag.layoutY, false);
+    });
+    this.canvas.addEventListener('wheel', () => { this.host.dataset.interacted = 'true'; }, { passive: true });
     const animate = (now: number) => {
       const dt = Math.min(.1, this.last ? (now - this.last) / 1000 : 0); this.last = now;
       if (host.clientWidth && host.clientHeight && !host.hidden && !document.hidden) {
@@ -171,6 +254,30 @@ export class SceneView3D {
       this.raf = requestAnimationFrame(animate);
     };
     this.resize(); this.raf = requestAnimationFrame(animate);
+  }
+  setEmbedded(embedded: boolean) {
+    this.canvas.style.touchAction = embedded ? 'pan-y' : 'none';
+    this.host.dataset.embedded = String(embedded);
+  }
+  setHint(text: string) { this.note.textContent = text; this.note.hidden = !text; }
+  setMessages(messages: Partial<typeof this.messages>) { Object.assign(this.messages, messages); this.advance(0); this.draw(); }
+  private ndc(clientX: number, clientY: number) {
+    const rect = this.canvas.getBoundingClientRect(), bottom = rect.width <= 650 ? 77 : 0, drawingHeight = Math.max(1, rect.height - bottom);
+    if (clientY - rect.top > drawingHeight) return null;
+    return new THREE.Vector2((clientX - rect.left) / rect.width * 2 - 1, -(clientY - rect.top) / drawingHeight * 2 + 1);
+  }
+  private pick(clientX: number, clientY: number) {
+    const ndc = this.ndc(clientX, clientY); if (!ndc) return { id: null as string | null, terminal: undefined as string | undefined };
+    this.raycaster.setFromCamera(ndc, this.camera);
+    let object: THREE.Object3D | undefined = this.raycaster.intersectObjects(this.equipmentLayer.children, true)[0]?.object;
+    const terminal = object?.userData.terminal as string | undefined;
+    while (object && !object.userData.equipmentId) object = object.parent ?? undefined;
+    return { id: (object?.userData.equipmentId as string | undefined) ?? null, terminal };
+  }
+  private groundPoint(clientX: number, clientY: number) {
+    const ndc = this.ndc(clientX, clientY); if (!ndc) return null;
+    this.raycaster.setFromCamera(ndc, this.camera);
+    return this.raycaster.ray.intersectPlane(this.ground, v());
   }
   private context(equipment: Equipment): Renderer3DContext {
     return { THREE, equipment, materials, invalidate: () => this.draw(),
@@ -240,7 +347,11 @@ export class SceneView3D {
       const startLead = start.clone().addScaledVector(normal(a!, edge.from.port), .30), endLead = end.clone().addScaledVector(normal(b!, edge.to.port), .30);
       const curve = new THREE.CurvePath<THREE.Vector3>(), high = Math.max(startLead.z, endLead.z), middleX = (startLead.x + endLead.x) / 2;
       const points = [start, startLead, v(startLead.x, startLead.y, high), v(middleX, startLead.y, high), v(middleX, endLead.y, high), v(endLead.x, endLead.y, high), endLead, end], body: THREE.Mesh[] = [];
-      for (let i = 1; i < points.length; i++) if (points[i].distanceTo(points[i - 1]) > .001) { curve.add(new THREE.LineCurve3(points[i - 1], points[i])); body.push(tubeBetween(this.pipeLayer, points[i - 1], points[i], .085, materials.fluid)); }
+      for (let i = 1; i < points.length; i++) if (points[i].distanceTo(points[i - 1]) > .001) {
+        curve.add(new THREE.LineCurve3(points[i - 1], points[i]));
+        tubeBetween(this.pipeLayer, points[i - 1], points[i], .112, materials.glass ?? materials.steel);
+        body.push(tubeBetween(this.pipeLayer, points[i - 1], points[i], .073, materials.fluid));
+      }
       if (!curve.curves.length) continue;
       const particles = [0, 1, 2, 3].map(() => addMesh(this.pipeLayer, new THREE.ConeGeometry(.14, .28, 8), materials.dark));
       this.tracks.push({ id: edge.id, curve, particles, body, phase: trackPhases.get(edge.id) ?? 0, value: null });
@@ -261,22 +372,24 @@ export class SceneView3D {
     this.advance(0); this.draw();
   }
   private advance(dt: number) {
-    const alerts: string[] = []; let unavailable = 0;
+    const alerts: string[] = []; let stale = 0, unavailable = 0;
     for (const { equipment, model, label, text, state } of this.objects.values()) {
       model.update(dt);
       const quality = observationQuality(this.scene, this.frame, equipment.id), alarm = observationAlarm(this.scene, this.frame, equipment.id);
       const key = model.readout ?? primarySignal[equipment.kind] ?? Object.keys(catalog[equipment.kind].signals ?? {})[0] ?? 'flow';
       const sample = observation(this.scene, this.frame, equipment.id, key), value = key === 'flow' ? this.flows.get(equipment.id) ?? null : numeric(sample);
       text.textContent = value === null ? '—' : `${value.toFixed(key === 'rpm' || key === 'level' ? 0 : 1)} ${unitLabel(sample?.unit ?? (key === 'flow' ? 'm3/h' : ''))}`;
-      state.textContent = [alarmLabel[alarm], quality !== 'good' ? 'Нет данных' : ''].filter(Boolean).join(' · ');
+      const qualityLabel = quality === 'stale' ? 'STALE' : quality === 'bad' ? 'BAD' : quality === 'offline' ? 'OFFLINE' : '';
+      state.textContent = [alarmLabel[alarm], qualityLabel].filter(Boolean).join(' · ');
       label.dataset.quality = quality; label.dataset.alarm = alarm; label.dataset.instanceId = this.frame?.equipment[equipment.id]?.instanceId ?? '';
       if (alarm !== 'none') alerts.push(`${equipment.id} · ${alarmLabel[alarm]}`);
+      if (quality === 'stale') stale++;
       else if (quality !== 'good') unavailable++;
     }
     const sourcePreview = this.frame?.runId === 'draft';
     this.alert.dataset.preview = String(sourcePreview);
-    const summary = [...alerts.slice(0, 3), ...(alerts.length > 3 ? [`Ещё тревог: ${alerts.length - 3}`] : []), ...(unavailable ? [`Нет данных: ${unavailable}`] : [])];
-    this.alert.textContent = sourcePreview ? 'Предпросмотр · телеметрия не подключена' : summary.join(' · '); this.alert.hidden = !sourcePreview && !summary.length;
+    const summary = [...alerts.slice(0, 3), ...(alerts.length > 3 ? [`${this.messages.moreAlarms}: ${alerts.length - 3}`] : []), ...(stale ? [`STALE: ${stale}`] : []), ...(unavailable ? [`${this.messages.noData}: ${unavailable}`] : [])];
+    this.alert.textContent = sourcePreview ? this.messages.preview : summary.join(' · '); this.alert.hidden = !sourcePreview && !summary.length;
     for (const track of this.tracks) {
       track.value = this.flows.get(track.id) ?? null;
       track.phase = ((track.phase + (track.value ?? 0) / 24 * .2 * dt) % 1 + 1) % 1;

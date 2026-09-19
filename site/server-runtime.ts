@@ -34,17 +34,28 @@ export async function fetchServerSession(): Promise<ServerSession> {
   return session;
 }
 
-export async function serverPost<T>(session: ServerSession, action: string, input: unknown): Promise<T> {
-  const response = await fetch(`/plant/api/${action}`, {
-    method: 'POST',
-    credentials: 'same-origin',
-    cache: 'no-store',
-    redirect: 'error',
-    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': session.csrf },
-    body: JSON.stringify(input),
-    signal: AbortSignal.timeout(15000),
-  });
-  return json<T>(response);
+export async function serverPost<T>(session: ServerSession, action: string, input: unknown, options: { retryTransport?: boolean } = {}): Promise<T> {
+  const delays = options.retryTransport ? [0, 900, 2200] : [0];
+  let last: unknown;
+  for (const delay of delays) {
+    if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+    try {
+      const response = await fetch(`/plant/api/${action}`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        redirect: 'error',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': session.csrf },
+        body: JSON.stringify(input),
+        signal: AbortSignal.timeout(15000),
+      });
+      return await json<T>(response);
+    } catch (error) {
+      last = error;
+      if (error instanceof Error && /^HTTP /.test(error.message)) throw error;
+    }
+  }
+  throw last instanceof Error ? last : new Error('Network request failed');
 }
 
 export function commandPayload(session: ServerSession, action: string, extra: Record<string, unknown> = {}) {

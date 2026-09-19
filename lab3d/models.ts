@@ -7,9 +7,21 @@ const lightSteel = new THREE.MeshStandardMaterial({ color: 0xe1e9e9, metalness: 
 const dark = new THREE.MeshStandardMaterial({ color: 0x284655, metalness: .4, roughness: .42 });
 const teal = new THREE.MeshStandardMaterial({ color: 0x167c88, metalness: .3, roughness: .32 });
 const amber = new THREE.MeshStandardMaterial({ color: 0xe9ac43, metalness: .35, roughness: .3 });
-const fluid = new THREE.MeshStandardMaterial({ color: 0x21bdc6, metalness: .12, roughness: .22 });
-const greyFluid = new THREE.MeshStandardMaterial({ color: 0x819199, roughness: .6 });
-const sharedMaterials = new Set<THREE.Material>([steel, lightSteel, dark, teal, amber, fluid, greyFluid]);
+const fluid = new THREE.MeshPhysicalMaterial({
+  color: 0x26cfe0, roughness: .08, metalness: 0, transmission: .42,
+  transparent: true, opacity: .72, ior: 1.333, thickness: .18,
+  clearcoat: .45, clearcoatRoughness: .08, depthWrite: false,
+});
+const greyFluid = new THREE.MeshPhysicalMaterial({
+  color: 0x819199, roughness: .28, metalness: 0, transmission: .18,
+  transparent: true, opacity: .48, ior: 1.333, thickness: .12, depthWrite: false,
+});
+const glass = new THREE.MeshPhysicalMaterial({
+  color: 0xd9f5fb, roughness: .06, metalness: 0, transmission: .86,
+  transparent: true, opacity: .22, ior: 1.46, thickness: .08,
+  clearcoat: .35, clearcoatRoughness: .06, depthWrite: false,
+});
+const sharedMaterials = new Set<THREE.Material>([steel, lightSteel, dark, teal, amber, fluid, greyFluid, glass]);
 const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 function mesh(parent: THREE.Object3D, geometry: THREE.BufferGeometry, material: THREE.Material, position = v(0, 0, 0)) {
   const object = new THREE.Mesh(geometry, material); object.position.copy(position);
@@ -74,7 +86,10 @@ registerModel('process.tank.vertical', asset => {
   const root = new THREE.Group(), r = asset.parameters.radius, h = asset.parameters.height;
   cylinder(root, r + .08, .15, v(0, 0, .13), dark);
   cylinder(root, r, .08, v(0, 0, .24));
-  const shellMat = steel.clone(); shellMat.side = THREE.DoubleSide;
+  const shellMat = new THREE.MeshPhysicalMaterial({
+    color: 0xc9d7dc, metalness: .38, roughness: .24, transparent: true, opacity: .62,
+    transmission: .08, clearcoat: .35, clearcoatRoughness: .18, side: THREE.DoubleSide, depthWrite: false,
+  });
   const shell = mesh(root, new THREE.CylinderGeometry(r, r, h, 64, 1, true, .7, Math.PI * 2 - 1.4), shellMat, v(0, 0, .28 + h / 2));
   shell.rotation.x = Math.PI / 2;
   for (const z of [.28, .28 + h]) {
@@ -148,4 +163,4 @@ export function createModel(asset: Asset): Model {
   if (!builder) throw new Error(`No 3D renderer for ${asset.type}`);
   return builder(asset);
 }
-export const materials = { steel, dark, teal, fluid, greyFluid };
+export const materials = { steel, dark, teal, fluid, greyFluid, glass };

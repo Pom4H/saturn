@@ -10,6 +10,7 @@ import { compile, patchFields, editable, appendEquipment, appendConnection, appe
 import { catalog, type Endpoint, type Value } from '../src/core';
 import { dslCompletions } from '../src/completion';
 import { SceneView } from '../src/view';
+import { tapPoint } from '../src/geometry';
 import '../src/visual-components';
 import type { SceneView3D } from '../src/view3d';
 import { examples, emptySource, createWorkspace, parseWorkspace, currentDocument, updateSource, createProject, workspaceKey, type ExampleId, type WorkspaceState } from './shell-projects';
@@ -22,6 +23,7 @@ import { updateFiles } from './shell-projects';
 import type { plantProjection } from './plant-project';
 import { downloadFile, exportHTML, shareURL, readSharedSource } from './exports';
 import { fetchServerSession, serverPost, commandPayload, type ServerSession } from './server-runtime';
+import { languageTag, t } from './i18n';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 type Surface = 'scene' | 'equipment' | 'source' | 'signals' | 'controls' | 'alarms' | 'projects';
@@ -43,7 +45,7 @@ export async function mountStudio() {
   let serverRevision: ServerRevision | null = null, pendingRevision: ServerRevision | null = null;
   let serverSession: ServerSession | null = null, runtimeOnly = false, runtimeRevision: string | null = null;
   let documents: Documents;
-  let codeVisible = false, propertiesVisible = false, mobilePane: 'scene' | 'source' | 'properties' = 'scene';
+  let codeVisible = !compact.matches, propertiesVisible = false, mobilePane: 'scene' | 'source' | 'properties' = 'scene';
   let progress = 0, explicit: '2d' | '3d' = '3d', fullscreen = false, scrollBeforeFullscreen = 0;
   let visible = false, paused = reduced.matches, toastTimer = 0;
   let connecting: Endpoint | 'choose' | null = null;
@@ -76,7 +78,7 @@ export async function mountStudio() {
     if (scale > maxScale) view.zoom(scale / maxScale);
   }
   let serverDraft: { revision: ServerRevision; documents: Documents } | null = null;
-  let telemetry: TelemetryUpdate = { state: 'connecting', frame: null, message: '' };
+  let telemetry: TelemetryUpdate = { state: 'connecting', frame: null, message: '', lastSeenAt: null, retryInMs: 0 };
   let observedRuntime: RuntimeFrame | null = null;
   const stream = new SimulationStream(update => {
     telemetry = update;
@@ -99,37 +101,45 @@ export async function mountStudio() {
   }
   function syncTelemetry() {
     if ((serverRevision || runtimeOnly) && plant) stream.start();
-    else { stream.stop(); telemetry = { state: 'connecting', frame: null, message: '' }; }
+    else { stream.stop(); telemetry = { state: 'connecting', frame: null, message: '', lastSeenAt: null, retryInMs: 0 }; }
     applyTelemetry();
   }
   function applyTelemetry() {
     if (!plant || !plantTools) { observedRuntime = null; shell.dataset.telemetry = 'local'; shell.dataset.runtimeSeq = ''; renderRuntimeControls(); renderRuntimeAlarms(); return; }
     const liveFrame = telemetry.frame;
-    let status: string = runtimeOnly ? telemetry.state : 'draft', label = runtimeOnly ? telemetry.message : 'Черновик · без телеметрии';
+    let status: string = runtimeOnly ? telemetry.state : 'draft', label = runtimeOnly ? telemetry.message : t('runtime.draft');
     observedRuntime = plant.runtime;
     const revision = serverRevision?.id ?? runtimeRevision;
     const sourceClean = runtimeOnly || !documents.dirty() && !error;
     if (revision && sourceClean) {
       status = telemetry.state; label = telemetry.message;
-      if (liveFrame && liveFrame.revision !== revision) { status = 'revision'; label = 'Симуляция другой ревизии'; }
+      if (liveFrame && liveFrame.revision !== revision) { status = 'revision'; label = t('runtime.otherRevision'); }
       else if (telemetry.state === 'live' && liveFrame) {
         status = liveFrame.paused ? 'paused' : 'live';
-        label = liveFrame.paused ? 'Симуляция · пауза' : 'Симуляция · подключена';
+        label = liveFrame.paused ? t('runtime.paused') : t('runtime.connected');
         observedRuntime = plantTools.visualFrame(plant.project, liveFrame);
+      } else if (liveFrame && ['stale', 'connecting', 'offline'].includes(telemetry.state)) {
+        status = 'stale';
+        const age = telemetry.lastSeenAt ? Math.max(0, Math.floor((Date.now() - telemetry.lastSeenAt) / 1000)) : 0;
+        const retry = telemetry.retryInMs > 0 ? ` · retry ${Math.ceil(telemetry.retryInMs / 1000)}s` : '';
+        label = `${t('runtime.stale')}${age ? ` · ${age}s` : ''}${retry}`;
+        observedRuntime = plantTools.staleRuntime(plant.project, liveFrame);
       }
-    } else if (serverRevision) label = 'Черновик · данные приостановлены';
-    if (status !== 'live' && status !== 'paused') observedRuntime = plantTools.unavailableRuntime(plant.project, status === 'draft' || status === 'revision' ? 'draft' : 'offline');
-    shell.dataset.telemetry = status; shell.dataset.runtimeSeq = String(status === 'live' || status === 'paused' ? liveFrame?.seq ?? '' : '');
-    $('studio-context').textContent = label || (runtimeOnly ? 'Установка' : 'Черновик'); $('studio-context').title = telemetry.message || label;
+    } else if (serverRevision) label = t('runtime.draftPaused');
+    if (!['live', 'paused', 'stale'].includes(status)) observedRuntime = plantTools.unavailableRuntime(plant.project, status === 'draft' || status === 'revision' ? 'draft' : 'offline');
+    shell.dataset.telemetry = status; shell.dataset.runtimeSeq = String(['live', 'paused', 'stale'].includes(status) ? liveFrame?.seq ?? '' : '');
+    window.dispatchEvent(new CustomEvent('saturn-telemetry-change', { detail: { state: status, lastSeenAt: telemetry.lastSeenAt, retryInMs: telemetry.retryInMs } }));
+    $('studio-context').textContent = label || (runtimeOnly ? t('runtime.installation') : t('runtime.draft')); $('studio-context').title = telemetry.message || label;
     view.setRuntime(observedRuntime); spatial?.setRuntime(observedRuntime);
     animateState();
     renderRuntimeControls(); renderRuntimeAlarms();
     if (surface === 'signals') renderSignals();
   }
   async function runtimeCommand(action: string, extra: Record<string, unknown> = {}) {
-    if (!serverSession || !telemetry.frame || !['live', 'paused'].includes(shell.dataset.telemetry ?? '')) throw new Error('Нет достоверной связи с runtime');
+    if (!serverSession || !telemetry.frame || !['live', 'paused'].includes(shell.dataset.telemetry ?? '')) throw new Error(t('runtime.noReliableLink'));
     const current = { ...serverSession, frame: telemetry.frame };
-    await serverPost(current, 'command', commandPayload(current, action, extra));
+    const payload = commandPayload(current, action, extra);
+    await serverPost(current, 'command', payload, { retryTransport: true });
   }
   function renderRuntimeControls() {
     const host = $('runtime-control-list'); host.replaceChildren();
@@ -177,7 +187,7 @@ export async function mountStudio() {
       const row = document.createElement('article'); row.className = 'runtime-alarm'; row.dataset.active = String(alarm.active);
       const text = document.createElement('div'), title = document.createElement('strong'), meta = document.createElement('small');
       title.textContent = rule?.title ?? alarm.id; meta.textContent = `${rule?.priority ?? 'alarm'} · ${alarm.active ? 'активен' : 'снят'}${alarm.acknowledged ? ' · подтверждён' : ''}`; text.append(title, meta);
-      const time = document.createElement('small'); time.textContent = alarm.raisedAt ? new Date(alarm.raisedAt).toLocaleTimeString('ru-RU') : '—';
+      const time = document.createElement('small'); time.textContent = alarm.raisedAt ? new Date(alarm.raisedAt).toLocaleTimeString(languageTag()) : '—';
       const ack = document.createElement('button'); ack.textContent = alarm.acknowledged ? 'Подтверждён' : 'Подтвердить'; ack.disabled = alarm.acknowledged || serverSession.actor.role === 'viewer' || !['live', 'paused'].includes(shell.dataset.telemetry ?? '');
       ack.onclick = () => void (async () => { try { await runtimeCommand('ack', { target: alarm.id }); toast('Аларм подтверждён'); } catch (e) { toast(e instanceof Error ? e.message : String(e)); } })();
       row.append(text, time, ack); host.append(row);
@@ -194,7 +204,7 @@ export async function mountStudio() {
     compiled = { ...compiled, scene: plant.scene };
     selected = null; filesVisible = false; codeVisible = false; propertiesVisible = false; mobilePane = 'scene';
     view.render(compiled.scene); spatial?.render(compiled.scene);
-    telemetry = { state: 'live', frame: session.frame, message: '' };
+    telemetry = { state: 'live', frame: session.frame, message: '', lastSeenAt: Date.now(), retryInMs: 0 };
     observedRuntime = plant.runtime; view.setRuntime(observedRuntime); spatial?.setRuntime(observedRuntime);
     renderTree(); renderMeta(); setSurface('scene'); syncPanels(); updatePause(); syncTelemetry();
     if (compact.matches) {
@@ -299,7 +309,7 @@ export async function mountStudio() {
         persist(); serverRevision = serverDraft.revision; documents = serverDraft.documents; editor.setState(documents.state);
         pendingRevision = revision.id !== serverRevision.id ? revision : null; refresh(false); renderMeta(); filesVisible = true; syncPanels();
       } else activateServer(revision);
-      serverState.dataset.state = 'ready'; serverState.textContent = `Проверено ${new Date().toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}`;
+      serverState.dataset.state = 'ready'; serverState.textContent = `Проверено ${new Date().toLocaleTimeString(languageTag(), { hour: '2-digit', minute: '2-digit' })}`;
       $('server-error').textContent = ''; $<HTMLDialogElement>('server-dialog').close();
     } catch (e) { const text = e instanceof Error ? e.message : String(e); $('server-error').textContent = text; serverState.dataset.state = 'error'; serverState.textContent = text; if (!$<HTMLDialogElement>('server-dialog').open) toast(text); }
     finally { serverLoading = false; button.removeAttribute('disabled'); $('server-refresh')?.removeAttribute('disabled'); $('file-tree').setAttribute('aria-busy', 'false'); }
@@ -319,6 +329,80 @@ export async function mountStudio() {
     openFile(target.path, true); editor.dispatch({ selection: { anchor: target.from, head: target.to }, scrollIntoView: true }); editor.focus();
   };
   document.querySelectorAll<HTMLButtonElement>('[data-shell-action]').forEach(button => button.onclick = () => { $(button.dataset.shellAction!).click(); button.closest('details')!.open = false; });
+
+  let positionPreview: { id: string; x: number; y: number } | null = null, positionPreviewFrame = 0;
+  function canMoveNode(id: string) {
+    if (error || runtimeOnly) return false;
+    const node = compiled.scene.nodes.find(item => item.id === id);
+    if (!node) return false;
+    if (node.tap) return !isPlant() && editable(compiled, id, 'at') && editable(compiled, id, 'offset');
+    if (isPlant()) {
+      const target = plant?.objects.get(id);
+      return Boolean(target?.fields.some(field => field.key === 'x') && target.fields.some(field => field.key === 'y'));
+    }
+    return editable(compiled, id, 'x') && editable(compiled, id, 'y');
+  }
+  function tapMovePatch(id: string, x: number, y: number): Record<string, number> | null {
+    const node = compiled.scene.nodes.find(item => item.id === id);
+    if (!node?.tap) return null;
+    const route = view.routes.get(node.tap); if (!route || route.points.length < 2) return null;
+    const segments = route.points.slice(1).map((b, i) => {
+      const a = route.points[i], length = Math.hypot(b.x - a.x, b.y - a.y);
+      return { a, b, length };
+    });
+    const horizontal = segments.filter(segment => Math.abs(segment.a.y - segment.b.y) < .01 && segment.length >= 90);
+    const choices = horizontal.length ? horizontal : segments;
+    const total = choices.reduce((sum, segment) => sum + segment.length, 0); if (!total) return null;
+    const currentOffset = Number(node.props.offset);
+    const target = { x: x + 33, y: y + currentOffset };
+    let walked = 0, best: { at: number; x: number; y: number; distance: number } | null = null;
+    for (const segment of choices) {
+      const dx = segment.b.x - segment.a.x, dy = segment.b.y - segment.a.y, length2 = dx * dx + dy * dy;
+      const raw = length2 ? ((target.x - segment.a.x) * dx + (target.y - segment.a.y) * dy) / length2 : 0;
+      const ratio = Math.min(.82, Math.max(.18, raw));
+      const px = segment.a.x + dx * ratio, py = segment.a.y + dy * ratio;
+      const distance = Math.hypot(target.x - px, target.y - py);
+      const at = Math.min(.9, Math.max(.1, (walked + segment.length * ratio) / total));
+      if (!best || distance < best.distance) best = { at, x: px, y: py, distance };
+      walked += segment.length;
+    }
+    if (!best) return null;
+    const field = catalog[node.kind].fields.offset;
+    const offset = Math.min(field.max ?? 240, Math.max(field.min ?? 80, best.y - y));
+    return { at: Number(best.at.toFixed(3)), offset: Math.round(offset) };
+  }
+  function movePatch(id: string, x: number, y: number): Record<string, number> {
+    return tapMovePatch(id, x, y) ?? { x, y };
+  }
+  function previewPosition(id: string, x: number, y: number) {
+    if (!canMoveNode(id)) return;
+    positionPreview = { id, x, y };
+    if (positionPreviewFrame) return;
+    positionPreviewFrame = requestAnimationFrame(() => {
+      positionPreviewFrame = 0;
+      const preview = positionPreview; if (!preview) return;
+      const patch = movePatch(preview.id, preview.x, preview.y);
+      const scene = isPlant() && plant && plantTools && 'x' in patch && 'y' in patch
+        ? plantTools.previewPlantPosition(plant.project, preview.id, patch.x, patch.y)
+        : { ...compiled.scene, nodes: compiled.scene.nodes.map(node => node.id === preview.id ? { ...node, props: { ...node.props, ...patch } } : node) };
+      view.render(scene); spatial?.render(scene); view.select(selected); spatial?.select(selected);
+    });
+  }
+  function restorePositionPreview() {
+    positionPreview = null;
+    if (positionPreviewFrame) cancelAnimationFrame(positionPreviewFrame);
+    positionPreviewFrame = 0;
+    view.render(compiled.scene); spatial?.render(compiled.scene); view.select(selected); spatial?.select(selected);
+  }
+  function commitPosition(id: string, x: number, y: number) {
+    positionPreview = null;
+    if (positionPreviewFrame) cancelAnimationFrame(positionPreviewFrame);
+    positionPreviewFrame = 0;
+    if (!canMoveNode(id)) { restorePositionPreview(); return; }
+    const patch = movePatch(id, x, y);
+    if (isPlant()) patchPlantFields(id, patch); else fields(id, patch);
+  }
+
   function showFiles(toggle = false) { filesVisible = surface !== 'scene' || !toggle || !filesVisible; if (surface !== 'scene') setSurface('scene'); syncPanels(); saveLayout(); }
   $('files-toggle').onclick = () => showFiles(true);
   $('files-close').onclick = () => { filesVisible = false; syncPanels(); saveLayout(); };
@@ -368,7 +452,7 @@ export async function mountStudio() {
       const csrf = serverSession.csrf;
       const status = await serverPost<Omit<ServerSession, 'csrf'>>(serverSession, 'publish', { revision: serverRevision.id, expected: serverSession.desired });
       serverSession = { ...status, csrf };
-      telemetry = { state: 'live', frame: status.frame, message: '' };
+      telemetry = { state: 'live', frame: status.frame, message: '', lastSeenAt: Date.now(), retryInMs: 0 };
       runtimeRevision = null;
       syncTelemetry(); renderMeta(); toast('Ревизия опубликована и применена');
     } catch (e) { toast(e instanceof Error ? e.message : String(e)); }
@@ -524,9 +608,9 @@ export async function mountStudio() {
     if (plant) {
       for (const device of plant.project.devices) for (const name of Object.keys(device.signals)) {
         const signal = observedRuntime?.equipment[device.id]?.signals[name];
-        const good = signal?.quality === 'good' && signal.value !== null;
-        const value = good ? `${typeof signal.value === 'number' ? Number(signal.value.toFixed(3)) : signal.value} ${signal.unit}` : '—';
-        const source = ['live', 'paused'].includes(shell.dataset.telemetry ?? '') ? `Симуляция · ${signal?.quality ?? 'offline'}` : $('studio-context').textContent ?? 'Нет данных';
+        const readable = (signal?.quality === 'good' || signal?.quality === 'stale') && signal.value !== null;
+        const value = readable ? `${typeof signal.value === 'number' ? Number(signal.value.toFixed(3)) : signal.value} ${signal.unit}` : '—';
+        const source = ['live', 'paused', 'stale'].includes(shell.dataset.telemetry ?? '') ? `${t('runtime.simulation')} · ${signal?.quality ?? 'offline'}` : $('studio-context').textContent ?? t('runtime.noData');
         const row = document.createElement('tr'); row.dataset.signal = `${device.id}.${name}`; row.dataset.quality = signal?.quality ?? 'offline';
         for (const cell of [device.id, name, value, source]) { const td = document.createElement('td'); td.textContent = cell; row.append(td); } rows.append(row);
       }
@@ -542,15 +626,15 @@ export async function mountStudio() {
     const list = $('project-list'); list.replaceChildren();
     if (!workspace.projects.length) {
       const empty = document.createElement('div'); empty.className = 'project-empty';
-      const heading = document.createElement('strong'); heading.textContent = 'Нет проектов';
-      const text = document.createElement('p'); text.textContent = 'Создайте проект из примера.';
+      const heading = document.createElement('strong'); heading.textContent = t('project.none');
+      const text = document.createElement('p'); text.textContent = t('project.createFromExample');
       empty.append(heading, text); list.append(empty);
     }
     for (const project of [...workspace.projects].reverse()) {
       const button = document.createElement('button'); button.className = 'project-card'; button.dataset.projectId = project.id;
       const symbol = document.createElement('span'); symbol.className = 'project-symbol'; symbol.innerHTML = '<svg><use href="#i-folder"/></svg>';
       const content = document.createElement('div'), name = document.createElement('strong'), meta = document.createElement('small');
-      name.textContent = project.title; meta.textContent = new Date(project.updatedAt).toLocaleDateString('ru-RU');
+      name.textContent = project.title; meta.textContent = new Date(project.updatedAt).toLocaleDateString(languageTag());
       content.append(name, meta); const arrow = document.createElement('span'); arrow.textContent = '↗';
       button.append(symbol, content, arrow); button.onclick = async () => { if (project.files?.['plant.ts']) await ensurePlant(); switchDocument({ kind: 'project', id: project.id }); }; list.append(button);
     }
@@ -598,13 +682,16 @@ export async function mountStudio() {
   }
   function revealShell() { if (!fullscreen) stage.scrollIntoView({ block: 'start', behavior: reduced.matches ? 'instant' : 'smooth' }); }
   function setFullscreen(enabled: boolean) {
+    const control = $('shell-fullscreen');
+    control.setAttribute('aria-label', enabled ? t('common.backToLanding') : t('common.fullscreen'));
+    control.setAttribute('title', control.getAttribute('aria-label')!);
+    control.querySelector('use')!.setAttribute('href', enabled ? '#i-collapse' : '#i-expand');
     if (fullscreen === enabled) return;
     if (enabled) scrollBeforeFullscreen = scrollY;
     fullscreen = enabled; document.body.classList.toggle('shell-fullscreen', enabled);
     for (const node of document.querySelectorAll<HTMLElement>('.site-header,.hero')) node.inert = enabled;
-    const control = $('shell-fullscreen'); control.setAttribute('aria-label', enabled ? 'Вернуться на лендинг' : 'Развернуть на весь экран'); control.setAttribute('title', control.getAttribute('aria-label')!);
-    control.querySelector('use')!.setAttribute('href', enabled ? '#i-collapse' : '#i-expand');
     if (enabled) { if (!compact.matches && !runtimeOnly) codeVisible = true; syncPanels(); } else window.scrollTo({ top: scrollBeforeFullscreen, behavior: 'instant' });
+    spatial?.setEmbedded(!enabled);
     visible = true; animateState(); documentTitle();
     requestAnimationFrame(() => { editor.requestMeasure(); spatial?.fit(); });
   }
@@ -659,7 +746,7 @@ export async function mountStudio() {
     const target = (event.target as Element); if (target.closest('[data-port]')) return;
     const object = target.closest('[data-node], [data-edge]'); if (object) select(object.getAttribute('data-node') ?? object.getAttribute('data-edge'));
   });
-  let drag: { id: string; x: number; y: number; startX: number; startY: number; dx: number; dy: number; element: SVGGElement; transform: string } | null = null;
+  let drag: { id: string; x: number; y: number; startX: number; startY: number; dx: number; dy: number } | null = null;
   let pan: { x: number; y: number; cameraX: number; cameraY: number } | null = null;
   canvas.addEventListener('pointerdown', event => {
     if (event.button !== 0) return;
@@ -670,19 +757,26 @@ export async function mountStudio() {
     const node = compiled.scene.nodes.find(n => n.id === element?.dataset.node);
     const point = view.point(event.clientX, event.clientY);
     if (!element || !node) { if (event.pointerType === 'mouse' || fullscreen) { pan = { x: event.clientX, y: event.clientY, cameraX: view.camera.x, cameraY: view.camera.y }; canvas.setPointerCapture(event.pointerId); } return; }
-    if (isPlant() || runtimeOnly) { select(node.id); return; }
-    if (error || node.tap || !editable(compiled, node.id, 'x') || !editable(compiled, node.id, 'y')) return;
-    drag = { id: node.id, x: Number(node.props.x), y: Number(node.props.y), startX: point.x, startY: point.y, dx: 0, dy: 0, element, transform: element.getAttribute('transform') ?? '' };
-    canvas.setPointerCapture(event.pointerId); select(node.id);
+    select(node.id);
+    if (!canMoveNode(node.id)) return;
+    const tap = node.tap ? view.routes.get(node.tap) : null, attached = tap ? tapPoint(tap, Number(node.props.at)) : null;
+    drag = { id: node.id, x: attached ? attached.x - 33 : Number(node.props.x), y: attached ? attached.y - Number(node.props.offset) : Number(node.props.y), startX: point.x, startY: point.y, dx: 0, dy: 0 };
+    canvas.setPointerCapture(event.pointerId); event.preventDefault();
   });
   canvas.addEventListener('pointermove', event => {
     if (pan) { const a = view.point(pan.x, pan.y), b = view.point(event.clientX, event.clientY); view.setCamera({ ...view.camera, x: pan.cameraX + a.x - b.x, y: pan.cameraY + a.y - b.y }); return; }
     if (!drag) return;
     const point = view.point(event.clientX, event.clientY); drag.dx = point.x - drag.startX; drag.dy = point.y - drag.startY;
-    drag.element.setAttribute('transform', `translate(${drag.dx} ${drag.dy}) ${drag.transform}`);
+    previewPosition(drag.id, Math.round(drag.x + drag.dx), Math.round(drag.y + drag.dy));
   });
-  canvas.addEventListener('pointerup', () => { pan = null; if (!drag) return; const d = drag; drag = null; d.element.setAttribute('transform', d.transform); if (Math.hypot(d.dx, d.dy) > 2) fields(d.id, { x: Math.round(d.x + d.dx), y: Math.round(d.y + d.dy) }); else renderInspector(); });
-  canvas.addEventListener('pointercancel', () => { pan = null; if (drag) drag.element.setAttribute('transform', drag.transform); drag = null; });
+  canvas.addEventListener('pointerup', event => {
+    pan = null; if (!drag) return;
+    const d = drag; drag = null;
+    if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    if (Math.hypot(d.dx, d.dy) > 2) commitPosition(d.id, Math.round(d.x + d.dx), Math.round(d.y + d.dy));
+    else { restorePositionPreview(); renderInspector(); }
+  });
+  canvas.addEventListener('pointercancel', event => { pan = null; drag = null; if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId); restorePositionPreview(); });
   canvas.addEventListener('wheel', event => { if (!fullscreen && !event.ctrlKey && !event.metaKey) return; event.preventDefault(); const before = view.point(event.clientX, event.clientY); view.zoom(Math.exp(event.deltaY * .0015)); const after = view.point(event.clientX, event.clientY); view.setCamera({ ...view.camera, x: view.camera.x + before.x - after.x, y: view.camera.y + before.y - after.y }); }, { passive: false });
   function clearConnection() { connecting = null; shell.classList.remove('connecting'); $('studio-connect').setAttribute('aria-pressed', 'false'); $('studio-mode-note').textContent = ''; $('studio-mode-note').hidden = true; }
   function choosePort(node: string, port: string) {
@@ -725,7 +819,7 @@ export async function mountStudio() {
     catch (e) { toast(e instanceof Error ? e.message : String(e)); }
   };
   function animateState() { const active = (visible || fullscreen) && !document.hidden && !['signals', 'controls', 'alarms', 'projects'].includes(surface); const stopped = isPlant() || runtimeOnly ? shell.dataset.telemetry !== 'live' : paused; view.paused = stopped || !active; if (spatial) spatial.paused = stopped || !active || progress >= 1; }
-  function updatePause() { $('studio-play').hidden = isPlant() || runtimeOnly; $('studio-play').innerHTML = `<svg aria-hidden="true"><use href="#i-${paused ? 'play' : 'pause'}"/></svg>`; $('studio-play').title = paused ? 'Запустить демонстрацию' : 'Приостановить демонстрацию'; $('studio-play').setAttribute('aria-label', $('studio-play').title); $('studio-play').setAttribute('aria-pressed', String(!paused)); }
+  function updatePause() { $('studio-play').hidden = isPlant() || runtimeOnly; $('studio-play').innerHTML = `<svg aria-hidden="true"><use href="#i-${paused ? 'play' : 'pause'}"/></svg>`; $('studio-play').title = t(paused ? 'canvas.runDemo' : 'canvas.pauseDemo'); $('studio-play').setAttribute('aria-label', $('studio-play').title); $('studio-play').setAttribute('aria-pressed', String(!paused)); }
   $('studio-play').onclick = () => { paused = !paused; animateState(); updatePause(); };
   document.addEventListener('visibilitychange', animateState);
   reduced.addEventListener('change', () => { if (reduced.matches) paused = true; updatePause(); animateState(); });
@@ -774,6 +868,11 @@ export async function mountStudio() {
     spatial?.fit(); animateState();
   }
   window.addEventListener('resize', () => { spatial?.fit(); syncPanels(); });
+  window.addEventListener('saturn-language-change', () => {
+    spatial?.setHint(t(compact.matches ? 'scene3d.hintTouch' : 'scene3d.hint'));
+    spatial?.setMessages({ preview: t('scene3d.preview'), noData: t('scene3d.noData'), moreAlarms: t('scene3d.moreAlarms') });
+    updatePause(); setFullscreen(fullscreen); applyTelemetry(); if (surface === 'projects') renderProjects();
+  });
   const observer = new IntersectionObserver(entries => { visible = entries[0].isIntersecting; animateState(); }, { rootMargin: '80px' }); observer.observe(stage);
   window.addEventListener('pagehide', persist);
   window.addEventListener('saturn-before-update', event => {
@@ -781,12 +880,22 @@ export async function mountStudio() {
     if (!storageAvailable || serverRevision && documents.dirty() || serverDraft?.documents.dirty()) event.preventDefault();
   });
   window.addEventListener('beforeunload', event => { if (serverRevision && documents.dirty() || serverDraft?.documents.dirty()) { event.preventDefault(); event.returnValue = ''; } });
-  try { const layout = JSON.parse(localStorage.getItem('saturn.shell.layout.v1') ?? '{}'); filesVisible = layout.filesVisible === true; codeVisible = layout.codeVisible === true; if (/^\d+(\.\d+)?px$/.test(layout.navigatorWidth ?? '')) shell.style.setProperty('--navigator-width', layout.navigatorWidth); if (/^\d+(\.\d+)?px$/.test(layout.sourceWidth ?? '')) shell.style.setProperty('--source-width', layout.sourceWidth); } catch {}
+  try {
+    const layout = JSON.parse(localStorage.getItem('saturn.shell.layout.v1') ?? '{}');
+    if ('filesVisible' in layout) filesVisible = layout.filesVisible === true;
+    if ('codeVisible' in layout) codeVisible = layout.codeVisible === true;
+    if (/^\d+(\.\d+)?px$/.test(layout.navigatorWidth ?? '')) shell.style.setProperty('--navigator-width', layout.navigatorWidth);
+    if (/^\d+(\.\d+)?px$/.test(layout.sourceWidth ?? '')) shell.style.setProperty('--source-width', layout.sourceWidth);
+  } catch {}
   if (isPlant()) await ensurePlant();
-  view.render(compiled.scene); refresh(false); fitScene(); updatePause(); renderMeta();
+  view.render(compiled.scene); refresh(false); fitScene(); updatePause(); renderMeta(); syncPanels();
   message(storageAvailable ? '' : 'Хранилище недоступно');
   try {
     const { SceneView3D } = await import('../src/view3d'); spatial = new SceneView3D(spatialHost, { landing: true }); spatial.onSelect = select;
+    spatial.canMove = id => !connecting && canMoveNode(id);
+    spatial.onMove = (id, x, y, commit) => commit ? commitPosition(id, x, y) : previewPosition(id, x, y);
+    spatial.setHint(t(compact.matches ? 'scene3d.hintTouch' : 'scene3d.hint'));
+    spatial.setMessages({ preview: t('scene3d.preview'), noData: t('scene3d.noData'), moreAlarms: t('scene3d.moreAlarms') });
     spatial.render(compiled.scene); spatial.setRuntime(observedRuntime ?? plant?.runtime ?? null); spatial.select(selected); setMode(explicit);
   } catch { $('studio-3d').setAttribute('disabled', ''); present(1); toast('WebGL недоступен. Работайте с 2D-схемой.'); }
   const requestedServer = !shared && new URLSearchParams(location.search).get('project') === 'server';
