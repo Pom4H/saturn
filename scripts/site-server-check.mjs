@@ -23,7 +23,7 @@ export async function checkServerFiles(browser) {
     // documentation and configuration without replacing the operational project.
     const documentPath = 'docs/operations/README.md';
     const fixtures = {
-      [documentPath]: '# Operations\n\nSERVER_BASELINE_REVISION\n',
+      [documentPath]: '# Operations\r\n\r\nSERVER_BASELINE_REVISION\r\n',
       'config/areas/cooling.json': '{"area":"cooling","revision":1}\n',
       'lib/helpers/labels.ts': 'export const labels = { pump: "P-01", area: "Cooling" };\n',
     };
