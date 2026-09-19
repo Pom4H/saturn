@@ -183,7 +183,7 @@ export async function checkServerFiles(browser) {
     assert(!(await operatorPage.locator('#studio-code').isVisible()), 'Operator does not see the code editor');
     assert(await operatorPage.locator('#project-trigger').isDisabled(), 'Runtime installation selector is read-only for operator');
     assert.equal(await operatorPage.locator('#studio-svg [data-node]').count(), app.service.project.devices.length);
-    const visibleRuntimeNode = operatorPage.locator('#studio-svg [data-node]').filter({ visible: true }).first();
+    const visibleRuntimeNode = operatorPage.locator('#studio-svg [data-node]:visible').first();
     const nodeBox = await visibleRuntimeNode.boundingBox();
     assert(nodeBox && nodeBox.width >= 24 && nodeBox.height >= 18, 'Mobile runtime fit keeps equipment readable');
     const topbarBox = await operatorPage.locator('.shell-topbar').boundingBox();
