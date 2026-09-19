@@ -26,6 +26,7 @@ export async function fetchServerSession(): Promise<ServerSession> {
     redirect: 'error',
     signal: AbortSignal.timeout(12000),
   });
+  if (response.status === 401 || response.status === 403) throw new Error('Войдите на сервер, затем повторите подключение.');
   const session = await json<ServerSession>(response);
   if (!session || session.mode !== 'simulation' || !session.actor || !session.project || !session.frame || typeof session.csrf !== 'string') {
     throw new Error('Неверный ответ сервера');
