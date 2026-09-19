@@ -866,7 +866,11 @@ export async function mountStudio() {
     spatial?.fit(); animateState();
   }
   window.addEventListener('resize', () => { spatial?.fit(); syncPanels(); });
-  window.addEventListener('saturn-language-change', () => { spatial?.setHint(t(compact.matches ? 'scene3d.hintTouch' : 'scene3d.hint')); updatePause(); setFullscreen(fullscreen); applyTelemetry(); if (surface === 'projects') renderProjects(); });
+  window.addEventListener('saturn-language-change', () => {
+    spatial?.setHint(t(compact.matches ? 'scene3d.hintTouch' : 'scene3d.hint'));
+    spatial?.setMessages({ preview: t('scene3d.preview'), noData: t('scene3d.noData'), moreAlarms: t('scene3d.moreAlarms') });
+    updatePause(); setFullscreen(fullscreen); applyTelemetry(); if (surface === 'projects') renderProjects();
+  });
   const observer = new IntersectionObserver(entries => { visible = entries[0].isIntersecting; animateState(); }, { rootMargin: '80px' }); observer.observe(stage);
   window.addEventListener('pagehide', persist);
   window.addEventListener('saturn-before-update', event => {
@@ -889,6 +893,7 @@ export async function mountStudio() {
     spatial.canMove = id => !connecting && canMoveNode(id);
     spatial.onMove = (id, x, y, commit) => commit ? commitPosition(id, x, y) : previewPosition(id, x, y);
     spatial.setHint(t(compact.matches ? 'scene3d.hintTouch' : 'scene3d.hint'));
+    spatial.setMessages({ preview: t('scene3d.preview'), noData: t('scene3d.noData'), moreAlarms: t('scene3d.moreAlarms') });
     spatial.render(compiled.scene); spatial.setRuntime(observedRuntime ?? plant?.runtime ?? null); spatial.select(selected); setMode(explicit);
   } catch { $('studio-3d').setAttribute('disabled', ''); present(1); toast('WebGL недоступен. Работайте с 2D-схемой.'); }
   const requestedServer = !shared && new URLSearchParams(location.search).get('project') === 'server';
