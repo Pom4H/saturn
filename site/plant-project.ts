@@ -41,6 +41,17 @@ export function unavailableRuntime(project: Project, mode: 'draft' | 'offline' =
   for (const equipment of Object.values(runtime.equipment)) { equipment.facts.mode = mode; for (const signal of Object.values(equipment.signals)) { signal.quality = 'offline'; signal.value = null; } }
   return runtime;
 }
+
+/** Preserve the last confirmed values while making their age explicit and non-actionable. */
+export function staleRuntime(project: Project, frame: Frame) {
+  const runtime = visualFrame(project, frame);
+  for (const equipment of Object.values(runtime.equipment)) {
+    equipment.facts.mode = 'stale';
+    for (const signal of Object.values(equipment.signals)) if (signal.quality === 'good') signal.quality = 'stale';
+  }
+  for (const signal of Object.values(runtime.flows)) if (signal.quality === 'good') signal.quality = 'stale';
+  return runtime;
+}
 export function plantProjection(files: Record<string, string>) {
   const project = compileProject(files); installEquipment();
   return { project, scene: sceneFor(project), runtime: unavailableRuntime(project), objects: sourceObjects(files) };
