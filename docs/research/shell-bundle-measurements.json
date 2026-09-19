@@ -1,0 +1,87 @@
+{
+  "measuredAt": "2026-09-19T10:11:19.539Z",
+  "node": "v26.4.0",
+  "esbuild": "0.28.2",
+  "method": "browser ESM ES2022; minify; named exports retained; gzip level 9; library CSS/themes; PNG data URLs; legal comments excluded; no application, editor, renderer or HTML",
+  "packages": {
+    "@lumino/algorithm": "2.0.5",
+    "@lumino/collections": "2.0.5",
+    "@lumino/commands": "2.3.4",
+    "@lumino/coreutils": "2.2.3",
+    "@lumino/default-theme": "2.1.16",
+    "@lumino/disposable": "2.1.6",
+    "@lumino/domutils": "2.0.5",
+    "@lumino/dragdrop": "2.1.9",
+    "@lumino/keyboard": "2.0.5",
+    "@lumino/messaging": "2.0.5",
+    "@lumino/properties": "2.0.5",
+    "@lumino/signaling": "2.1.6",
+    "@lumino/virtualdom": "2.0.5",
+    "@lumino/widgets": "2.9.0",
+    "dockview": "8.3.1",
+    "dockview-core": "8.3.1",
+    "golden-layout": "2.6.0"
+  },
+  "cases": {
+    "dockview": {
+      "sizes": [
+        {
+          "type": "js",
+          "bytes": 348945,
+          "gzipBytes": 82849
+        },
+        {
+          "type": "css",
+          "bytes": 132503,
+          "gzipBytes": 10333
+        }
+      ],
+      "modules": 4
+    },
+    "luminoDock": {
+      "sizes": [
+        {
+          "type": "js",
+          "bytes": 190089,
+          "gzipBytes": 48454
+        },
+        {
+          "type": "css",
+          "bytes": 14796,
+          "gzipBytes": 3473
+        }
+      ],
+      "modules": 39
+    },
+    "luminoShell": {
+      "sizes": [
+        {
+          "type": "js",
+          "bytes": 190174,
+          "gzipBytes": 48496
+        },
+        {
+          "type": "css",
+          "bytes": 14796,
+          "gzipBytes": 3473
+        }
+      ],
+      "modules": 39
+    },
+    "goldenLayout": {
+      "sizes": [
+        {
+          "type": "js",
+          "bytes": 128366,
+          "gzipBytes": 30201
+        },
+        {
+          "type": "css",
+          "bytes": 8446,
+          "gzipBytes": 2207
+        }
+      ],
+      "modules": 41
+    }
+  }
+}

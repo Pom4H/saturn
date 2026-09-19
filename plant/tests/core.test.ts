@@ -9,6 +9,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createECDH, randomBytes } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { compileProject, validateProject } from '../compiler';
 import { demoFiles } from '../demo/files';
 import { Kernel, evaluate } from '../kernel';
@@ -54,6 +55,23 @@ test('command idempotency, permissions and checkpoint restore', async () => { co
     s.tick(); const copy = s.frame(); const resumed = new Service(s.store, s.repository, { reportRunner: async (task) => executeReport(task, new NodeSql()) }); await resumed.start(demoFiles); assert.deepEqual(resumed.frame(), copy); assert.equal(s.store.db.all('SELECT * FROM commands').length, 1); s.store.db.close(); });
 test('local repository CAS and release rollback preserve old observations', async () => { const s = await makeService(), old = await s.repository.head(); for (let i = 0; i < 10; i++)
     s.tick(); const before = s.frame(), files = { ...demoFiles, 'cooling.ts': demoFiles['cooling.ts'].replace('voltage: 1', 'voltage: 0.4') }; const revision = await s.save(files, old, 'New supply', engineer); await assert.rejects(s.save(files, old, 'Stale draft', engineer), /changed/); await s.publish(revision.id, old, engineer); assert.notEqual(s.frame().runId, before.runId); await s.rollback(old!, revision.id, engineer); assert.equal(s.project.simulations.find(n => n.id === 'GRID')!.parameters.voltage, 1); assert.ok(s.store.db.all('SELECT * FROM samples WHERE run_id=?', [before.runId]).length > 0); const bad = { ...demoFiles, 'plant.ts': 'throw new Error()' }; await assert.rejects(s.save(bad, await s.repository.head(), 'Invalid', engineer)); s.store.db.close(); });
+test('nested installation repository never discovers or modifies its source checkout', async () => {
+    const parent = await mkdtemp(join(tmpdir(), 'scada-nested-git-test-'));
+    try {
+        execFileSync('git', ['init', parent], { stdio: 'ignore' });
+        const directory = join(parent, 'data-plant', 'project.git');
+        const repository = await new GitRepository(directory).initialize();
+        assert.equal(await repository.head(), null);
+        const first = await repository.commit(demoFiles, null, 'First installation', engineer.id);
+        await repository.publish(first.id, null);
+        const reopened = await new GitRepository(directory).initialize();
+        assert.equal(await reopened.desired(), first.id);
+        assert.deepEqual((await reopened.read(first.id)).files, demoFiles);
+        assert.equal(execFileSync('git', ['-C', parent, 'for-each-ref', '--format=%(refname)'], { encoding: 'utf8' }), '');
+        await assert.rejects(new GitRepository(parent).initialize());
+        assert.equal(execFileSync('git', ['-C', parent, 'rev-parse', '--is-bare-repository'], { encoding: 'utf8' }).trim(), 'false');
+    } finally { await rm(parent, { recursive: true, force: true }); }
+});
 test('Git adapter uses real commits, CAS refs, immutable UTF-8 files and durable release', async () => { const dir = await mkdtemp(join(tmpdir(), 'scada-git-test-')); try {
     const repo = await new GitRepository(dir).initialize();
     const first = await repo.commit(demoFiles, null, 'Начальная версия', engineer.id);
@@ -86,6 +104,19 @@ test('native report worker runs the same capsule with bounded execution', async 
 test('Web Push allowlist, per-session subscription, expired endpoint handling', async () => { assert.equal(allowedPushEndpoint('https://127.0.0.1/api'), false); assert.equal(allowedPushEndpoint('http://fcm.googleapis.com/x'), false); assert.equal(allowedPushEndpoint('https://fcm.googleapis.com.evil.test/x'), false); const store = new Store(new NodeSql()), auth = new Auth(store); auth.seed('engineer', 'password-for-tests'); const login = auth.login('engineer', 'password-for-tests', 'local'), session = auth.session(`scada_session=${login.token}`); const ecdh = createECDH('prime256v1'); ecdh.generateKeys(); const subscription = { endpoint: 'https://fcm.googleapis.com/fcm/send/test', keys: { p256dh: ecdh.getPublicKey().toString('base64url'), auth: randomBytes(16).toString('base64url') } }; let sent = 0; const push = new Push(store, 'mailto:operator@example.org', (async (_s: unknown, payload: unknown) => { sent++; assert.ok(!payload?.toString().includes('temperature')); throw Object.assign(new Error('Expired'), { statusCode: 410 }); }) as any); push.subscribe(subscription, engineer, session.sessionId); store.notify('notice', Date.now(), 'alarm', 'temperature'); await push.flush(); assert.equal(sent, 1); assert.equal(store.db.all('SELECT * FROM subscriptions').length, 0); assert.equal(store.db.all('SELECT status FROM deliveries')[0].status, 'expired'); auth.logout(session.sessionId); assert.throws(() => auth.session(`scada_session=${login.token}`), /expired/); store.db.close(); });
 test('HTTP auth, CSRF, private HTML, SQL reports, SSE and revocation', async () => { const dir = await mkdtemp(join(tmpdir(), 'scada-http-test-')); const app = await startPlantServer({ port: 0, data: join(dir, 'db.sqlite'), repository: join(dir, 'repo.git'), password: 'password-for-http-tests', autoTick: false }); try {
     const base = app.origin + '/plant/';
+    const landing = await fetch(app.origin + '/');
+    assert.equal(landing.status, 200);
+    const landingHTML = await landing.text();
+    assert.ok(landingHTML.includes('hero-title'));
+    assert.equal((await fetch(app.origin + '/', { method: 'HEAD' })).status, 200);
+    const scriptPath = landingHTML.match(/<script[^>]+src="(\/site\/assets\/site-[^"]+\.js)"/)?.[1];
+    assert.ok(scriptPath, 'Landing references its built module');
+    const landingScript = await fetch(app.origin + scriptPath);
+    assert.equal(landingScript.status, 200);
+    assert.equal(landingScript.headers.get('content-type'), 'text/javascript');
+    const starter = await fetch(app.origin + '/site/assets/first-pump.json');
+    assert.equal(starter.status, 200);
+    assert.equal(compileProject(await starter.json() as Record<string, string>).id, 'first-pump');
     const unauth = await fetch(base + 'app/', { redirect: 'manual' });
     assert.equal(unauth.status, 302);
     assert.equal((await fetch(base + 'api/session')).status, 401);

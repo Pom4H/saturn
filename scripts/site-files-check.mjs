@@ -1,0 +1,93 @@
+import assert from 'node:assert/strict';
+export async function checkFiles(browser, origin) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' });
+  const page = await context.newPage(), errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto(origin);
+  await page.locator('#project-trigger').click(); await page.locator('[data-project="template:plant"]').click();
+  await page.waitForFunction(() => document.getElementById('studio-shell').dataset.projectKind === 'plant');
+  assert.equal(await page.locator('#file-tree [data-file]').count(), 4);
+  assert(await page.locator('#file-tree [data-folder]').filter({ hasText: 'systems' }).isVisible());
+  await page.locator('#shell-fullscreen').click();
+  await page.locator('#studio-2d').click();
+  await page.locator('[data-file="systems/pumping.ts"]').click();
+  await page.locator('#studio-svg [data-node="PUMP-01"]').press('Enter');
+  const inertia = page.getByRole('spinbutton', { name: 'PUMP-01: inertia', exact: true });
+  await inertia.fill('2.4'); await inertia.press('Tab');
+  const source = page.locator('#studio-editor .cm-content');
+  assert((await source.innerText()).includes('inertia: 2.4'));
+  await page.locator('[data-file="views.ts"]').click();
+  await page.locator('[data-file="systems/pumping.ts"]').click();
+  await page.locator('#studio-undo').click(); assert.equal(await inertia.inputValue(), '1.6');
+  await page.locator('#studio-redo').click(); assert.equal(await inertia.inputValue(), '2.4');
+  await page.locator('[data-file="README.md"]').click();
+  await page.locator('#object-source').click();
+  assert.equal(await page.locator('#file-path').textContent(), 'systems/pumping.ts');
+  assert((await page.evaluate(() => getSelection()?.toString()))?.includes('simulation'));
+  await page.locator('[data-file="views.ts"]').click();
+  await source.press('ControlOrMeta+End'); await source.press('Enter'); await source.pressSequentially('invalid(');
+  await page.waitForFunction(() => document.getElementById('studio-diagnostics').dataset.error === 'true');
+  assert.equal(await page.locator('#studio-svg [data-node]').count(), 1, 'Last valid scene survives imported-module error');
+  await page.locator('#studio-undo').click();
+  await page.waitForFunction(() => document.getElementById('studio-diagnostics').dataset.error === 'false');
+  await page.locator('#inspector-close').click();
+  await page.locator('[data-file="systems/pumping.ts"]').click();
+  await page.screenshot({ path: 'test-results/site-studio/files-desktop.png' });
+  const workspace = await page.evaluate(() => JSON.parse(localStorage.getItem('saturn.shell.workspace.v1')));
+  const fixture = workspace.projects.at(-1).files;
+  assert(fixture['systems/pumping.ts'].includes('inertia: 2.4'));
+  await page.reload();
+  await page.waitForFunction(() => document.getElementById('studio-shell').dataset.projectKind === 'plant');
+  await page.locator('#files-toggle').click();
+  await page.locator('[data-file="systems/pumping.ts"]').click();
+  assert((await source.innerText()).includes('inertia: 2.4'), 'Local multi-file source survives reload');
+  // The real server contract, including authentication errors and changing immutable revisions.
+  let revision = { id: 'revision-one', parent: null, actor: 'engineer', time: 1, message: 'Initial', files: fixture }, denied = true;
+  await page.route('**/plant/api/session', async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      actor: { id: 'engineer', role: 'engineer' }, mode: 'simulation',
+      project: { title: 'Fixture installation', controls: [], alarms: [] },
+      frame: { synthetic: true, runId: 'fixture-run', revision: revision.id, seq: 1, time: 1, paused: false, samples: {}, alarms: [], displays: {} },
+      head: revision.id, desired: revision.id, healthy: true, releaseError: '', overrides: {}, csrf: 'fixture-csrf',
+    }) });
+  });
+  await page.route('**/plant/api/project', async route => {
+    assert.equal(route.request().method(), 'GET');
+    await route.fulfill({ status: denied ? 403 : 200, contentType: 'application/json', body: JSON.stringify(denied ? { error: 'permission' } : revision) });
+  });
+  await page.locator('.export-options').evaluate(menu => menu.open = true); await page.locator('#server-open').click(); await page.locator('#server-load').click();
+  await page.waitForFunction(() => document.getElementById('server-error').textContent.includes('ролью инженера'));
+  assert.equal(await page.locator('#studio-shell').getAttribute('data-server-project'), 'false');
+  denied = false; await page.locator('#server-load').click();
+  await page.waitForFunction(() => document.getElementById('studio-shell').dataset.serverProject === 'true');
+  const before = await page.evaluate(() => localStorage.getItem('saturn.shell.workspace.v1'));
+  await page.locator('#studio-2d').click();
+  await page.locator('#studio-svg [data-node="PUMP-01"]').press('Enter');
+  await inertia.fill('3.2'); await inertia.press('Tab');
+  assert.equal(await page.evaluate(() => window.dispatchEvent(new Event('saturn-before-update', { cancelable: true }))), false, 'Update must not discard dirty server source');
+  assert.equal(await page.evaluate(() => localStorage.getItem('saturn.shell.workspace.v1')), before, 'Server sources must not silently persist to public local workspace');
+  revision = { ...revision, id: 'revision-two', parent: 'revision-one', files: { ...fixture, 'systems/pumping.ts': fixture['systems/pumping.ts'].replace('inertia: 2.4', 'inertia: 4.8') } };
+  await page.locator('#server-refresh').click();
+  await page.waitForSelector('#server-update', { state: 'visible' });
+  assert(await page.locator('#server-apply').isDisabled()); assert.equal(await inertia.inputValue(), '3.2');
+  await page.locator('#studio-undo').click(); assert.equal(await inertia.inputValue(), '2.4');
+  await page.locator('#server-apply').click();
+  await page.locator('#studio-svg [data-node="PUMP-01"]').press('Enter');
+  assert.equal(await inertia.inputValue(), '4.8');
+  await inertia.fill('5.6'); await inertia.press('Tab');
+  await page.locator('#project-create').click(); await page.locator('#project-name').fill('Копия сервера'); await page.locator('#project-form button[type=submit]').click();
+  assert.equal(await page.locator('#studio-shell').getAttribute('data-server-project'), 'false');
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('saturn.shell.workspace.v1')));
+  assert(saved.projects.at(-1).files['systems/pumping.ts'].includes('inertia: 5.6'));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('#mobile-scene').click();
+  if (!await page.locator('#file-browser').isVisible()) await page.locator('#files-toggle').click();
+  await page.locator('[data-file="views.ts"]').click();
+  assert(!await page.locator('#file-browser').isVisible()); assert(await source.isVisible());
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+  await page.screenshot({ path: 'test-results/site-studio/files-mobile.png' });
+  assert.deepEqual(errors, []);
+  await context.close();
+  console.log('PASS: real nested files; per-document undo/redo; source navigation; multi-file diagnostics and persistence; authenticated server contract; protected drafts and revision update; independent local copy; mobile files.');
+  return fixture;
+}

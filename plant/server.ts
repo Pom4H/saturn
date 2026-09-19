@@ -66,7 +66,8 @@ export async function startPlantServer(options: {
             if (req.method === 'POST' && req.headers.origin !== origin)
                 throw new AppError('Cross-origin write blocked', 403);
             if (path === '/') {
-                res.writeHead(302, { Location: `${prefix}/app/`, 'Cache-Control': 'no-store' }).end();
+                if (!['GET', 'HEAD'].includes(req.method ?? '')) throw new AppError('Method not allowed', 405);
+                html(200, req.method === 'HEAD' ? '' : (await readFile(resolve(root, 'site/index.html'), 'utf8')).replaceAll('/plant/', `${prefix}/`));
                 return;
             }
             if (path === `${prefix}/api/health` && req.method === 'GET') {
@@ -212,6 +213,20 @@ export async function startPlantServer(options: {
             }
             if (!['GET', 'HEAD'].includes(req.method ?? ''))
                 throw new AppError('Method not allowed', 405);
+            if (path === '/saturn-sw.js') {
+                res.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/' });
+                res.end(req.method === 'HEAD' ? undefined : await readFile(resolve(root, 'site/saturn-sw.js')));
+                return;
+            }
+            if (path.startsWith('/site/assets/')) {
+                const siteRoot = resolve(root, 'site/assets');
+                const file = await realpath(resolve(siteRoot, path.slice('/site/assets/'.length)));
+                if (!file.startsWith(siteRoot + sep)) throw new AppError('Path rejected', 403);
+                const mime: Record<string, string> = { '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.txt': 'text/plain', '.md': 'text/plain; charset=utf-8' };
+                res.writeHead(200, { 'Content-Type': mime[extname(file)] ?? 'application/octet-stream', 'Cache-Control': 'no-cache' });
+                res.end(req.method === 'HEAD' ? undefined : await readFile(file));
+                return;
+            }
             if (path === `${prefix}/demo/`) {
                 html(200, await readFile(resolve(root, 'index.html'), 'utf8'));
                 return;

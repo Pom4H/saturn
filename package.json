@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Source-first SCADA playground. Drag equipment, edit TypeScript, keep one source of truth.",
   "scripts": {
+    "site:build": "node scripts/site-build.mjs",
+    "site:dev": "node scripts/site-dev.mjs",
+    "site:check": "tsc --noEmit -p tsconfig.site.json && node scripts/site-check.mjs",
     "build": "node scripts/build.mjs && node scripts/plant-build.mjs",
     "dev": "node scripts/dev.mjs",
     "preview": "node scripts/serve.mjs",
@@ -33,7 +36,8 @@
     "plant:typecheck": "tsc --noEmit -p tsconfig.plant.json",
     "plant:test": "node scripts/plant-test.mjs",
     "plant:test:browser": "node scripts/plant-e2e.mjs",
-    "plant:check": "npm run plant:build && npm run plant:typecheck && npm run plant:test"
+    "plant:check": "npm run plant:build && npm run plant:typecheck && npm run plant:test",
+    "site:test:browser": "node scripts/site-studio-check.mjs"
   },
   "keywords": [],
   "author": "Roman Popov",

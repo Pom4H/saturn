@@ -1,0 +1,39 @@
+name: Saturn product tour
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/self-hosted-product-tour
+permissions:
+  contents: read
+concurrency:
+  group: saturn-product-tour-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  tour:
+    runs-on: [self-hosted]
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run plant:build
+      - run: npm run site:check
+      - run: npm run site:test:browser
+      - run: node scripts/product-tour.mjs
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: saturn-product-tour
+          path: |
+            product-tour/
+            test-results/site-studio/
+          retention-days: 14

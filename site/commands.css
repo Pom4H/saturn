@@ -1,0 +1,53 @@
+.shell-modal {
+  --modal-bg: var(--shell-panel, #202124);
+  --modal-text: var(--shell-text, #edeef0);
+  --modal-muted: var(--shell-muted, #9da1aa);
+  --modal-border: var(--shell-border, #35373c);
+  --modal-hover: var(--shell-hover, #2e3035);
+  color: var(--modal-text); background: var(--modal-bg); border: 1px solid var(--modal-border);
+  border-radius: 14px; padding: 0; width: min(580px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px); box-shadow: 0 24px 90px #0006;
+  font: 13px/1.5 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.shell-modal::backdrop { background: #05060980; backdrop-filter: blur(3px); }
+.shell-modal *, .shell-modal *::before, .shell-modal *::after { box-sizing: border-box; }
+.shell-modal button, .shell-modal input { font: inherit; }
+.shell-modal button { color: var(--modal-text); cursor: pointer; }
+.shell-modal :focus-visible { outline: 2px solid var(--shell-focus, #a5b8f5); outline-offset: 2px; }
+#shell-command-dialog { margin: min(16vh, 130px) auto auto; }
+.shell-modal-searchbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--modal-border); }
+.shell-modal .shell-modal-search { width: 100%; min-width: 0; height: 40px; color: var(--modal-text); background: transparent; border: 0; padding: 8px 10px; border-radius: 6px; box-shadow: none; font-size: 14px; }
+.shell-modal .shell-modal-search::placeholder { color: var(--modal-muted); }
+.shell-modal .shell-modal-search::-webkit-search-cancel-button { cursor: pointer; }
+.shell-modal .shell-modal-close { flex: 0 0 28px; width: 28px; height: 28px; min-height: 0; border: 0; padding: 0; border-radius: 6px; background: transparent; color: var(--modal-muted); font-size: 22px; font-weight: 400; line-height: 1; }
+.shell-modal .shell-modal-close:hover { color: var(--modal-text); background: var(--modal-hover); }
+.shell-command-results { max-height: min(430px, 55dvh); overflow-y: auto; padding: 6px; overscroll-behavior: contain; }
+.shell-command { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 38px; padding: 8px 11px; border-radius: 7px; cursor: pointer; }
+.shell-command[aria-selected="true"] { background: var(--modal-hover); }
+.shell-command-label { min-width: 0; }
+.shell-key { white-space: nowrap; font: 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--modal-muted); }
+.shell-command-footer { display: flex; align-items: center; gap: 18px; padding: 10px 17px; border-top: 1px solid var(--modal-border); font-size: 11px; color: var(--modal-muted); }
+.shell-command-footer > :last-child { margin-left: auto; }
+.shell-modal-empty { color: var(--modal-muted); padding: 12px; }
+.shell-visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+#shell-help-dialog { width: min(760px, calc(100vw - 32px)); }
+.shell-help-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px 8px; }
+.shell-help-header h2 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.025em; }
+#shell-help-dialog > .shell-modal-search { display: block; width: calc(100% - 40px); margin: 4px 20px 16px; background: var(--shell-bg, #18191c); border: 1px solid var(--modal-border); }
+.shell-help-body { display: grid; grid-template-columns: 190px minmax(0, 1fr); border-top: 1px solid var(--modal-border); min-height: 330px; max-height: min(520px, 65dvh); }
+.shell-help-navigation { padding: 12px 8px; border-right: 1px solid var(--modal-border); overflow: auto; }
+.shell-modal .shell-help-topic { display: block; text-align: left; padding: 9px 10px; width: 100%; min-height: 36px; background: transparent; border: 0; border-radius: 7px; color: var(--modal-muted); line-height: 1.4; }
+.shell-modal .shell-help-topic:hover, .shell-modal .shell-help-topic[aria-current="page"] { color: var(--modal-text); background: var(--modal-hover); }
+.shell-help-article { padding: 22px 26px; overflow-y: auto; overscroll-behavior: contain; }
+.shell-help-article h3 { margin: 0 0 16px; font-size: 16px; font-weight: 600; letter-spacing: -.02em; }
+.shell-help-article p { margin: 0 0 15px; line-height: 1.7; color: var(--modal-muted); }
+.shell-help-link { color: var(--modal-text); text-underline-offset: 3px; }
+@media (max-width: 600px) {
+  #shell-command-dialog { margin-top: 24px; }
+  .shell-command-results { max-height: 60dvh; }
+  .shell-help-body { grid-template-columns: 1fr; max-height: calc(100dvh - 200px); }
+  .shell-help-navigation { display: flex; gap: 4px; padding: 8px; border-right: 0; border-bottom: 1px solid var(--modal-border); }
+  .shell-modal .shell-help-topic { width: auto; flex-shrink: 0; white-space: nowrap; }
+  .shell-help-article { padding: 20px; }
+}
+@media (prefers-reduced-motion: reduce) { .shell-modal::backdrop { backdrop-filter: none; } }

@@ -1,10 +1,11 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm, mkdir } from 'node:fs/promises';
+import { mkdtemp, rm, mkdir, readdir } from 'node:fs/promises';
 import { tmpdir, devNull } from 'node:os';
 import { resolve, join } from 'node:path';
 import { AppError, type Repository, type Revision } from '../types';
 import { validateFiles, projectPath } from '../compiler';
 const oid = (v: string) => /^[a-f0-9]{40,64}$/.test(v);
+const gitNull = process.platform === 'win32' ? 'NUL' : devNull;
 /** Immutable Git object I/O, no checkout, hooks, project execution or shell interpolation. */
 export class GitRepository implements Repository {
     readonly activeRef = 'refs/scada/plant/published';
@@ -12,12 +13,12 @@ export class GitRepository implements Repository {
         if (!/^refs\/heads\/[A-Za-z0-9_/-]+$/.test(branch) || branch.includes('..'))
             throw new AppError('Invalid configured project branch');
     }
-    private git(args: string[], input?: string, extra: Record<string, string> = {}): Promise<string> {
+    private git(args: string[], input?: string, extra: Record<string, string> = {}, quietFailure = false): Promise<string> {
         return new Promise((accept, reject) => {
             const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
-            const child = spawn('git', ['-c', `core.hooksPath=${devNull}`, '-c', 'core.fsmonitor=false', '-c', 'protocol.ext.allow=never', '-C', resolve(this.directory), ...args], { shell: false, env: { ...env, GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_NOSYSTEM: '1', ...extra }, stdio: ['pipe', 'pipe', 'pipe'] });
-            const chunks: Buffer[] = [];
-            let size = 0, settled = false;
+            const child = spawn('git', ['-c', `core.hooksPath=${gitNull}`, '-c', 'core.fsmonitor=false', '-c', 'protocol.ext.allow=never', '--git-dir', resolve(this.directory), '-C', resolve(this.directory), ...args], { shell: false, env: { ...env, GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_GLOBAL: gitNull, GIT_CONFIG_NOSYSTEM: '1', ...extra }, stdio: ['pipe', 'pipe', 'pipe'] });
+            const chunks: Buffer[] = [], stderr: Buffer[] = [];
+            let size = 0, stderrSize = 0, settled = false;
             const done = (error?: Error) => { if (settled)
                 return; settled = true; clearTimeout(timer); if (error)
                 reject(error);
@@ -36,21 +37,27 @@ export class GitRepository implements Repository {
             }
             else
                 chunks.push(b); });
-            child.stderr.resume();
+            child.stderr.on('data', b => { stderrSize += b.length; if (stderrSize <= 16384) stderr.push(b); });
             child.stdin.on('error', () => { });
-            child.on('error', () => done(new AppError('Git unavailable', 503)));
-            child.on('close', code => done(code === 0 ? undefined : new AppError('Git operation failed', 409)));
+            child.on('error', error => { console.error('Git spawn failed:', args[0] ?? '(none)', error.message); done(new AppError('Git unavailable', 503)); });
+            child.on('close', code => {
+                if (code !== 0 && !quietFailure) console.error('Git command failed:', args[0] ?? '(none)', 'exit', code, Buffer.concat(stderr).toString('utf8').trim());
+                done(code === 0 ? undefined : new AppError('Git operation failed', 409));
+            });
             child.stdin.end(input);
         });
     }
-    async initialize() { await mkdir(this.directory, { recursive: true }); try {
-        await this.git(['rev-parse', '--git-dir']);
+    async initialize() {
+        await mkdir(this.directory, { recursive: true });
+        // A nested data directory must never discover or modify its parent checkout.
+        if ((await readdir(this.directory)).length === 0)
+            await this.git(['init', '--bare']);
+        if ((await this.git(['rev-parse', '--is-bare-repository'])).trim() !== 'true')
+            throw new AppError('Use a dedicated bare Git repository for installation data');
+        return this;
     }
-    catch {
-        await this.git(['init', '--bare']);
-    } return this; }
     private async ref(name: string) { try {
-        const sha = (await this.git(['rev-parse', '--verify', '--end-of-options', `${name}^{commit}`])).trim();
+        const sha = (await this.git(['rev-parse', '--verify', '--end-of-options', `${name}^{commit}`], undefined, {}, true)).trim();
         if (!oid(sha))
             throw new AppError('Invalid object ID');
         return sha;
