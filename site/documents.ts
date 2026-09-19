@@ -2,13 +2,18 @@ import { EditorState } from '@codemirror/state';
 /** Document histories belong to paths; closing a tab never destroys a document. */
 export class Documents {
   readonly states = new Map<string, EditorState>();
-  readonly baseline: Record<string, string>;
+  readonly baseline: Record<string, string> = {};
   active: string;
   tabs: string[];
   preview: string | null = null;
   constructor(files: Record<string, string>, readonly makeState: (source: string, path: string) => EditorState, entry: string) {
-    this.baseline = { ...files };
-    for (const [path, source] of Object.entries(files)) this.states.set(path, makeState(source, path));
+    for (const [path, source] of Object.entries(files)) {
+      const state = makeState(source, path);
+      this.states.set(path, state);
+      // CodeMirror canonicalizes line separators. Compare against the exact
+      // representation the editor owns so CRLF checkouts are not all dirty.
+      this.baseline[path] = state.doc.toString();
+    }
     if (!this.states.has(entry)) throw new Error(`Нет файла ${entry}`);
     this.active = entry; this.tabs = [entry];
   }
