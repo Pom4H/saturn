@@ -118,7 +118,7 @@ export class SceneView3D {
   private raycaster = new THREE.Raycaster();
   private ground = new THREE.Plane(v(0, 0, 1), 0);
   private down: { x: number; y: number; id: string | null; moved: boolean; offset?: THREE.Vector3; layoutX?: number; layoutY?: number } | null = null;
-  private note: HTMLDivElement;
+  private note!: HTMLDivElement;
   constructor(public host: HTMLElement, options: { landing?: boolean } = {}) {
     host.classList.add('scene3d');
     this.canvas = document.createElement('canvas'); this.canvas.tabIndex = 0;
