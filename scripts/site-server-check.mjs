@@ -91,7 +91,7 @@ export async function checkServerFiles(browser) {
       assert(await match.isVisible(), 'Search results ignore collapsed ancestors');
       assert((await page.locator('#file-tree').innerText()).includes(path.slice(0, path.lastIndexOf('/'))), 'Flat results include their relative parent path');
       await match.click();
-      await page.waitForFunction(expected => document.querySelector('#studio-editor .cm-content')?.textContent?.includes(expected), fixtures[path].split('\n').find(line => line.length > 0));
+      await page.waitForFunction(expected => document.querySelector('#studio-editor .cm-content')?.textContent?.includes(expected), fixtures[path].split(/\r?\n/).find(line => line.length > 0));
     }
     await search.fill(documentPath); await readme.click(); await search.fill('');
     await page.locator('#files-reveal').click();
