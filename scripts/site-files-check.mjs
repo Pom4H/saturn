@@ -43,6 +43,14 @@ export async function checkFiles(browser, origin) {
   assert((await source.innerText()).includes('inertia: 2.4'), 'Local multi-file source survives reload');
   // The real server contract, including authentication errors and changing immutable revisions.
   let revision = { id: 'revision-one', parent: null, actor: 'engineer', time: 1, message: 'Initial', files: fixture }, denied = true;
+  await page.route('**/plant/api/session', async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      actor: { id: 'engineer', role: 'engineer' }, mode: 'simulation',
+      project: { title: 'Fixture installation', controls: [], alarms: [] },
+      frame: { synthetic: true, runId: 'fixture-run', revision: revision.id, seq: 1, time: 1, paused: false, samples: {}, alarms: [], displays: {} },
+      head: revision.id, desired: revision.id, healthy: true, releaseError: '', overrides: {}, csrf: 'fixture-csrf',
+    }) });
+  });
   await page.route('**/plant/api/project', async route => {
     assert.equal(route.request().method(), 'GET');
     await route.fulfill({ status: denied ? 403 : 200, contentType: 'application/json', body: JSON.stringify(denied ? { error: 'permission' } : revision) });
