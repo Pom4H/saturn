@@ -5,6 +5,7 @@ import { resolve, join } from 'node:path';
 import { AppError, type Repository, type Revision } from '../types';
 import { validateFiles, projectPath } from '../compiler';
 const oid = (v: string) => /^[a-f0-9]{40,64}$/.test(v);
+const gitNull = process.platform === 'win32' ? 'NUL' : devNull;
 /** Immutable Git object I/O, no checkout, hooks, project execution or shell interpolation. */
 export class GitRepository implements Repository {
     readonly activeRef = 'refs/scada/plant/published';
@@ -15,7 +16,7 @@ export class GitRepository implements Repository {
     private git(args: string[], input?: string, extra: Record<string, string> = {}): Promise<string> {
         return new Promise((accept, reject) => {
             const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
-            const child = spawn('git', ['-c', `core.hooksPath=${devNull}`, '-c', 'core.fsmonitor=false', '-c', 'protocol.ext.allow=never', '--git-dir', resolve(this.directory), '-C', resolve(this.directory), ...args], { shell: false, env: { ...env, GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_NOSYSTEM: '1', ...extra }, stdio: ['pipe', 'pipe', 'pipe'] });
+            const child = spawn('git', ['-c', `core.hooksPath=${gitNull}`, '-c', 'core.fsmonitor=false', '-c', 'protocol.ext.allow=never', '--git-dir', resolve(this.directory), '-C', resolve(this.directory), ...args], { shell: false, env: { ...env, GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_GLOBAL: gitNull, GIT_CONFIG_NOSYSTEM: '1', ...extra }, stdio: ['pipe', 'pipe', 'pipe'] });
             const chunks: Buffer[] = [], stderr: Buffer[] = [];
             let size = 0, stderrSize = 0, settled = false;
             const done = (error?: Error) => { if (settled)
