@@ -25,9 +25,9 @@ assert(loop.rpm < 1 && loop.flow < .01);
 const open = new HydraulicLoop(), closed = new HydraulicLoop(); closed.valve = .28;
 for (let i = 0; i < 1200; i++) { open.step(1 / 60); closed.step(1 / 60); }
 assert(closed.left > open.left + .1, 'Valve restriction must change reservoir levels');
-assert.equal(serverAppUrl('https://example.com'), 'https://example.com/plant/app/');
-assert.equal(serverAppUrl('http://localhost:4176/plant/app/'), 'http://localhost:4176/plant/app/');
-assert.equal(serverAppUrl('https://example.com/custom/login'), 'https://example.com/custom/app/');
+assert.equal(serverAppUrl('https://example.com'), 'https://example.com/plant/login');
+assert.equal(serverAppUrl('http://localhost:4176/plant/app/'), 'http://localhost:4176/plant/login');
+assert.equal(serverAppUrl('https://example.com/custom/login'), 'https://example.com/custom/login');
 for (const bad of ['javascript:alert(1)', 'ftp://example.com', 'https://user:pass@example.com', 'https://example.com/?token=x', 'not-a-url']) assert.throws(() => serverAppUrl(bad));
 const dir = await mkdtemp(join(tmpdir(), 'saturn-site-check-'));
 try {
