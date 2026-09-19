@@ -23,7 +23,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run plant:build
-      - run: npx playwright install chromium
       - run: node scripts/product-tour.mjs
       - uses: actions/upload-artifact@v7.0.1
         if: always()
