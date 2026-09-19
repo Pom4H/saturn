@@ -311,7 +311,11 @@ export class SceneView3D {
       const startLead = start.clone().addScaledVector(normal(a!, edge.from.port), .30), endLead = end.clone().addScaledVector(normal(b!, edge.to.port), .30);
       const curve = new THREE.CurvePath<THREE.Vector3>(), high = Math.max(startLead.z, endLead.z), middleX = (startLead.x + endLead.x) / 2;
       const points = [start, startLead, v(startLead.x, startLead.y, high), v(middleX, startLead.y, high), v(middleX, endLead.y, high), v(endLead.x, endLead.y, high), endLead, end], body: THREE.Mesh[] = [];
-      for (let i = 1; i < points.length; i++) if (points[i].distanceTo(points[i - 1]) > .001) { curve.add(new THREE.LineCurve3(points[i - 1], points[i])); body.push(tubeBetween(this.pipeLayer, points[i - 1], points[i], .085, materials.fluid)); }
+      for (let i = 1; i < points.length; i++) if (points[i].distanceTo(points[i - 1]) > .001) {
+        curve.add(new THREE.LineCurve3(points[i - 1], points[i]));
+        tubeBetween(this.pipeLayer, points[i - 1], points[i], .112, materials.glass ?? materials.steel);
+        body.push(tubeBetween(this.pipeLayer, points[i - 1], points[i], .073, materials.fluid));
+      }
       if (!curve.curves.length) continue;
       const particles = [0, 1, 2, 3].map(() => addMesh(this.pipeLayer, new THREE.ConeGeometry(.14, .28, 8), materials.dark));
       this.tracks.push({ id: edge.id, curve, particles, body, phase: trackPhases.get(edge.id) ?? 0, value: null });
