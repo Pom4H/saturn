@@ -1,5 +1,5 @@
 import './pwa.css';
-import { readAppLanguage, resolveLanguage, setAppLanguage, t } from './i18n';
+import { readAppLanguage, setAppLanguage, t } from './i18n';
 
 type InstallPrompt = Event & {
   prompt(): Promise<void>;
