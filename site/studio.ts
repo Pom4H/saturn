@@ -608,7 +608,7 @@ export async function mountStudio() {
         const signal = observedRuntime?.equipment[device.id]?.signals[name];
         const readable = (signal?.quality === 'good' || signal?.quality === 'stale') && signal.value !== null;
         const value = readable ? `${typeof signal.value === 'number' ? Number(signal.value.toFixed(3)) : signal.value} ${signal.unit}` : '—';
-        const source = ['live', 'paused', 'stale'].includes(shell.dataset.telemetry ?? '') ? `Simulation · ${signal?.quality ?? 'offline'}` : $('studio-context').textContent ?? t('runtime.noData');
+        const source = ['live', 'paused', 'stale'].includes(shell.dataset.telemetry ?? '') ? `${t('runtime.simulation')} · ${signal?.quality ?? 'offline'}` : $('studio-context').textContent ?? t('runtime.noData');
         const row = document.createElement('tr'); row.dataset.signal = `${device.id}.${name}`; row.dataset.quality = signal?.quality ?? 'offline';
         for (const cell of [device.id, name, value, source]) { const td = document.createElement('td'); td.textContent = cell; row.append(td); } rows.append(row);
       }
@@ -624,8 +624,8 @@ export async function mountStudio() {
     const list = $('project-list'); list.replaceChildren();
     if (!workspace.projects.length) {
       const empty = document.createElement('div'); empty.className = 'project-empty';
-      const heading = document.createElement('strong'); heading.textContent = 'Нет проектов';
-      const text = document.createElement('p'); text.textContent = 'Создайте проект из примера.';
+      const heading = document.createElement('strong'); heading.textContent = t('project.none');
+      const text = document.createElement('p'); text.textContent = t('project.createFromExample');
       empty.append(heading, text); list.append(empty);
     }
     for (const project of [...workspace.projects].reverse()) {
@@ -815,7 +815,7 @@ export async function mountStudio() {
     catch (e) { toast(e instanceof Error ? e.message : String(e)); }
   };
   function animateState() { const active = (visible || fullscreen) && !document.hidden && !['signals', 'controls', 'alarms', 'projects'].includes(surface); const stopped = isPlant() || runtimeOnly ? shell.dataset.telemetry !== 'live' : paused; view.paused = stopped || !active; if (spatial) spatial.paused = stopped || !active || progress >= 1; }
-  function updatePause() { $('studio-play').hidden = isPlant() || runtimeOnly; $('studio-play').innerHTML = `<svg aria-hidden="true"><use href="#i-${paused ? 'play' : 'pause'}"/></svg>`; $('studio-play').title = paused ? 'Запустить демонстрацию' : 'Приостановить демонстрацию'; $('studio-play').setAttribute('aria-label', $('studio-play').title); $('studio-play').setAttribute('aria-pressed', String(!paused)); }
+  function updatePause() { $('studio-play').hidden = isPlant() || runtimeOnly; $('studio-play').innerHTML = `<svg aria-hidden="true"><use href="#i-${paused ? 'play' : 'pause'}"/></svg>`; $('studio-play').title = t(paused ? 'canvas.runDemo' : 'canvas.pauseDemo'); $('studio-play').setAttribute('aria-label', $('studio-play').title); $('studio-play').setAttribute('aria-pressed', String(!paused)); }
   $('studio-play').onclick = () => { paused = !paused; animateState(); updatePause(); };
   document.addEventListener('visibilitychange', animateState);
   reduced.addEventListener('change', () => { if (reduced.matches) paused = true; updatePause(); animateState(); });
@@ -864,7 +864,7 @@ export async function mountStudio() {
     spatial?.fit(); animateState();
   }
   window.addEventListener('resize', () => { spatial?.fit(); syncPanels(); });
-  window.addEventListener('saturn-language-change', () => { spatial?.setHint(t(compact.matches ? 'scene3d.hintTouch' : 'scene3d.hint')); applyTelemetry(); if (surface === 'projects') renderProjects(); });
+  window.addEventListener('saturn-language-change', () => { spatial?.setHint(t(compact.matches ? 'scene3d.hintTouch' : 'scene3d.hint')); updatePause(); setFullscreen(fullscreen); applyTelemetry(); if (surface === 'projects') renderProjects(); });
   const observer = new IntersectionObserver(entries => { visible = entries[0].isIntersecting; animateState(); }, { rootMargin: '80px' }); observer.observe(stage);
   window.addEventListener('pagehide', persist);
   window.addEventListener('saturn-before-update', event => {
