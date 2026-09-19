@@ -486,7 +486,9 @@ export class SceneView3D {
       label.dataset.detail = this.scene.groups?.length && distance > 18 && item.equipment.id !== this.selected && label.dataset.alarm === 'none' ? 'compact' : 'full';
       if (compact || label.hidden) { leader.style.display = 'none'; continue; }
       const x = Math.max(8, Math.min(width - item.width - 8, px - item.width / 2));
-      const minimum = this.alert.hidden ? 10 : 56, maximum = Math.max(minimum, height - item.height - 24);
+      // Keep projected labels below the canvas toolbar and outside the shell
+      // topbar hit area even when the IDE pane makes the 3D viewport narrow.
+      const minimum = this.alert.hidden ? 58 : 96, maximum = Math.max(minimum, height - item.height - 24);
       const desired = Math.max(minimum, Math.min(maximum, py - item.height));
       const candidates = [desired, ...placed.flatMap(r => [r.y - item.height - 6, r.y + r.height + 6])].filter(y => y >= minimum && y <= maximum).sort((a, b) => Math.abs(a - desired) - Math.abs(b - desired));
       const y = candidates.find(y => !placed.some(r => x < r.x + r.width + 5 && x + item.width + 5 > r.x && y < r.y + r.height + 5 && y + item.height + 5 > r.y)) ?? desired;
