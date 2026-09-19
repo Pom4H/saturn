@@ -165,6 +165,7 @@ export async function checkServerFiles(browser) {
       const status = await response.json();
       return status.desired === expected && status.frame.revision === expected;
     }, committed.id);
+    await page.waitForFunction(() => document.getElementById('server-publish')?.hasAttribute('disabled'));
     assert(await page.locator('#server-publish').isDisabled(), 'Published revision is no longer offered again');
 
     // Operator opens the same root PWA and gets runtime/HMI, not the engineering IDE.
