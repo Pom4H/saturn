@@ -450,7 +450,7 @@ export async function mountStudio() {
       const csrf = serverSession.csrf;
       const status = await serverPost<Omit<ServerSession, 'csrf'>>(serverSession, 'publish', { revision: serverRevision.id, expected: serverSession.desired });
       serverSession = { ...status, csrf };
-      telemetry = { state: 'live', frame: status.frame, message: '' };
+      telemetry = { state: 'live', frame: status.frame, message: '', lastSeenAt: Date.now(), retryInMs: 0 };
       runtimeRevision = null;
       syncTelemetry(); renderMeta(); toast('Ревизия опубликована и применена');
     } catch (e) { toast(e instanceof Error ? e.message : String(e)); }
