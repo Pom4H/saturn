@@ -13,7 +13,7 @@ export class GitRepository implements Repository {
         if (!/^refs\/heads\/[A-Za-z0-9_/-]+$/.test(branch) || branch.includes('..'))
             throw new AppError('Invalid configured project branch');
     }
-    private git(args: string[], input?: string, extra: Record<string, string> = {}): Promise<string> {
+    private git(args: string[], input?: string, extra: Record<string, string> = {}, quietFailure = false): Promise<string> {
         return new Promise((accept, reject) => {
             const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
             const child = spawn('git', ['-c', `core.hooksPath=${gitNull}`, '-c', 'core.fsmonitor=false', '-c', 'protocol.ext.allow=never', '--git-dir', resolve(this.directory), '-C', resolve(this.directory), ...args], { shell: false, env: { ...env, GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_GLOBAL: gitNull, GIT_CONFIG_NOSYSTEM: '1', ...extra }, stdio: ['pipe', 'pipe', 'pipe'] });
@@ -41,7 +41,7 @@ export class GitRepository implements Repository {
             child.stdin.on('error', () => { });
             child.on('error', error => { console.error('Git spawn failed:', args[0] ?? '(none)', error.message); done(new AppError('Git unavailable', 503)); });
             child.on('close', code => {
-                if (code !== 0) console.error('Git command failed:', args[0] ?? '(none)', 'exit', code, Buffer.concat(stderr).toString('utf8').trim());
+                if (code !== 0 && !quietFailure) console.error('Git command failed:', args[0] ?? '(none)', 'exit', code, Buffer.concat(stderr).toString('utf8').trim());
                 done(code === 0 ? undefined : new AppError('Git operation failed', 409));
             });
             child.stdin.end(input);
@@ -57,7 +57,7 @@ export class GitRepository implements Repository {
         return this;
     }
     private async ref(name: string) { try {
-        const sha = (await this.git(['rev-parse', '--verify', '--end-of-options', `${name}^{commit}`])).trim();
+        const sha = (await this.git(['rev-parse', '--verify', '--end-of-options', `${name}^{commit}`], undefined, {}, true)).trim();
         if (!oid(sha))
             throw new AppError('Invalid object ID');
         return sha;
