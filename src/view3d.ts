@@ -25,17 +25,51 @@ function primitiveModel(context: Renderer3DContext, kind: string): EquipmentMode
     ports.set(key, p); tubeBetween(root, v(0, 0, .75), p, .11, materials.steel);
   }
   if (kind === 'valve') {
-    addMesh(root, new THREE.SphereGeometry(.32, 24, 16), materials.teal, v(0, 0, .75));
-    tubeBetween(root, v(0, 0, .8), v(0, 0, 1.3), .06, materials.steel);
-    addMesh(root, new THREE.BoxGeometry(.5, .35, .22), materials.dark, v(0, 0, 1.3));
-    const indicator = addMesh(root, new THREE.BoxGeometry(.34, .055, .045), materials.fluid, v(0, 0, 1.46));
-    return { root, ports, labelAnchor: v(0, 0, 1.75), update: dt => { const opening = context.number('opening', dt); indicator.visible = opening !== null; indicator.rotation.z = (opening ?? 0) / 100 * Math.PI / 2; }, metrics: () => ({ opening: numeric(context.signal('opening')) }) };
+    // Compact flanged control valve: body, bonnet, stem and handwheel remain
+    // recognizable from the default oblique operator camera.
+    for (const x of [-width / 2 + .08, width / 2 - .08]) {
+      const flange = addMesh(root, new THREE.CylinderGeometry(.24, .24, .08, 24), materials.steel, v(x, 0, .75));
+      flange.rotation.z = Math.PI / 2;
+    }
+    const leftBody = addMesh(root, new THREE.ConeGeometry(.34, .19, .52, 24), materials.teal, v(-.20, 0, .75));
+    leftBody.rotation.z = -Math.PI / 2;
+    const rightBody = addMesh(root, new THREE.ConeGeometry(.34, .19, .52, 24), materials.teal, v(.20, 0, .75));
+    rightBody.rotation.z = Math.PI / 2;
+    tubeBetween(root, v(0, 0, .84), v(0, 0, 1.34), .055, materials.steel);
+    addMesh(root, new THREE.CylinderGeometry(.16, .20, .18, 24), materials.steel, v(0, 0, 1.12));
+    const wheel = addMesh(root, new THREE.TorusGeometry(.28, .035, 10, 32), materials.dark, v(0, 0, 1.43));
+    const indicator = addMesh(root, new THREE.BoxGeometry(.40, .045, .035), materials.fluid, v(0, 0, 1.43));
+    return { root, ports, labelAnchor: v(0, 0, 1.82), update: dt => {
+      const opening = context.number('opening', dt); indicator.visible = opening !== null; wheel.visible = opening !== null;
+      indicator.rotation.z = (opening ?? 0) / 100 * Math.PI / 2;
+    }, metrics: () => ({ opening: numeric(context.signal('opening')) }) };
   }
-  if (kind === 'flowmeter' || kind === 'pressure' || kind === 'temperature') {
-    addMesh(root, new THREE.CylinderGeometry(.32, .32, .18, 32), materials.steel, v(0, 0, .9));
-    const glass = addMesh(root, new THREE.CircleGeometry(.26, 32), materials.dark, v(0, -.095, .9)); glass.rotation.x = Math.PI / 2;
-    if (!ports.size) { tubeBetween(root, v(0, 0, .1), v(0, 0, .65), .04, materials.steel); }
-    return { root, ports, labelAnchor: v(0, 0, 1.48), update: () => {} };
+  if (kind === 'flowmeter') {
+    const body = addMesh(root, new THREE.CylinderGeometry(.30, .30, .62, 28), materials.steel, v(0, 0, .75)); body.rotation.z = Math.PI / 2;
+    for (const x of [-.36, .36]) { const flange = addMesh(root, new THREE.CylinderGeometry(.35, .35, .07, 28), materials.dark, v(x, 0, .75)); flange.rotation.z = Math.PI / 2; }
+    addMesh(root, new THREE.BoxGeometry(.42, .34, .28), materials.dark, v(0, 0, 1.14));
+    const window = addMesh(root, new THREE.BoxGeometry(.30, .025, .13), materials.glass ?? materials.fluid, v(0, -.18, 1.15));
+    window.renderOrder = 3;
+    return { root, ports, labelAnchor: v(0, 0, 1.62), update: () => {} };
+  }
+  if (kind === 'pressure') {
+    tubeBetween(root, v(0, 0, .08), v(0, 0, .62), .038, materials.steel);
+    const caseMesh = addMesh(root, new THREE.CylinderGeometry(.34, .34, .16, 36), materials.steel, v(0, 0, .92)); caseMesh.rotation.x = Math.PI / 2;
+    const face = addMesh(root, new THREE.CircleGeometry(.285, 36), materials.glass ?? materials.dark, v(0, -.086, .92)); face.rotation.x = Math.PI / 2; face.renderOrder = 4;
+    const needle = addMesh(root, new THREE.BoxGeometry(.025, .018, .22), materials.teal, v(0, -.102, .98)); needle.rotation.x = Math.PI / 2;
+    return { root, ports, labelAnchor: v(0, 0, 1.48), update: dt => {
+      const value = context.number('value', dt); needle.visible = value !== null;
+      needle.rotation.z = THREE.MathUtils.degToRad(-125 + Math.min(16, Math.max(0, value ?? 0)) / 16 * 250);
+    } };
+  }
+  if (kind === 'temperature') {
+    tubeBetween(root, v(0, 0, .06), v(0, 0, .60), .032, materials.steel);
+    addMesh(root, new THREE.CapsuleGeometry(.12, .58, 8, 18), materials.steel, v(0, 0, .98));
+    const column = addMesh(root, new THREE.CapsuleGeometry(.035, .42, 6, 12), materials.fluid, v(0, -.125, .97));
+    return { root, ports, labelAnchor: v(0, 0, 1.58), update: dt => {
+      const value = context.number('value', dt); column.visible = value !== null;
+      const normalized = Math.min(1, Math.max(0, ((value ?? -40) + 40) / 190)); column.scale.z = .35 + normalized * .65;
+    } };
   }
   if (kind === 'outlet') {
     const arrow = addMesh(root, new THREE.ConeGeometry(.24, .48, 4), materials.teal, v(.18, 0, .75)); arrow.rotation.z = -Math.PI / 2;
