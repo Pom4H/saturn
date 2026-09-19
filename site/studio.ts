@@ -128,6 +128,7 @@ export async function mountStudio() {
     } else if (serverRevision) label = t('runtime.draftPaused');
     if (!['live', 'paused', 'stale'].includes(status)) observedRuntime = plantTools.unavailableRuntime(plant.project, status === 'draft' || status === 'revision' ? 'draft' : 'offline');
     shell.dataset.telemetry = status; shell.dataset.runtimeSeq = String(['live', 'paused', 'stale'].includes(status) ? liveFrame?.seq ?? '' : '');
+    window.dispatchEvent(new CustomEvent('saturn-telemetry-change', { detail: { state: status, lastSeenAt: telemetry.lastSeenAt, retryInMs: telemetry.retryInMs } }));
     $('studio-context').textContent = label || (runtimeOnly ? t('runtime.installation') : t('runtime.draft')); $('studio-context').title = telemetry.message || label;
     view.setRuntime(observedRuntime); spatial?.setRuntime(observedRuntime);
     animateState();
