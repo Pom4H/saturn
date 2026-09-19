@@ -197,8 +197,12 @@ export async function mountStudio() {
     telemetry = { state: 'live', frame: session.frame, message: '' };
     observedRuntime = plant.runtime; view.setRuntime(observedRuntime); spatial?.setRuntime(observedRuntime);
     renderTree(); renderMeta(); setSurface('scene'); syncPanels(); updatePause(); syncTelemetry();
-    if (compact.matches) setMode('2d');
-    fitScene(); spatial?.fit(); renderRuntimeControls(); renderRuntimeAlarms();
+    if (compact.matches) {
+      setMode('2d');
+      const group = plant.scene.groups?.[0];
+      if (group) view.fitGroup(group.id); else fitScene();
+    } else fitScene();
+    spatial?.fit(); renderRuntimeControls(); renderRuntimeAlarms();
   }
   async function probeRuntime() {
     try {
