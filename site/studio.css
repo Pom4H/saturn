@@ -81,7 +81,18 @@
 #studio-spatial .scene3d-label strong { color: #cbe4f1; font-size: 11px; font-weight: 500; }
 #studio-spatial .scene3d-label small:empty { display: none; }
 #studio-spatial .scene3d-label.selected { border-color: #87c9db; }
-#studio-spatial .scene3d-note { display: none; }
+#studio-spatial .scene3d-note {
+  position: absolute; left: 50%; bottom: 14px; z-index: 3; transform: translateX(-50%);
+  max-width: calc(100% - 160px); padding: 6px 10px; border: 1px solid #ffffff14;
+  border-radius: 999px; background: #10161bc9; color: #aeb8c0;
+  font: 10px/1.4 var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none; opacity: .78; transition: opacity .25s ease, transform .25s ease;
+}
+#studio-spatial[data-interacted=true] .scene3d-note { opacity: .18; transform: translate(-50%,4px); }
+#studio-spatial:hover .scene3d-note { opacity: .72; transform: translateX(-50%); }
+#studio-spatial[data-embedded=true] .scene3d-note { bottom: 10px; }
+#studio-spatial canvas { cursor: grab; }
+#studio-spatial canvas:active { cursor: grabbing; }
 #studio-spatial .scene3d-alert { position: absolute; top: 10px; left: 10px; right: 10px; padding: 10px; border: 1px solid #715c45; border-radius: 5px; background: #29251bea; color: #dbc197; font-size: 11px; }
 .mobile-only, .export-options .mobile-only { display: none; }
 .shell-fullscreen .studio-editor-pane { width: var(--source-width, 40%); }
@@ -282,4 +293,12 @@
   .runtime-alarm { grid-template-columns: 1fr auto; }
   .runtime-alarm small { grid-column: 1 / -1; }
   .controls-panel,.alarms-panel { padding: 14px; }
+}
+
+@media(max-width:650px) {
+  #studio-spatial .scene3d-note { max-width: calc(100% - 20px); bottom: 62px; font-size: 9px; }
+  #studio-spatial[data-embedded=true] .scene3d-note { display: none; }
+}
+@media(prefers-reduced-motion: reduce) {
+  #studio-spatial .scene3d-note { transition: none; }
 }
