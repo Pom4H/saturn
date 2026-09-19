@@ -44,7 +44,7 @@ export async function mountStudio() {
   let serverRevision: ServerRevision | null = null, pendingRevision: ServerRevision | null = null;
   let serverSession: ServerSession | null = null, runtimeOnly = false, runtimeRevision: string | null = null;
   let documents: Documents;
-  let codeVisible = false, propertiesVisible = false, mobilePane: 'scene' | 'source' | 'properties' = 'scene';
+  let codeVisible = !compact.matches, propertiesVisible = false, mobilePane: 'scene' | 'source' | 'properties' = 'scene';
   let progress = 0, explicit: '2d' | '3d' = '3d', fullscreen = false, scrollBeforeFullscreen = 0;
   let visible = false, paused = reduced.matches, toastTimer = 0;
   let connecting: Endpoint | 'choose' | null = null;
@@ -834,9 +834,15 @@ export async function mountStudio() {
     if (!storageAvailable || serverRevision && documents.dirty() || serverDraft?.documents.dirty()) event.preventDefault();
   });
   window.addEventListener('beforeunload', event => { if (serverRevision && documents.dirty() || serverDraft?.documents.dirty()) { event.preventDefault(); event.returnValue = ''; } });
-  try { const layout = JSON.parse(localStorage.getItem('saturn.shell.layout.v1') ?? '{}'); filesVisible = layout.filesVisible === true; codeVisible = layout.codeVisible === true; if (/^\d+(\.\d+)?px$/.test(layout.navigatorWidth ?? '')) shell.style.setProperty('--navigator-width', layout.navigatorWidth); if (/^\d+(\.\d+)?px$/.test(layout.sourceWidth ?? '')) shell.style.setProperty('--source-width', layout.sourceWidth); } catch {}
+  try {
+    const layout = JSON.parse(localStorage.getItem('saturn.shell.layout.v1') ?? '{}');
+    if ('filesVisible' in layout) filesVisible = layout.filesVisible === true;
+    if ('codeVisible' in layout) codeVisible = layout.codeVisible === true;
+    if (/^\d+(\.\d+)?px$/.test(layout.navigatorWidth ?? '')) shell.style.setProperty('--navigator-width', layout.navigatorWidth);
+    if (/^\d+(\.\d+)?px$/.test(layout.sourceWidth ?? '')) shell.style.setProperty('--source-width', layout.sourceWidth);
+  } catch {}
   if (isPlant()) await ensurePlant();
-  view.render(compiled.scene); refresh(false); fitScene(); updatePause(); renderMeta();
+  view.render(compiled.scene); refresh(false); fitScene(); updatePause(); renderMeta(); syncPanels();
   message(storageAvailable ? '' : 'Хранилище недоступно');
   try {
     const { SceneView3D } = await import('../src/view3d'); spatial = new SceneView3D(spatialHost, { landing: true }); spatial.onSelect = select;
