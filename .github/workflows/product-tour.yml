@@ -10,6 +10,9 @@ jobs:
   tour:
     runs-on: [self-hosted]
     timeout-minutes: 20
+    defaults:
+      run:
+        shell: cmd
     steps:
       - uses: actions/checkout@v7.0.1
         with:
