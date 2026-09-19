@@ -178,8 +178,8 @@ export class SceneView3D {
       if (!point || !object) return;
       drag.moved = true;
       const world = point.add(drag.offset), definition = catalog[object.equipment.kind], centered = !!this.scene.groups?.length;
-      const x = world.x * 100 - (centered ? definition.width / 2 : 0);
-      const y = -world.y * 100 - (centered ? definition.height / 2 : 0);
+      const x = object.equipment.tap ? world.x * 100 - 33 : world.x * 100 - (centered ? definition.width / 2 : 0);
+      const y = object.equipment.tap ? -world.y * 100 : -world.y * 100 - (centered ? definition.height / 2 : 0);
       this.onMove?.(drag.id, Math.round(x), Math.round(y), false);
       e.preventDefault();
     });
@@ -193,7 +193,9 @@ export class SceneView3D {
           const point = this.groundPoint(e.clientX, e.clientY), object = this.objects.get(drag.id);
           if (point && object) {
             const world = point.add(drag.offset), definition = catalog[object.equipment.kind], centered = !!this.scene.groups?.length;
-            this.onMove?.(drag.id, Math.round(world.x * 100 - (centered ? definition.width / 2 : 0)), Math.round(-world.y * 100 - (centered ? definition.height / 2 : 0)), true);
+            const x = object.equipment.tap ? world.x * 100 - 33 : world.x * 100 - (centered ? definition.width / 2 : 0);
+            const y = object.equipment.tap ? -world.y * 100 : -world.y * 100 - (centered ? definition.height / 2 : 0);
+            this.onMove?.(drag.id, Math.round(x), Math.round(y), true);
           }
           return;
         }
