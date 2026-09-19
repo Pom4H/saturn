@@ -382,7 +382,9 @@ export async function mountStudio() {
       positionPreviewFrame = 0;
       const preview = positionPreview; if (!preview) return;
       const patch = movePatch(preview.id, preview.x, preview.y);
-      const scene = { ...compiled.scene, nodes: compiled.scene.nodes.map(node => node.id === preview.id ? { ...node, props: { ...node.props, ...patch } } : node) };
+      const scene = isPlant() && plant && plantTools && 'x' in patch && 'y' in patch
+        ? plantTools.previewPlantPosition(plant.project, preview.id, patch.x, patch.y)
+        : { ...compiled.scene, nodes: compiled.scene.nodes.map(node => node.id === preview.id ? { ...node, props: { ...node.props, ...patch } } : node) };
       view.render(scene); spatial?.render(scene); view.select(selected); spatial?.select(selected);
     });
   }
