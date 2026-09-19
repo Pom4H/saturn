@@ -680,12 +680,14 @@ export async function mountStudio() {
   }
   function revealShell() { if (!fullscreen) stage.scrollIntoView({ block: 'start', behavior: reduced.matches ? 'instant' : 'smooth' }); }
   function setFullscreen(enabled: boolean) {
+    const control = $('shell-fullscreen');
+    control.setAttribute('aria-label', enabled ? t('common.backToLanding') : t('common.fullscreen'));
+    control.setAttribute('title', control.getAttribute('aria-label')!);
+    control.querySelector('use')!.setAttribute('href', enabled ? '#i-collapse' : '#i-expand');
     if (fullscreen === enabled) return;
     if (enabled) scrollBeforeFullscreen = scrollY;
     fullscreen = enabled; document.body.classList.toggle('shell-fullscreen', enabled);
     for (const node of document.querySelectorAll<HTMLElement>('.site-header,.hero')) node.inert = enabled;
-    const control = $('shell-fullscreen'); control.setAttribute('aria-label', enabled ? 'Вернуться на лендинг' : 'Развернуть на весь экран'); control.setAttribute('title', control.getAttribute('aria-label')!);
-    control.querySelector('use')!.setAttribute('href', enabled ? '#i-collapse' : '#i-expand');
     if (enabled) { if (!compact.matches && !runtimeOnly) codeVisible = true; syncPanels(); } else window.scrollTo({ top: scrollBeforeFullscreen, behavior: 'instant' });
     spatial?.setEmbedded(!enabled);
     visible = true; animateState(); documentTitle();
