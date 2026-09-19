@@ -10,6 +10,7 @@ import { compile, patchFields, editable, appendEquipment, appendConnection, appe
 import { catalog, type Endpoint, type Value } from '../src/core';
 import { dslCompletions } from '../src/completion';
 import { SceneView } from '../src/view';
+import { tapPoint } from '../src/geometry';
 import '../src/visual-components';
 import type { SceneView3D } from '../src/view3d';
 import { examples, emptySource, createWorkspace, parseWorkspace, currentDocument, updateSource, createProject, workspaceKey, type ExampleId, type WorkspaceState } from './shell-projects';
@@ -332,12 +333,45 @@ export async function mountStudio() {
   function canMoveNode(id: string) {
     if (error || runtimeOnly) return false;
     const node = compiled.scene.nodes.find(item => item.id === id);
-    if (!node || node.tap) return false;
+    if (!node) return false;
+    if (node.tap) return !isPlant() && editable(compiled, id, 'at') && editable(compiled, id, 'offset');
     if (isPlant()) {
       const target = plant?.objects.get(id);
       return Boolean(target?.fields.some(field => field.key === 'x') && target.fields.some(field => field.key === 'y'));
     }
     return editable(compiled, id, 'x') && editable(compiled, id, 'y');
+  }
+  function tapMovePatch(id: string, x: number, y: number): Record<string, number> | null {
+    const node = compiled.scene.nodes.find(item => item.id === id);
+    if (!node?.tap) return null;
+    const route = view.routes.get(node.tap); if (!route || route.points.length < 2) return null;
+    const segments = route.points.slice(1).map((b, i) => {
+      const a = route.points[i], length = Math.hypot(b.x - a.x, b.y - a.y);
+      return { a, b, length };
+    });
+    const horizontal = segments.filter(segment => Math.abs(segment.a.y - segment.b.y) < .01 && segment.length >= 90);
+    const choices = horizontal.length ? horizontal : segments;
+    const total = choices.reduce((sum, segment) => sum + segment.length, 0); if (!total) return null;
+    const currentOffset = Number(node.props.offset);
+    const target = { x: x + 33, y: y + currentOffset };
+    let walked = 0, best: { at: number; x: number; y: number; distance: number } | null = null;
+    for (const segment of choices) {
+      const dx = segment.b.x - segment.a.x, dy = segment.b.y - segment.a.y, length2 = dx * dx + dy * dy;
+      const raw = length2 ? ((target.x - segment.a.x) * dx + (target.y - segment.a.y) * dy) / length2 : 0;
+      const ratio = Math.min(.82, Math.max(.18, raw));
+      const px = segment.a.x + dx * ratio, py = segment.a.y + dy * ratio;
+      const distance = Math.hypot(target.x - px, target.y - py);
+      const at = Math.min(.9, Math.max(.1, (walked + segment.length * ratio) / total));
+      if (!best || distance < best.distance) best = { at, x: px, y: py, distance };
+      walked += segment.length;
+    }
+    if (!best) return null;
+    const field = catalog[node.kind].fields.offset;
+    const offset = Math.min(field.max ?? 240, Math.max(field.min ?? 80, best.y - y));
+    return { at: Number(best.at.toFixed(3)), offset: Math.round(offset) };
+  }
+  function movePatch(id: string, x: number, y: number): Record<string, number> {
+    return tapMovePatch(id, x, y) ?? { x, y };
   }
   function previewPosition(id: string, x: number, y: number) {
     if (!canMoveNode(id)) return;
@@ -346,7 +380,8 @@ export async function mountStudio() {
     positionPreviewFrame = requestAnimationFrame(() => {
       positionPreviewFrame = 0;
       const preview = positionPreview; if (!preview) return;
-      const scene = { ...compiled.scene, nodes: compiled.scene.nodes.map(node => node.id === preview.id ? { ...node, props: { ...node.props, x: preview.x, y: preview.y } } : node) };
+      const patch = movePatch(preview.id, preview.x, preview.y);
+      const scene = { ...compiled.scene, nodes: compiled.scene.nodes.map(node => node.id === preview.id ? { ...node, props: { ...node.props, ...patch } } : node) };
       view.render(scene); spatial?.render(scene); view.select(selected); spatial?.select(selected);
     });
   }
@@ -361,7 +396,8 @@ export async function mountStudio() {
     if (positionPreviewFrame) cancelAnimationFrame(positionPreviewFrame);
     positionPreviewFrame = 0;
     if (!canMoveNode(id)) { restorePositionPreview(); return; }
-    if (isPlant()) patchPlantFields(id, { x, y }); else fields(id, { x, y });
+    const patch = movePatch(id, x, y);
+    if (isPlant()) patchPlantFields(id, patch); else fields(id, patch);
   }
 
   function showFiles(toggle = false) { filesVisible = surface !== 'scene' || !toggle || !filesVisible; if (surface !== 'scene') setSurface('scene'); syncPanels(); saveLayout(); }
@@ -718,7 +754,8 @@ export async function mountStudio() {
     if (!element || !node) { if (event.pointerType === 'mouse' || fullscreen) { pan = { x: event.clientX, y: event.clientY, cameraX: view.camera.x, cameraY: view.camera.y }; canvas.setPointerCapture(event.pointerId); } return; }
     select(node.id);
     if (!canMoveNode(node.id)) return;
-    drag = { id: node.id, x: Number(node.props.x), y: Number(node.props.y), startX: point.x, startY: point.y, dx: 0, dy: 0 };
+    const tap = node.tap ? view.routes.get(node.tap) : null, attached = tap ? tapPoint(tap, Number(node.props.at)) : null;
+    drag = { id: node.id, x: attached ? attached.x - 33 : Number(node.props.x), y: attached ? attached.y - Number(node.props.offset) : Number(node.props.y), startX: point.x, startY: point.y, dx: 0, dy: 0 };
     canvas.setPointerCapture(event.pointerId); event.preventDefault();
   });
   canvas.addEventListener('pointermove', event => {
