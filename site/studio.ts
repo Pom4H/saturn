@@ -41,7 +41,7 @@ export async function mountStudio() {
   let filesVisible = false;
   let plantTools: typeof import('./plant-project') | undefined, plant: ReturnType<typeof plantProjection> | undefined;
   let serverRevision: ServerRevision | null = null, pendingRevision: ServerRevision | null = null;
-  let serverSession: ServerSession | null = null, runtimeOnly = false;
+  let serverSession: ServerSession | null = null, runtimeOnly = false, runtimeRevision: string | null = null;
   let documents: Documents;
   let codeVisible = false, propertiesVisible = false, mobilePane: 'scene' | 'source' | 'properties' = 'scene';
   let progress = 0, explicit: '2d' | '3d' = '3d', fullscreen = false, scrollBeforeFullscreen = 0;
@@ -107,7 +107,7 @@ export async function mountStudio() {
     const liveFrame = telemetry.frame;
     let status: string = runtimeOnly ? telemetry.state : 'draft', label = runtimeOnly ? telemetry.message : 'Черновик · без телеметрии';
     observedRuntime = plant.runtime;
-    const revision = serverRevision?.id ?? serverSession?.frame.revision ?? null;
+    const revision = serverRevision?.id ?? runtimeRevision;
     const sourceClean = runtimeOnly || !documents.dirty() && !error;
     if (revision && sourceClean) {
       status = telemetry.state; label = telemetry.message;
@@ -185,7 +185,7 @@ export async function mountStudio() {
   }
   async function activateRuntimeSession(session: ServerSession) {
     await ensurePlant();
-    setServerRole(session); runtimeOnly = true; serverRevision = null; pendingRevision = null;
+    setServerRole(session); runtimeOnly = true; runtimeRevision = session.frame.revision; serverRevision = null; pendingRevision = null;
     shell.dataset.runtimeOnly = 'true';
     plant = plantTools!.runtimeProjection(session.project, session.frame);
     compiled = { ...compiled, scene: plant.scene };
@@ -256,7 +256,7 @@ export async function mountStudio() {
     } catch (e) { toast(e instanceof Error ? e.message : String(e)); renderMeta(); }
   }
   function activateServer(revision: ServerRevision) {
-    persist(); runtimeOnly = false; delete shell.dataset.runtimeOnly; serverRevision = revision; pendingRevision = null;
+    persist(); runtimeOnly = false; runtimeRevision = null; delete shell.dataset.runtimeOnly; serverRevision = revision; pendingRevision = null;
     documents = new Documents(revision.files, editorState, 'plant.ts'); editor.setState(documents.state);
     serverDraft = { revision, documents }; selected = null; clearConnection(); refresh(false); fitScene(); spatial?.fit();
     filesVisible = true; renderMeta(); syncPanels();
@@ -325,6 +325,43 @@ export async function mountStudio() {
   $('server-close').onclick = () => $<HTMLDialogElement>('server-dialog').close();
   $('server-load').onclick = () => void loadServer();
   $('server-apply').onclick = () => { if (pendingRevision && !documents.dirty()) activateServer(pendingRevision); };
+  $('runtime-pause').onclick = () => void (async () => {
+    try { await runtimeCommand(telemetry.frame?.paused ? 'resume' : 'pause'); }
+    catch (e) { toast(e instanceof Error ? e.message : String(e)); }
+  })();
+  $('server-save').onclick = () => {
+    if (!serverSession || serverSession.actor.role !== 'engineer' || !serverRevision || !documents.dirty() || error) return;
+    $('server-commit-error').textContent = '';
+    $<HTMLDialogElement>('server-commit-dialog').showModal();
+    $<HTMLInputElement>('server-commit-message').select();
+  };
+  $('server-commit-close').onclick = () => $<HTMLDialogElement>('server-commit-dialog').close();
+  $('server-commit-form').onsubmit = event => {
+    event.preventDefault();
+    void (async () => {
+      if (!serverSession || serverSession.actor.role !== 'engineer' || !serverRevision) return;
+      try {
+        documents.capture(editor.state);
+        const message = $<HTMLInputElement>('server-commit-message').value.trim();
+        const revision = await serverPost<ServerRevision>(serverSession, 'save', { files: documents.files, expected: serverRevision.id, message });
+        serverSession = { ...serverSession, head: revision.id };
+        activateServer(revision);
+        $<HTMLDialogElement>('server-commit-dialog').close();
+        toast('Ревизия сохранена. Runtime ещё работает на опубликованной версии.');
+      } catch (e) { $('server-commit-error').textContent = e instanceof Error ? e.message : String(e); }
+    })();
+  };
+  $('server-publish').onclick = () => void (async () => {
+    if (!serverSession || serverSession.actor.role !== 'engineer' || !serverRevision || documents.dirty()) return;
+    try {
+      const csrf = serverSession.csrf;
+      const status = await serverPost<Omit<ServerSession, 'csrf'>>(serverSession, 'publish', { revision: serverRevision.id, expected: serverSession.desired });
+      serverSession = { ...status, csrf };
+      telemetry = { state: 'live', frame: status.frame, message: '' };
+      runtimeRevision = null;
+      syncTelemetry(); renderMeta(); toast('Ревизия опубликована и применена');
+    } catch (e) { toast(e instanceof Error ? e.message : String(e)); }
+  })();
 
   function message(text: string) { $('studio-message').textContent = text; }
   function toast(text: string) { $('shell-toast').textContent = text; $('shell-toast').hidden = false; clearTimeout(toastTimer); toastTimer = window.setTimeout(() => $('shell-toast').hidden = true, 4500); }
@@ -423,7 +460,7 @@ export async function mountStudio() {
       const button = document.createElement('button'); button.dataset.id = node.id;
       const icon = document.createElement('span'); icon.textContent = ({ tank: '▥', pump: '◉', valve: '⋈', flowmeter: '⊙', outlet: '↗', exchanger: '▥' } as Record<string, string>)[node.kind] ?? '◇';
       const label = document.createElement('span'); label.textContent = node.id;
-      button.append(icon, label); button.title = catalog[node.kind].label; button.onclick = () => select(node.id); tree.append(button);
+      button.append(icon, label); button.title = catalog[node.kind]?.label ?? node.kind; button.onclick = () => select(node.id); tree.append(button);
     }
   }
   function renderInspector() {
@@ -431,9 +468,13 @@ export async function mountStudio() {
     const node = compiled.scene.nodes.find(n => n.id === selected), edge = compiled.scene.links.find(l => l.id === selected);
     syncPanels();
     $('studio-selected').textContent = node?.id ?? (edge ? 'Соединение' : '');
-    $('studio-kind').textContent = node ? catalog[node.kind].label : edge ? `${edge.from.node} → ${edge.to.node}` : '';
+    $('studio-kind').textContent = node ? catalog[node.kind]?.label ?? node.kind : edge ? `${edge.from.node} → ${edge.to.node}` : '';
     $('object-source').toggleAttribute('disabled', error);
-    $('object-source').hidden = !node || (isPlant() ? !plant?.objects.has(node.id) : !compiled.objects.has(node.id));
+    $('object-source').hidden = runtimeOnly || !node || (isPlant() ? !plant?.objects.has(node.id) : !compiled.objects.has(node.id));
+    if (runtimeOnly) {
+      if (!node && !edge) $('studio-kind').textContent = 'Выберите объект';
+      return;
+    }
     if (node && isPlant()) {
       $('studio-kind').textContent = plant?.project.devices.find(d => d.id === node.id)?.type ?? node.kind;
       const source = plant?.objects.get(node.id);
@@ -501,7 +542,7 @@ export async function mountStudio() {
     }
   }
   function switchDocument(active: WorkspaceState['active'], save = true) {
-    if (save) { persist(); if (serverRevision) serverDraft = { revision: serverRevision, documents }; } runtimeOnly = false; delete shell.dataset.runtimeOnly; serverRevision = null; pendingRevision = null; setServerRole(null); workspace.active = active; selected = null; clearConnection();
+    if (save) { persist(); if (serverRevision) serverDraft = { revision: serverRevision, documents }; } runtimeOnly = false; runtimeRevision = null; delete shell.dataset.runtimeOnly; serverRevision = null; pendingRevision = null; setServerRole(null); workspace.active = active; selected = null; clearConnection();
     const next = currentDocument(workspace);
     documents = new Documents(next.files ?? { 'station.ts': next.source }, editorState, next.files?.['plant.ts'] !== undefined ? 'plant.ts' : 'station.ts');
     editor.setState(documents.state); refresh(false); fitScene();
