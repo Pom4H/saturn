@@ -119,6 +119,7 @@ export class SceneView3D {
   private ground = new THREE.Plane(v(0, 0, 1), 0);
   private down: { x: number; y: number; id: string | null; moved: boolean; offset?: THREE.Vector3; layoutX?: number; layoutY?: number } | null = null;
   private note!: HTMLDivElement;
+  private messages = { preview: 'Preview · telemetry disconnected', noData: 'No data', moreAlarms: 'More alarms' };
   constructor(public host: HTMLElement, options: { landing?: boolean } = {}) {
     host.classList.add('scene3d');
     this.canvas = document.createElement('canvas'); this.canvas.tabIndex = 0;
@@ -225,6 +226,7 @@ export class SceneView3D {
     this.host.dataset.embedded = String(embedded);
   }
   setHint(text: string) { this.note.textContent = text; this.note.hidden = !text; }
+  setMessages(messages: Partial<typeof this.messages>) { Object.assign(this.messages, messages); this.advance(0); this.draw(); }
   private ndc(clientX: number, clientY: number) {
     const rect = this.canvas.getBoundingClientRect(), bottom = rect.width <= 650 ? 77 : 0, drawingHeight = Math.max(1, rect.height - bottom);
     if (clientY - rect.top > drawingHeight) return null;
@@ -336,22 +338,24 @@ export class SceneView3D {
     this.advance(0); this.draw();
   }
   private advance(dt: number) {
-    const alerts: string[] = []; let unavailable = 0;
+    const alerts: string[] = []; let stale = 0, unavailable = 0;
     for (const { equipment, model, label, text, state } of this.objects.values()) {
       model.update(dt);
       const quality = observationQuality(this.scene, this.frame, equipment.id), alarm = observationAlarm(this.scene, this.frame, equipment.id);
       const key = model.readout ?? primarySignal[equipment.kind] ?? Object.keys(catalog[equipment.kind].signals ?? {})[0] ?? 'flow';
       const sample = observation(this.scene, this.frame, equipment.id, key), value = key === 'flow' ? this.flows.get(equipment.id) ?? null : numeric(sample);
       text.textContent = value === null ? '—' : `${value.toFixed(key === 'rpm' || key === 'level' ? 0 : 1)} ${unitLabel(sample?.unit ?? (key === 'flow' ? 'm3/h' : ''))}`;
-      state.textContent = [alarmLabel[alarm], quality !== 'good' ? 'Нет данных' : ''].filter(Boolean).join(' · ');
+      const qualityLabel = quality === 'stale' ? 'STALE' : quality === 'bad' ? 'BAD' : quality === 'offline' ? 'OFFLINE' : '';
+      state.textContent = [alarmLabel[alarm], qualityLabel].filter(Boolean).join(' · ');
       label.dataset.quality = quality; label.dataset.alarm = alarm; label.dataset.instanceId = this.frame?.equipment[equipment.id]?.instanceId ?? '';
       if (alarm !== 'none') alerts.push(`${equipment.id} · ${alarmLabel[alarm]}`);
+      if (quality === 'stale') stale++;
       else if (quality !== 'good') unavailable++;
     }
     const sourcePreview = this.frame?.runId === 'draft';
     this.alert.dataset.preview = String(sourcePreview);
-    const summary = [...alerts.slice(0, 3), ...(alerts.length > 3 ? [`Ещё тревог: ${alerts.length - 3}`] : []), ...(unavailable ? [`Нет данных: ${unavailable}`] : [])];
-    this.alert.textContent = sourcePreview ? 'Предпросмотр · телеметрия не подключена' : summary.join(' · '); this.alert.hidden = !sourcePreview && !summary.length;
+    const summary = [...alerts.slice(0, 3), ...(alerts.length > 3 ? [`${this.messages.moreAlarms}: ${alerts.length - 3}`] : []), ...(stale ? [`STALE: ${stale}`] : []), ...(unavailable ? [`${this.messages.noData}: ${unavailable}`] : [])];
+    this.alert.textContent = sourcePreview ? this.messages.preview : summary.join(' · '); this.alert.hidden = !sourcePreview && !summary.length;
     for (const track of this.tracks) {
       track.value = this.flows.get(track.id) ?? null;
       track.phase = ((track.phase + (track.value ?? 0) / 24 * .2 * dt) % 1 + 1) % 1;
