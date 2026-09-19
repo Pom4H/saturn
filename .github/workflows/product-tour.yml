@@ -6,6 +6,9 @@ on:
       - feat/self-hosted-product-tour
 permissions:
   contents: read
+concurrency:
+  group: saturn-product-tour-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   tour:
     runs-on: [self-hosted]
