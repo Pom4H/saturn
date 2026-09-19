@@ -163,10 +163,10 @@ export class SceneView3D {
       this.down = { x: e.clientX, y: e.clientY, id, moved: false };
       if (!id || !this.canMove?.(id)) return;
       const point = this.groundPoint(e.clientX, e.clientY), object = this.objects.get(id);
-      if (!point || !object || object.equipment.tap) return;
+      if (!point || !object) return;
       this.down.offset = object.model.root.position.clone().sub(point);
-      this.down.layoutX = Number(object.equipment.props.x);
-      this.down.layoutY = Number(object.equipment.props.y);
+      this.down.layoutX = object.equipment.tap ? object.model.root.position.x * 100 - 33 : Number(object.equipment.props.x);
+      this.down.layoutY = object.equipment.tap ? -object.model.root.position.y * 100 : Number(object.equipment.props.y);
       this.controls.enabled = false;
       this.canvas.setPointerCapture(e.pointerId);
       e.preventDefault();
