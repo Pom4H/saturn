@@ -45,6 +45,10 @@ export function plantProjection(files: Record<string, string>) {
   const project = compileProject(files); installEquipment();
   return { project, scene: sceneFor(project), runtime: unavailableRuntime(project), objects: sourceObjects(files) };
 }
+export function runtimeProjection(project: Project, frame: Frame) {
+  installEquipment();
+  return { project, scene: sceneFor(project), runtime: visualFrame(project, frame), objects: new Map<string, SourceObject>() };
+}
 export function nestedStarter() {
   const files = { ...starter };
   files['systems/pumping.ts'] = files['equipment.ts']; delete files['equipment.ts'];
