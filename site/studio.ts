@@ -186,7 +186,10 @@ export async function mountStudio() {
   async function activateRuntimeSession(session: ServerSession) {
     await ensurePlant();
     setServerRole(session); runtimeOnly = true; runtimeRevision = session.frame.revision; serverRevision = null; pendingRevision = null;
-    shell.dataset.runtimeOnly = 'true';
+    shell.dataset.runtimeOnly = 'true'; shell.dataset.serverProject = 'true';
+    const trigger = $('project-trigger') as HTMLButtonElement; trigger.disabled = true;
+    shell.querySelector<HTMLElement>('.project-trigger-name')!.textContent = session.project.title;
+    window.dispatchEvent(new Event('saturn-project-change'));
     plant = plantTools!.runtimeProjection(session.project, session.frame);
     compiled = { ...compiled, scene: plant.scene };
     selected = null; filesVisible = false; codeVisible = false; propertiesVisible = false; mobilePane = 'scene';
@@ -244,7 +247,7 @@ export async function mountStudio() {
     $('studio-context').textContent = isPlant() ? 'Черновик' : 'Демо';
     $('studio-context').title = isPlant() ? 'Исходники и схема; runtime не подключён' : 'Расчётная демонстрационная модель';
     window.dispatchEvent(new Event('saturn-project-change'));
-    syncTelemetry();
+    syncServerActions(); syncTelemetry();
     $('studio-message').textContent = serverRevision ? (documents.dirty() ? 'Черновик в памяти' : 'Серверная ревизия') : isPlant() ? 'Черновик · без runtime' : $('studio-message').textContent;
   }
   async function openPlantExample() {
@@ -256,7 +259,7 @@ export async function mountStudio() {
     } catch (e) { toast(e instanceof Error ? e.message : String(e)); renderMeta(); }
   }
   function activateServer(revision: ServerRevision) {
-    persist(); runtimeOnly = false; runtimeRevision = null; delete shell.dataset.runtimeOnly; serverRevision = revision; pendingRevision = null;
+    persist(); runtimeOnly = false; runtimeRevision = null; delete shell.dataset.runtimeOnly; shell.dataset.serverProject = 'true'; ($('project-trigger') as HTMLButtonElement).disabled = false; serverRevision = revision; pendingRevision = null;
     documents = new Documents(revision.files, editorState, 'plant.ts'); editor.setState(documents.state);
     serverDraft = { revision, documents }; selected = null; clearConnection(); refresh(false); fitScene(); spatial?.fit();
     filesVisible = true; renderMeta(); syncPanels();
@@ -408,6 +411,14 @@ export async function mountStudio() {
     renderFiles(); updatePause();
     if (save) persist();
   }
+  function syncServerActions() {
+    const connected = Boolean(serverSession && (serverRevision || runtimeOnly));
+    $('runtime-controls').hidden = !connected; $('runtime-alarms').hidden = !connected;
+    const engineer = connected && serverSession?.actor.role === 'engineer' && !!serverRevision;
+    $('server-save').hidden = !engineer; $('server-publish').hidden = !engineer;
+    $('server-save').toggleAttribute('disabled', !engineer || !documents.dirty() || error);
+    $('server-publish').toggleAttribute('disabled', !engineer || documents.dirty() || !serverRevision || serverRevision.id === serverSession?.desired);
+  }
   function renderMeta() {
     const picker = $<HTMLSelectElement>('project-switch'); picker.replaceChildren();
     const exampleGroup = document.createElement('optgroup'); exampleGroup.label = 'Примеры';
@@ -427,12 +438,7 @@ export async function mountStudio() {
     $('studio-html').hidden = isPlant() || runtimeOnly; $('studio-share').hidden = isPlant() || runtimeOnly;
     $('equipment-toggle').hidden = isPlant() || runtimeOnly; $('studio-connect').hidden = isPlant() || runtimeOnly;
     $('studio-download').hidden = runtimeOnly; $('studio-download').textContent = isPlant() ? 'Скачать проект (.json)' : 'Скачать исходник (.ts)';
-    const connected = Boolean(serverSession && (serverRevision || runtimeOnly));
-    $('runtime-controls').hidden = !connected; $('runtime-alarms').hidden = !connected;
-    const engineer = connected && serverSession?.actor.role === 'engineer' && !!serverRevision;
-    $('server-save').hidden = !engineer; $('server-publish').hidden = !engineer;
-    $('server-save').toggleAttribute('disabled', !engineer || !documents.dirty() || error);
-    $('server-publish').toggleAttribute('disabled', !engineer || documents.dirty() || !serverRevision || serverRevision.id === serverSession?.desired);
+    syncServerActions();
     documentTitle(); renderProjects();
   }
   function documentTitle() { document.title = fullscreen ? `${(serverRevision || runtimeOnly ? plant?.project.title ?? serverSession?.project.title ?? 'Установка' : currentDocument(workspace).title)} — Saturn SCADA` : 'Saturn SCADA'; }
@@ -542,7 +548,7 @@ export async function mountStudio() {
     }
   }
   function switchDocument(active: WorkspaceState['active'], save = true) {
-    if (save) { persist(); if (serverRevision) serverDraft = { revision: serverRevision, documents }; } runtimeOnly = false; runtimeRevision = null; delete shell.dataset.runtimeOnly; serverRevision = null; pendingRevision = null; setServerRole(null); workspace.active = active; selected = null; clearConnection();
+    if (save) { persist(); if (serverRevision) serverDraft = { revision: serverRevision, documents }; } runtimeOnly = false; runtimeRevision = null; delete shell.dataset.runtimeOnly; shell.dataset.serverProject = 'false'; ($('project-trigger') as HTMLButtonElement).disabled = false; serverRevision = null; pendingRevision = null; setServerRole(null); workspace.active = active; selected = null; clearConnection();
     const next = currentDocument(workspace);
     documents = new Documents(next.files ?? { 'station.ts': next.source }, editorState, next.files?.['plant.ts'] !== undefined ? 'plant.ts' : 'station.ts');
     editor.setState(documents.state); refresh(false); fitScene();
