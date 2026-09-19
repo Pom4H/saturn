@@ -21,9 +21,10 @@ import { Documents, fetchServerProject, type ServerRevision } from './documents'
 import { updateFiles } from './shell-projects';
 import type { plantProjection } from './plant-project';
 import { downloadFile, exportHTML, shareURL, readSharedSource } from './exports';
+import { fetchServerSession, serverPost, commandPayload, type ServerSession } from './server-runtime';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
-type Surface = 'scene' | 'equipment' | 'source' | 'signals' | 'projects';
+type Surface = 'scene' | 'equipment' | 'source' | 'signals' | 'controls' | 'alarms' | 'projects';
 export async function mountStudio() {
   const stage = $('studio'), shell = $('studio-shell'), spatialHost = $('studio-spatial');
   const canvas = document.getElementById('studio-svg') as unknown as SVGSVGElement;
@@ -40,6 +41,7 @@ export async function mountStudio() {
   let filesVisible = false;
   let plantTools: typeof import('./plant-project') | undefined, plant: ReturnType<typeof plantProjection> | undefined;
   let serverRevision: ServerRevision | null = null, pendingRevision: ServerRevision | null = null;
+  let serverSession: ServerSession | null = null, runtimeOnly = false;
   let documents: Documents;
   let codeVisible = false, propertiesVisible = false, mobilePane: 'scene' | 'source' | 'properties' = 'scene';
   let progress = 0, explicit: '2d' | '3d' = '3d', fullscreen = false, scrollBeforeFullscreen = 0;
@@ -67,29 +69,49 @@ export async function mountStudio() {
     view.fit(); capPlantScale();
   }
   function capPlantScale() {
-    if (!isPlant()) return;
-    const rect = canvas.getBoundingClientRect(), c = view.camera;
-    const scale = Math.min(rect.width / c.width, rect.height / c.height);
-    if (scale > 1.25) view.zoom(scale / 1.25);
+    if (!isPlant() && !runtimeOnly) return;
+    const rect = canvas.getBoundingClientRect(), camera = view.camera;
+    const scale = Math.min(rect.width / camera.width, rect.height / camera.height);
+    const maxScale = runtimeOnly && compact.matches ? 3.2 : 1.25;
+    if (scale > maxScale) view.zoom(scale / maxScale);
   }
   let serverDraft: { revision: ServerRevision; documents: Documents } | null = null;
   let telemetry: TelemetryUpdate = { state: 'connecting', frame: null, message: '' };
   let observedRuntime: RuntimeFrame | null = null;
-  const stream = new SimulationStream(update => { telemetry = update; applyTelemetry(); });
+  const stream = new SimulationStream(update => {
+    telemetry = update;
+    if (serverSession && update.frame) serverSession = { ...serverSession, frame: update.frame };
+    applyTelemetry();
+  });
   let serverLoading = false;
+  function setServerRole(session: ServerSession | null) {
+    serverSession = session;
+    if (session) {
+      shell.dataset.role = session.actor.role;
+      $('server-role').hidden = false;
+      $('server-role').textContent = session.actor.role;
+      $('server-role').title = `Пользователь ${session.actor.id}`;
+    } else {
+      delete shell.dataset.role;
+      $('server-role').hidden = true;
+      $('server-role').textContent = '';
+    }
+  }
   function syncTelemetry() {
-    if (serverRevision && plant) stream.start();
+    if ((serverRevision || runtimeOnly) && plant) stream.start();
     else { stream.stop(); telemetry = { state: 'connecting', frame: null, message: '' }; }
     applyTelemetry();
   }
   function applyTelemetry() {
-    if (!plant || !plantTools) { observedRuntime = null; shell.dataset.telemetry = 'local'; shell.dataset.runtimeSeq = ''; return; }
+    if (!plant || !plantTools) { observedRuntime = null; shell.dataset.telemetry = 'local'; shell.dataset.runtimeSeq = ''; renderRuntimeControls(); renderRuntimeAlarms(); return; }
     const liveFrame = telemetry.frame;
-    let status: string = 'draft', label = 'Черновик · без телеметрии';
+    let status: string = runtimeOnly ? telemetry.state : 'draft', label = runtimeOnly ? telemetry.message : 'Черновик · без телеметрии';
     observedRuntime = plant.runtime;
-    if (serverRevision && !documents.dirty() && !error) {
+    const revision = serverRevision?.id ?? serverSession?.frame.revision ?? null;
+    const sourceClean = runtimeOnly || !documents.dirty() && !error;
+    if (revision && sourceClean) {
       status = telemetry.state; label = telemetry.message;
-      if (liveFrame && liveFrame.revision !== serverRevision.id) { status = 'revision'; label = 'Симуляция другой ревизии'; }
+      if (liveFrame && liveFrame.revision !== revision) { status = 'revision'; label = 'Симуляция другой ревизии'; }
       else if (telemetry.state === 'live' && liveFrame) {
         status = liveFrame.paused ? 'paused' : 'live';
         label = liveFrame.paused ? 'Симуляция · пауза' : 'Симуляция · подключена';
@@ -98,10 +120,90 @@ export async function mountStudio() {
     } else if (serverRevision) label = 'Черновик · данные приостановлены';
     if (status !== 'live' && status !== 'paused') observedRuntime = plantTools.unavailableRuntime(plant.project, status === 'draft' || status === 'revision' ? 'draft' : 'offline');
     shell.dataset.telemetry = status; shell.dataset.runtimeSeq = String(status === 'live' || status === 'paused' ? liveFrame?.seq ?? '' : '');
-    $('studio-context').textContent = label; $('studio-context').title = telemetry.message || label;
+    $('studio-context').textContent = label || (runtimeOnly ? 'Установка' : 'Черновик'); $('studio-context').title = telemetry.message || label;
     view.setRuntime(observedRuntime); spatial?.setRuntime(observedRuntime);
     animateState();
+    renderRuntimeControls(); renderRuntimeAlarms();
     if (surface === 'signals') renderSignals();
+  }
+  async function runtimeCommand(action: string, extra: Record<string, unknown> = {}) {
+    if (!serverSession || !telemetry.frame || !['live', 'paused'].includes(shell.dataset.telemetry ?? '')) throw new Error('Нет достоверной связи с runtime');
+    const current = { ...serverSession, frame: telemetry.frame };
+    await serverPost(current, 'command', commandPayload(current, action, extra));
+  }
+  function renderRuntimeControls() {
+    const host = $('runtime-control-list'); host.replaceChildren();
+    const project = serverSession?.project, frame = telemetry.frame;
+    const controls = project?.controls ?? [];
+    $('runtime-controls').hidden = !serverSession;
+    $('runtime-state').textContent = serverSession ? `${project!.title} · ${frame?.paused ? 'пауза' : telemetry.state === 'live' ? 'runtime активен' : telemetry.message || 'нет данных'}` : '';
+    $('runtime-pause').textContent = frame?.paused ? 'Продолжить' : 'Пауза';
+    $('runtime-pause').toggleAttribute('disabled', !serverSession || serverSession.actor.role === 'viewer' || !frame || !['live', 'paused'].includes(shell.dataset.telemetry ?? ''));
+    if (!serverSession) return;
+    if (!controls.length) { const empty = document.createElement('div'); empty.className = 'runtime-empty'; empty.textContent = 'В проекте нет операторских уставок.'; host.append(empty); return; }
+    for (const control of controls) {
+      const actual = frame?.samples[`${control.id}.value`], requested = frame?.samples[`${control.id}.requested`], blocked = Boolean(frame?.samples[`${control.id}.blocked`]?.value);
+      const good = actual?.quality === 'good';
+      const card = document.createElement('article'); card.className = 'runtime-control-card'; card.dataset.blocked = String(blocked);
+      const header = document.createElement('header'), title = document.createElement('h3'), unit = document.createElement('small');
+      title.textContent = control.title; unit.textContent = `${control.id} · ${control.unit}`; header.append(title, unit);
+      const values = document.createElement('div'); values.className = 'runtime-control-values';
+      for (const [labelText, sample] of [['Уставка', requested], ['Фактически', actual]] as const) {
+        const box = document.createElement('div'), label = document.createElement('span'), value = document.createElement('b');
+        label.textContent = labelText; value.textContent = sample?.quality === 'good' && typeof sample.value === 'number' ? Number(sample.value.toFixed(3)).toString() : '—'; box.append(label, value); values.append(box);
+      }
+      const edit = document.createElement('div'); edit.className = 'runtime-control-edit';
+      const input = document.createElement('input'); input.type = 'number'; input.min = String(control.min); input.max = String(control.max); input.step = String(control.step); input.value = typeof requested?.value === 'number' ? String(requested.value) : String(control.initial); input.setAttribute('aria-label', control.title);
+      const button = document.createElement('button'); button.textContent = 'Применить';
+      button.disabled = serverSession.actor.role === 'viewer' || !good || blocked || telemetry.state !== 'live';
+      input.disabled = button.disabled;
+      button.onclick = () => void (async () => { try { if (!input.checkValidity()) { input.reportValidity(); return; } await runtimeCommand('operate', { target: control.id, value: Number(input.value) }); toast('Уставка принята'); } catch (e) { toast(e instanceof Error ? e.message : String(e)); } })();
+      edit.append(input, button);
+      const note = document.createElement('p'); note.textContent = !good ? 'Данные недостоверны: команды заблокированы.' : blocked ? control.blockedReason ?? 'Блокировка активна' : `${control.min}…${control.max} ${control.unit} · до ${control.rate}/с`;
+      card.append(header, values, edit, note); host.append(card);
+    }
+  }
+  function renderRuntimeAlarms() {
+    const host = $('runtime-alarm-list'); host.replaceChildren();
+    const project = serverSession?.project, frame = telemetry.frame;
+    const alarms = frame?.alarms.filter(alarm => alarm.active || alarm.raisedAt !== null && !alarm.acknowledged) ?? [];
+    $('runtime-alarms').hidden = !serverSession;
+    $('runtime-alarm-count').hidden = !alarms.length;
+    $('runtime-alarm-count').textContent = String(alarms.length);
+    if (!serverSession) return;
+    if (!alarms.length) { const empty = document.createElement('div'); empty.className = 'runtime-empty'; empty.textContent = 'Активных алармов нет.'; host.append(empty); return; }
+    for (const alarm of alarms) {
+      const rule = project?.alarms.find(item => item.id === alarm.id);
+      const row = document.createElement('article'); row.className = 'runtime-alarm'; row.dataset.active = String(alarm.active);
+      const text = document.createElement('div'), title = document.createElement('strong'), meta = document.createElement('small');
+      title.textContent = rule?.title ?? alarm.id; meta.textContent = `${rule?.priority ?? 'alarm'} · ${alarm.active ? 'активен' : 'снят'}${alarm.acknowledged ? ' · подтверждён' : ''}`; text.append(title, meta);
+      const time = document.createElement('small'); time.textContent = alarm.raisedAt ? new Date(alarm.raisedAt).toLocaleTimeString('ru-RU') : '—';
+      const ack = document.createElement('button'); ack.textContent = alarm.acknowledged ? 'Подтверждён' : 'Подтвердить'; ack.disabled = alarm.acknowledged || serverSession.actor.role === 'viewer' || telemetry.state !== 'live';
+      ack.onclick = () => void (async () => { try { await runtimeCommand('ack', { target: alarm.id }); toast('Аларм подтверждён'); } catch (e) { toast(e instanceof Error ? e.message : String(e)); } })();
+      row.append(text, time, ack); host.append(row);
+    }
+  }
+  async function activateRuntimeSession(session: ServerSession) {
+    await ensurePlant();
+    setServerRole(session); runtimeOnly = true; serverRevision = null; pendingRevision = null;
+    shell.dataset.runtimeOnly = 'true';
+    plant = plantTools!.runtimeProjection(session.project, session.frame);
+    compiled = { ...compiled, scene: plant.scene };
+    selected = null; filesVisible = false; codeVisible = false; propertiesVisible = false; mobilePane = 'scene';
+    view.render(compiled.scene); spatial?.render(compiled.scene);
+    telemetry = { state: 'live', frame: session.frame, message: '' };
+    observedRuntime = plant.runtime; view.setRuntime(observedRuntime); spatial?.setRuntime(observedRuntime);
+    renderTree(); renderMeta(); setSurface('scene'); syncPanels(); updatePause(); syncTelemetry();
+    if (compact.matches) setMode('2d');
+    fitScene(); spatial?.fit(); renderRuntimeControls(); renderRuntimeAlarms();
+  }
+  async function probeRuntime() {
+    try {
+      const session = await fetchServerSession();
+      setServerRole(session);
+      if (session.actor.role !== 'engineer') await activateRuntimeSession(session);
+      else if (matchMedia('(display-mode: standalone)').matches || new URLSearchParams(location.search).get('project') === 'server') await loadServer();
+    } catch { /* Static playground or unauthenticated landing stays local. */ }
   }
   const fileNavigator = new FileNavigator(() => ({ paths: [...documents.states.keys()], active: documents.active,
     dirty: new Set([...documents.states.keys()].filter(path => documents.dirty(path))),
@@ -154,7 +256,7 @@ export async function mountStudio() {
     } catch (e) { toast(e instanceof Error ? e.message : String(e)); renderMeta(); }
   }
   function activateServer(revision: ServerRevision) {
-    persist(); serverRevision = revision; pendingRevision = null;
+    persist(); runtimeOnly = false; delete shell.dataset.runtimeOnly; serverRevision = revision; pendingRevision = null;
     documents = new Documents(revision.files, editorState, 'plant.ts'); editor.setState(documents.state);
     serverDraft = { revision, documents }; selected = null; clearConnection(); refresh(false); fitScene(); spatial?.fit();
     filesVisible = true; renderMeta(); syncPanels();
@@ -168,7 +270,15 @@ export async function mountStudio() {
     const baseDocuments = documents;
     const button = $('server-load'); button.setAttribute('disabled', ''); $('server-error').textContent = 'Загрузка…';
     try {
-      await ensurePlant(); const revision = await fetchServerProject(); plantTools!.validateFiles(revision.files); plantTools!.plantProjection(revision.files);
+      await ensurePlant();
+      const session = await fetchServerSession(); setServerRole(session);
+      if (session.actor.role !== 'engineer') {
+        await activateRuntimeSession(session);
+        serverState.dataset.state = 'ready'; serverState.textContent = `Подключено · ${session.actor.role}`;
+        $('server-error').textContent = ''; $<HTMLDialogElement>('server-dialog').close();
+        return;
+      }
+      const revision = await fetchServerProject(); plantTools!.validateFiles(revision.files); plantTools!.plantProjection(revision.files);
       if (documents !== baseDocuments) throw new Error('Проект был переключён. Повторите загрузку.');
       if (serverRevision && documents.dirty()) {
         if (revision.id !== serverRevision.id) pendingRevision = revision;
@@ -256,8 +366,8 @@ export async function mountStudio() {
       if (path === documents.active) editor.dispatch(spec); else documents.states.set(path, state.update(spec).state);
       renderInspector(); clearConnection();
     }
-    $('studio-add').toggleAttribute('disabled', error || isPlant());
-    $('studio-connect').toggleAttribute('disabled', error || isPlant() || progress < .72);
+    $('studio-add').toggleAttribute('disabled', error || isPlant() || runtimeOnly);
+    $('studio-connect').toggleAttribute('disabled', error || isPlant() || runtimeOnly || progress < .72);
     renderFiles(); updatePause();
     if (save) persist();
   }
@@ -272,17 +382,23 @@ export async function mountStudio() {
       for (const project of workspace.projects) { const option = document.createElement('option'); option.value = `project:${project.id}`; option.textContent = project.title; group.append(option); }
       picker.append(group);
     }
-    if (serverRevision || serverDraft) { const option = document.createElement('option'); option.value = 'server:current'; option.textContent = serverRevision ? plant?.project.title ?? 'Серверный проект' : 'Серверный проект'; picker.append(option); picker.value = serverRevision ? option.value : `${workspace.active.kind}:${workspace.active.id}`; }
+    if (serverRevision || runtimeOnly || serverDraft) { const option = document.createElement('option'); option.value = 'server:current'; option.textContent = plant?.project.title ?? serverSession?.project.title ?? 'Серверный проект'; picker.append(option); picker.value = serverRevision || runtimeOnly ? option.value : `${workspace.active.kind}:${workspace.active.id}`; }
     else picker.value = `${workspace.active.kind}:${workspace.active.id}`;
-    $('project-create').hidden = !serverRevision && workspace.active.kind !== 'example';
+    $('project-create').hidden = runtimeOnly || !serverRevision && workspace.active.kind !== 'example';
     $('project-create').textContent = serverRevision ? 'Скопировать проект' : 'Создать проект';
-    $('project-duplicate').hidden = !!serverRevision || workspace.active.kind !== 'project';
-    $('studio-html').hidden = isPlant(); $('studio-share').hidden = isPlant();
-    $('equipment-toggle').hidden = isPlant(); $('studio-connect').hidden = isPlant();
-    $('studio-download').textContent = isPlant() ? 'Скачать проект (.json)' : 'Скачать исходник (.ts)';
+    $('project-duplicate').hidden = runtimeOnly || !!serverRevision || workspace.active.kind !== 'project';
+    $('studio-html').hidden = isPlant() || runtimeOnly; $('studio-share').hidden = isPlant() || runtimeOnly;
+    $('equipment-toggle').hidden = isPlant() || runtimeOnly; $('studio-connect').hidden = isPlant() || runtimeOnly;
+    $('studio-download').hidden = runtimeOnly; $('studio-download').textContent = isPlant() ? 'Скачать проект (.json)' : 'Скачать исходник (.ts)';
+    const connected = Boolean(serverSession && (serverRevision || runtimeOnly));
+    $('runtime-controls').hidden = !connected; $('runtime-alarms').hidden = !connected;
+    const engineer = connected && serverSession?.actor.role === 'engineer' && !!serverRevision;
+    $('server-save').hidden = !engineer; $('server-publish').hidden = !engineer;
+    $('server-save').toggleAttribute('disabled', !engineer || !documents.dirty() || error);
+    $('server-publish').toggleAttribute('disabled', !engineer || documents.dirty() || !serverRevision || serverRevision.id === serverSession?.desired);
     documentTitle(); renderProjects();
   }
-  function documentTitle() { document.title = fullscreen ? `${(serverRevision ? plant?.project.title ?? 'Проект' : currentDocument(workspace).title)} — Saturn SCADA` : 'Saturn SCADA'; }
+  function documentTitle() { document.title = fullscreen ? `${(serverRevision || runtimeOnly ? plant?.project.title ?? serverSession?.project.title ?? 'Установка' : currentDocument(workspace).title)} — Saturn SCADA` : 'Saturn SCADA'; }
   function select(id: string | null) {
     if (id && id !== selected) propertiesVisible = true;
     if (!id) propertiesVisible = false;
@@ -291,13 +407,13 @@ export async function mountStudio() {
     if (!drag) renderInspector();
   }
   function fields(id: string, patch: Record<string, Value>) {
-    if (error) return;
+    if (error || runtimeOnly) return;
     if (isPlant()) { patchPlantFields(id, patch); return; }
     try { editor.dispatch({ changes: patchFields(editor.state.doc.toString(), id, patch), annotations: isolateHistory.of('full'), userEvent: 'input.visual' }); }
     catch (e) { toast(e instanceof Error ? e.message : String(e)); }
   }
   function removeSelected() {
-    if (!selected || error || isPlant()) return;
+    if (!selected || error || isPlant() || runtimeOnly) return;
     try { editor.dispatch({ changes: removeObject(editor.state.doc.toString(), selected), annotations: isolateHistory.of('full'), userEvent: 'delete' }); }
     catch (e) { toast(e instanceof Error ? e.message : String(e)); }
   }
@@ -385,7 +501,7 @@ export async function mountStudio() {
     }
   }
   function switchDocument(active: WorkspaceState['active'], save = true) {
-    if (save) { persist(); if (serverRevision) serverDraft = { revision: serverRevision, documents }; } serverRevision = null; pendingRevision = null; workspace.active = active; selected = null; clearConnection();
+    if (save) { persist(); if (serverRevision) serverDraft = { revision: serverRevision, documents }; } runtimeOnly = false; delete shell.dataset.runtimeOnly; serverRevision = null; pendingRevision = null; setServerRole(null); workspace.active = active; selected = null; clearConnection();
     const next = currentDocument(workspace);
     documents = new Documents(next.files ?? { 'station.ts': next.source }, editorState, next.files?.['plant.ts'] !== undefined ? 'plant.ts' : 'station.ts');
     editor.setState(documents.state); refresh(false); fitScene();
@@ -399,6 +515,7 @@ export async function mountStudio() {
     if (!selected && mobilePane === 'properties') mobilePane = 'scene';
     if (!selected) propertiesVisible = false;
     $('inspector-toggle').toggleAttribute('disabled', !selected);
+    if (runtimeOnly || serverSession && serverSession.actor.role !== 'engineer') { filesVisible = false; codeVisible = false; propertiesVisible = false; mobilePane = 'scene'; }
     $('file-browser').hidden = !filesVisible; $('files-toggle').setAttribute('aria-expanded', String(filesVisible));
     $('studio-editor-pane').hidden = mobile ? mobilePane !== 'source' : !codeVisible;
     $('source-splitter').hidden = mobile || !codeVisible;
@@ -407,7 +524,7 @@ export async function mountStudio() {
     $('studio-code').setAttribute('aria-pressed', String(surface === 'scene' && (mobile ? mobilePane === 'source' : codeVisible)));
     $('inspector-toggle').setAttribute('aria-pressed', String(surface === 'scene' && (mobile ? mobilePane === 'properties' : propertiesVisible)));
     $('mobile-scene').setAttribute('aria-pressed', String(surface === 'scene' && mobilePane === 'scene'));
-    shell.querySelectorAll<HTMLButtonElement>('[data-shell-view="signals"]').forEach(button => button.setAttribute('aria-pressed', String(surface === 'signals')));
+    shell.querySelectorAll<HTMLButtonElement>('[data-shell-view]').forEach(button => button.setAttribute('aria-pressed', String(surface === button.dataset.shellView)));
     requestAnimationFrame(() => { editor.requestMeasure(); capPlantScale(); });
   }
   function toggleCode() { if (surface !== 'scene') { codeVisible = true; mobilePane = 'source'; setSurface('scene'); } else if (compact.matches) mobilePane = mobilePane === 'source' ? 'scene' : 'source'; else codeVisible = !codeVisible; syncPanels(); saveLayout(); }
@@ -417,9 +534,11 @@ export async function mountStudio() {
     if (next === 'equipment') { toggleEquipment(true); next = 'scene'; }
     surface = next; shell.dataset.view = next;
     $('scene-panel').hidden = next !== 'scene';
-    $('signals-panel').hidden = next !== 'signals'; $('projects-panel').hidden = next !== 'projects';
+    $('signals-panel').hidden = next !== 'signals'; $('controls-panel').hidden = next !== 'controls'; $('alarms-panel').hidden = next !== 'alarms'; $('projects-panel').hidden = next !== 'projects';
     document.querySelectorAll<HTMLDetailsElement>('.export-options').forEach(menu => menu.open = false);
     if (next === 'signals') renderSignals();
+    if (next === 'controls') renderRuntimeControls();
+    if (next === 'alarms') renderRuntimeAlarms();
     syncPanels(); renderMeta(); animateState();
   }
   function revealShell() { if (!fullscreen) stage.scrollIntoView({ block: 'start', behavior: reduced.matches ? 'instant' : 'smooth' }); }
@@ -430,7 +549,7 @@ export async function mountStudio() {
     for (const node of document.querySelectorAll<HTMLElement>('.site-header,.hero')) node.inert = enabled;
     const control = $('shell-fullscreen'); control.setAttribute('aria-label', enabled ? 'Вернуться на лендинг' : 'Развернуть на весь экран'); control.setAttribute('title', control.getAttribute('aria-label')!);
     control.querySelector('use')!.setAttribute('href', enabled ? '#i-collapse' : '#i-expand');
-    if (enabled) { if (!compact.matches) codeVisible = true; syncPanels(); } else window.scrollTo({ top: scrollBeforeFullscreen, behavior: 'instant' });
+    if (enabled) { if (!compact.matches && !runtimeOnly) codeVisible = true; syncPanels(); } else window.scrollTo({ top: scrollBeforeFullscreen, behavior: 'instant' });
     visible = true; animateState(); documentTitle();
     requestAnimationFrame(() => { editor.requestMeasure(); spatial?.fit(); });
   }
@@ -496,7 +615,7 @@ export async function mountStudio() {
     const node = compiled.scene.nodes.find(n => n.id === element?.dataset.node);
     const point = view.point(event.clientX, event.clientY);
     if (!element || !node) { if (event.pointerType === 'mouse' || fullscreen) { pan = { x: event.clientX, y: event.clientY, cameraX: view.camera.x, cameraY: view.camera.y }; canvas.setPointerCapture(event.pointerId); } return; }
-    if (isPlant()) { select(node.id); return; }
+    if (isPlant() || runtimeOnly) { select(node.id); return; }
     if (error || node.tap || !editable(compiled, node.id, 'x') || !editable(compiled, node.id, 'y')) return;
     drag = { id: node.id, x: Number(node.props.x), y: Number(node.props.y), startX: point.x, startY: point.y, dx: 0, dy: 0, element, transform: element.getAttribute('transform') ?? '' };
     canvas.setPointerCapture(event.pointerId); select(node.id);
@@ -546,12 +665,12 @@ export async function mountStudio() {
   $('studio-plus').onclick = () => { if (progress < .72) spatial?.zoom(.8); else view.zoom(.8); };
   $('studio-minus').onclick = () => { if (progress < .72) spatial?.zoom(1.25); else view.zoom(1.25); };
   $('studio-add').onclick = () => {
-    if (error) return;
+    if (error || runtimeOnly) return;
     try { const kind = $<HTMLSelectElement>('studio-catalog').value; const source = kind === 'pressure' || kind === 'temperature' ? appendTap(editor.state.doc.toString(), selected ?? '', kind) : appendEquipment(editor.state.doc.toString(), kind, 450, 480); editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: source }, annotations: isolateHistory.of('full'), userEvent: 'input' }); fitScene(); spatial?.fit(); select(compiled.scene.nodes.at(-1)?.id ?? null); }
     catch (e) { toast(e instanceof Error ? e.message : String(e)); }
   };
-  function animateState() { const active = (visible || fullscreen) && !document.hidden && !['signals', 'projects'].includes(surface); const stopped = isPlant() ? shell.dataset.telemetry !== 'live' : paused; view.paused = stopped || !active; if (spatial) spatial.paused = stopped || !active || progress >= 1; }
-  function updatePause() { $('studio-play').hidden = isPlant(); $('studio-play').innerHTML = `<svg aria-hidden="true"><use href="#i-${paused ? 'play' : 'pause'}"/></svg>`; $('studio-play').title = paused ? 'Запустить демонстрацию' : 'Приостановить демонстрацию'; $('studio-play').setAttribute('aria-label', $('studio-play').title); $('studio-play').setAttribute('aria-pressed', String(!paused)); }
+  function animateState() { const active = (visible || fullscreen) && !document.hidden && !['signals', 'controls', 'alarms', 'projects'].includes(surface); const stopped = isPlant() || runtimeOnly ? shell.dataset.telemetry !== 'live' : paused; view.paused = stopped || !active; if (spatial) spatial.paused = stopped || !active || progress >= 1; }
+  function updatePause() { $('studio-play').hidden = isPlant() || runtimeOnly; $('studio-play').innerHTML = `<svg aria-hidden="true"><use href="#i-${paused ? 'play' : 'pause'}"/></svg>`; $('studio-play').title = paused ? 'Запустить демонстрацию' : 'Приостановить демонстрацию'; $('studio-play').setAttribute('aria-label', $('studio-play').title); $('studio-play').setAttribute('aria-pressed', String(!paused)); }
   $('studio-play').onclick = () => { paused = !paused; animateState(); updatePause(); };
   document.addEventListener('visibilitychange', animateState);
   reduced.addEventListener('change', () => { if (reduced.matches) paused = true; updatePause(); animateState(); });
@@ -595,7 +714,7 @@ export async function mountStudio() {
     const flat = progress > .72;
     shell.style.setProperty('--studio-progress', String(progress)); shell.dataset.mode = flat ? '2d' : '3d';
     $('studio-2d').setAttribute('aria-pressed', String(flat)); $('studio-3d').setAttribute('aria-pressed', String(!flat));
-    $('studio-connect').toggleAttribute('disabled', error || isPlant() || !flat); if (!flat) clearConnection();
+    $('studio-connect').toggleAttribute('disabled', error || isPlant() || runtimeOnly || !flat); if (!flat) clearConnection();
     spatialHost.inert = flat; $('studio-flat').inert = !flat; spatialHost.style.visibility = progress >= 1 ? 'hidden' : 'visible';
     spatial?.fit(); animateState();
   }
@@ -615,7 +734,8 @@ export async function mountStudio() {
     const { SceneView3D } = await import('../src/view3d'); spatial = new SceneView3D(spatialHost, { landing: true }); spatial.onSelect = select;
     spatial.render(compiled.scene); spatial.setRuntime(observedRuntime ?? plant?.runtime ?? null); spatial.select(selected); setMode(explicit);
   } catch { $('studio-3d').setAttribute('disabled', ''); present(1); toast('WebGL недоступен. Работайте с 2D-схемой.'); }
-  if (matchMedia('(display-mode: standalone)').matches || location.hash === '#studio' || location.hash === '#workspace' || shared) setFullscreen(true);
+  await probeRuntime();
+  if (runtimeOnly || matchMedia('(display-mode: standalone)').matches || location.hash === '#studio' || location.hash === '#workspace' || shared) setFullscreen(true);
   if (shared) persist();
   if (!shared && new URLSearchParams(location.search).get('project') === 'server') { await loadServer(); if (!serverRevision) $<HTMLDialogElement>('server-dialog').showModal(); }
 }
