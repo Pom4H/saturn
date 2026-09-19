@@ -789,8 +789,11 @@ export async function mountStudio() {
     const { SceneView3D } = await import('../src/view3d'); spatial = new SceneView3D(spatialHost, { landing: true }); spatial.onSelect = select;
     spatial.render(compiled.scene); spatial.setRuntime(observedRuntime ?? plant?.runtime ?? null); spatial.select(selected); setMode(explicit);
   } catch { $('studio-3d').setAttribute('disabled', ''); present(1); toast('WebGL недоступен. Работайте с 2D-схемой.'); }
+  const requestedServer = !shared && new URLSearchParams(location.search).get('project') === 'server';
   await probeRuntime();
   if (runtimeOnly || matchMedia('(display-mode: standalone)').matches || location.hash === '#studio' || location.hash === '#workspace' || shared) setFullscreen(true);
   if (shared) persist();
-  if (!shared && new URLSearchParams(location.search).get('project') === 'server') { await loadServer(); if (!serverRevision) $<HTMLDialogElement>('server-dialog').showModal(); }
+  // probeRuntime owns authenticated activation. Only unauthenticated server links
+  // need the connection dialog; operator/viewer deliberately have no source revision.
+  if (requestedServer && !serverRevision && !runtimeOnly) $<HTMLDialogElement>('server-dialog').showModal();
 }
