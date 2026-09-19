@@ -225,3 +225,61 @@
 .shell[data-telemetry=live] #studio-context { color: var(--status-live); }
 .shell[data-telemetry=offline] #studio-context,.shell[data-telemetry=auth] #studio-context,.shell[data-telemetry=revision] #studio-context { color: var(--status-warning); }
 #studio-context { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+
+
+/* Integrated installation runtime. Engineering chrome is removed, not merely disabled,
+   when the authenticated role does not own source/release permissions. */
+.alarm-count { min-width: 15px; height: 15px; padding: 0 4px; border-radius: 9px; display: inline-grid; place-items: center; background: #8b3f3b; color: #fff; font: 9px var(--mono); margin-left: -5px; }
+.runtime-heading-actions { display: flex; gap: 8px; align-items: center; }
+.content-heading p { margin-top: 6px; color: var(--muted); font-size: 11px; }
+.runtime-control-list { display: grid; grid-template-columns: repeat(auto-fit,minmax(260px,1fr)); gap: 12px; margin-top: 20px; }
+.runtime-control-card { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.runtime-control-card header { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.runtime-control-card h3 { font: 14px var(--mono); font-weight: 500; }
+.runtime-control-card small,.runtime-control-card p { color: var(--muted); font-size: 10px; }
+.runtime-control-values { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.runtime-control-values div { padding: 10px; background: var(--bg); border-radius: 6px; }
+.runtime-control-values span { display: block; color: var(--muted); font-size: 9px; margin-bottom: 4px; }
+.runtime-control-values b { font: 16px var(--mono); font-weight: 500; }
+.runtime-control-edit { display: flex; gap: 7px; align-items: center; }
+.runtime-control-edit input { width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); color: var(--text); font: 12px var(--mono); }
+.runtime-control-card[data-blocked=true] { opacity: .65; }
+.runtime-alarm-list { display: grid; gap: 8px; margin-top: 20px; }
+.runtime-alarm { display: grid; grid-template-columns: minmax(100px,1fr) auto auto; gap: 12px; align-items: center; padding: 12px 14px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); }
+.runtime-alarm[data-active=true] { border-color: #72514a; background: color-mix(in srgb,#713d35 12%,var(--panel)); }
+.runtime-alarm strong { font: 12px var(--mono); font-weight: 500; }
+.runtime-alarm small { color: var(--muted); font-size: 10px; }
+.runtime-empty { padding: 40px 12px; text-align: center; color: var(--muted); font-size: 12px; }
+#server-role { text-transform: capitalize; }
+.shell[data-role=operator] #files-toggle,
+.shell[data-role=operator] #studio-code,
+.shell[data-role=operator] #inspector-toggle,
+.shell[data-role=operator] #project-create,
+.shell[data-role=operator] .export-options,
+.shell[data-role=operator] #command-launcher,
+.shell[data-role=viewer] #files-toggle,
+.shell[data-role=viewer] #studio-code,
+.shell[data-role=viewer] #inspector-toggle,
+.shell[data-role=viewer] #project-create,
+.shell[data-role=viewer] .export-options,
+.shell[data-role=viewer] #command-launcher { display: none !important; }
+.shell[data-role=operator] .canvas-tools:first-child,
+.shell[data-role=viewer] .canvas-tools:first-child { display: none; }
+.shell[data-role=viewer] #runtime-pause { display: none; }
+.shell[data-runtime-only=true] #file-browser,
+.shell[data-runtime-only=true] .studio-editor-pane,
+.shell[data-runtime-only=true] #source-splitter,
+.shell[data-runtime-only=true] .studio-inspector { display: none !important; }
+
+@media(max-width:520px) {
+  .shell[data-role=operator] .shell-topbar,.shell[data-role=viewer] .shell-topbar { height: 48px; padding: 0 6px; }
+  .shell[data-role=operator] .shell-actions,.shell[data-role=viewer] .shell-actions { position: static; height: auto; border: 0; margin-left: auto; inset: auto; }
+  .shell[data-role=operator] #mobile-scene,.shell[data-role=viewer] #mobile-scene { display: none; }
+  .shell[data-role=operator] #shell-fullscreen,.shell[data-role=viewer] #shell-fullscreen { margin-left: 0; order: initial; }
+  .shell[data-role=operator] .canvas-toolbar,.shell[data-role=viewer] .canvas-toolbar { top: 7px; }
+  .shell[data-role=operator] .canvas-zoom,.shell[data-role=viewer] .canvas-zoom { bottom: 12px; }
+  .runtime-control-list { grid-template-columns: 1fr; margin-top: 12px; }
+  .runtime-alarm { grid-template-columns: 1fr auto; }
+  .runtime-alarm small { grid-column: 1 / -1; }
+  .controls-panel,.alarms-panel { padding: 14px; }
+}
