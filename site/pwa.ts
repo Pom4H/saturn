@@ -58,7 +58,8 @@ function installationHint(): string {
 function offlineReady(): boolean { return Boolean(registration?.active); }
 function networkState(): void {
   const node = document.getElementById('studio-network');
-  const serverProject = document.getElementById('studio-shell')?.dataset.serverProject === 'true';
+  const shell = document.getElementById('studio-shell');
+  const serverProject = shell?.dataset.serverProject === 'true' || shell?.dataset.runtimeOnly === 'true';
   if (node) {
     node.textContent = !navigator.onLine ? 'Без сети' : serverProject ? 'Сервер' : offlineReady() ? 'Локально' : 'Демо';
     node.title = serverProject ? 'Состояние сети не подтверждает доступность сервера.' : offlineReady() ? 'Приложение сохранено для работы без сети.' : 'Подготовка приложения для работы без сети.';
@@ -133,7 +134,7 @@ function createSettings(): HTMLDialogElement {
         <div class="app-settings-row"><h3 id="app-notifications-title">Уведомления</h3><span id="app-notifications-state" class="app-settings-value"></span></div>
         <p id="app-notifications-description"></p>
         <div class="app-settings-actions"><button type="button" id="app-notifications-allow">Разрешить уведомления</button><button type="button" id="app-notifications-test" hidden>Отправить проверку</button></div>
-        <p class="app-settings-footnote">Тревоги с сервера подключаются <a href="/plant/app/">в установке</a>.</p>
+        <p class="app-settings-footnote">Тревоги и управление доступны в рабочей среде после подключения к установке.</p>
       </section>
     </div>
     <div id="app-settings-message" class="app-settings-message" role="status" aria-live="polite"></div>`;
