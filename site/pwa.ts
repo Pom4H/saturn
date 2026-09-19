@@ -1,4 +1,5 @@
 import './pwa.css';
+import { readAppLanguage, resolveLanguage, setAppLanguage, t } from './i18n';
 
 type InstallPrompt = Event & {
   prompt(): Promise<void>;
@@ -61,8 +62,14 @@ function networkState(): void {
   const shell = document.getElementById('studio-shell');
   const serverProject = shell?.dataset.serverProject === 'true' || shell?.dataset.runtimeOnly === 'true';
   if (node) {
-    node.textContent = !navigator.onLine ? 'Без сети' : serverProject ? 'Сервер' : offlineReady() ? 'Локально' : 'Демо';
-    node.title = serverProject ? 'Состояние сети не подтверждает доступность сервера.' : offlineReady() ? 'Приложение сохранено для работы без сети.' : 'Подготовка приложения для работы без сети.';
+    const telemetry = shell?.dataset.telemetry;
+    node.textContent = !navigator.onLine ? t('network.offline')
+      : serverProject && (telemetry === 'live' || telemetry === 'paused') ? t('network.live')
+      : serverProject && telemetry === 'auth' ? t('network.auth')
+      : serverProject && (telemetry === 'stale' || telemetry === 'connecting') ? t('network.stale')
+      : serverProject ? t('network.reconnecting')
+      : offlineReady() ? t('network.local') : t('network.demo');
+    node.title = serverProject ? (telemetry === 'live' || telemetry === 'paused' ? t('runtime.connected') : t('runtime.stale')) : offlineReady() ? 'Приложение сохранено для работы без сети.' : 'Подготовка приложения для работы без сети.';
   }
   renderSettings();
 }
@@ -105,6 +112,8 @@ function renderSettings(): void {
   test.disabled = busy || !registration?.active || typeof registration.showNotification !== 'function';
   const theme = document.documentElement.dataset.theme ?? 'system';
   dialog.querySelectorAll<HTMLInputElement>('[name="app-theme"]').forEach(input => { input.checked = input.value === theme; });
+  const language = readAppLanguage();
+  dialog.querySelectorAll<HTMLInputElement>('[name="app-language"]').forEach(input => { input.checked = input.value === language; });
 }
 
 function createSettings(): HTMLDialogElement {
@@ -113,27 +122,35 @@ function createSettings(): HTMLDialogElement {
   panel.id = 'app-settings';
   panel.setAttribute('aria-labelledby', 'app-settings-title');
   panel.innerHTML = `
-    <header class="app-settings-heading"><h2 id="app-settings-title">Настройки</h2><button type="button" class="app-settings-close" aria-label="Закрыть настройки" autofocus>×</button></header>
+    <header class="app-settings-heading"><h2 id="app-settings-title">${t('settings.title')}</h2><button type="button" class="app-settings-close" aria-label="${t('settings.title')}" autofocus>×</button></header>
     <div class="app-settings-body">
       <section class="app-settings-section" aria-labelledby="app-appearance-title">
-        <h3 id="app-appearance-title">Оформление</h3>
-        <fieldset class="app-theme-options"><legend class="app-sr-only">Тема приложения</legend>
-          <label><input type="radio" name="app-theme" value="system"><span>Системная</span></label>
-          <label><input type="radio" name="app-theme" value="light"><span>Светлая</span></label>
-          <label><input type="radio" name="app-theme" value="dark"><span>Тёмная</span></label>
+        <h3 id="app-appearance-title">${t('settings.appearance')}</h3>
+        <fieldset class="app-theme-options"><legend class="app-sr-only">${t('settings.theme')}</legend>
+          <label><input type="radio" name="app-theme" value="system"><span>${t('settings.themeSystem')}</span></label>
+          <label><input type="radio" name="app-theme" value="light"><span>${t('settings.themeLight')}</span></label>
+          <label><input type="radio" name="app-theme" value="dark"><span>${t('settings.themeDark')}</span></label>
+        </fieldset>
+      </section>
+      <section class="app-settings-section" aria-labelledby="app-language-title">
+        <h3 id="app-language-title">${t('settings.language')}</h3>
+        <fieldset class="app-theme-options"><legend class="app-sr-only">${t('settings.language')}</legend>
+          <label><input type="radio" name="app-language" value="system"><span>${t('settings.languageSystem')}</span></label>
+          <label><input type="radio" name="app-language" value="ru"><span>${t('settings.languageRussian')}</span></label>
+          <label><input type="radio" name="app-language" value="en"><span>${t('settings.languageEnglish')}</span></label>
         </fieldset>
       </section>
       <section class="app-settings-section" aria-labelledby="app-install-title">
-        <div class="app-settings-row"><h3 id="app-install-title">Приложение</h3><span id="app-install-state" class="app-settings-value"></span></div>
-        <p id="app-install-description"></p><button type="button" id="app-install">Установить Saturn</button>
-        <dl class="app-settings-status"><div><dt>Сеть</dt><dd id="app-network-state"></dd></div><div><dt>Доступ без сети</dt><dd id="app-offline-state"></dd></div><div><dt>Обновления</dt><dd id="app-update-state"></dd></div></dl>
+        <div class="app-settings-row"><h3 id="app-install-title">${t('settings.application')}</h3><span id="app-install-state" class="app-settings-value"></span></div>
+        <p id="app-install-description"></p><button type="button" id="app-install">${t('common.install')} Saturn</button>
+        <dl class="app-settings-status"><div><dt>${t('settings.network')}</dt><dd id="app-network-state"></dd></div><div><dt>${t('settings.offline')}</dt><dd id="app-offline-state"></dd></div><div><dt>${t('settings.updates')}</dt><dd id="app-update-state"></dd></div></dl>
         <p id="app-update-note" hidden>Сохраните изменения и закройте все окна Saturn. Новая версия откроется при следующем запуске.</p>
-        <div class="app-settings-actions"><button type="button" id="app-check-updates">Проверить обновления</button><button type="button" id="app-update" hidden>Обновить приложение</button></div>
+        <div class="app-settings-actions"><button type="button" id="app-check-updates">${t('settings.checkUpdates')}</button><button type="button" id="app-update" hidden>${t('settings.updateApp')}</button></div>
       </section>
       <section class="app-settings-section" aria-labelledby="app-notifications-title">
-        <div class="app-settings-row"><h3 id="app-notifications-title">Уведомления</h3><span id="app-notifications-state" class="app-settings-value"></span></div>
+        <div class="app-settings-row"><h3 id="app-notifications-title">${t('settings.notifications')}</h3><span id="app-notifications-state" class="app-settings-value"></span></div>
         <p id="app-notifications-description"></p>
-        <div class="app-settings-actions"><button type="button" id="app-notifications-allow">Разрешить уведомления</button><button type="button" id="app-notifications-test" hidden>Отправить проверку</button></div>
+        <div class="app-settings-actions"><button type="button" id="app-notifications-allow">${t('settings.allowNotifications')}</button><button type="button" id="app-notifications-test" hidden>${t('settings.testNotification')}</button></div>
         <p class="app-settings-footnote">Тревоги и управление доступны в рабочей среде после подключения к установке.</p>
       </section>
     </div>
@@ -148,6 +165,9 @@ function createSettings(): HTMLDialogElement {
   });
   panel.querySelectorAll<HTMLInputElement>('[name="app-theme"]').forEach(input => input.addEventListener('change', () => {
     if (input.checked && ['system', 'light', 'dark'].includes(input.value)) setAppTheme(input.value as AppTheme);
+  }));
+  panel.querySelectorAll<HTMLInputElement>('[name="app-language"]').forEach(input => input.addEventListener('change', () => {
+    if (input.checked && ['system', 'ru', 'en'].includes(input.value)) setAppLanguage(input.value as 'system' | 'ru' | 'en');
   }));
   panel.querySelector<HTMLButtonElement>('#app-install')!.onclick = () => { void requestInstall(); };
   panel.querySelector<HTMLButtonElement>('#app-notifications-allow')!.onclick = () => { void requestNotifications(); };
@@ -232,6 +252,12 @@ window.addEventListener('saturn-project-change', networkState);
 window.addEventListener('online', networkState);
 window.addEventListener('offline', networkState);
 window.addEventListener('focus', renderSettings);
+window.addEventListener('saturn-language-change', () => {
+  const reopen = Boolean(dialog?.open);
+  dialog?.remove(); dialog = undefined;
+  networkState();
+  if (reopen) openAppSettings();
+});
 displayMode.addEventListener('change', renderSettings);
 window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); installPrompt = event as InstallPrompt; renderSettings(); });
 window.addEventListener('appinstalled', () => { installed = true; installPrompt = undefined; renderSettings(); });
