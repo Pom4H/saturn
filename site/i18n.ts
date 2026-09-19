@@ -241,7 +241,6 @@ const textBindings: [string, MessageKey][] = [
   ['.export-options [data-open-help]', 'common.help'],
   ['.export-options [data-install-studio]', 'menu.installSaturn'],
   ['.navigator-heading>span', 'files.title'],
-  ['.studio-inspector .panel-heading', 'common.properties'],
   ['#signals-panel thead th:nth-child(1)', 'table.object'],
   ['#signals-panel thead th:nth-child(2)', 'table.parameter'],
   ['#signals-panel thead th:nth-child(3)', 'table.value'],
