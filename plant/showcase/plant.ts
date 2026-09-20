@@ -1,5 +1,5 @@
 import {
-  project, system, simulation, plc, pin, gt, block, setpoint, functionBlock,
+  project, system, simulation, plc, gt, setpoint,
   port, cable, pipe, expansion, alarm
 } from '@scada/plant';
 
@@ -25,11 +25,8 @@ const controller=plc('SATURN-DEMO',{
     PUMP:{caption:'Насос P-101',min:0,max:1,initial:1,step:1},
     VALVE:{caption:'Клапан V-101',min:0,max:1,initial:1,step:1},
   },
-  blocks:{
-    pumpDrive:functionBlock('OR',[gt(pin('AI1'),420),setpoint('PUMP')]),
-  },
   outputs:{
-    DO1:block('pumpDrive'),
+    DO1:setpoint('PUMP'),
     DO2:setpoint('VALVE'),
   },
   hmi:{
