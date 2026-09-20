@@ -71,8 +71,40 @@ export interface HmiRectElement {
   color?: number;
   visible?: HmiVisibility;
 }
+export interface HmiCircleElement {
+  kind: "circle";
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  color?: number;
+  visible?: HmiVisibility;
+}
+export interface HmiLineElement {
+  kind: "line";
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  color?: number;
+  width?: number;
+  visible?: HmiVisibility;
+}
+export interface HmiGaugeElement {
+  kind: "gauge";
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  color?: number;
+  bkcolor?: number;
+  maxvalue: number;
+  valueElem: number;
+  orientation?: 0 | 1;
+  visible?: HmiVisibility;
+}
 
-export type HmiElement = HmiTextElement | HmiRectElement;
+export type HmiElement = HmiTextElement | HmiRectElement | HmiCircleElement | HmiLineElement | HmiGaugeElement;
 
 export interface HmiScreenSpec {
   bkcolor?: number;
@@ -139,12 +171,11 @@ function encodeTextElement(el: HmiTextElement): Uint8Array {
   return Uint8Array.from(bytes);
 }
 
-function encodeRectElement(el: HmiRectElement): Uint8Array {
+function encodeRectLike(type: number, el: HmiRectElement | HmiCircleElement): Uint8Array {
   const structSize = 24;
   const bytes: number[] = [];
-
   pushU16(bytes, structSize);
-  pushU16(bytes, SCR_ELEM.RECT);
+  pushU16(bytes, type);
   encodeVisibility(bytes, el.visible, structSize);
   pushU16(bytes, el.x1);
   pushU16(bytes, el.y1);
@@ -152,7 +183,33 @@ function encodeRectElement(el: HmiRectElement): Uint8Array {
   pushU16(bytes, el.y2);
   pushU16(bytes, el.color ?? HMI_COLOR.HEADER);
   pushU16(bytes, 0);
-
+  return Uint8Array.from(bytes);
+}
+function encodeLineElement(el: HmiLineElement): Uint8Array {
+  const structSize = 32, bytes: number[] = [];
+  const dx = el.x2 - el.x1, dy = el.y2 - el.y1, length = Math.hypot(dx, dy) || 1;
+  pushU16(bytes, structSize);
+  pushU16(bytes, SCR_ELEM.LINE);
+  encodeVisibility(bytes, el.visible, structSize);
+  pushU16(bytes, el.x1); pushU16(bytes, el.y1);
+  pushU16(bytes, el.x2); pushU16(bytes, el.y2);
+  pushU16(bytes, el.color ?? HMI_COLOR.ACCENT);
+  pushU16(bytes, Math.max(1, Math.min(16, Math.round(el.width ?? 1))));
+  pushF32(bytes, dy / length); pushF32(bytes, dx / length);
+  return Uint8Array.from(bytes);
+}
+function encodeGaugeElement(el: HmiGaugeElement): Uint8Array {
+  const structSize = 32, bytes: number[] = [];
+  pushU16(bytes, structSize);
+  pushU16(bytes, SCR_ELEM.GAUGE);
+  encodeVisibility(bytes, el.visible, structSize);
+  pushU16(bytes, el.x1); pushU16(bytes, el.y1);
+  pushU16(bytes, el.x2); pushU16(bytes, el.y2);
+  pushU16(bytes, el.color ?? HMI_COLOR.ACCENT);
+  pushU16(bytes, el.bkcolor ?? HMI_COLOR.HEADER);
+  pushI32(bytes, Math.max(1, Math.round(el.maxvalue)));
+  pushU16(bytes, el.valueElem);
+  pushU16(bytes, el.orientation ?? 0);
   return Uint8Array.from(bytes);
 }
 
@@ -161,7 +218,13 @@ function encodeElement(el: HmiElement): Uint8Array {
     case "text":
       return encodeTextElement(el);
     case "rect":
-      return encodeRectElement(el);
+      return encodeRectLike(SCR_ELEM.RECT, el);
+    case "circle":
+      return encodeRectLike(SCR_ELEM.CIRCLE, el);
+    case "line":
+      return encodeLineElement(el);
+    case "gauge":
+      return encodeGaugeElement(el);
     default: {
       const _exhaustive: never = el;
       throw new Error(`Неизвестный примитив HMI: ${String(_exhaustive)}`);
