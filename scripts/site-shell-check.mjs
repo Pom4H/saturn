@@ -25,7 +25,7 @@ export async function checkShell(browser, origin) {
     await page.goto(origin);
     await page.waitForSelector('#studio-spatial canvas', { state: 'attached' });
     await page.waitForFunction(() => document.getElementById('project-switch')?.options.length > 0);
-    await mkdir('test-results/site-studio', { recursive: true });
+    await mkdir('site-browser-results/site-studio', { recursive: true });
     // Project switching is a styled, searchable popover, including keyboard selection.
     assert(await page.locator('#project-switch').evaluate(node => node.hidden));
     await page.locator('#project-trigger').click();
@@ -51,7 +51,7 @@ export async function checkShell(browser, origin) {
     await page.locator('#project-trigger').click();
     const pickerBox = await page.locator('#project-picker').boundingBox();
     assert(pickerBox.x >= 0 && pickerBox.x + pickerBox.width <= 666);
-    await page.screenshot({ path: 'test-results/site-studio/project-picker-666.png' });
+    await page.screenshot({ path: 'site-browser-results/site-studio/project-picker-666.png' });
     await page.locator('#project-picker-search').press('Escape');
     await page.locator('#files-close').click();
     await page.setViewportSize({ width: 1440, height: 1000 });
@@ -99,7 +99,7 @@ export async function checkShell(browser, origin) {
     await page.locator('#shell-help-search').fill('ревизия');
     assert.equal(await page.locator('.shell-help-article h3').innerText(), 'Проект с сервера');
     assert.match(await page.locator('.shell-help-article').innerText(), /не перезаписывает/);
-    await page.screenshot({ path: 'test-results/site-studio/shell-help.png' });
+    await page.screenshot({ path: 'site-browser-results/site-studio/shell-help.png' });
     await page.keyboard.press('Escape');
     assert.equal(await page.evaluate(() => document.activeElement?.id), 'shell-help');
 
@@ -125,7 +125,7 @@ export async function checkShell(browser, origin) {
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'light');
     const lightBackground = await page.locator('#studio-shell').evaluate(node => getComputedStyle(node).backgroundColor);
     await page.locator('.app-settings-close').click();
-    await page.screenshot({ path: 'test-results/site-studio/shell-light.png' });
+    await page.screenshot({ path: 'site-browser-results/site-studio/shell-light.png' });
     await page.reload();
     await page.waitForSelector('#studio-spatial canvas', { state: 'attached' });
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'light', 'Theme survives reload');
@@ -137,7 +137,7 @@ export async function checkShell(browser, origin) {
     assert.notEqual(await page.locator('#studio-shell').evaluate(node => getComputedStyle(node).backgroundColor), lightBackground, 'Theme changes the actual Shell appearance');
     assert.equal(await page.evaluate(() => localStorage.getItem('saturn.ui.theme')), 'dark');
     await page.locator('.app-settings-close').click();
-    await page.screenshot({ path: 'test-results/site-studio/shell-dark.png' });
+    await page.screenshot({ path: 'site-browser-results/site-studio/shell-dark.png' });
     await page.reload();
     await page.waitForSelector('#studio-spatial canvas', { state: 'attached' });
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark', 'Dark theme also survives reload');
@@ -155,13 +155,13 @@ export async function checkShell(browser, origin) {
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Narrow Shell must not overflow the page');
     const topbar = await page.locator('.shell-topbar').evaluate(node => ({ width: node.clientWidth, content: node.scrollWidth }));
     assert(topbar.content <= topbar.width + 1, 'Narrow toolbar must fit its container');
-    await page.screenshot({ path: 'test-results/site-studio/shell-mobile.png' });
+    await page.screenshot({ path: 'site-browser-results/site-studio/shell-mobile.png' });
     await page.keyboard.press('F1');
     await page.locator('#shell-help-dialog').waitFor({ state: 'visible' });
     const helpBox = await page.locator('#shell-help-dialog').boundingBox();
     assert(helpBox && helpBox.x >= 0 && helpBox.x + helpBox.width <= 391, 'Mobile help stays inside viewport');
     assert(await page.locator('#shell-help-dialog').evaluate(node => node.scrollWidth <= node.clientWidth + 1), 'Mobile help has no horizontal overflow');
-    await page.screenshot({ path: 'test-results/site-studio/shell-mobile-help.png' });
+    await page.screenshot({ path: 'site-browser-results/site-studio/shell-mobile-help.png' });
     await page.keyboard.press('Escape');
     await page.keyboard.press('Control+k');
     await search.fill('справка');
