@@ -98,7 +98,7 @@ class CatalogTreeProvider extends RefreshableTree {
     try {
       let extensions = [];
       try {
-        extensions = await runCliJson(['extension', 'list', '--json']);
+        extensions = await runCliJson(['ide', 'catalog', '--json']);
       } catch (error) {
         extensions = [];
       }
