@@ -174,3 +174,110 @@ test('PLC artifact export checks engineer role, revision and target, and include
 test('layout-only edits preserve the run and compiled program',async()=>{
  const s=await makeService();try{for(let i=0;i<20;i++)s.tick();const old=s.frame(),files={...demoFiles,'commissioning.ts':demoFiles['commissioning.ts'].replace('x:760,y:3100','x:765,y:3100')};const head=await s.repository.head(),commit=await s.save(files,head,'Move PLC',engineer);await s.publish(commit.id,await s.repository.desired(),engineer);assert.equal(s.frame().runId,old.runId);assert.deepEqual(s.frame().displays,old.displays);}finally{s.store.db.close();}
 });
+
+
+test('Saturn instances link live runtime through a memory-only bearer bridge', async () => {
+    const engineerDir = await mkdtemp(join(tmpdir(), 'saturn-engineer-'));
+    const operatorDir = await mkdtemp(join(tmpdir(), 'saturn-operator-'));
+    const engineerApp = await startPlantServer({
+        port: 0,
+        data: join(engineerDir, 'db.sqlite'),
+        repository: join(engineerDir, 'repo.git'),
+        password: 'engineer-instance-password',
+        autoTick: false,
+    });
+    const operatorApp = await startPlantServer({
+        port: 0,
+        data: join(operatorDir, 'db.sqlite'),
+        repository: join(operatorDir, 'repo.git'),
+        password: 'operator-instance-password',
+        autoTick: false,
+    });
+    try {
+        const engineerBase = engineerApp.origin + '/plant/api/';
+        const loginResponse = await fetch(engineerBase + 'login', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', Origin: engineerApp.origin },
+            body: JSON.stringify({ user: 'engineer', password: 'engineer-instance-password' }),
+        });
+        assert.equal(loginResponse.status, 200);
+        const cookie = loginResponse.headers.get('set-cookie')!.split(';')[0];
+        const login = await loginResponse.json() as any;
+
+        const connect = await fetch(engineerBase + 'environment/connect', {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: engineerApp.origin,
+                'content-type': 'application/json',
+                'x-csrf-token': login.csrf,
+            },
+            body: JSON.stringify({
+                name: 'Plant-01',
+                url: operatorApp.origin,
+                user: 'engineer',
+                password: 'operator-instance-password',
+            }),
+        });
+        assert.equal(connect.status, 200);
+        const descriptor = await connect.json() as any;
+        assert.equal(descriptor.name, 'Plant-01');
+        assert.equal(descriptor.projectId, operatorApp.service.project.id);
+        assert.equal(descriptor.instanceId, operatorApp.service.instanceId);
+
+        const remoteSession = await fetch(engineerBase + 'environment/session', { headers: { Cookie: cookie } });
+        assert.equal(remoteSession.status, 200);
+        const status = await remoteSession.json() as any;
+        assert.equal(status.project.id, engineerApp.service.project.id);
+        assert.equal(status.instance.instanceId, operatorApp.service.instanceId);
+        assert.equal(status.csrf, login.csrf);
+
+        const stream = await fetch(engineerBase + 'environment/stream', { headers: { Cookie: cookie } });
+        assert.equal(stream.status, 200);
+        const reader = stream.body!.getReader();
+        const first = new TextDecoder().decode((await reader.read()).value);
+        assert.match(first, /event: frame/);
+        await reader.cancel();
+
+        const command = await fetch(engineerBase + 'environment/command', {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: engineerApp.origin,
+                'content-type': 'application/json',
+                'x-csrf-token': login.csrf,
+            },
+            body: JSON.stringify({
+                id: 'cmd-linked-instance-test',
+                revision: status.frame.revision,
+                runId: status.frame.runId,
+                action: 'pause',
+            }),
+        });
+        assert.equal(command.status, 200);
+        assert.equal(operatorApp.service.frame().paused, true);
+
+        const localStatus = await fetch(engineerBase + 'session', { headers: { Cookie: cookie } });
+        const local = await localStatus.json() as any;
+        assert.equal(local.environment.instanceId, operatorApp.service.instanceId);
+        assert.equal(local.frame.paused, false, 'remote command must not mutate engineering runtime');
+
+        const disconnect = await fetch(engineerBase + 'environment/disconnect', {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: engineerApp.origin,
+                'content-type': 'application/json',
+                'x-csrf-token': login.csrf,
+            },
+            body: '{}',
+        });
+        assert.equal(disconnect.status, 200);
+    }
+    finally {
+        await engineerApp.close();
+        await operatorApp.close();
+        await rm(engineerDir, { recursive: true, force: true });
+        await rm(operatorDir, { recursive: true, force: true });
+    }
+});
