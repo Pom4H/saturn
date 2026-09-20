@@ -42,11 +42,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Saturn CLI
-        run: |
-          npm run plant:build
-          node scripts\update-test-key.mjs "%RUNNER_TEMP%\saturn-vscode-key"
-          npm run saturn -- pack --target windows-x64 --outfile "%RUNNER_TEMP%\saturn.exe" --skip-web-build --update-public-key-file "%RUNNER_TEMP%\saturn-vscode-key\public.pem"
+      - name: Build Saturn web assets
+        run: npm run plant:build
+
+      - name: Generate capture update key
+        run: node scripts\update-test-key.mjs "%RUNNER_TEMP%\saturn-vscode-key"
+
+      - name: Pack Saturn CLI
+        run: npm run saturn -- pack --target windows-x64 --outfile "%RUNNER_TEMP%\saturn.exe" --skip-web-build --update-public-key-file "%RUNNER_TEMP%\saturn-vscode-key\public.pem"
 
       - name: Launch installed Saturn extension and capture real VS Code
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\vscode-screenshot.ps1
