@@ -28,6 +28,7 @@ export class WorkspaceRepository implements Repository {
             const first = await this.local.commit(seed, null, 'Open workspace', 'workspace');
             await this.local.publish(first.id, null);
         }
+        await this.refresh();
         return this;
     }
 
