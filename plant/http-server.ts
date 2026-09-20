@@ -4,6 +4,7 @@ import { resolve, sep, extname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { Auth } from './adapters/auth';
+import { EnvironmentBroker } from './environment';
 import { Push } from './adapters/push';
 import { Store } from './store';
 import { Service } from './service';
@@ -41,7 +42,7 @@ export async function startPlantHttpServer(options: {
     const repository = options.projectRepository;
     const service = new Service(store, repository, { reportRunner: options.reportRunner });
     await service.start(options.seed);
-    const auth = new Auth(store), password = options.password ?? randomBytes(18).toString('base64url'), username = options.user ?? 'engineer';
+    const auth = new Auth(store), environments = new EnvironmentBroker(), password = options.password ?? randomBytes(18).toString('base64url'), username = options.user ?? 'engineer';
     const created = auth.seed(username, password);
     const push = options.pushSubject ? new Push(store, options.pushSubject) : null;
     const configuredRoot = resolve(options.root ?? resolve('dist/plant'));
@@ -88,8 +89,17 @@ export async function startPlantHttpServer(options: {
             }
             if (path === `${prefix}/api/login` && req.method === 'POST') {
                 const input = await body(req), session = auth.login(input.user, input.password, req.socket.remoteAddress ?? 'unknown');
-                res.setHeader('Set-Cookie', `scada_session=${session.token}; HttpOnly; SameSite=Strict; Path=${prefix}/; Max-Age=28800${origin.startsWith('https:') ? '; Secure' : ''}`);
-                json(200, { actor: session.actor, csrf: session.csrf });
+                if (input.mode === 'bearer') {
+                    const remote = req.socket.remoteAddress ?? '';
+                    const loopback = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1';
+                    if (!origin.startsWith('https:') && !loopback)
+                        throw new AppError('Bearer login requires HTTPS outside loopback', 400);
+                    json(200, { actor: session.actor, token: session.token, expiresIn: 28800 });
+                }
+                else {
+                    res.setHeader('Set-Cookie', `scada_session=${session.token}; HttpOnly; SameSite=Strict; Path=${prefix}/; Max-Age=28800${origin.startsWith('https:') ? '; Secure' : ''}`);
+                    json(200, { actor: session.actor, csrf: session.csrf });
+                }
                 return;
             }
             if (path === `${prefix}/login` && req.method === 'GET') {
@@ -100,7 +110,7 @@ export async function startPlantHttpServer(options: {
                 if (req.method !== 'GET')
                     throw new AppError('Method not allowed', 405);
                 try {
-                    auth.session(req.headers.cookie);
+                    auth.session(req.headers.cookie, req.headers.authorization);
                 }
                 catch {
                     res.writeHead(302, { Location: `${prefix}/login`, 'Cache-Control': 'no-store' }).end();
@@ -110,13 +120,61 @@ export async function startPlantHttpServer(options: {
                 return;
             }
             if (path.startsWith(`${prefix}/api/`)) {
-                const session = auth.session(req.headers.cookie), actor = session.actor;
-                if (req.method === 'POST' && req.headers['x-csrf-token'] !== session.csrf)
+                const session = auth.session(req.headers.cookie, req.headers.authorization), actor = session.actor;
+                if (req.method === 'POST' && !session.bearer && req.headers['x-csrf-token'] !== session.csrf)
                     throw new AppError('Invalid CSRF token', 403);
                 const action = path.slice(`${prefix}/api/`.length);
+
+                if (action === 'environment/connect' && req.method === 'POST') {
+                    requireRole(session.actor, 'engineer');
+                    json(200, await environments.connect(session.sessionId, await body(req)));
+                    return;
+                }
+                if (action === 'environment/disconnect' && req.method === 'POST') {
+                    environments.disconnect(session.sessionId);
+                    json(200, { ok: true });
+                    return;
+                }
+                if (action === 'environment' && req.method === 'GET') {
+                    json(200, environments.descriptor(session.sessionId));
+                    return;
+                }
+                if (action === 'environment/stream' && req.method === 'GET') {
+                    const remote = await environments.stream(session.sessionId);
+                    if (!remote.ok || !remote.body) {
+                        const message = await remote.text().catch(() => '');
+                        throw new AppError(message || `Remote stream failed (${remote.status})`, remote.status || 502);
+                    }
+                    res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
+                    const reader = remote.body.getReader();
+                    res.on('close', () => void reader.cancel());
+                    while (!res.destroyed) {
+                        const chunk = await reader.read();
+                        if (chunk.done)
+                            break;
+                        if (!res.write(Buffer.from(chunk.value)))
+                            await new Promise<void>(resolve => res.once('drain', resolve));
+                    }
+                    res.end();
+                    return;
+                }
+                if (action.startsWith('environment/')) {
+                    const remoteAction = action.slice('environment/'.length);
+                    const query = new URLSearchParams(url.searchParams);
+                    const input = req.method === 'POST' ? await body(req) : undefined;
+                    const remote = await environments.request(session.sessionId, remoteAction, { method: req.method === 'POST' ? 'POST' : 'GET', query, body: input });
+                    const contentType = remote.headers.get('content-type') ?? 'application/json; charset=utf-8';
+                    const payload = Buffer.from(await remote.arrayBuffer());
+                    res.writeHead(remote.status, { 'Content-Type': contentType, 'Cache-Control': 'no-store' }).end(payload);
+                    return;
+                }
                 if (req.method === 'GET') {
                     if (action === 'session') {
-                        json(200, { ...await service.status(actor), csrf: session.csrf, push: push ? { publicKey: push.keys.publicKey } : null });
+                        json(200, { ...await service.status(actor), csrf: session.bearer ? undefined : session.csrf, push: push ? { publicKey: push.keys.publicKey } : null, environment: environments.descriptor(session.sessionId) });
+                        return;
+                    }
+                    if (action === 'instance') {
+                        json(200, await service.instance(actor));
                         return;
                     }
                     if (action === 'project') {
@@ -152,7 +210,7 @@ export async function startPlantHttpServer(options: {
                         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
                         streams.add(res);
                         const write = (frame: unknown) => { try {
-                            auth.session(req.headers.cookie);
+                            auth.session(req.headers.cookie, req.headers.authorization);
                         }
                         catch {
                             res.end();
@@ -163,7 +221,7 @@ export async function startPlantHttpServer(options: {
                         } res.write(`event: frame\ndata: ${JSON.stringify(frame)}\n\n`); };
                         write(service.frame());
                         const unsubscribe = service.subscribe(write), timer = setInterval(() => { try {
-                            auth.session(req.headers.cookie);
+                            auth.session(req.headers.cookie, req.headers.authorization);
                             if (service.kernel.state.paused)
                                 write(service.frame());
                             else
@@ -179,6 +237,7 @@ export async function startPlantHttpServer(options: {
                 if (req.method === 'POST') {
                     const input = await body(req);
                     if (action === 'logout') {
+                        environments.disconnect(session.sessionId);
                         auth.logout(session.sessionId);
                         res.setHeader('Set-Cookie', `scada_session=; Path=${prefix}/; HttpOnly; SameSite=Strict; Max-Age=0`);
                         json(200, { ok: true });
