@@ -1,6 +1,6 @@
 import type { Presentation, ViewNode } from './presentation';
 import type { Controller, PlcBlock } from './controller';
-import type { Endpoint, Connection, Attachment } from './ports';
+import { portRefs, physicalTypes, type Endpoint, type Connection, type Attachment, type DynamicEndpoint, type PhysicalType, type PortRefs, type Terminal, type TerminalOf, type TypedEndpoint } from './ports';
 import { AppError, id, type Expr, type System, type Simulation, type Project, type Derived, type Device, type AlarmRule, type Report, type Layout, type HistoryPolicy, type Control } from './types';
 import { model, type builtInModels } from './models';
 const simulationValue = Symbol('saturn.simulation');
@@ -26,6 +26,9 @@ type BuiltInModels = typeof builtInModels;
 /** Module augmentation can add metadata for independently installed equipment. */
 export interface ModelCatalog extends BuiltInModels {
 }
+type VisualOf<M> = M extends { visual: infer V extends PhysicalType } ? V : never;
+type PortsOf<M,ID extends string> = [VisualOf<M>] extends [never] ? {} : PortRefs<VisualOf<M>,ID>;
+
 export type SimRef<
     M = { outputs: Record<string, string> },
     ID extends string = string,
@@ -33,6 +36,7 @@ export type SimRef<
 > = {
     readonly id: ID;
     readonly kind: Kind;
+    readonly ports: PortsOf<M,ID>;
     readonly [simulationValue]: Simulation;
 } & {
     readonly [K in M extends { outputs: infer O } ? keyof O : never]: Expr;
@@ -50,7 +54,8 @@ type Options<M extends {
 /** Runtime metadata supplies validation and editor completion, including external installed models. */
 export function simulation<const ID extends string, K extends keyof ModelCatalog>(name: ID, kind: K, options: Options<ModelCatalog[K]>): SimRef<ModelCatalog[K], ID, K & string> {
     const spec = model(kind), node: Simulation = { id: id(name), model: kind, system: options.system, parameters: { ...Object.fromEntries(Object.entries(spec.parameters).map(([k, v]) => [k, v.default])), ...options.parameters }, inputs: { ...spec.inputs, ...options.inputs }, layout: options.at, ...(options.history ? { history: options.history } : {}) };
-    return Object.assign({ id: node.id as ID, kind: String(kind), [simulationValue]: node }, Object.fromEntries(Object.keys(spec.outputs).map(k => [k, signal(`${name}.${k}`)]))) as SimRef<ModelCatalog[K], ID, K & string>;
+    const ports = physicalTypes().includes(spec.visual) ? portRefs(node.id as ID, spec.visual as VisualOf<ModelCatalog[K]>) : {} as PortsOf<ModelCatalog[K],ID>;
+    return Object.assign({ id: node.id as ID, kind: String(kind), ports, [simulationValue]: node }, Object.fromEntries(Object.keys(spec.outputs).map(k => [k, signal(`${name}.${k}`)]))) as SimRef<ModelCatalog[K], ID, K & string>;
 }
 export const derived = (name: string, expression: Expr, unit = 'отн.', history?: HistoryPolicy): Derived => ({ id: id(name), expression, unit, ...(history ? { history } : {}) });
 export const equipment = (name: string, type: string, options: {
@@ -107,17 +112,29 @@ export function aggregate<T extends SimRef>(items: T[], output: Exclude<keyof T,
 export type ControllerRef<ID extends string = string, O extends Record<string, Expr> = Record<string, Expr>> = {
     readonly id: ID;
     readonly profile: 'saturn-fbd';
+    readonly ports: PortRefs<'saturn',ID>;
     readonly [controllerValue]: Controller;
 } & { readonly [K in keyof O]: Expr };
 
 /** Installed PLC profile. Program refs are terminal names, not arbitrary signal expressions. */
 export function plc<const ID extends string, const O extends Record<string,Expr>>(name:ID, options:Omit<Controller,'id'|'layout'|'profile'|'outputs'> & {at:Layout;outputs:O}): ControllerRef<ID,O> {
  const controller:Controller={id:id(name),profile:'saturn-fbd',system:options.system,layout:options.at,outputs:options.outputs,blocks:options.blocks,hmi:options.hmi};
- return Object.assign({id:controller.id as ID,profile:controller.profile,[controllerValue]:controller},Object.fromEntries(Object.keys(options.outputs).map(k=>[k,signal(`${name}.${k}`)]))) as ControllerRef<ID,O>;
+ return Object.assign({id:controller.id as ID,profile:controller.profile,ports:portRefs(controller.id as ID,'saturn'),[controllerValue]:controller},Object.fromEntries(Object.keys(options.outputs).map(k=>[k,signal(`${name}.${k}`)]))) as ControllerRef<ID,O>;
 }
 export const pin=(name:string):Expr=>({ref:id(name)});
-export const port=(device:string|SimRef|ControllerRef|Device,name:string):Endpoint=>({device:typeof device==='string'?id(device):device.id,port:name});
-export const pipe=(name:string,from:Endpoint,to:Endpoint,options:Pick<Connection,'via'>={}):Connection=>({id:id(name),from,to,medium:'pipe',...options});
+export function port<M,ID extends string,Kind extends string,P extends keyof PortsOf<M,ID>&string>(device:SimRef<M,ID,Kind>,name:P):PortsOf<M,ID>[P];
+export function port<ID extends string,O extends Record<string,Expr>,P extends keyof PortRefs<'saturn',ID>&string>(device:ControllerRef<ID,O>,name:P):PortRefs<'saturn',ID>[P];
+export function port(device:string|Device,name:string):DynamicEndpoint;
+export function port(device:string|SimRef|ControllerRef|Device,name:string):Endpoint {
+ const deviceId=typeof device==='string'?id(device):device.id;
+ if(typeof device!=='string'&&'ports' in device&&device.ports&&Object.hasOwn(device.ports,name))return (device.ports as Record<string,Endpoint>)[name];
+ return {device:deviceId,port:name};
+}
+type FluidSource = TypedEndpoint<string,Terminal&{medium:'pipe';family:string;role:'source'|'passive'}>;
+type FluidTarget<From extends FluidSource> = TypedEndpoint<string,Terminal&{medium:'pipe';family:TerminalOf<From>['family'];role:'sink'|'passive'}>;
+export function pipe<const ID extends string,From extends FluidSource>(name:ID,from:From,to:FluidTarget<From>,options?:Pick<Connection,'via'>):Connection;
+export function pipe(name:string,from:DynamicEndpoint,to:DynamicEndpoint,options?:Pick<Connection,'via'>):Connection;
+export function pipe(name:string,from:Endpoint,to:Endpoint,options:Pick<Connection,'via'>={}):Connection {return{id:id(name),from,to,medium:'pipe',...options};}
 export const cable=(name:string,from:Endpoint,to:Endpoint,options:Omit<Connection,'id'|'from'|'to'>):Connection=>({id:id(name),from,to,...options});
 export const expansion=(device:SimRef,controller:ControllerRef,slot:number):Attachment=>({device:device.id,controller:controller.id,slot,profile:'virtual-io4'});
 
