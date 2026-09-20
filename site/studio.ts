@@ -23,7 +23,7 @@ import { updateFiles } from './shell-projects';
 import type { plantProjection } from './plant-project';
 import { downloadFile, exportHTML, shareURL, readSharedSource } from './exports';
 import { fetchServerSession, serverPost, commandPayload, type ServerSession } from './server-runtime';
-import { languageTag, t } from './i18n';
+import { languageTag, t, tr } from './i18n';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 type Surface = 'scene' | 'equipment' | 'source' | 'signals' | 'controls' | 'alarms' | 'projects';
@@ -146,11 +146,11 @@ export async function mountStudio() {
     const project = serverSession?.project, frame = telemetry.frame;
     const controls = project?.controls ?? [];
     $('runtime-controls').hidden = !serverSession;
-    $('runtime-state').textContent = serverSession ? `${project!.title} · ${frame?.paused ? 'пауза' : telemetry.state === 'live' ? 'runtime активен' : telemetry.message || 'нет данных'}` : '';
-    $('runtime-pause').textContent = frame?.paused ? 'Продолжить' : 'Пауза';
+    $('runtime-state').textContent = serverSession ? `${project!.title} · ${frame?.paused ? tr('пауза', 'paused') : telemetry.state === 'live' ? tr('runtime активен', 'runtime active') : telemetry.message || tr('нет данных', 'no data')}` : '';
+    $('runtime-pause').textContent = frame?.paused ? tr('Продолжить', 'Resume') : tr('Пауза', 'Pause');
     $('runtime-pause').toggleAttribute('disabled', !serverSession || serverSession.actor.role === 'viewer' || !frame || !['live', 'paused'].includes(shell.dataset.telemetry ?? ''));
     if (!serverSession) return;
-    if (!controls.length) { const empty = document.createElement('div'); empty.className = 'runtime-empty'; empty.textContent = 'В проекте нет операторских уставок.'; host.append(empty); return; }
+    if (!controls.length) { const empty = document.createElement('div'); empty.className = 'runtime-empty'; empty.textContent = tr('В проекте нет операторских уставок.', 'This project has no operator setpoints.'); host.append(empty); return; }
     for (const control of controls) {
       const actual = frame?.samples[`${control.id}.value`], requested = frame?.samples[`${control.id}.requested`], blocked = Boolean(frame?.samples[`${control.id}.blocked`]?.value);
       const good = actual?.quality === 'good';
@@ -158,18 +158,18 @@ export async function mountStudio() {
       const header = document.createElement('header'), title = document.createElement('h3'), unit = document.createElement('small');
       title.textContent = control.title; unit.textContent = `${control.id} · ${control.unit}`; header.append(title, unit);
       const values = document.createElement('div'); values.className = 'runtime-control-values';
-      for (const [labelText, sample] of [['Уставка', requested], ['Фактически', actual]] as const) {
+      for (const [labelText, sample] of [[tr('Уставка', 'Setpoint'), requested], [tr('Фактически', 'Actual'), actual]] as const) {
         const box = document.createElement('div'), label = document.createElement('span'), value = document.createElement('b');
         label.textContent = labelText; value.textContent = sample?.quality === 'good' && typeof sample.value === 'number' ? Number(sample.value.toFixed(3)).toString() : '—'; box.append(label, value); values.append(box);
       }
       const edit = document.createElement('div'); edit.className = 'runtime-control-edit';
       const input = document.createElement('input'); input.type = 'number'; input.min = String(control.min); input.max = String(control.max); input.step = String(control.step); input.value = typeof requested?.value === 'number' ? String(requested.value) : String(control.initial); input.setAttribute('aria-label', control.title);
-      const button = document.createElement('button'); button.textContent = 'Применить';
+      const button = document.createElement('button'); button.textContent = tr('Применить', 'Apply');
       button.disabled = serverSession.actor.role === 'viewer' || !good || blocked || !['live', 'paused'].includes(shell.dataset.telemetry ?? '');
       input.disabled = button.disabled;
-      button.onclick = () => void (async () => { try { if (!input.checkValidity()) { input.reportValidity(); return; } await runtimeCommand('operate', { target: control.id, value: Number(input.value) }); toast('Уставка принята'); } catch (e) { toast(e instanceof Error ? e.message : String(e)); } })();
+      button.onclick = () => void (async () => { try { if (!input.checkValidity()) { input.reportValidity(); return; } await runtimeCommand('operate', { target: control.id, value: Number(input.value) }); toast(tr('Уставка принята', 'Setpoint accepted')); } catch (e) { toast(e instanceof Error ? e.message : String(e)); } })();
       edit.append(input, button);
-      const note = document.createElement('p'); note.textContent = !good ? 'Данные недостоверны: команды заблокированы.' : blocked ? control.blockedReason ?? 'Блокировка активна' : `${control.min}…${control.max} ${control.unit} · до ${control.rate}/с`;
+      const note = document.createElement('p'); note.textContent = !good ? tr('Данные недостоверны: команды заблокированы.', 'Data is not authoritative: commands are disabled.') : blocked ? control.blockedReason ?? tr('Блокировка активна', 'Interlock active') : `${control.min}…${control.max} ${control.unit} · ${tr('до', 'up to')} ${control.rate}/s`;
       card.append(header, values, edit, note); host.append(card);
     }
   }
@@ -181,15 +181,15 @@ export async function mountStudio() {
     $('runtime-alarm-count').hidden = !alarms.length;
     $('runtime-alarm-count').textContent = String(alarms.length);
     if (!serverSession) return;
-    if (!alarms.length) { const empty = document.createElement('div'); empty.className = 'runtime-empty'; empty.textContent = 'Активных алармов нет.'; host.append(empty); return; }
+    if (!alarms.length) { const empty = document.createElement('div'); empty.className = 'runtime-empty'; empty.textContent = tr('Активных алармов нет.', 'No active alarms.'); host.append(empty); return; }
     for (const alarm of alarms) {
       const rule = project?.alarms.find(item => item.id === alarm.id);
       const row = document.createElement('article'); row.className = 'runtime-alarm'; row.dataset.active = String(alarm.active);
       const text = document.createElement('div'), title = document.createElement('strong'), meta = document.createElement('small');
-      title.textContent = rule?.title ?? alarm.id; meta.textContent = `${rule?.priority ?? 'alarm'} · ${alarm.active ? 'активен' : 'снят'}${alarm.acknowledged ? ' · подтверждён' : ''}`; text.append(title, meta);
+      title.textContent = rule?.title ?? alarm.id; meta.textContent = `${rule?.priority ?? 'alarm'} · ${alarm.active ? tr('активен', 'active') : tr('снят', 'cleared')}${alarm.acknowledged ? ` · ${tr('подтверждён', 'acknowledged')}` : ''}`; text.append(title, meta);
       const time = document.createElement('small'); time.textContent = alarm.raisedAt ? new Date(alarm.raisedAt).toLocaleTimeString(languageTag()) : '—';
-      const ack = document.createElement('button'); ack.textContent = alarm.acknowledged ? 'Подтверждён' : 'Подтвердить'; ack.disabled = alarm.acknowledged || serverSession.actor.role === 'viewer' || !['live', 'paused'].includes(shell.dataset.telemetry ?? '');
-      ack.onclick = () => void (async () => { try { await runtimeCommand('ack', { target: alarm.id }); toast('Аларм подтверждён'); } catch (e) { toast(e instanceof Error ? e.message : String(e)); } })();
+      const ack = document.createElement('button'); ack.textContent = alarm.acknowledged ? tr('Подтверждён', 'Acknowledged') : tr('Подтвердить', 'Acknowledge'); ack.disabled = alarm.acknowledged || serverSession.actor.role === 'viewer' || !['live', 'paused'].includes(shell.dataset.telemetry ?? '');
+      ack.onclick = () => void (async () => { try { await runtimeCommand('ack', { target: alarm.id }); toast(tr('Аларм подтверждён', 'Alarm acknowledged')); } catch (e) { toast(e instanceof Error ? e.message : String(e)); } })();
       row.append(text, time, ack); host.append(row);
     }
   }
@@ -285,31 +285,31 @@ export async function mountStudio() {
   async function loadServer() {
     if (serverLoading) return;
     serverLoading = true;
-    const serverState = $('file-server-state'); serverState.hidden = false; serverState.dataset.state = 'loading'; serverState.textContent = 'Получение ревизии…';
+    const serverState = $('file-server-state'); serverState.hidden = false; serverState.dataset.state = 'loading'; serverState.textContent = tr('Получение ревизии…', 'Fetching revision…');
     $('file-tree').setAttribute('aria-busy', 'true');
     $('server-refresh')?.setAttribute('disabled', '');
     const baseDocuments = documents;
-    const button = $('server-load'); button.setAttribute('disabled', ''); $('server-error').textContent = 'Загрузка…';
+    const button = $('server-load'); button.setAttribute('disabled', ''); $('server-error').textContent = tr('Загрузка…', 'Loading…');
     try {
       await ensurePlant();
       const session = await fetchServerSession(); setServerRole(session);
       if (session.actor.role !== 'engineer') {
         await activateRuntimeSession(session);
-        serverState.dataset.state = 'ready'; serverState.textContent = `Подключено · ${session.actor.role}`;
+        serverState.dataset.state = 'ready'; serverState.textContent = `${tr('Подключено', 'Connected')} · ${session.actor.role}`;
         $('server-error').textContent = ''; $<HTMLDialogElement>('server-dialog').close();
         return;
       }
       const revision = await fetchServerProject(); plantTools!.validateFiles(revision.files); plantTools!.plantProjection(revision.files);
-      if (documents !== baseDocuments) throw new Error('Проект был переключён. Повторите загрузку.');
+      if (documents !== baseDocuments) throw new Error(tr('Проект был переключён. Повторите загрузку.', 'The project changed while loading. Try again.'));
       if (serverRevision && documents.dirty()) {
         if (revision.id !== serverRevision.id) pendingRevision = revision;
-        renderFiles(); toast(revision.id === serverRevision.id ? 'Серверная ревизия не изменилась' : 'Доступна новая ревизия. Черновик сохранён.');
-      } else if (serverRevision?.id === revision.id) toast('Серверная ревизия не изменилась');
+        renderFiles(); toast(revision.id === serverRevision.id ? tr('Серверная ревизия не изменилась', 'Server revision is unchanged') : tr('Доступна новая ревизия. Черновик сохранён.', 'A new revision is available. Your draft was preserved.'));
+      } else if (serverRevision?.id === revision.id) toast(tr('Серверная ревизия не изменилась', 'Server revision is unchanged'));
       else if (!serverRevision && serverDraft?.documents.dirty()) {
         persist(); serverRevision = serverDraft.revision; documents = serverDraft.documents; editor.setState(documents.state);
         pendingRevision = revision.id !== serverRevision.id ? revision : null; refresh(false); renderMeta(); filesVisible = true; syncPanels();
       } else activateServer(revision);
-      serverState.dataset.state = 'ready'; serverState.textContent = `Проверено ${new Date().toLocaleTimeString(languageTag(), { hour: '2-digit', minute: '2-digit' })}`;
+      serverState.dataset.state = 'ready'; serverState.textContent = `${tr('Проверено', 'Checked')} ${new Date().toLocaleTimeString(languageTag(), { hour: '2-digit', minute: '2-digit' })}`;
       $('server-error').textContent = ''; $<HTMLDialogElement>('server-dialog').close();
     } catch (e) { const text = e instanceof Error ? e.message : String(e); $('server-error').textContent = text; serverState.dataset.state = 'error'; serverState.textContent = text; if (!$<HTMLDialogElement>('server-dialog').open) toast(text); }
     finally { serverLoading = false; button.removeAttribute('disabled'); $('server-refresh')?.removeAttribute('disabled'); $('file-tree').setAttribute('aria-busy', 'false'); }
@@ -697,9 +697,9 @@ export async function mountStudio() {
   }
   function openProjectDialog(empty = false) {
     $('project-error').textContent = '';
-    $('project-dialog-title').textContent = empty ? 'Новый проект' : serverRevision ? 'Скопировать проект' : workspace.active.kind === 'example' ? 'Создать проект' : 'Дублировать проект';
-    $<HTMLSelectElement>('project-base').querySelector<HTMLOptionElement>('[value="current"]')!.textContent = serverRevision ? 'Серверный проект с изменениями' : 'Текущий проект с изменениями';
-    $<HTMLInputElement>('project-name').value = empty ? 'Новая установка' : `${(serverRevision ? plant?.project.title ?? 'Проект' : currentDocument(workspace).title)} — мой проект`;
+    $('project-dialog-title').textContent = empty ? tr('Новый проект', 'New project') : serverRevision ? tr('Скопировать проект', 'Copy project') : workspace.active.kind === 'example' ? tr('Создать проект', 'Create project') : tr('Дублировать проект', 'Duplicate project');
+    $<HTMLSelectElement>('project-base').querySelector<HTMLOptionElement>('[value="current"]')!.textContent = serverRevision ? tr('Серверный проект с изменениями', 'Server project with changes') : tr('Текущий проект с изменениями', 'Current project with changes');
+    $<HTMLInputElement>('project-name').value = empty ? tr('Новая установка', 'New installation') : `${(serverRevision ? plant?.project.title ?? tr('Проект', 'Project') : currentDocument(workspace).title)} — ${tr('мой проект', 'my project')}`;
     $<HTMLSelectElement>('project-base').value = empty ? 'empty' : 'current';
     $<HTMLDialogElement>('project-dialog').showModal(); $<HTMLInputElement>('project-name').select();
   }
@@ -724,7 +724,7 @@ export async function mountStudio() {
       const saved = persist();
       if (copiedServer) serverDraft = { revision: copiedServer, documents: saved && fromFiles ? new Documents(copiedServer.files, editorState, 'plant.ts') : previousServerDocuments };
       renderFiles(); renderMeta(); setSurface('scene'); setFullscreen(true);
-      $<HTMLDialogElement>('project-dialog').close(); toast(saved ? 'Проект создан' : 'Проект открыт в памяти. Хранилище недоступно — скачайте .ts.');
+      $<HTMLDialogElement>('project-dialog').close(); toast(saved ? tr('Проект создан', 'Project created') : tr('Проект открыт в памяти. Хранилище недоступно — скачайте .ts.', 'Project is open in memory. Storage is unavailable — download the .ts file.'));
     } catch (e) { $('project-error').textContent = e instanceof Error ? e.message : String(e); }
   };
   $('project-dialog-close').onclick = () => $<HTMLDialogElement>('project-dialog').close();
@@ -899,7 +899,7 @@ export async function mountStudio() {
     spatial.canMove = id => !connecting && canMoveNode(id);
     spatial.onMove = (id, x, y, commit) => commit ? commitPosition(id, x, y) : previewPosition(id, x, y);
     spatial.setHint(t(compact.matches ? 'scene3d.hintTouch' : 'scene3d.hint'));
-    spatial.setMessages({ preview: t('scene3d.preview'), noData: t('scene3d.noData'), moreAlarms: t('scene3d.moreAlarms') });
+    spatial.setMessages({ preview: t('scene3d.preview'), noData: t('scene3d.noData'), moreAlarms: t('scene3d.moreAlarms'), warning: tr('Предупреждение', 'Warning'), trip: tr('Авария', 'Trip'), aria: tr('3D схема. Стрелки меняют ракурс, плюс и минус — масштаб, F — вписать. Оборудование можно выбрать клавишей Tab.', '3D diagram. Arrow keys orbit, plus and minus zoom, F fits the view. Use Tab to select equipment.') });
     spatial.render(compiled.scene); spatial.setRuntime(observedRuntime ?? plant?.runtime ?? null); spatial.select(selected); setMode(explicit);
   } catch { $('studio-3d').setAttribute('disabled', ''); present(1); toast('WebGL недоступен. Работайте с 2D-схемой.'); }
   if (runtimeOnly || matchMedia('(display-mode: standalone)').matches || location.hash === '#studio' || location.hash === '#workspace' || shared) setFullscreen(true);
