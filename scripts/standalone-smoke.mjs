@@ -128,7 +128,7 @@ const extensionPackage = {
 };
 const extensionTar = gzipSync(Buffer.concat([
     tarFile('package/package.json', JSON.stringify(extensionPackage)),
-    tarFile('package/dist/index.js', 'export const installed = true;'),
+    tarFile('package/dist/index.js', 'customElements.define("test-motor", class extends HTMLElement {}); export const installed = true;'),
     Buffer.alloc(1024),
 ]));
 const extensionIntegrity = 'sha512-' + createHash('sha512').update(extensionTar).digest('base64');
@@ -156,6 +156,71 @@ try {
     if (listed.code !== 0 || !listed.stdout.includes('@test/elements@1.0.0'))
         throw new Error(`Installed extension was not listed: ${listed.stderr || listed.stdout}`);
     console.log('Extension registry install OK: @test/elements@1.0.0');
+
+    const extensionPort = port + 1;
+    const extensionData = join(tmpdir(), `saturn-extension-api-${process.pid}-${Date.now()}`);
+    mkdirSync(extensionData, { recursive: true });
+    const appChild = spawn(exe, ['open', project], {
+        env: {
+            ...process.env,
+            LOCALAPPDATA: localAppData,
+            PORT: String(extensionPort),
+            HOST: '127.0.0.1',
+            SCADA_USER: 'engineer',
+            SCADA_PASSWORD: 'standalone-ci-password',
+            SATURN_DATA_DIR: extensionData,
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+    });
+    const appStdout = [], appStderr = [];
+    appChild.stdout.on('data', chunk => appStdout.push(Buffer.from(chunk)));
+    appChild.stderr.on('data', chunk => appStderr.push(Buffer.from(chunk)));
+    try {
+        let ready = false;
+        for (let i = 0; i < 80; i++) {
+            if (appChild.exitCode !== null)
+                throw new Error(`Extension API Saturn exited early: ${Buffer.concat(appStderr).toString('utf8')}`);
+            try {
+                const response = await fetch(`http://127.0.0.1:${extensionPort}/plant/api/health`, { signal: AbortSignal.timeout(1000) });
+                if (response.ok) { ready = true; break; }
+            } catch {}
+            await sleep(200);
+        }
+        if (!ready)
+            throw new Error('Extension API Saturn did not become ready');
+        const origin = `http://127.0.0.1:${extensionPort}`;
+        const login = await fetch(origin + '/plant/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Origin: origin },
+            body: JSON.stringify({ user: 'engineer', password: 'standalone-ci-password' }),
+        });
+        if (!login.ok)
+            throw new Error(`Extension API login failed: ${login.status}`);
+        const cookie = login.headers.get('set-cookie')?.split(';')[0];
+        if (!cookie)
+            throw new Error('Extension API login returned no cookie');
+        const applicationResponse = await fetch(origin + '/plant/api/application', { headers: { Cookie: cookie } });
+        const application = await applicationResponse.json();
+        const extension = application.extensions?.find(item => item.name === '@test/elements');
+        if (!applicationResponse.ok || !extension?.entryUrl)
+            throw new Error('Installed extension is missing from authenticated application API');
+        const asset = await fetch(origin + extension.entryUrl, { headers: { Cookie: cookie } });
+        const source = await asset.text();
+        if (!asset.ok || !source.includes('customElements.define("test-motor"'))
+            throw new Error('Installed extension browser entry was not served');
+        const page = await fetch(origin + '/plant/app/', { headers: { Cookie: cookie } });
+        if (!page.ok || !(await page.text()).includes('data-tab="extensions"'))
+            throw new Error('Engineering UI does not expose Extensions panel');
+        console.log('Extension application API + browser entry OK');
+    } finally {
+        appChild.kill();
+        await Promise.race([
+            new Promise(resolveExit => appChild.once('exit', resolveExit)),
+            sleep(3000).then(() => { if (appChild.exitCode === null) appChild.kill('SIGKILL'); }),
+        ]);
+    }
+
     const removed = await run(exe, ['extension', 'remove', '@test/elements']);
     if (removed.code !== 0) throw new Error(`Extension remove failed: ${removed.stderr || removed.stdout}`);
 } finally {

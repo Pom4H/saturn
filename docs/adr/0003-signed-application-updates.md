@@ -87,7 +87,7 @@ A build without an embedded update manifest URL may use `--manifest`; signature 
 
 The private Ed25519 signing key must never be committed to the repository or embedded in Saturn. Release CI receives it from a protected signing secret or external signing service.
 
-The public key and default manifest URL are build inputs.
+The public key and default manifest URL are build inputs. The repository provides `scripts/sign-update-manifest.mjs` / `npm run update:manifest` to hash final release bytes and create schema-1 signatures after final HTTPS artifact URLs are known.
 
 ### Installation permissions
 

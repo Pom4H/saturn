@@ -215,3 +215,19 @@ npm run saturn -- pack \
 The signing private key belongs in protected release infrastructure and must never be committed or embedded.
 
 The update protocol is defined in [ADR-0003](adr/0003-signed-application-updates.md).
+
+### Signing a release manifest
+
+After release artifacts are uploaded to their final HTTPS URLs, release infrastructure can generate the manifest with the repository tool:
+
+~~~sh
+npm run update:manifest -- \
+  --version 0.2.0 \
+  --channel stable \
+  --private-key-file /secure/saturn-update-private.pem \
+  --artifact windows-x64 dist/saturn.exe https://downloads.example/saturn/0.2.0/saturn.exe \
+  --artifact linux-x64 dist/saturn-linux https://downloads.example/saturn/0.2.0/saturn-linux \
+  --output dist/stable.json
+~~~
+
+The command hashes the final bytes, signs each target's canonical metadata with Ed25519 and writes schema-1 JSON. The private key path is an input to release infrastructure only.

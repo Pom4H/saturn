@@ -39,7 +39,8 @@
     "plant:check": "npm run plant:build && npm run plant:typecheck && npm run plant:test",
     "site:test:browser": "node scripts/site-studio-check.mjs",
     "saturn": "node scripts/saturn.mjs",
-    "standalone:pack": "bun run scripts/standalone-pack.ts"
+    "standalone:pack": "bun run scripts/standalone-pack.ts",
+    "update:manifest": "node scripts/sign-update-manifest.mjs"
   },
   "keywords": [],
   "author": "Roman Popov",
