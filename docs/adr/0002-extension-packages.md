@@ -16,14 +16,14 @@ An extension package is ordinary npm package metadata plus a Saturn manifest:
 
 ~~~json
 {
-  "name": "@factory/equipment",
+  "name": "@saturn/my-extension",
   "version": "1.4.2",
   "saturn": {
     "api": 1,
     "entry": "dist/index.js",
     "capabilities": ["elements"],
     "elements": [
-      { "type": "factory.motor", "title": "Motor", "tag": "factory-motor" }
+      { "type": "saturn.example", "title": "Motor", "tag": "factory-motor" }
     ]
   }
 }
@@ -62,7 +62,7 @@ Saturn application data/
   extensions/
     state.json
     packages/
-      factory__equipment/
+      saturn__my-extension/
         1.4.2/
 ~~~
 
@@ -89,10 +89,10 @@ Future permissions that grant filesystem, network or process access require a se
 
 ~~~sh
 saturn extension list
-saturn extension add @factory/equipment
-saturn extension add @factory/equipment@1.4.2
-saturn extension update @factory/equipment
-saturn extension remove @factory/equipment
+saturn extension add @saturn/my-extension
+saturn extension add @saturn/my-extension@1.4.2
+saturn extension update @saturn/my-extension
+saturn extension remove @saturn/my-extension
 ~~~
 
 ### Consequences
