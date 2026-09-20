@@ -7,6 +7,8 @@ import { Store } from '../store';
 import { startPlantServer } from '../bun-server';
 import { runReport } from '../adapters/bun-reports';
 import { ModbusTcpClient } from '../adapters/modbus-tcp';
+import { Auth } from '../adapters/auth';
+import { BunAuth } from '../adapters/bun-auth';
 import type { ReportTask } from '../types';
 
 const sql = new BunSql(':memory:');
@@ -20,6 +22,18 @@ sql.transaction(() => {
 assert.equal(portableStore.meta('tx-a', 0), 1);
 assert.equal(portableStore.meta('tx-b', 0), 2);
 sql.close();
+
+const authSql = new BunSql(':memory:');
+const authStore = new Store(authSql);
+const legacyAuth = new Auth(authStore);
+assert.equal(legacyAuth.seed('legacy', 'legacy-password-2026'), true);
+assert.notEqual(authStore.db.all<{ salt: string }>('SELECT salt FROM users WHERE id=?', ['legacy'])[0].salt, 'bun:argon2id');
+const nativeAuth = new BunAuth(authStore);
+const migratedSession = await nativeAuth.login('legacy', 'legacy-password-2026', '127.0.0.1');
+assert.equal(migratedSession.actor.id, 'legacy');
+assert.equal(authStore.db.all<{ salt: string }>('SELECT salt FROM users WHERE id=?', ['legacy'])[0].salt, 'bun:argon2id');
+assert.match(authStore.db.all<{ hash: string }>('SELECT hash FROM users WHERE id=?', ['legacy'])[0].hash, /^\$argon2id\$/);
+authSql.close();
 
 const reportTask: ReportTask = {
     id: 'bun-report-smoke',
@@ -187,4 +201,4 @@ try {
     await rm(dir, { recursive: true, force: true });
 }
 
-console.log('Bun server smoke: SQLite, report isolation, Modbus TCP, auth, origin guard and WebSocket live stream OK');
+console.log('Bun server smoke: SQLite, Argon2id migration, report isolation, Modbus TCP, auth, origin guard and WebSocket live stream OK');
