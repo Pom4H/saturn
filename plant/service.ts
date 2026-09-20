@@ -13,6 +13,7 @@ export class Service {
     alarms: Record<string, AlarmState> = {};
     healthy = true;
     releaseError = '';
+    readonly instanceId: string;
     private listeners = new Set<(frame: Frame) => void>();
     private jobsRunning = false;
     private jobPromise: Promise<void> | null = null;
@@ -22,7 +23,12 @@ export class Service {
         now?: () => number;
         uuid?: () => string;
         reportRunner: (task: ReportTask) => Promise<ReportArtifact>;
-    }) { }
+    }) {
+        const existing = store.meta<string | null>('instanceId', null);
+        this.instanceId = existing ?? crypto.randomUUID();
+        if (!existing)
+            store.set('instanceId', this.instanceId);
+    }
     private now() { return (this.options.now ?? Date.now)(); }
     private uuid() { return (this.options.uuid ?? (() => crypto.randomUUID()))(); }
     async start(seed: Record<string, string>): Promise<void> {
@@ -194,7 +200,21 @@ export class Service {
         throw error;
     } this.healthy = true; return this.emit(); }
     history(signals: string[], from: number, to: number) { finite(from, 'from', 0, Number.MAX_SAFE_INTEGER); finite(to, 'to', from, this.kernel.state.time); return this.store.history(this.kernel.state.runId, signals, from, to); }
-    async status(actor: Actor) { return { actor, mode: 'simulation', project: this.project, frame: this.frame(), head: await this.repository.head(), desired: await this.repository.desired(), healthy: this.healthy, releaseError: this.releaseError, overrides: clone(this.kernel.state.overrides) }; }
+    async instance(actor: Actor) {
+        return {
+            protocol: 1,
+            instanceId: this.instanceId,
+            authority: 'runtime' as const,
+            actor,
+            projectId: this.project.id,
+            head: await this.repository.head(),
+            published: await this.repository.desired(),
+            applied: this.kernel.state.revision,
+            runId: this.kernel.state.runId,
+            healthy: this.healthy,
+        };
+    }
+    async status(actor: Actor) { return { actor, mode: 'simulation', project: this.project, frame: this.frame(), head: await this.repository.head(), desired: await this.repository.desired(), healthy: this.healthy, releaseError: this.releaseError, overrides: clone(this.kernel.state.overrides), instance: await this.instance(actor) }; }
     async files(actor: Actor) { requireRole(actor, 'engineer'); const head = await this.repository.head(); return head ? this.repository.read(head) : null; }
     firmware(controllerId:string, revision:string, actor:Actor) {
         requireRole(actor,'engineer');if(revision!==this.kernel.state.revision)throw new AppError('Project revision changed',409);
