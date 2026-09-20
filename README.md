@@ -1,5 +1,21 @@
 # SCADA playground
 
+> System architecture: [ADR-0001 — Saturn system architecture](docs/adr/0001-saturn-system-architecture.md).
+
+## Saturn application modes
+
+Saturn is packaged once; projects stay ordinary source directories and are selected at runtime.
+
+~~~sh
+saturn open ./project
+saturn run ./project
+saturn run ./project --kiosk
+~~~
+
+An engineering workspace can connect to another Saturn as a live environment: local source/Git remains local while telemetry, history and commands come from the operator runtime. Git synchronizes project/release configuration; the live Saturn protocol synchronizes operational state.
+
+See [standalone application and project workflow](docs/standalone.md).
+
 ## Node.js / offline PWA workbench
 
 The new installation workbench runs the same process models, signal expressions, alarms, historian and report workflows in Node.js and a browser Worker. SQLite is native on the server and WASM/OPFS in the demo. Git-backed server releases and local browser revisions support explicit publication and rollback.
