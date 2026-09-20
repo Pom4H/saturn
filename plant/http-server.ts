@@ -77,7 +77,7 @@ export async function startPlantHttpServer(options: {
             catch {
                 throw new AppError('Malformed URL');
             }
-            if (req.method === 'POST' && req.headers.origin !== origin)
+            if (req.method === 'POST' && req.headers.origin && req.headers.origin !== origin)
                 throw new AppError('Cross-origin write blocked', 403);
             if (path === '/') {
                 if (!['GET', 'HEAD'].includes(req.method ?? '')) throw new AppError('Method not allowed', 405);
