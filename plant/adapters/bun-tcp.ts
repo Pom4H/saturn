@@ -98,7 +98,7 @@ export class BunTcpChannel {
     private accept(chunk: Uint8Array): void {
         if (chunk.byteLength === 0) return;
         if (!this.pending) {
-            this.disconnected(new Error('Unexpected TCP data without a pending request'));
+            this.fail(new Error('Unexpected TCP data without a pending request'));
             return;
         }
         const next = new Uint8Array(this.buffered.byteLength + chunk.byteLength);
@@ -126,10 +126,11 @@ export class BunTcpChannel {
             return;
         }
         const pending = this.pending;
+        const frame = this.buffered.slice(0, expected);
         this.pending = null;
         this.buffered = new Uint8Array(0);
         clearTimeout(pending.timer);
-        pending.resolve(this.buffered.byteLength === expected ? this.buffered : next.slice(0, expected));
+        pending.resolve(frame);
     }
 
     private fail(error: Error): void {
