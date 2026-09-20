@@ -165,7 +165,7 @@ try {
         await bench.waitForFunction(()=>document.querySelector('#levelReadout')?.textContent==='7.0 V',null,{timeout:12000});
         await bench.waitForFunction(()=>document.querySelector('#doReadout')?.textContent==='1',null,{timeout:5000});
         assert.equal(await bench.locator('#plcLamp').getAttribute('data-on'),'true');
-        assert.match(await bench.locator('#plcFront .runtime-hmi').textContent(),/700/);
+        await bench.waitForFunction(()=>document.querySelector('#plcFront .runtime-hmi')?.textContent?.includes('700'),null,{timeout:5000});
         assert.ok(await bench.locator('#plcLamp .hmi-lamp-bulb').evaluate(element=>element.getAnimations().length>0));
         await bench.screenshot({path:evidence+'/hmi-saturn-plc-live.png',fullPage:true});
         await bench.locator('#plcBack').click();
