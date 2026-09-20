@@ -1,6 +1,5 @@
 import { mkdir, readFile } from 'node:fs/promises';
-import { resolve, relative, sep } from 'node:path';
-import { demoFiles } from '../plant/demo/files';
+import { resolve } from 'node:path';
 
 const args = process.argv.slice(2);
 const value = (name: string) => {
@@ -26,40 +25,12 @@ const rawTarget = value('--target') ?? (process.platform === 'win32' ? 'windows-
 const target = (aliases[rawTarget] ?? rawTarget) as Bun.Build.Target;
 if (!String(target).startsWith('bun-')) throw new Error(`Unsupported target: ${rawTarget}`);
 
-const projectDirectory = value('--project');
-async function loadProject(): Promise<Record<string, string>> {
-    if (!projectDirectory || projectDirectory === 'demo') return demoFiles;
-    const root = resolve(projectDirectory);
-    const manifestPath = resolve(root, 'scada.project.json');
-    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
-    if (manifest.version !== 1 || manifest.entry !== 'plant.ts' || !Array.isArray(manifest.files) || manifest.files.length === 0 || manifest.files.length > 128) {
-        throw new Error('scada.project.json must be version 1 with entry "plant.ts" and 1..128 files');
-    }
-    const result: Record<string, string> = {};
-    let total = 0;
-    for (const item of manifest.files) {
-        if (typeof item !== 'string' || item.length > 180 || item.includes('\\') || item.startsWith('/') || item.split('/').some((part: string) => part === '..' || part === '')) {
-            throw new Error(`Unsafe project path: ${String(item)}`);
-        }
-        const path = resolve(root, item);
-        const rel = relative(root, path);
-        if (rel.startsWith('..' + sep) || rel === '..') throw new Error(`Project path escapes root: ${item}`);
-        const source = await readFile(path, 'utf8');
-        total += Buffer.byteLength(source);
-        if (Buffer.byteLength(source) > 200_000 || total > 2_500_000) throw new Error('Project source exceeds standalone pack limits');
-        result[item] = source;
-    }
-    if (!result['plant.ts']) throw new Error('Packed project must include plant.ts');
-    return result;
-}
-
 if (!has('--skip-web-build')) {
     const child = Bun.spawn(['node', 'scripts/plant-build.mjs'], { stdout: 'inherit', stderr: 'inherit', stdin: 'inherit' });
     const exit = await child.exited;
     if (exit !== 0) process.exit(exit);
 }
 
-const project = await loadProject();
 const packageJson = JSON.parse(await readFile('package.json', 'utf8'));
 const defaultName = target.includes('windows') ? 'saturn.exe' : 'saturn';
 const outfile = resolve(value('--outfile') ?? resolve('dist/standalone', defaultName));
@@ -71,7 +42,6 @@ const build = await Bun.build({
     minify: true,
     sourcemap: 'none',
     define: {
-        SATURN_PACKED_PROJECT: JSON.stringify(project),
         SATURN_VERSION: JSON.stringify(packageJson.version),
     },
     compile: {
@@ -100,5 +70,5 @@ if (!build.success) {
     process.exit(1);
 }
 
-console.log(`Packed ${Object.keys(project).length} project files -> ${outfile}`);
+console.log(`Packed Saturn application -> ${outfile}`);
 console.log(`Target: ${target}`);
