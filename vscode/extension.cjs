@@ -504,6 +504,13 @@ function activate(context) {
 
   void catalog.reload();
   targets.reload();
+
+  if (process.env.SATURN_VSCODE_CAPTURE === '1') {
+    setTimeout(() => {
+      void vscode.commands.executeCommand('workbench.view.extension.saturn')
+        .then(() => vscode.commands.executeCommand('saturn.openDiagram'));
+    }, 1200);
+  }
 }
 
 function deactivate() {}
