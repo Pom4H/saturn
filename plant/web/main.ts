@@ -13,10 +13,13 @@ import { models, model } from '../models';
 import { compileProject, validateFiles } from '../compiler';
 import { chartSVG, escape } from '../workflows';
 import { LocalClient, RemoteClient, type Connection, type Status, type Revision, type Frame, type ReportArtifact, type ReportData } from './client';
+import { HmiRuntime, hashNavigation, type HmiEquipmentNode, type HmiPrimitive } from '../../src/hmi';
+import { mountHmiDom, type HmiDomEquipmentRenderer } from '../../src/hmi-dom';
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const base = new URL('../', location.href), demo = location.pathname.endsWith('/demo/');
 let client: Connection, status: Status, frame: Frame, scene: SceneView, system = '', selected: string | null = null, tab = 'scheme', file = 'plant.ts', files: Record<string, string> = {}, head: string | null = null, dirty = false, validDraft = true, editor: EditorView, loadingEditor = false, failed = false;
 let scene3d: SceneView3D | undefined, viewMode: '2d' | '3d' = '2d', changingView = false;
+let hmiRuntime: HmiRuntime | undefined, hmiDom: ReturnType<typeof mountHmiDom> | undefined, hmiRouteStop: (() => void) | undefined;
 let registration: ServiceWorkerRegistration | undefined, pendingInstall: any, noticeEnabled = false, closed = false;
 const fmt = (v: number | null | undefined, digits = 2) => typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—';
 const time = (v: number | null | undefined) => v ? new Date(v).toLocaleString('ru-RU') : '—';
@@ -37,6 +40,70 @@ async function command(action: string, extra: object = {}) { ensureActive(); con
     renderInspector(); return result; }
 async function refreshStatus() { const previous = status?.project; status = await client.request<Status>('session'); frame = status.frame; if (previous !== status.project && JSON.stringify(previous) !== JSON.stringify(status.project))
     setupProject(); renderFrame(frame); refreshActions(); }
+function hmiProp(node: HmiEquipmentNode, key: string, runtime: HmiRuntime): HmiPrimitive {
+    const value = node.props?.[key];
+    return value === undefined ? null : runtime.resolve(value);
+}
+const hmiEquipment: Record<string, HmiDomEquipmentRenderer> = {
+    'saturn-plc': (node, runtime) => {
+        const card = document.createElement('article');
+        card.className = 'hmi-equipment hmi-plc-card';
+        card.innerHTML = `<div class="hmi-plc-visual">${renderSaturnPlcSvg({ defsPrefix: 'hmi-' + node.id })}</div><div class="hmi-plc-state"><span>AI1 <b data-ai>—</b></span><span>DO1 <b data-do>—</b></span><span data-health>PLC</span></div>`;
+        const lcd = card.querySelector<SVGSVGElement>('.runtime-hmi');
+        return { element: card, update: () => {
+            const input = hmiProp(node, 'input', runtime), output = hmiProp(node, 'output', runtime), healthy = hmiProp(node, 'healthy', runtime);
+            card.dataset.on = String(Number(output) > .5);
+            card.dataset.healthy = String(Number(healthy) > .5);
+            card.querySelector('[data-ai]')!.textContent = typeof input === 'number' ? input.toFixed(0) : '—';
+            card.querySelector('[data-do]')!.textContent = typeof output === 'number' ? output.toFixed(0) : '—';
+            card.querySelector('[data-health]')!.textContent = Number(healthy) > .5 ? 'RUN' : 'NO DATA';
+            if (lcd) drawHmiSvg(lcd, node.equipmentId);
+        } };
+    },
+    lamp: (node, runtime) => {
+        const card = document.createElement('article');
+        card.className = 'hmi-equipment hmi-lamp-card';
+        card.innerHTML = '<div class="hmi-lamp-halo"><div class="hmi-lamp-bulb"></div></div><strong>LAMP-1</strong><span data-brightness>—</span>';
+        return { element: card, update: () => {
+            const brightness = hmiProp(node, 'brightness', runtime);
+            const on = typeof brightness === 'number' && brightness > .5;
+            card.dataset.on = String(on);
+            card.querySelector('[data-brightness]')!.textContent = typeof brightness === 'number' ? (on ? 'ГОРИТ' : 'ВЫКЛ') : 'НЕТ ДАННЫХ';
+        } };
+    },
+};
+function hmiSignals(next: Frame): Record<string, HmiPrimitive> {
+    return Object.fromEntries(Object.entries(next.samples).map(([id, sample]) => [id, sample.quality === 'good' ? sample.value : null]));
+}
+function refreshHmiRoute() {
+    if (!hmiRuntime) { $('hmi-route').textContent = ''; return; }
+    $('hmi-route').textContent = `#hmi${hmiRuntime.currentScreen().route}`;
+}
+function setupHmi() {
+    hmiRouteStop?.(); hmiRouteStop = undefined; hmiDom?.dispose(); hmiDom = undefined; hmiRuntime?.dispose(); hmiRuntime = undefined;
+    const host = $('hmi-root'), app = status.project.hmi;
+    if (!app) { host.innerHTML = '<div class="empty">В проекте нет hmi().</div>'; $('hmi-route').textContent = ''; return; }
+    hmiRuntime = new HmiRuntime(app, {
+        operate: async (control, value) => {
+            if (status.actor.role === 'viewer') throw new Error('Нужны права оператора');
+            await command('operate', { target: control, value });
+        },
+        ack: async alarm => {
+            if (!alarm) throw new Error('Укажите аларм для квитирования');
+            if (status.actor.role === 'viewer') throw new Error('Нужны права оператора');
+            await command('ack', { target: alarm });
+        },
+        confirm: message => window.confirm(message),
+    }, hashNavigation('hmi'));
+    hmiRuntime.updateSignals(hmiSignals(frame));
+    hmiDom = mountHmiDom(host, hmiRuntime, {
+        equipment: hmiEquipment,
+        interactive: () => !failed && status.actor.role !== 'viewer',
+        onError: value => error(value instanceof Error ? value.message : String(value)),
+    });
+    hmiRouteStop = hmiRuntime.subscribe(refreshHmiRoute);
+    refreshHmiRoute();
+}
 function setupProject() {
     $('title').textContent = status.project.title;
     $('description').textContent = status.project.description;
@@ -61,6 +128,7 @@ function setupProject() {
     renderControls();
     renderInventory();
     setupViews();
+    setupHmi();
 }
 function renderScene() {
     if (!scene)
@@ -138,6 +206,7 @@ function renderFrame(next: Frame) {
     $('alarm-count').textContent = String(outstanding.length);
     const observation = visualFrame(status.project, frame);
     scene?.setRuntime(observation);
+    hmiRuntime?.updateSignals(hmiSignals(frame));
     if (scene3d) { scene3d.paused = frame.paused; scene3d.setRuntime(observation); }
     refreshControls();
     if(tab==='views')refreshView();
@@ -351,7 +420,9 @@ async function start(memory = false) {
         $('pause').hidden = !operator;
         if (engineering)
             await loadFiles();
-        if (['alarms', 'reports', 'events'].includes(location.hash.slice(1)))
+        if (location.hash.startsWith('#hmi'))
+            document.querySelector<HTMLButtonElement>('[data-tab="hmi"]')?.click();
+        else if (['alarms', 'reports', 'events'].includes(location.hash.slice(1)))
             document.querySelector<HTMLButtonElement>(`[data-tab="${location.hash.slice(1)}"]`)?.click();
         void guard(setupPwa);
     }
@@ -528,7 +599,7 @@ $('diagram').addEventListener('keydown', e => { if (e.key.toLowerCase() === 'f')
 $('view-3d').onclick = () => void guard(() => setView('3d'));
 $('equipment-search').oninput = renderInventory;
 window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
-window.addEventListener('pagehide', () => { closed = true; scene3d?.dispose(); client?.close(); });
+window.addEventListener('pagehide', () => { closed = true; hmiRouteStop?.(); hmiDom?.dispose(); hmiRuntime?.dispose(); scene3d?.dispose(); client?.close(); });
 
 void start();
 
