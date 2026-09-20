@@ -1,7 +1,7 @@
 {
-  "name": "@pom4h/scada",
+  "name": "@saturn/scada",
   "version": "0.1.0",
-  "description": "Source-first SCADA playground. Drag equipment, edit TypeScript, keep one source of truth.",
+  "description": "Saturn engineering IDE, SCADA runtime and TypeScript project DSL.",
   "scripts": {
     "site:build": "node scripts/site-build.mjs",
     "site:dev": "node scripts/site-dev.mjs",
@@ -64,7 +64,7 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Pom4H/scada.git"
+    "url": "https://github.com/Pom4H/saturn.git"
   },
   "engines": {
     "node": ">=22.16.0 <23 || >=24.20.0 <25"
@@ -85,4 +85,4 @@
   "bin": {
     "saturn": "scripts/saturn.mjs"
   }
-}
+}\n
