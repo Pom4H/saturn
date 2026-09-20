@@ -1,4 +1,4 @@
-import { models } from '../plant/models';
+import { resolve } from 'node:path';\nimport { models } from '../plant/models';
 import { ExtensionManager } from './extensions';
 
 export interface IdeCatalogItem {
