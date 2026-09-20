@@ -159,10 +159,11 @@ export class Kernel {
         // produced by the last scan, including while paused or after restoration.
         for(const id of this.controllers.keys()){const saved=this.state.plc![id];displays[id]=saved.healthy?clone(saved.display??[]):[];}
         return { displays, runId: this.state.runId, revision: this.state.revision, seq: this.state.seq, time: this.state.time, paused: this.state.paused, synthetic: true, samples: this.samples(), alarms: [] }; }
-    controllerKey(target:string,key:ControllerKey):void {
+    controllerKey(target:string,key:string):void {
         const controller=this.project.controllers?.find(c=>c.id===target),state=this.state.plc?.[target];
         if(!controller||!state)throw new AppError('Unknown controller');
-        state.screen=controllerScreenAfterKey(controller,state.screen,key);
+        if(!['up','down','left','right'].includes(key))throw new AppError('Unknown controller key');
+        state.screen=controllerScreenAfterKey(controller,state.screen,key as ControllerKey);
     }
     operate(target: string, value: number): void {
         const c = this.project.controls?.find(c => c.id === target);
