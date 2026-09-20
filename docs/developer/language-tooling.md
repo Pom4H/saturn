@@ -97,8 +97,8 @@ const pump = simulation('P-101', 'pump', {
 
 const suction = pipe(
   'suction',
-  tank.outlet,
-  pump.inlet,
+  tank.ports.outlet,
+  pump.ports.inlet,
   {
     medium: 'water',
     diameter: mm(100),
@@ -140,8 +140,8 @@ Internal transport objects such as `node: Simulation` must not dominate completi
 The desired public shape is domain-oriented:
 
 ~~~ts
-pump.inlet
-pump.outlet
+pump.ports.inlet
+pump.ports.outlet
 pump.rpm
 pump.flow
 pump.temperature
@@ -545,8 +545,8 @@ parameters: {
 
 pipe(
   'suction',
-  tank.outlet,         // water · out
-  pump.inlet,          // water · in
+  tank.ports.outlet,   // water · out
+  pump.ports.inlet,    // water · in
 )
 ~~~
 
