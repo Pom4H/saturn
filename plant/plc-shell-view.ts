@@ -102,5 +102,5 @@ export function drawPlcShell(svg:SVGSVGElement,project:Project,frame:Frame,contr
  const lamp=svg.querySelector<SVGCircleElement>('[data-lamp]');if(lamp){const controller=project.controllers?.find(c=>c.id===controllerId),system=controller?.system;const v=system?project.devices.find(d=>d.type==='indicator'&&d.system===system):undefined;const current=v?sample(frame,v.id+'.brightness'):sample(frame,controllerId+'.DO1');const on=(current??0)>.5;lamp.setAttribute('class','ps-lamp '+(on?'on':''));}
  for(const node of svg.querySelectorAll<SVGTextElement>('[data-generic]'))node.textContent=n(sample(frame,node.dataset.generic!));
  for(const chip of svg.querySelectorAll<SVGRectElement>('[data-io]')){const key=chip.dataset.io;if(!key)continue;const v=sample(frame,controllerId+'.'+key);chip.setAttribute('class','ps-chip '+((v??0)!==0?'active':''));}
- for(const node of svg.querySelectorAll<SVGTextElement>('[data-io-value]'))const key=node.dataset.ioValue;if(key)node.textContent=n(sample(frame,controllerId+'.'+key));
+ for(const node of svg.querySelectorAll<SVGTextElement>('[data-io-value]')){const key=node.dataset.ioValue;if(key)node.textContent=n(sample(frame,controllerId+'.'+key));}
 }
