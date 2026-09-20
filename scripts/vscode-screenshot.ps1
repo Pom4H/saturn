@@ -19,10 +19,12 @@ $downloadedCodeRoot = Join-Path $root 'code'
 $userData = Join-Path $root 'user-data'
 $extensions = Join-Path $root 'extensions'
 $extensionTarget = Join-Path $extensions 'saturn.saturn-vscode-0.1.0'
-Remove-Item -Recurse -Force $root -ErrorAction SilentlyContinue
-New-Item -ItemType Directory -Force -Path $root,$downloadedCodeRoot,$userData,$extensions,$extensionTarget | Out-Null
+New-Item -ItemType Directory -Force -Path $root,$downloadedCodeRoot | Out-Null
+Remove-Item -Recurse -Force $userData,$extensions -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path $userData,$extensions,$extensionTarget | Out-Null
 
 $candidates = @(
+  (Join-Path $downloadedCodeRoot 'Code.exe'),
   (Join-Path $env:LOCALAPPDATA 'Programs\Microsoft VS Code\Code.exe'),
   (Join-Path $env:ProgramFiles 'Microsoft VS Code\Code.exe')
 )
