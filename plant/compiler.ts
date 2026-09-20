@@ -1,4 +1,6 @@
 import { validatePresentation, presentationActions } from './presentation';
+import { hmiActions, validateHmi, type HmiNode, type HmiValue } from '../src/hmi';
+import * as hmiDsl from '../src/hmi';
 import { compileController, inputPins } from './controller';
 import { validateConnections, terminals, connectionExpression } from './ports';
 import ts from '@typescript/typescript6';
@@ -26,7 +28,11 @@ export function compileProject(files: Record<string, string>, entry = 'plant.ts'
     validateFiles(files);
     const cache = new Map<string, Record<string, unknown>>(), visiting = new Set<string>();
     let steps = 0;
-    const builtins = Object.fromEntries(Object.entries(dsl).filter(([, v]) => typeof v === 'function'));
+    const plantBuiltins = Object.fromEntries(Object.entries(dsl).filter(([, v]) => typeof v === 'function'));
+    const hmiNames = ['bind','group','text','readout','button','equipmentView','screen','dialog','hmi','navigate','back','command','operate','write','toggle','open','close','ack','sequence','confirm','script'] as const;
+    const hmiBuiltins = Object.fromEntries(hmiNames.map(name => [name, hmiDsl[name]]));
+    const builtinModules: Record<string, Record<string, unknown>> = { '@scada/plant': plantBuiltins, '@scada/hmi': hmiBuiltins };
+    const allowedFunctions = new Set([...Object.values(plantBuiltins), ...Object.values(hmiBuiltins)]);
     function module(path: string): Record<string, unknown> {
         if (cache.has(path))
             return cache.get(path)!;
@@ -146,7 +152,7 @@ export function compileProject(files: Record<string, string>, entry = 'plant.ts'
             }
             if (ts.isCallExpression(n) && ts.isIdentifier(n.expression)) {
                 const fn = scope[n.expression.text];
-                if (typeof fn !== 'function' || !Object.values(builtins).includes(fn))
+                if (typeof fn !== 'function' || !allowedFunctions.has(fn))
                     return fail(n, 'Only installed DSL functions may be called');
                 return fn(...n.arguments.map(ev));
             }
@@ -158,8 +164,8 @@ export function compileProject(files: Record<string, string>, entry = 'plant.ts'
                     fail(statement, 'Use named imports');
                 const spec = (statement.moduleSpecifier as ts.StringLiteral).text;
                 let source: Record<string, unknown>;
-                if (spec === '@scada/plant')
-                    source = builtins;
+                if (own(builtinModules, spec))
+                    source = builtinModules[spec];
                 else {
                     if (!spec.startsWith('./') && !spec.startsWith('../'))
                         fail(statement, 'Only local modules or @scada/plant are allowed');
@@ -368,6 +374,44 @@ export function validateProject(value: unknown): asserts value is Project {
             throw new AppError('Invalid overview metric');
         if (m.alarmAbove !== undefined)
             finite(m.alarmAbove, 'metric threshold');
+    }
+    if (p.hmi) {
+        try { validateHmi(p.hmi); } catch (error) { throw new AppError(error instanceof Error ? error.message : String(error)); }
+        const checkHmiValue = (value: HmiValue): void => {
+            if (value && typeof value === 'object' && 'kind' in value && value.kind === 'signal' && !signals.has(value.path))
+                throw new AppError('Unknown HMI signal: ' + value.path);
+        };
+        const visitHmiNode = (node: HmiNode): void => {
+            if (node.type === 'group') node.children.forEach(visitHmiNode);
+            else if (node.type === 'text') checkHmiValue(node.text);
+            else if (node.type === 'readout') checkHmiValue(node.value);
+            else if (node.type === 'button') { checkHmiValue(node.label); if (node.disabledWhen) checkHmiValue(node.disabledWhen); }
+            else if (node.type === 'equipment') {
+                if (!p.devices.some(device => device.id === node.equipmentId)) throw new AppError('Unknown HMI equipment: ' + node.equipmentId);
+                for (const value of Object.values(node.props ?? {})) checkHmiValue(value);
+            }
+        };
+        p.hmi.screens.forEach(screen => screen.body.forEach(visitHmiNode));
+        p.hmi.dialogs.forEach(dialog => dialog.body.forEach(visitHmiNode));
+        for (const action of hmiActions(p.hmi)) {
+            if (action.type === 'operate') {
+                const control = p.controls?.find(item => item.id === action.control);
+                if (!control) throw new AppError('Unknown HMI control: ' + action.control);
+                checkHmiValue(action.value);
+                if (typeof action.value === 'number' && (action.value < control.min || action.value > control.max))
+                    throw new AppError('HMI control value outside declared range');
+            } else if (action.type === 'write' || action.type === 'toggle') {
+                if (!signals.has(action.signal)) throw new AppError('Unknown HMI signal: ' + action.signal);
+                if (action.type === 'write') checkHmiValue(action.value);
+            } else if (action.type === 'command') {
+                if (!p.devices.some(device => device.id === action.equipmentId)) throw new AppError('Unknown HMI equipment command target: ' + action.equipmentId);
+                if (action.value !== undefined) checkHmiValue(action.value);
+            } else if (action.type === 'ack' && action.alarm && !p.alarms.some(alarm => alarm.id === action.alarm)) {
+                throw new AppError('Unknown HMI alarm: ' + action.alarm);
+            } else if (action.type === 'script') {
+                throw new AppError('Project HMI scripts require an installed trusted extension');
+            }
+        }
     }
     if(p.views&&(!Array.isArray(p.views)||p.views.length>32))throw new AppError('Presentation count budget');
     const viewIds=new Set<string>();
