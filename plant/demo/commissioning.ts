@@ -1,5 +1,5 @@
 import { benchPanel } from './views';
-import { system, simulation, control, plc, pin, gt, block, setpoint, functionBlock, port, cable, expansion, alarm, view } from '@scada/plant';
+import { system, simulation, control, plc, pin, gt, block, setpoint, functionBlock, port, pipe, cable, expansion, alarm, view } from '@scada/plant';
 // Generic isolated low-voltage commissioning bench; never connected to reactor controls.
 export const benchSystem=system('commissioning','PLC · стенд подключения клемм','site');
 export const level=control('BENCH-LEVEL',{title:'Датчик уровня · тестовый сигнал',system:'commissioning',min:0,max:10,initial:3,rate:1,unit:'V'});
@@ -11,6 +11,7 @@ export const controller=plc('SATURN-1',{
  blocks:{drive:functionBlock('OR',[gt(pin('AI1'),500),setpoint('MANUAL')])},
  outputs:{DO1:block('drive')},
  hmi:{
+  shell:{auto:true},
   title:'Commissioning bench',rows:[{label:'AI1 x100',pin:'AI1'},{label:'Relay DO1',pin:'DO1'}],
   view:view('plc-screen',{title:'PLC',body:benchPanel,bindings:{input:pin('AI1'),output:block('drive')}}),
   initial:'main',
@@ -48,10 +49,12 @@ export const controller=plc('SATURN-1',{
   },
  }
 });
+export const processPump=simulation('PUMP-1','pump',{system:'commissioning',at:{x:1320,y:3440},inputs:{voltage:controller.DO1,resistance:1},parameters:{inertia:1.2,nominalFlow:1}});
+export const processTank=simulation('TANK-1','reservoir',{system:'commissioning',at:{x:1000,y:3440},inputs:{inflow:.55,demand:processPump.flow},parameters:{capacity:20,initialLevel:.72}});
 export const relay=simulation('RELAY-1','contactor',{system:'commissioning',at:{x:1370,y:3100}});
 export const lamp=simulation('LAMP-1','indicator',{system:'commissioning',at:{x:1780,y:3100}});
 export const module=simulation('EXP-AI4','io-module',{system:'commissioning',at:{x:1150,y:3480}});
-export const benchNodes=[psu,sensor,relay,lamp,module];
+export const benchNodes=[psu,sensor,processTank,processPump,relay,lamp,module];
 export const benchControllers=[controller];
 export const benchControls=[level];
 export const benchModules=[expansion(module,controller,1)];
