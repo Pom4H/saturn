@@ -123,7 +123,7 @@ export class EnvironmentBroker {
         query?: URLSearchParams;
         body?: unknown;
     } = {}): Promise<Response> {
-        const allowed = new Set(['session', 'instance', 'events', 'reports', 'history', 'report', 'command', 'restart', 'firmware']);
+        const allowed = new Set(['session', 'instance', 'events', 'reports', 'history', 'report', 'command', 'restart', 'firmware', 'subscribe', 'unsubscribe']);
         if (!allowed.has(action))
             throw new AppError('Environment action is not allowed', 403);
         const link = this.link(sessionId);
