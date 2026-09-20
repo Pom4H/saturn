@@ -870,7 +870,7 @@ export async function mountStudio() {
   window.addEventListener('resize', () => { spatial?.fit(); syncPanels(); });
   window.addEventListener('saturn-language-change', () => {
     spatial?.setHint(t(compact.matches ? 'scene3d.hintTouch' : 'scene3d.hint'));
-    spatial?.setMessages({ preview: t('scene3d.preview'), noData: t('scene3d.noData'), moreAlarms: t('scene3d.moreAlarms') });
+    spatial?.setMessages({ preview: t('scene3d.preview'), noData: t('scene3d.noData'), moreAlarms: t('scene3d.moreAlarms'), warning: tr('Предупреждение', 'Warning'), trip: tr('Авария', 'Trip'), aria: tr('3D схема. Стрелки меняют ракурс, плюс и минус — масштаб, F — вписать. Оборудование можно выбрать клавишей Tab.', '3D diagram. Arrow keys orbit, plus and minus zoom, F fits the view. Use Tab to select equipment.') });
     updatePause(); setFullscreen(fullscreen); applyTelemetry(); if (surface === 'projects') renderProjects();
   });
   const observer = new IntersectionObserver(entries => { visible = entries[0].isIntersecting; animateState(); }, { rootMargin: '80px' }); observer.observe(stage);
