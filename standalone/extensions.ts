@@ -294,9 +294,23 @@ export class ExtensionManager {
     }
 }
 
-export async function runExtensionCommand(args: string[], appData: string): Promise<void> {\n    const json = args.includes('--json');\n    const positional = args.filter(arg => arg !== '--json');\n    const [action = 'list', value] = positional;
+export async function runExtensionCommand(args: string[], appData: string): Promise<void> {
+    const json = args.includes('--json');
+    const positional = args.filter(arg => arg !== '--json');
+    const [action = 'list', value] = positional;
     const manager = new ExtensionManager(resolve(appData, 'extensions'));
-    if (action === 'list') {\n        const extensions = await manager.list();\n        if (json) {\n            console.log(JSON.stringify(extensions));\n            return;\n        }\n        if (!extensions.length)\n            console.log('No Saturn extensions installed.');\n        for (const extension of extensions)\n            console.log(`${extension.name}@${extension.version} · ${extension.capabilities.join(', ')}`);\n        return;\n    }
+    if (action === 'list') {
+        const extensions = await manager.list();
+        if (json) {
+            console.log(JSON.stringify(extensions));
+            return;
+        }
+        if (!extensions.length)
+            console.log('No Saturn extensions installed.');
+        for (const extension of extensions)
+            console.log(`${extension.name}@${extension.version} · ${extension.capabilities.join(', ')}`);
+        return;
+    }
     if (action === 'add' || action === 'update') {
         if (!value)
             throw new Error(`Usage: saturn extension ${action} <package[@version]>`);
