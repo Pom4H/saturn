@@ -18,7 +18,8 @@ else {
         '  saturn open [PROJECT]',
         '  saturn run PROJECT [--kiosk]',
         '  saturn update [--check] [--channel stable|preview|nightly]',
-        '  saturn extension <list|add|update|remove> [package]',\n        '  saturn ide catalog --json',
+        '  saturn extension <list|add|update|remove> [package]',
+        '  saturn ide catalog --json',
         '  saturn pack [--target windows-x64|linux-x64|linux-arm64|darwin-arm64] [--outfile PATH]',
     ].join('\n'));
     process.exit(2);
