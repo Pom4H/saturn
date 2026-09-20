@@ -70,3 +70,32 @@ export function failDiagnostic(
 ): never {
   throw new SaturnDiagnosticError(diagnostic(code, key, args, data));
 }
+
+export interface SaturnErrorPayload {
+  error: string;
+  code?: string;
+  severity?: DiagnosticSeverity;
+  messageKey?: string;
+  messageArgs?: Record<string, DiagnosticValue>;
+  data?: Record<string, unknown>;
+  locale?: SaturnLocale;
+}
+
+export function diagnosticLocale(value: string | undefined | null): SaturnLocale {
+  return value && /(?:^|[,;\s])ru(?:-|_|[,;\s]|$)/i.test(value) ? 'ru' : 'en';
+}
+
+export function errorPayload(error: unknown, locale: SaturnLocale = 'en', fallback = 'Internal error'): SaturnErrorPayload {
+  if (error instanceof SaturnDiagnosticError) {
+    return {
+      error: formatDiagnostic(error.diagnostic, locale),
+      code: error.diagnostic.code,
+      severity: error.diagnostic.severity,
+      messageKey: error.diagnostic.message.key,
+      ...(error.diagnostic.message.args ? { messageArgs: error.diagnostic.message.args } : {}),
+      ...(error.diagnostic.data ? { data: error.diagnostic.data } : {}),
+      locale,
+    };
+  }
+  return { error: error instanceof Error ? error.message : fallback, locale };
+}
