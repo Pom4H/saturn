@@ -5,7 +5,7 @@ import { BunSql } from './adapters/bun-sql';
 import { GitRepository } from './adapters/git';
 import { Auth } from './adapters/auth';
 import { Push } from './adapters/push';
-import { runReport } from './adapters/node-reports';
+import { runReport } from './adapters/bun-reports';
 import { Store } from './store';
 import { Service } from './service';
 import { AppError, requireRole } from './types';
