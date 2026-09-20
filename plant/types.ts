@@ -1,4 +1,5 @@
 import type { Presentation } from './presentation';
+import type { HmiApplication } from '../src/hmi';
 import type { Controller, ControllerState } from './controller';
 import type { Connection, Attachment } from './ports';
 import type { HmiDrawCommand } from './vendor/saturn/src/runtime';
@@ -124,6 +125,7 @@ export interface Control {
 }
 export interface ControlState { requested: number; value: number; blocked: boolean }
 export interface Project {
+    hmi?: HmiApplication;
     views?: Presentation[];
     controllers?: Controller[];
     connections?: Connection[];
