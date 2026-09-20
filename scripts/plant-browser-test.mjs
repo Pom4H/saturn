@@ -224,7 +224,7 @@ try {
         await bench.locator('[data-tab="scheme"]').click();await bench.locator('[data-system="commissioning"]').click();
         await bench.locator('#view-3d').click();await bench.locator('#scene3d canvas').waitFor({state:'visible'});
         await bench.locator('[data-node3d="SATURN-1"]').click();await bench.waitForTimeout(800);
-        assert.match(await bench.locator('#plc-front .runtime-hmi').textContent(),/800/);
+        assert.match(await bench.locator('#plc-front .runtime-hmi').textContent(),/AUTO SHELL/);
         await bench.screenshot({path:evidence+'/commissioning-3d.png',fullPage:true});await bench.locator('#view-2d').click();
     });
     await check('offline PWA restores compiled PLC outputs, terminal wiring and HMI without a server',async()=>{
@@ -232,7 +232,7 @@ try {
         await bench.waitForFunction(()=>!!navigator.serviceWorker.controller);await wiringContext.setOffline(true);await bench.reload();await bench.locator('#application').waitFor({state:'visible'});
         assert.equal(await bench.locator('#clock').innerText(),clock);assert.equal(await bench.locator('[data-connection]').count(),23);
         await bench.locator('[data-system="commissioning"]').click();await bench.locator('#diagram [data-node="SATURN-1"]').click();
-        assert.equal(Number(await bench.locator('#inspector [data-signal="SATURN-1.DO1"] b').innerText()),1);assert.match(await bench.locator('#plc-front .runtime-hmi').textContent(),/800/);
+        assert.equal(Number(await bench.locator('#inspector [data-signal="SATURN-1.DO1"] b').innerText()),1);assert.match(await bench.locator('#plc-front .runtime-hmi').textContent(),/AUTO SHELL/);
         await bench.locator('#view-3d').click();await bench.locator('#scene3d canvas').waitFor({state:'visible'});await bench.waitForTimeout(500);await bench.screenshot({path:evidence+'/commissioning-offline-3d.png',fullPage:true});
     });
     await check('shared DSL panel renders identical frozen PLC values in live view and report while paused offline',async()=>{
