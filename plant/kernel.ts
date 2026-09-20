@@ -1,5 +1,5 @@
 import { ControllerVM, inputPins, CONTROLLER_ABI } from './controller';
-import { connectionExpression, terminals, busConnected } from './ports';
+import { connectionExpression, terminals, busConnected, type Terminal } from './ports';
 import { model } from './models';
 import { AppError, clone, finite, type Checkpoint, type Expr, type Frame, type Project, type Sample } from './types';
 export { evaluate } from './expressions';
@@ -50,7 +50,8 @@ export class Kernel {
             const observed = spec.observe(this.state.states[n.id], this.parameters(n));
             for (const k of Object.keys(spec.outputs)) {
                 const v = observed[k];
-                const unwired = n.model==='io-module'&&!this.project.connections?.some(w=>w.to.device===n.id&&terminals('ioModule')[w.to.port]?.input===k);
+                const modulePorts = n.model === 'io-module' ? terminals('ioModule') as Record<string, Terminal> : undefined;
+                const unwired = !!modulePorts && !this.project.connections?.some(w=>w.to.device===n.id&&modulePorts[w.to.port]?.input===k);
                 output[`${n.id}.${k}`] = { value: !unwired && !this.bad.has(n.id) && Number.isFinite(v) ? v : null, quality: unwired || this.bad.has(n.id) || !Number.isFinite(v) ? 'bad' : 'good', time: this.state.time };
             }
         }
