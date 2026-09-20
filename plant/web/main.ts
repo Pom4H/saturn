@@ -3,7 +3,6 @@ import { terminals, resolvePort, type Endpoint, type Connection as PhysicalConne
 import { appendConnection, addExpansionSource, removeConnection } from '../connection-edit';
 import { renderSaturnPlcSvg } from '../saturn-view';
 import { drawHmiSvg } from '../hmi-view';
-import { drawPlcShell } from '../plc-shell-view';
 import type { SceneView3D } from '../../src/view3d';
 import { EditorState } from '@codemirror/state';
 import { EditorView, basicSetup } from 'codemirror';
@@ -42,9 +41,9 @@ async function command(action: string, extra: object = {}) { ensureActive(); con
 async function refreshStatus() { const previous = status?.project; status = await client.request<Status>('session'); frame = status.frame; if (previous !== status.project && JSON.stringify(previous) !== JSON.stringify(status.project))
     setupProject(); renderFrame(frame); refreshActions(); }
 function drawControllerDisplay(svg:SVGSVGElement,id:string){
-    const controller=status.project.controllers?.find(item=>item.id===id);
-    if(controller?.hmi.shell?.auto) drawPlcShell(svg,status.project,frame,id,frame.controllerScreens?.[id]??0);
-    else drawHmiSvg(svg,id);
+    // The browser preview is the exact draw-command stream produced by the
+    // compiled .fbdbin in Firmverse. There is no richer browser-only shell.
+    drawHmiSvg(svg,id);
 }
 function hmiProp(node: HmiEquipmentNode, key: string, runtime: HmiRuntime): HmiPrimitive {
     const value = node.props?.[key];
