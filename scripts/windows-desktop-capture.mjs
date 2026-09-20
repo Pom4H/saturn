@@ -63,7 +63,26 @@ try {
   await page.waitForLoadState('networkidle').catch(()=>{});
   await sleep(2500);
 
-  execFileSync('ffmpeg', ['-y','-loglevel','error','-f','gdigrab','-draw_mouse','0','-i','desktop','-frames:v','1',out], { stdio:'inherit' });
+  const diag = execFileSync('cmd.exe', ['/d','/s','/c','query session & echo --- & tasklist /fi "imagename eq explorer.exe" /v'], { encoding:'utf8' });
+  writeFileSync(resolve(out, '..', 'windows-session.txt'), diag);
+  console.log(diag);
+
+  const ps = [
+    'Add-Type -AssemblyName System.Windows.Forms',
+    'Add-Type -AssemblyName System.Drawing',
+    '$b=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds',
+    '$bmp=New-Object System.Drawing.Bitmap $b.Width,$b.Height',
+    '$g=[System.Drawing.Graphics]::FromImage($bmp)',
+    '$g.CopyFromScreen($b.Location,[System.Drawing.Point]::Empty,$b.Size)',
+    '$bmp.Save(' + JSON.stringify(out.replaceAll('\\','/')) + ',[System.Drawing.Imaging.ImageFormat]::Png)',
+    '$g.Dispose();$bmp.Dispose()'
+  ].join(';');
+  try {
+    execFileSync('powershell.exe', ['-NoProfile','-ExecutionPolicy','Bypass','-Command',ps], { stdio:'inherit' });
+  } catch {
+    execFileSync('ffmpeg', ['-y','-loglevel','error','-f','gdigrab','-draw_mouse','0','-i','desktop','-frames:v','1',out], { stdio:'inherit' });
+  }
+  await page.screenshot({ path: resolve(out, '..', 'saturn-page.png'), fullPage:false });
   if (!existsSync(out)) throw new Error('Desktop screenshot was not created');
   console.log(out);
 } finally {
