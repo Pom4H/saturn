@@ -1,0 +1,112 @@
+name: Standalone Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/standalone-pack
+
+permissions:
+  contents: read
+
+concurrency:
+  group: standalone-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: [self-hosted, windows]
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck plant runtime
+        run: npm run plant:typecheck
+
+      - name: Build web assets
+        run: npm run plant:build
+
+      - name: Pack Windows executable
+        run: npm run saturn -- pack --target windows-x64 --outfile dist/standalone/saturn.exe --skip-web-build
+
+      - name: Smoke test executable
+        run: |
+          $ErrorActionPreference = "Stop"
+          $env:PORT = "43176"
+          $env:HOST = "127.0.0.1"
+          $env:SCADA_USER = "engineer"
+          $env:SCADA_PASSWORD = "standalone-ci-password"
+          $env:SATURN_DATA_DIR = Join-Path $env:RUNNER_TEMP ("saturn-standalone-" + $env:GITHUB_RUN_ID)
+
+          $stdout = Join-Path $env:RUNNER_TEMP "saturn-standalone.stdout.log"
+          $stderr = Join-Path $env:RUNNER_TEMP "saturn-standalone.stderr.log"
+          $process = Start-Process -FilePath ".\dist\standalone\saturn.exe" -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+
+          try {
+            $healthy = $false
+            for ($i = 0; $i -lt 40; $i++) {
+              if ($process.HasExited) {
+                throw "saturn.exe exited early with code $($process.ExitCode)"
+              }
+              try {
+                $response = Invoke-WebRequest "http://127.0.0.1:43176/plant/api/health" -UseBasicParsing -TimeoutSec 2
+                if ($response.StatusCode -eq 200) {
+                  $body = $response.Content | ConvertFrom-Json
+                  if ($body.status -eq "ok") {
+                    $healthy = $true
+                    break
+                  }
+                }
+              } catch {
+                Start-Sleep -Milliseconds 500
+              }
+            }
+
+            if (-not $healthy) {
+              throw "Standalone health endpoint did not become ready"
+            }
+
+            $database = Join-Path $env:SATURN_DATA_DIR "saturn.sqlite3"
+            if (-not (Test-Path $database)) {
+              throw "Standalone database was not created"
+            }
+
+            $exe = Get-Item ".\dist\standalone\saturn.exe"
+            Write-Host ("Standalone OK: {0:N1} MiB" -f ($exe.Length / 1MB))
+            Get-Content $stdout
+            if ((Test-Path $stderr) -and (Get-Item $stderr).Length -gt 0) {
+              Get-Content $stderr
+            }
+          }
+          finally {
+            if (-not $process.HasExited) {
+              Stop-Process -Id $process.Id -Force
+            }
+          }
+
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: saturn-windows-standalone
+          path: |
+            dist/standalone/saturn.exe
+            ${{ runner.temp }}/saturn-standalone.stdout.log
+            ${{ runner.temp }}/saturn-standalone.stderr.log
+          retention-days: 14
