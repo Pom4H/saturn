@@ -158,7 +158,7 @@ export class Kernel {
         // Observation must never advance the PLC. Every consumer sees the image
         // produced by the last scan, including while paused or after restoration.
         for(const id of this.controllers.keys()){const saved=this.state.plc![id];displays[id]=saved.healthy?clone(saved.display??[]):[];}
-        return { displays, runId: this.state.runId, revision: this.state.revision, seq: this.state.seq, time: this.state.time, paused: this.state.paused, synthetic: true, samples: this.samples(), alarms: [] }; }
+        return { displays, controllerScreens:Object.fromEntries([...this.controllers.keys()].map(id=>[id,this.state.plc![id].screen])), runId: this.state.runId, revision: this.state.revision, seq: this.state.seq, time: this.state.time, paused: this.state.paused, synthetic: true, samples: this.samples(), alarms: [] }; }
     controllerKey(target:string,key:string):void {
         const controller=this.project.controllers?.find(c=>c.id===target),state=this.state.plc?.[target];
         if(!controller||!state)throw new AppError('Unknown controller');
