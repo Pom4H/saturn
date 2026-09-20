@@ -30,7 +30,8 @@ export function generatePlcShell(project:Project, controllerId:string):PlcShellM
     if(wire.to.device===controllerId) connected.add(wire.from.device);
   }
   const ordered=[...systemDevices].sort((a,b)=>Number(connected.has(b.id))-Number(connected.has(a.id))||a.layout.x-b.layout.x||a.id.localeCompare(b.id));
-  const detail=ordered.filter(device=>interesting.has(device.type)).slice(0,8);
+  const detailPriority:Record<string,number>={pump:0,reservoir:1,valve:2,motor:3,fan:4,contactor:5,indicator:6,transmitter:7,ioModule:8,tower:9};
+  const detail=ordered.filter(device=>interesting.has(device.type)).sort((a,b)=>(detailPriority[a.type]??99)-(detailPriority[b.type]??99)||a.x-b.x||a.id.localeCompare(b.id)).slice(0,8);
   const peers=[
     ...(project.attachments??[]).filter(item=>item.controller===controllerId).map(item=>item.device),
     ...[...connected].filter(id=>project.devices.find(device=>device.id===id)?.type==='ioModule'),
