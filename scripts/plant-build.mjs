@@ -13,7 +13,7 @@ if (process.argv.includes('--server'))
     process.exit(0);
 await rm('dist/plant/assets', { recursive: true, force: true });
 await mkdir('dist/plant/assets', { recursive: true });
-await build({ ...options, entryPoints: { app: 'plant/web/main.ts', worker: 'plant/adapters/browser-worker.ts', 'browser-report-worker': 'plant/adapters/browser-report-worker.ts', login: 'plant/web/login.ts' }, outdir: 'dist/plant/assets', platform: 'browser', minify: true, sourcemap: false, legalComments: 'linked', splitting: true, chunkNames: 'chunks/[name]-[hash]', loader: { '.wasm': 'file' } });
+await build({ ...options, entryPoints: { app: 'plant/web/main.ts', 'dsl-reference': 'plant/web/dsl-reference.ts', worker: 'plant/adapters/browser-worker.ts', 'browser-report-worker': 'plant/adapters/browser-report-worker.ts', login: 'plant/web/login.ts' }, outdir: 'dist/plant/assets', platform: 'browser', minify: true, sourcemap: false, legalComments: 'linked', splitting: true, chunkNames: 'chunks/[name]-[hash]', loader: { '.wasm': 'file' } });
 await cp('node_modules/@sqlite.org/sqlite-wasm/dist/sqlite3.wasm', 'dist/plant/assets/sqlite3.wasm');
 await cp('node_modules/@sqlite.org/sqlite-wasm/dist/sqlite3.wasm', 'dist/plant/assets/chunks/sqlite3.wasm');
 await writeFile('dist/plant/assets/THIRD-PARTY.txt', 'Saturn profile adapted from Pom4H/open-device 007ada38d2cce27b37413f38952ca11b919842c1\n\n'+await readFile('plant/vendor/saturn/LICENSE','utf8')+'\n\nFBD WASM runtime\n'+await readFile('plant/vendor/saturn/RUNTIME-LICENSE','utf8')+'\n\nFirmverse portable Saturn package\n'+await readFile('plant/vendor/firmverse/LICENSE','utf8')+'\n\n'+await readFile('plant/vendor/firmverse/RUNTIME_LICENSE','utf8'));
