@@ -48,6 +48,7 @@ export type HmiAction =
   | { type: 'navigate'; screen: string; params?: Readonly<Record<string, HmiRouteParam>>; replace?: boolean }
   | { type: 'back' }
   | { type: 'command'; equipmentId: string; command: string; value?: HmiValue<Exclude<HmiPrimitive, null>> }
+  | { type: 'operate'; control: string; value: HmiValue<number> }
   | { type: 'write'; signal: string; value: HmiValue<Exclude<HmiPrimitive, null>> }
   | { type: 'toggle'; signal: string }
   | { type: 'open'; dialog: string }
@@ -86,6 +87,7 @@ export interface HmiSnapshot {
 }
 export interface HmiEnvironment {
   command?: (command: EquipmentCommand) => void | Promise<void>;
+  operate?: (control: string, value: number) => void | Promise<void>;
   write?: (signal: string, value: Exclude<HmiPrimitive, null>) => void | Promise<void>;
   ack?: (alarm?: string) => void | Promise<void>;
   script?: (id: string, runtime: HmiRuntime) => void | Promise<void>;
@@ -135,6 +137,8 @@ export const navigate = (target: string | HmiScreen, params?: Readonly<Record<st
 export const back = (): HmiAction => ({ type: 'back' });
 export const command = (equipmentId: string, name: string, value?: HmiValue<Exclude<HmiPrimitive, null>>): HmiAction =>
   ({ type: 'command', equipmentId: checkId(equipmentId, 'equipment'), command: checkId(name, 'command'), ...(value === undefined ? {} : { value }) });
+export const operate = (control: string, value: HmiValue<number>): HmiAction =>
+  ({ type: 'operate', control: checkId(control, 'control'), value });
 export const write = (signal: string, value: HmiValue<Exclude<HmiPrimitive, null>>): HmiAction =>
   ({ type: 'write', signal: checkId(signal, 'signal'), value });
 export const toggle = (signal: string): HmiAction => ({ type: 'toggle', signal: checkId(signal, 'signal') });
@@ -179,6 +183,22 @@ function walkAction(action: HmiAction, screens: Set<string>, dialogs: Set<string
   if (action.type === 'sequence') for (const nested of action.actions) walkAction(nested, screens, dialogs);
   if (action.type === 'confirm') walkAction(action.then, screens, dialogs);
 }
+export function hmiActions(app: HmiApplication): HmiAction[] {
+  const result: HmiAction[] = [];
+  const collectAction = (action: HmiAction): void => {
+    result.push(action);
+    if (action.type === 'sequence') for (const nested of action.actions) collectAction(nested);
+    if (action.type === 'confirm') collectAction(action.then);
+  };
+  const collectNode = (node: HmiNode): void => {
+    if (node.type === 'group') for (const child of node.children) collectNode(child);
+    if (node.type === 'button') collectAction(node.action);
+  };
+  for (const item of app.screens) for (const node of item.body) collectNode(node);
+  for (const item of app.dialogs) for (const node of item.body) collectNode(node);
+  return result;
+}
+
 function walkNode(node: HmiNode, screens: Set<string>, dialogs: Set<string>, ids: Set<string>): void {
   if (ids.has(node.id)) throw new Error(`Duplicate HMI node id: ${node.id}`);
   ids.add(node.id);
@@ -293,6 +313,12 @@ export class HmiRuntime {
         const payload: EquipmentCommand = { commandId: this.nextCommandId(), equipmentId: action.equipmentId, command: action.command, ...(value === undefined ? {} : { value }) };
         await this.environment.command(payload); return;
       }
+      case 'operate': {
+        if (!this.environment.operate) throw new Error('HMI operate adapter is not configured');
+        const value = this.resolve(action.value);
+        if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(`Control value is unavailable: ${action.control}`);
+        await this.environment.operate(action.control, value); return;
+      }
       case 'write': {
         if (!this.environment.write) throw new Error('HMI write adapter is not configured');
         const value = this.resolve(action.value);
@@ -346,6 +372,31 @@ export function browserNavigation(base = ''): HmiNavigation {
       const handler = () => listener(current());
       window.addEventListener('popstate', handler);
       return () => window.removeEventListener('popstate', handler);
+    },
+  };
+}
+
+
+export function hashNavigation(prefix = 'hmi'): HmiNavigation {
+  if (typeof window === 'undefined') throw new Error('Hash navigation requires window');
+  const marker = '#' + prefix.replace(/^#/, '').replace(/\/$/, '');
+  const current = () => {
+    const hash = window.location.hash;
+    if (!hash.startsWith(marker)) return '/';
+    const value = hash.slice(marker.length);
+    return value.startsWith('/') ? value : value ? '/' + value : '/';
+  };
+  const url = (path: string) => marker + (path.startsWith('/') ? path : '/' + path);
+  return {
+    current,
+    push: path => { window.history.pushState(null, '', url(path)); window.dispatchEvent(new HashChangeEvent('hashchange')); },
+    replace: path => { window.history.replaceState(null, '', url(path)); window.dispatchEvent(new HashChangeEvent('hashchange')); },
+    back: () => window.history.back(),
+    subscribe: listener => {
+      const handler = () => listener(current());
+      window.addEventListener('hashchange', handler);
+      window.addEventListener('popstate', handler);
+      return () => { window.removeEventListener('hashchange', handler); window.removeEventListener('popstate', handler); };
     },
   };
 }
