@@ -1,4 +1,5 @@
-import { resolve } from 'node:path';\nimport { models } from '../plant/models';
+import { resolve } from 'node:path';
+import { models } from '../plant/models';
 import { ExtensionManager } from './extensions';
 
 export interface IdeCatalogItem {
@@ -30,7 +31,7 @@ export async function ideCatalog(appData: string): Promise<IdeCatalogDocument> {
             .sort((a, b) => a.title.localeCompare(b.title)),
     };
 
-    const extensions = await new ExtensionManager(resolveExtensions(appData)).list();
+    const extensions = await new ExtensionManager(resolve(appData, 'extensions')).list();
     const catalogs: IdeCatalogGroup[] = [core];
     for (const extension of extensions) {
         if (!extension.elements.length)
@@ -48,10 +49,6 @@ export async function ideCatalog(appData: string): Promise<IdeCatalogDocument> {
         });
     }
     return { schema: 1, catalogs };
-}
-
-function resolveExtensions(appData: string): string {
-    return new URL('./extensions/', new URL('file://' + appData.replaceAll('\\', '/') + '/')).pathname;
 }
 
 export async function runIdeCommand(args: string[], appData: string): Promise<void> {
