@@ -1,18 +1,30 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
 
-const [command, ...args] = process.argv.slice(2);
-if (command !== 'pack') {
-    console.error('Usage: saturn pack [--project DIR] [--target windows-x64|linux-x64|linux-arm64|darwin-arm64] [--outfile PATH]');
+const args = process.argv.slice(2);
+const command = args[0] ?? 'open';
+const bun = process.platform === 'win32' ? 'bun.exe' : 'bun';
+
+let childArgs;
+if (command === 'pack') {
+    childArgs = ['run', 'scripts/standalone-pack.ts', ...args.slice(1)];
+}
+else if (command === 'open' || command === 'run') {
+    childArgs = ['run', 'standalone/entry.ts', command, ...args.slice(1)];
+}
+else {
+    console.error([
+        'Usage:',
+        '  saturn open [PROJECT]',
+        '  saturn run PROJECT [--kiosk]',
+        '  saturn pack [--target windows-x64|linux-x64|linux-arm64|darwin-arm64] [--outfile PATH]',
+    ].join('\n'));
     process.exit(2);
 }
 
-const child = spawn(process.platform === 'win32' ? 'bun.exe' : 'bun', ['run', 'scripts/standalone-pack.ts', ...args], {
-    stdio: 'inherit',
-    shell: false,
-});
-child.on('error', (error) => {
-    console.error('Bun is required to create a standalone executable:', error.message);
+const child = spawn(bun, childArgs, { stdio: 'inherit', shell: false });
+child.on('error', error => {
+    console.error('Bun is required when running Saturn from the source checkout:', error.message);
     process.exit(1);
 });
-child.on('exit', (code) => process.exit(code ?? 1));
+child.on('exit', code => process.exit(code ?? 1));
