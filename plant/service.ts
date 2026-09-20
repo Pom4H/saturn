@@ -269,6 +269,7 @@ export class Service {
     async idle() { await this.jobPromise; }
     async refreshRelease() { if (this.refreshing)
         return; this.refreshing = true; try {
+        await this.repository.refresh?.();
         const desired = await this.repository.desired();
         if (desired && desired !== this.kernel.state.revision && desired !== this.rejected) {
             try {
