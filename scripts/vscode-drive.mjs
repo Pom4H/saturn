@@ -46,6 +46,25 @@ if (!page) throw new Error('VS Code workbench page not found');
 await page.bringToFront();
 await page.waitForSelector('.monaco-workbench', { timeout: 15000 });
 
+async function clickVisibleByText(text) {
+  const exact = page.getByText(text, { exact: true }).last();
+  try {
+    if (await exact.isVisible({ timeout: 500 })) {
+      await exact.click();
+      await page.waitForTimeout(700);
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+await clickVisibleByText('Continue without Signing In');
+await clickVisibleByText('Cancel');
+for (const label of ['Continue', 'Skip', 'Done', 'Start Using VS Code']) {
+  const bodyText = await page.locator('body').innerText();
+  if (!bodyText.includes('Welcome to VS Code')) break;
+  await clickVisibleByText(label);
+}
 for (let i = 0; i < 3; i++) {
   await page.keyboard.press('Escape');
   await page.waitForTimeout(150);
