@@ -12,13 +12,14 @@ import { installEquipment, sceneFor, visualFrame, references } from '../equipmen
 import { models, model } from '../models';
 import { compileProject, validateFiles } from '../compiler';
 import { chartSVG, escape } from '../workflows';
-import { LocalClient, RemoteClient, type Connection, type Status, type Revision, type Frame, type ReportArtifact, type ReportData } from './client';
+import { LocalClient, RemoteClient, LinkedClient, type Connection, type Status, type Revision, type Frame, type ReportArtifact, type ReportData } from './client';
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const base = new URL('../', location.href), demo = location.pathname.endsWith('/demo/');
 let client: Connection, status: Status, frame: Frame, scene: SceneView, system = '', selected: string | null = null, tab = 'scheme', file = 'plant.ts', files: Record<string, string> = {}, head: string | null = null, dirty = false, validDraft = true, editor: EditorView, loadingEditor = false, failed = false;
 let scene3d: SceneView3D | undefined, viewMode: '2d' | '3d' = '2d', changingView = false;
 let registration: ServiceWorkerRegistration | undefined, pendingInstall: any, noticeEnabled = false, closed = false;
 const fmt = (v: number | null | undefined, digits = 2) => typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—';
+const runtimeRole = () => status?.runtimeActor?.role ?? status?.actor?.role ?? 'viewer';
 const time = (v: number | null | undefined) => v ? new Date(v).toLocaleString('ru-RU') : '—';
 function toast(message: string) { $('toast').textContent = message; $('toast').hidden = false; setTimeout(() => $('toast').hidden = true, 4000); }
 function error(message: string) { $('error').textContent = message; $('error').hidden = false; }
@@ -54,7 +55,7 @@ function setupProject() {
         append(group.id, depth + 1);
     } };
     append();
-    const definitions = status.project.reports.map(r => `<div class="card"><div class="card-header"><div><h3>${escape(r.title)}</h3><span class="badge">${escape(r.id)}</span></div><button data-run="${escape(r.id)}" ${!r.on.workflow_dispatch || status.actor.role === 'viewer' ? 'disabled' : ''}>Запустить</button></div><p>${r.on.schedule?.length ? escape(r.on.schedule.map(s => s.cron + ' UTC').join(', ')) : 'Только вручную'} · окно ${Math.round(r.window / 60000)} мин</p><div class="report-inputs">${Object.entries(r.on.workflow_dispatch?.inputs ?? {}).map(([k, v]) => `<label>${escape(k)}<input type="number" data-report="${escape(r.id)}" data-input="${escape(k)}" min="${v.min}" max="${v.max}" value="${v.default}" step="any"></label>`).join('')}</div></div>`).join('');
+    const definitions = status.project.reports.map(r => `<div class="card"><div class="card-header"><div><h3>${escape(r.title)}</h3><span class="badge">${escape(r.id)}</span></div><button data-run="${escape(r.id)}" ${!r.on.workflow_dispatch || runtimeRole() === 'viewer' ? 'disabled' : ''}>Запустить</button></div><p>${r.on.schedule?.length ? escape(r.on.schedule.map(s => s.cron + ' UTC').join(', ')) : 'Только вручную'} · окно ${Math.round(r.window / 60000)} мин</p><div class="report-inputs">${Object.entries(r.on.workflow_dispatch?.inputs ?? {}).map(([k, v]) => `<label>${escape(k)}<input type="number" data-report="${escape(r.id)}" data-input="${escape(k)}" min="${v.min}" max="${v.max}" value="${v.default}" step="any"></label>`).join('')}</div></div>`).join('');
     $('report-definitions').innerHTML = definitions;
     renderScene();
     renderMetrics();
@@ -310,11 +311,9 @@ async function enableNotifications() {
     await client.request('subscribe', subscription.toJSON());
     toast('Web Push включён для пользователя на этом устройстве. Выход из текущей сессии отзывает подписку.');
 }
-async function start(memory = false) {
-    closed = false;
-    client = demo ? new LocalClient() : new RemoteClient();
-    client.onFrame = renderFrame;
-    client.onFailure = message => { failed = true; error(message); refreshActions(); if (frame) {
+function bindClient(target: Connection) {
+    target.onFrame = renderFrame;
+    target.onFailure = message => { failed = true; error(message); refreshActions(); if (frame) {
         const unknown = structuredClone(frame);
         for (const sample of Object.values(unknown.samples)) {
             sample.value = null;
@@ -325,8 +324,33 @@ async function start(memory = false) {
         renderFrame(unknown);
         status.healthy = health;
     } };
-    client.onNotification = n => { if (demo && noticeEnabled && registration && Notification.permission === 'granted')
+    target.onNotification = n => { if (demo && noticeEnabled && registration && Notification.permission === 'granted')
         void registration.showNotification(n.kind === 'alarm' ? 'SCADA · Аларм' : 'SCADA · Отчёт готов', { body: 'Откройте демонстрацию для подробностей.', tag: n.id, data: { url: new URL('demo/', base).href } }); };
+}
+function renderEnvironmentStatus() {
+    if (demo) {
+        $('environment-state').textContent = 'Runtime · локальное демо';
+        $('environment-connect').hidden = true;
+        $('environment-disconnect').hidden = true;
+        return;
+    }
+    const env = status?.environment;
+    if (!env) {
+        $('environment-state').textContent = 'Runtime · локальный';
+        $('environment-connect').hidden = false;
+        $('environment-disconnect').hidden = true;
+        return;
+    }
+    const applied = status.runtimeInstance?.applied ?? env.applied;
+    const local = status.head;
+    $('environment-state').textContent = `${env.name} · LIVE · ${applied.slice(0, 8)}${local && local !== applied ? ` · workspace ${local.slice(0, 8)}` : ''}`;
+    $('environment-connect').hidden = true;
+    $('environment-disconnect').hidden = false;
+}
+async function start(memory = false) {
+    closed = false;
+    client = demo ? new LocalClient() : new RemoteClient();
+    bindClient(client);
     try {
         status = await client.start(memory);
         frame = status.frame;
@@ -338,6 +362,7 @@ async function start(memory = false) {
         $('mode').textContent = demo ? 'СИМУЛЯЦИЯ · БЕЗ СЕРВЕРА' : 'СИМУЛЯЦИЯ · NODE.JS';
         $('storage').textContent = demo ? memory ? 'SQLite WASM · память, без сохранения' : 'SQLite WASM · OPFS · одна вкладка-владелец' : 'Node.js · SQLite · Git · авторизованная сессия';
         $('logout').hidden = demo;
+        renderEnvironmentStatus();
         installEquipment();
         scene = new SceneView($('diagram') as unknown as SVGSVGElement);
         scene.onSelect = selectEquipment;
@@ -361,6 +386,66 @@ async function start(memory = false) {
         client.close();
     }
 }
+$('environment-connect').onclick = () => ($<HTMLDialogElement>('environment-dialog')).showModal();
+$('environment-form').addEventListener('submit', e => {
+    if ((e as SubmitEvent).submitter?.getAttribute('value') === 'cancel')
+        return;
+    e.preventDefault();
+    void guard(async () => {
+        if (demo)
+            return;
+        const form = new FormData(e.currentTarget as HTMLFormElement);
+        const descriptor = await client.request<any>('environment/connect', {
+            name: form.get('name'),
+            url: form.get('url'),
+            user: form.get('user'),
+            password: form.get('password'),
+        });
+        const next = new LinkedClient(
+            new RemoteClient(),
+            new RemoteClient(new URL('../api/environment/', location.href)),
+        );
+        bindClient(next);
+        const nextStatus = await next.start();
+        const previous = client;
+        client = next;
+        previous.close();
+        status = nextStatus;
+        frame = status.frame;
+        head = status.head;
+        failed = false;
+        $('error').hidden = true;
+        setupProject();
+        renderFrame(frame);
+        if (status.actor.role === 'engineer')
+            await loadFiles();
+        renderEnvironmentStatus();
+        ($<HTMLDialogElement>('environment-dialog')).close();
+        (e.currentTarget as HTMLFormElement).querySelector<HTMLInputElement>('input[name=password]')!.value = '';
+        toast(`Подключено: ${descriptor.name}. Source остаётся локальным; live state идёт с ${descriptor.url}.`);
+    });
+});
+$('environment-disconnect').onclick = () => void guard(async () => {
+    if (demo)
+        return;
+    await client.request('environment/disconnect', {});
+    const next = new RemoteClient();
+    bindClient(next);
+    const nextStatus = await next.start();
+    const previous = client;
+    client = next;
+    previous.close();
+    status = nextStatus;
+    frame = status.frame;
+    head = status.head;
+    failed = false;
+    setupProject();
+    renderFrame(frame);
+    if (status.actor.role === 'engineer')
+        await loadFiles();
+    renderEnvironmentStatus();
+    toast('Live environment отключён. Runtime снова локальный.');
+});
 $('recover-draft').onclick = () => void guard(() => { const saved = JSON.parse(sessionStorage.getItem(`scada-draft:${demo ? 'demo' : 'server'}`) ?? 'null'); if (!saved?.files)
     throw new Error('Нет сохранённого черновика'); validateFiles(saved.files); files = saved.files; head = saved.head; file = saved.file in files ? saved.file : Object.keys(files)[0]; dirty = true; validDraft = false; populateFiles(); setEditor(); refreshActions(); toast('Черновик восстановлен с исходной базовой ревизией.'); });
 $('new-file').onclick = () => void guard(() => { const path = prompt('Имя нового модуля, например sensors.ts'); if (!path)
@@ -507,7 +592,7 @@ function refreshControls() {
         const healthy = !failed && actual?.quality === 'good';
         const blocked = !!frame.samples[`${c.id}.blocked`]?.value;
         node.querySelector('meter')!.value = healthy ? actual.value ?? c.min : c.min;
-        (node.querySelector('[data-operate]') as HTMLButtonElement).disabled = !healthy || blocked || status.actor.role === 'viewer';
+        (node.querySelector('[data-operate]') as HTMLButtonElement).disabled = !healthy || blocked || runtimeRole() === 'viewer';
         node.dataset.blocked = String(blocked);
         node.querySelector('[data-gate]')!.textContent = !healthy ? 'Данные недостоверны: команды заблокированы.' : blocked ? c.blockedReason ?? 'Блокировка активна' : c.enableWhen ? 'Разрешающие условия выполнены' : 'Диапазон учебной модели';
     }
@@ -542,7 +627,7 @@ function setupViews(){
 function refreshView(rebuild=false){
     const view=status.project.views?.find(v=>v.id===$<HTMLSelectElement>('view-select').value),host=$('live-view');
     if(!view){host.textContent='Объявите view() в DSL проекта. Тот же panel() можно использовать в HMI и отчёте.';return;}
-    const values=bindPresentation(view,frame.samples,frame.time),interactive=!failed&&status.actor.role!=='viewer';
+    const values=bindPresentation(view,frame.samples,frame.time),interactive=!failed&&runtimeRole()!=='viewer';
     // Telemetry updates readouts in place: keyboard focus and operator buttons survive a scan.
     if(rebuild||host.dataset.definition!==JSON.stringify(view)){host.innerHTML=renderPresentation(view,{values,interactive});host.dataset.definition=JSON.stringify(view);}
     for(const node of host.querySelectorAll<HTMLElement>('[data-view-value]')){
