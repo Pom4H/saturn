@@ -575,7 +575,7 @@ function activate(context) {
   targets.reload();
 
   if (process.env.SATURN_VSCODE_TOUR === '1') {
-    setTimeout(() => { void runRecordedTour(catalog, targets, terminal); }, 1800);
+    setTimeout(() => { void runRecordedTour(catalog, targets, terminal); }, 6000);
   } else if (process.env.SATURN_VSCODE_CAPTURE === '1') {
     setTimeout(() => {
       void (async () => {
