@@ -1,4 +1,4 @@
-import { system, simulation, bank, aggregate, derived, signal, add } from "@scada/plant";
+import { system, simulation, bank, aggregate, derived, signal, add } from "@saturn/core";
 export const coreSystem = system("core", "Реактор и группы каналов", "unit4");
 export const groupA = system("coreA", "Каналы · группа A", "core");
 export const groupB = system("coreB", "Каналы · группа B", "core");
