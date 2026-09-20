@@ -1,5 +1,5 @@
-import { defineComponent } from '@pom4h/scada/sdk';
-import { connect, tank, outlet } from '@pom4h/scada/core';
+import { defineComponent } from '@saturn/scada/sdk';
+import { connect, tank, outlet } from '@saturn/scada/core';
 
 const regulator = defineComponent('consumerRegulator', {
   version: '1.0.0', label: 'Regulator', width: 100, height: 60,
