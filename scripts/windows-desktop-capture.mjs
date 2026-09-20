@@ -46,10 +46,20 @@ try {
   const browserPath = candidates.find(p => existsSync(p));
   if (!browserPath) throw new Error('Edge/Chrome executable not found on Windows runner');
 
+  const screenText = execFileSync('powershell.exe', ['-NoProfile','-ExecutionPolicy','Bypass','-Command',
+    'Add-Type -AssemblyName System.Windows.Forms; $b=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds; Write-Output ($b.Width.ToString()+","+$b.Height.ToString())'
+  ], { encoding:'utf8' }).trim();
+  const [screenW, screenH] = screenText.split(',').map(Number);
+  const windowW = Math.round(screenW * 0.8);
+  const windowH = Math.round(screenH * 0.8);
+  const windowX = Math.round((screenW - windowW) / 2);
+  const windowY = Math.round((screenH - windowH) / 2);
+  console.log(`Primary screen ${screenW}x${screenH}; Saturn window ${windowW}x${windowH} at ${windowX},${windowY}`);
+
   browser = await chromium.launch({
     headless:false,
     executablePath:browserPath,
-    args:['--window-size=1536,864','--window-position=192,90','--disable-infobars','--no-first-run'],
+    args:[`--window-size=${windowW},${windowH}`,`--window-position=${windowX},${windowY}`,'--disable-infobars','--no-first-run'],
   });
   const context = await browser.newContext({ viewport:null });
   const page = await context.newPage();
@@ -63,7 +73,7 @@ try {
   await page.waitForLoadState('networkidle').catch(()=>{});
   await sleep(2500);
 
-  const diag = execFileSync('cmd.exe', ['/d','/s','/c','query session & echo --- & tasklist /fi "imagename eq explorer.exe" /v'], { encoding:'utf8' });
+  const diag = execFileSync('cmd.exe', ['/d','/s','/c','query session'], { encoding:'utf8' });
   writeFileSync(resolve(out, '..', 'windows-session.txt'), diag);
   console.log(diag);
 
