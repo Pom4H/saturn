@@ -1,0 +1,61 @@
+name: VS Code full tour video
+
+on:
+  pull_request:
+    paths:
+      - 'vscode/**'
+      - 'standalone/**'
+      - 'plant/**'
+      - 'scripts/vscode-video.ps1'
+      - '.github/workflows/vscode-video.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vscode-video-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  record:
+    runs-on: [self-hosted, windows]
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Saturn web assets
+        run: npm run plant:build
+
+      - name: Generate capture update key
+        run: node scripts\update-test-key.mjs "%RUNNER_TEMP%\saturn-vscode-video-key"
+
+      - name: Pack Saturn CLI
+        run: npm run saturn -- pack --target windows-x64 --outfile "%RUNNER_TEMP%\saturn.exe" --skip-web-build --update-public-key-file "%RUNNER_TEMP%\saturn-vscode-video-key\public.pem"
+
+      - name: Record full Saturn tour inside real VS Code
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\vscode-video.ps1
+
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: saturn-vscode-tour-video
+          path: vscode-video/
+          retention-days: 14
