@@ -147,6 +147,31 @@ try {
         assert.equal(Number(await bench.locator('#inspector [data-signal="SATURN-1.DO1"] b').innerText()),1);assert.match(await bench.locator('#plc-front .runtime-hmi').textContent(),/800/);
         await bench.screenshot({path:evidence+'/saturn-inspector.png',fullPage:true});
     });
+    await check('HMI as code navigates and drives the exact Saturn PLC runtime in the browser',async()=>{
+        await bench.locator('[data-tab="hmi"]').click();
+        await bench.locator('#hmi-root [data-hmi-screen="overview"]').waitFor();
+        assert.match(await bench.locator('#hmi-route').innerText(), /#hmi\/$/);
+        await bench.locator('#openPlc').click();
+        await bench.locator('#hmi-root [data-hmi-screen="plc"]').waitFor();
+        assert.equal(new URL(bench.url()).hash,'#hmi/plc');
+        await bench.locator('#level3').click();
+        await bench.waitForFunction(()=>document.querySelector('#levelReadout')?.textContent==='3.0 V',null,{timeout:12000});
+        await bench.waitForFunction(()=>document.querySelector('#aiReadout')?.textContent==='300',null,{timeout:5000});
+        assert.equal(await bench.locator('#doReadout').innerText(),'0');
+        assert.equal(await bench.locator('#plcLamp').getAttribute('data-on'),'false');
+        assert.match(await bench.locator('#plcFront .runtime-hmi').textContent(),/300/);
+        bench.once('dialog',dialog=>dialog.accept());
+        await bench.locator('#level7').click();
+        await bench.waitForFunction(()=>document.querySelector('#levelReadout')?.textContent==='7.0 V',null,{timeout:12000});
+        await bench.waitForFunction(()=>document.querySelector('#doReadout')?.textContent==='1',null,{timeout:5000});
+        assert.equal(await bench.locator('#plcLamp').getAttribute('data-on'),'true');
+        assert.match(await bench.locator('#plcFront .runtime-hmi').textContent(),/700/);
+        assert.ok(await bench.locator('#plcLamp .hmi-lamp-bulb').evaluate(element=>element.getAnimations().length>0));
+        await bench.screenshot({path:evidence+'/hmi-saturn-plc-live.png',fullPage:true});
+        await bench.locator('#plcBack').click();
+        await bench.locator('#hmi-root [data-hmi-screen="overview"]').waitFor();
+        assert.match(await bench.locator('#overviewOutputValue').innerText(),/^1$/);
+    });
     await check('clicking two terminals and removing a connection only edits a validated source draft',async()=>{
         await bench.locator('#diagram [data-node="PSU-24"]').click();await bench.locator('[data-connect-port="minus"]').click();
         await bench.locator('#diagram [data-node="SATURN-1"] [data-port="COM2"]').click({force:true});
