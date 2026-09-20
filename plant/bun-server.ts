@@ -37,8 +37,11 @@ interface BunRuntimeLike {
     serve(options: Record<string, unknown>): BunServerLike;
     file(path: string): Blob;
 }
-const bunRuntime = (globalThis as typeof globalThis & { Bun?: BunRuntimeLike }).Bun;
-if (!bunRuntime) throw new Error('Saturn native server requires Bun. Use the version pinned in .bun-version.');
+const bunRuntime = (() => {
+    const runtime = (globalThis as typeof globalThis & { Bun?: BunRuntimeLike }).Bun;
+    if (!runtime) throw new Error('Saturn native server requires Bun. Use the version pinned in .bun-version.');
+    return runtime;
+})();
 
 const defaultSecurityHeaders: Record<string, string> = {
     'X-Content-Type-Options': 'nosniff',
@@ -74,7 +77,7 @@ async function safeFile(root: string, relative: string): Promise<string> {
     return file;
 }
 function fileResponse(path: string, type: string, head = false, extra: HeadersInit = {}): Response {
-    return response(head ? null : bunRuntime!.file(path), 200, {
+    return response(head ? null : bunRuntime.file(path), 200, {
         'Content-Type': type,
         'Cache-Control': 'no-cache',
         ...Object.fromEntries(new Headers(extra)),
