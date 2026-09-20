@@ -115,6 +115,10 @@ if (args[0] === 'extension' || args[0] === 'extensions') {
     await runExtensionCommand(args.slice(1), appData);
     process.exit(0);
 }
+if (args[0] === 'ide') {
+    await runIdeCommand(args.slice(1), appData);
+    process.exit(0);
+}
 
 const runtimeInvocationArgs = args.slice();
 const command = args[0] === 'run' ? 'run' : args[0] === 'open' ? 'open' : 'open';
