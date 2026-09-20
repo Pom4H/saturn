@@ -105,7 +105,7 @@ export function aggregate<T extends {
 
 /** Installed PLC profile. Program refs are terminal names, not arbitrary signal expressions. */
 export function plc<const O extends Record<string,Expr>>(name:string, options:Omit<Controller,'id'|'layout'|'profile'|'outputs'> & {at:Layout;outputs:O}) {
- const controller:Controller={id:id(name),profile:'saturn-fbd',system:options.system,layout:options.at,outputs:options.outputs,blocks:options.blocks,hmi:options.hmi};
+ const controller:Controller={id:id(name),profile:'saturn-fbd',system:options.system,layout:options.at,outputs:options.outputs,blocks:options.blocks,setpoints:options.setpoints,hmi:options.hmi};
  return Object.assign({controller},Object.fromEntries(Object.keys(options.outputs).map(k=>[k,signal(`${name}.${k}`)]))) as {controller:Controller}&{readonly[K in keyof O]:Expr};
 }
 export const pin=(name:string):Expr=>({ref:id(name)});
