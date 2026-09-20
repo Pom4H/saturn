@@ -16,7 +16,7 @@ Canonical package names:
 @saturn/my-extension   extension-package naming pattern
 ~~~
 
-The bounded project compiler treats `@saturn/core` as the canonical authored DSL module. `@scada/plant` remains a compatibility alias during migration; new examples and documentation must use `@saturn/core`.
+The bounded project compiler accepts one authored DSL module: `@saturn/core`. Pre-production legacy aliases are intentionally rejected so the repository cannot drift into multiple project languages.
 
 Extensions are ordinary npm-compatible packages with a Saturn manifest. They may use any registry scope that an operator controls, but Saturn's own examples and first-party packages use the `@saturn/*` namespace.
 
