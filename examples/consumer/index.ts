@@ -1,4 +1,4 @@
-import { pipe, project, simulation, system } from '@saturn/core';
+import { cable, pipe, project, simulation, system } from '@saturn/core';
 
 const water = system('water', 'Water');
 const tank = simulation('T-101', 'reservoir', {
@@ -13,15 +13,28 @@ const separator = simulation('SEP-101', 'separator', {
   system: 'water',
   at: { x: 520, y: 120 },
 });
+const generator = simulation('GEN', 'alternator', {
+  system: 'water',
+  at: { x: 20, y: 360 },
+});
+const transformer = simulation('TR', 'transformer', {
+  system: 'water',
+  at: { x: 260, y: 360 },
+});
+const supply = simulation('PSU', 'dc-supply', {
+  system: 'water',
+  at: { x: 520, y: 360 },
+});
 
 const suction = pipe('suction', tank.ports.outlet, pump.ports.inlet);
+const feeder = cable('feeder', generator.ports.output, transformer.ports.primary, { medium: 'power' });
 
 const installation = project('consumer', {
   title: 'Consumer',
   description: 'External TypeScript consumer',
   systems: [water],
-  simulations: [tank, pump, separator],
-  connections: [suction],
+  simulations: [tank, pump, separator, generator, transformer, supply],
+  connections: [suction, feeder],
   signals: [],
   alarms: [],
   reports: [],
@@ -51,6 +64,10 @@ if (false) {
   // Separator outlet carries steam; pump inlet accepts water.
   // @ts-expect-error incompatible fluid media
   pipe('steam-to-water', separator.ports.outlet, pump.ports.inlet);
+
+  // Both are power terminals, but their electrical families are incompatible.
+  // @ts-expect-error drive power cannot be wired directly to a dc24 terminal
+  cable('drive-to-dc24', generator.ports.output, supply.ports.plus, { medium: 'power' });
 }
 
 console.log('@saturn/core consumer passed');
