@@ -30,6 +30,8 @@ jobs:
       - run: npm run plant:check
       - run: npx playwright install --with-deps chromium-headless-shell
       - run: xvfb-run -a npm run plant:test:browser
+        env:
+          PWA_ONLY_PLC: '1'
       - uses: actions/upload-artifact@v7.0.1
         if: always()
         with:
