@@ -1,3 +1,4 @@
+// Vendored from Pom4H/firmverse c72bffc9781bd08f390b26c603df8b9c40ce00d6 (packages/saturn/src/display.ts).
 /**
  * Deterministic 320x240 Saturn display emulator.
  *
