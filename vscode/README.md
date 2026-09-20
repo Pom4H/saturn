@@ -9,7 +9,7 @@ It deliberately does **not** embed a second IDE inside VS Code.
 - **Project** — native `TreeView` for the project entry, diagram, local runtime and HMI.
 - **Equipment Catalog** — native `TreeView` built from Saturn Core equipment plus `elements` contributed by installed Saturn extensions.
 - **Targets** — native `TreeView` for local runtime, servers, controllers, HMIs and devices.
-- **Diagram** — editor-area `WebviewPanel`, opened beside TypeScript source.
+- **Diagram** — editor-area `WebviewPanel` rendered from `saturn ide diagram --json`, opened beside TypeScript source. It contains only the mnemonic, not the Saturn web IDE; clicking equipment reveals its TypeScript declaration.
 - **Status bar** — local runtime state.
 - **Integrated terminal** — Saturn CLI processes remain visible and controllable by the engineer.
 
