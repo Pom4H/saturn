@@ -15,12 +15,16 @@ import { chartSVG, escape } from '../workflows';
 import { LocalClient, RemoteClient, type Connection, type Status, type Revision, type Frame, type ReportArtifact, type ReportData } from './client';
 import { HmiRuntime, hashNavigation, type HmiEquipmentNode, type HmiPrimitive } from '../../src/hmi';
 import { mountHmiDom, type HmiDomEquipmentRenderer } from '../../src/hmi-dom';
+import * as React from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { SaturnPlcHmi } from './plc-react-hmi';
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const base = new URL('../', location.href), demo = location.pathname.endsWith('/demo/');
 let client: Connection, status: Status, frame: Frame, scene: SceneView, system = '', selected: string | null = null, tab = 'scheme', file = 'plant.ts', files: Record<string, string> = {}, head: string | null = null, dirty = false, validDraft = true, editor: EditorView, loadingEditor = false, failed = false;
 let scene3d: SceneView3D | undefined, viewMode: '2d' | '3d' = '2d', changingView = false;
 let hmiRuntime: HmiRuntime | undefined, hmiDom: ReturnType<typeof mountHmiDom> | undefined, hmiRouteStop: (() => void) | undefined;
 let registration: ServiceWorkerRegistration | undefined, pendingInstall: any, noticeEnabled = false, closed = false;
+const plcHmiRoots = new WeakMap<SVGSVGElement, Root>();
 const fmt = (v: number | null | undefined, digits = 2) => typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—';
 const time = (v: number | null | undefined) => v ? new Date(v).toLocaleString('ru-RU') : '—';
 function toast(message: string) { $('toast').textContent = message; $('toast').hidden = false; setTimeout(() => $('toast').hidden = true, 4000); }
@@ -41,8 +45,17 @@ async function command(action: string, extra: object = {}) { ensureActive(); con
 async function refreshStatus() { const previous = status?.project; status = await client.request<Status>('session'); frame = status.frame; if (previous !== status.project && JSON.stringify(previous) !== JSON.stringify(status.project))
     setupProject(); renderFrame(frame); refreshActions(); }
 function drawControllerDisplay(svg:SVGSVGElement,id:string){
-    // The browser preview is the exact draw-command stream produced by the
-    // compiled .fbdbin in Firmverse. There is no richer browser-only shell.
+    const c=status.project.controllers?.find(item=>item.id===id);
+    if(c?.hmi.shell?.auto){
+        let root=plcHmiRoots.get(svg);
+        if(!root){ svg.replaceChildren(); root=createRoot(svg); plcHmiRoots.set(svg,root); }
+        root.render(React.createElement(SaturnPlcHmi,{project:status.project,frame,controllerId:id}));
+        svg.dataset.renderer='react';
+        return;
+    }
+    const root=plcHmiRoots.get(svg);
+    if(root){ root.unmount(); plcHmiRoots.delete(svg); }
+    svg.dataset.renderer='fbd';
     drawHmiSvg(svg,id);
 }
 function hmiProp(node: HmiEquipmentNode, key: string, runtime: HmiRuntime): HmiPrimitive {
