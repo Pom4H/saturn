@@ -37,7 +37,8 @@
     "plant:test": "node scripts/plant-test.mjs",
     "plant:test:browser": "node scripts/plant-e2e.mjs",
     "plant:check": "npm run plant:build && npm run plant:typecheck && npm run plant:test",
-    "site:test:browser": "node scripts/site-studio-check.mjs"
+    "site:test:browser": "node scripts/site-studio-check.mjs",
+    "plant:hmi:video": "node scripts/plant-hmi-tour.mjs"
   },
   "keywords": [],
   "author": "Roman Popov",
