@@ -32,9 +32,13 @@ jobs:
       - run: xvfb-run -a npm run plant:test:browser
         env:
           PWA_ONLY_PLC: '1'
+      - name: Record Saturn PLC HMI emulator tour
+        run: xvfb-run -a npm run plant:hmi:video
       - uses: actions/upload-artifact@v7.0.1
         if: always()
         with:
           name: plant-evidence
-          path: plant-test-results/
+          path: |
+            plant-test-results/
+            plant-tour/
           retention-days: 7
