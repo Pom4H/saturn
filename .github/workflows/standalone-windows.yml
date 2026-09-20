@@ -40,11 +40,11 @@ jobs:
       - name: Typecheck plant runtime
         run: npm run plant:typecheck
 
-      - name: Test plant runtime
-        run: npm run plant:test
-
       - name: Build web assets
         run: npm run plant:build
+
+      - name: Test plant runtime
+        run: npm run plant:test
 
       - name: Pack Windows executable
         run: npm run saturn -- pack --target windows-x64 --outfile dist/standalone/saturn.exe --skip-web-build
