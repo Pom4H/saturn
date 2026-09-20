@@ -14,6 +14,7 @@ interface BunRuntimeLike {
             error(socket: BunSocketLike & { data: T }, error: Error): void;
             connectError(socket: BunSocketLike & { data: T }, error: Error): void;
             timeout(socket: BunSocketLike & { data: T }): void;
+            drain(socket: BunSocketLike & { data: T }): void;
         };
     }): Promise<BunSocketLike & { data: T }>;
 }
@@ -36,6 +37,8 @@ interface PendingExchange {
     resolve(frame: Uint8Array): void;
     reject(error: Error): void;
     timer: ReturnType<typeof setTimeout>;
+    request: Uint8Array;
+    offset: number;
 }
 
 /**
@@ -75,6 +78,7 @@ export class BunTcpChannel {
                 error(socket, error) { socket.data.channel.disconnected(error); },
                 connectError(socket, error) { socket.data.channel.disconnected(error); },
                 timeout(socket) { socket.data.channel.disconnected(new Error('TCP connection timed out')); },
+                drain(socket) { socket.data.channel.flushWrite(socket); },
             },
         }).then(socket => {
             this.socket = socket;
@@ -140,19 +144,30 @@ export class BunTcpChannel {
         this.disconnected(error);
     }
 
+
+    private flushWrite(socket: BunSocketLike): void {
+        const pending = this.pending;
+        if (!pending || pending.offset >= pending.request.byteLength) return;
+        try {
+            const written = socket.write(pending.request.subarray(pending.offset));
+            if (written < 0) {
+                this.fail(new Error('TCP socket closed while writing request'));
+                return;
+            }
+            pending.offset += written;
+        } catch (error) {
+            this.fail(error instanceof Error ? error : new Error(String(error)));
+        }
+    }
+
     async exchange(request: Uint8Array, frameLength: (buffer: Uint8Array) => number | null): Promise<Uint8Array> {
         if (this.pending) throw new Error('TCP channel allows one in-flight exchange');
         if (request.byteLength === 0 || request.byteLength > this.maxFrameBytes) throw new Error('Invalid TCP request size');
         const socket = await this.connect();
         return new Promise<Uint8Array>((resolve, reject) => {
             const timer = setTimeout(() => this.fail(new Error(`TCP request timed out after ${this.timeoutMs} ms`)), this.timeoutMs);
-            this.pending = { frameLength, resolve, reject, timer };
-            try {
-                const written = socket.write(request);
-                if (written < request.byteLength) this.fail(new Error('TCP request could not be fully queued'));
-            } catch (error) {
-                this.fail(error instanceof Error ? error : new Error(String(error)));
-            }
+            this.pending = { frameLength, resolve, reject, timer, request, offset: 0 };
+            this.flushWrite(socket);
         });
     }
 
