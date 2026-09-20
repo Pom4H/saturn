@@ -136,7 +136,8 @@ try {
     await check('Saturn inspector executes the same compiled WASM program, downloads exact CRC-tested bytes and renders its HMI',async()=>{
         await bench.locator('#diagram [data-node="SATURN-1"]').click();
         await bench.waitForFunction(()=>Number(document.querySelector('#inspector [data-signal="SATURN-1.AI1"] b')?.textContent)===300);
-        assert.match(await bench.locator('#plc-front .runtime-hmi').textContent(),/AUTO SHELL/);
+        assert.equal(await bench.locator('#plc-front .runtime-hmi').getAttribute('data-renderer'),'react');
+        await bench.locator('#plc-front .runtime-hmi [data-react-plc-hmi]').waitFor();
         const downloaded=bench.waitForEvent('download');await bench.locator('#build-plc').click();const artifact=await downloaded;
         await artifact.saveAs(evidence+'/SATURN-1.fbdbin');assert.deepEqual(new Uint8Array(await readFile(evidence+'/SATURN-1.fbdbin')),comparison.compileController(comparison.plcFixture(),comparison.plcProjectFixture()).fbdbin);
         const manifestDownload=bench.waitForEvent('download');await bench.locator('#build-manifest').click();const file=await manifestDownload;
@@ -144,7 +145,8 @@ try {
         await bench.locator('[data-tab="controls"]').click();await bench.locator('[data-control-input="BENCH-LEVEL"]').fill('8');await bench.locator('[data-operate="BENCH-LEVEL"]').click();
         await bench.waitForFunction(()=>Number(document.querySelector('[data-control="BENCH-LEVEL"] [data-actual]').textContent)>=8);
         await bench.locator('[data-tab="scheme"]').click();await bench.waitForFunction(()=>Number(document.querySelector('#inspector [data-signal="SATURN-1.AI1"] b')?.textContent)===800);
-        assert.equal(Number(await bench.locator('#inspector [data-signal="SATURN-1.DO1"] b').innerText()),1);assert.match(await bench.locator('#plc-front .runtime-hmi').textContent(),/AUTO SHELL/);
+        assert.equal(Number(await bench.locator('#inspector [data-signal="SATURN-1.DO1"] b').innerText()),1);assert.equal(await bench.locator('#plc-front .runtime-hmi').getAttribute('data-renderer'),'react');
+        await bench.locator('#plc-front .runtime-hmi [data-react-plc-hmi]').waitFor();
         await bench.screenshot({path:evidence+'/saturn-inspector.png',fullPage:true});
     });
     await check('Saturn front-panel keys navigate the exact firmware HMI and only operate contextual equipment',async()=>{
@@ -157,28 +159,30 @@ try {
         await bench.locator('#diagram [data-node="SATURN-1"]').click();
         const lcd=bench.locator('#plc-front .runtime-hmi'),right=bench.locator('#plc-front [data-plc-button="right"]'),left=bench.locator('#plc-front [data-plc-button="left"]');
         const up=bench.locator('#plc-front [data-plc-button="up"]'),down=bench.locator('#plc-front [data-plc-button="down"]');
-        await bench.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('AUTO SHELL'));
+        await bench.locator('#plc-front .runtime-hmi [data-hmi-page="overview"]').waitFor();
         await right.click();
-        await bench.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('PUMP-1'));
-        assert.match(await lcd.textContent(),/TANK-1/);
+        await bench.locator('#plc-front .runtime-hmi [data-hmi-page="process"]').waitFor();
+        assert.match(await lcd.textContent(),/PUMP-1/);assert.match(await lcd.textContent(),/TANK-1/);
+        assert.ok(await lcd.locator('[data-flow]').evaluate(element=>element.getAnimations().length>0));
         assert.ok(await lcd.locator('line').count()>0,'native process HMI must contain firmware lines');
         assert.ok(await lcd.locator('ellipse').count()>0,'native process HMI must contain firmware circles');
         await right.click();
-        await bench.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('PUMP'));
+        await bench.locator('#plc-front .runtime-hmi [data-hmi-page="device.PUMP-1"]').waitFor();
+        assert.ok(await lcd.locator('[data-rotor]').evaluate(element=>element.getAnimations().length>0));
         await down.click();
         await bench.waitForFunction(()=>Number(document.querySelector('#inspector [data-signal="SATURN-1.DO1"] b')?.textContent)===0);
         await up.click();
         await bench.waitForFunction(()=>Number(document.querySelector('#inspector [data-signal="SATURN-1.DO1"] b')?.textContent)===1);
         await right.click();
-        await bench.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('TANK-1'));
+        await bench.locator('#plc-front .runtime-hmi [data-hmi-page="device.TANK-1"]').waitFor();
         await up.click();await bench.waitForTimeout(250);
         assert.equal(Number(await bench.locator('#inspector [data-signal="SATURN-1.DO1"] b').innerText()),1,'tank UP must not start/stop another device');
         await down.click();await bench.waitForTimeout(250);
         assert.equal(Number(await bench.locator('#inspector [data-signal="SATURN-1.DO1"] b').innerText()),1,'tank DOWN must not start/stop another device');
         await left.click();
-        await bench.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('ТЕХПРОЦЕСС'));
+        await bench.locator('#plc-front .runtime-hmi [data-hmi-page="process"]').waitFor();
         await left.click();
-        await bench.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('AUTO SHELL'));
+        await bench.locator('#plc-front .runtime-hmi [data-hmi-page="overview"]').waitFor();
         await bench.screenshot({path:evidence+'/saturn-autoshell-navigation.png',fullPage:true});
     });
     await check('HMI as code navigates and drives the exact Saturn PLC runtime in the browser',async()=>{
@@ -193,13 +197,14 @@ try {
         await bench.waitForFunction(()=>document.querySelector('#aiReadout')?.textContent==='300',null,{timeout:5000});
         assert.equal(await bench.locator('#doReadout').innerText(),'0');
         assert.equal(await bench.locator('#plcLamp').getAttribute('data-on'),'false');
-        assert.match(await bench.locator('#plcFront .runtime-hmi').textContent(),/AUTO SHELL/);
+        assert.equal(await bench.locator('#plcFront .runtime-hmi').getAttribute('data-renderer'),'react');
+        await bench.locator('#plcFront .runtime-hmi [data-react-plc-hmi]').waitFor();
         bench.once('dialog',dialog=>dialog.accept());
         await bench.locator('#level7').click();
         await bench.waitForFunction(()=>document.querySelector('#levelReadout')?.textContent==='7.0 V',null,{timeout:12000});
         await bench.waitForFunction(()=>document.querySelector('#doReadout')?.textContent==='1',null,{timeout:5000});
         assert.equal(await bench.locator('#plcLamp').getAttribute('data-on'),'true');
-        await bench.waitForFunction(()=>document.querySelector('#plcFront .runtime-hmi')?.textContent?.includes('AUTO SHELL'),null,{timeout:5000});
+        await bench.locator('#plcFront .runtime-hmi [data-react-plc-hmi]').waitFor({timeout:5000});
         assert.ok(await bench.locator('#plcLamp .hmi-lamp-bulb').evaluate(element=>element.getAnimations().length>0));
         await bench.screenshot({path:evidence+'/hmi-saturn-plc-live.png',fullPage:true});
         await bench.locator('#plcBack').click();
@@ -231,7 +236,8 @@ try {
         await bench.locator('[data-tab="scheme"]').click();await bench.locator('[data-system="commissioning"]').click();
         await bench.locator('#view-3d').click();await bench.locator('#scene3d canvas').waitFor({state:'visible'});
         await bench.locator('[data-node3d="SATURN-1"]').click();await bench.waitForTimeout(800);
-        assert.match(await bench.locator('#plc-front .runtime-hmi').textContent(),/AUTO SHELL/);
+        assert.equal(await bench.locator('#plc-front .runtime-hmi').getAttribute('data-renderer'),'react');
+        await bench.locator('#plc-front .runtime-hmi [data-react-plc-hmi]').waitFor();
         await bench.screenshot({path:evidence+'/commissioning-3d.png',fullPage:true});await bench.locator('#view-2d').click();
     });
     await check('offline PWA restores compiled PLC outputs, terminal wiring and HMI without a server',async()=>{
@@ -239,7 +245,8 @@ try {
         await bench.waitForFunction(()=>!!navigator.serviceWorker.controller);await wiringContext.setOffline(true);await bench.reload();await bench.locator('#application').waitFor({state:'visible'});
         assert.equal(await bench.locator('#clock').innerText(),clock);assert.equal(await bench.locator('[data-connection]').count(),23);
         await bench.locator('[data-system="commissioning"]').click();await bench.locator('#diagram [data-node="SATURN-1"]').click();
-        assert.equal(Number(await bench.locator('#inspector [data-signal="SATURN-1.DO1"] b').innerText()),1);assert.match(await bench.locator('#plc-front .runtime-hmi').textContent(),/AUTO SHELL/);
+        assert.equal(Number(await bench.locator('#inspector [data-signal="SATURN-1.DO1"] b').innerText()),1);assert.equal(await bench.locator('#plc-front .runtime-hmi').getAttribute('data-renderer'),'react');
+        await bench.locator('#plc-front .runtime-hmi [data-react-plc-hmi]').waitFor();
         await bench.locator('#view-3d').click();await bench.locator('#scene3d canvas').waitFor({state:'visible'});await bench.waitForTimeout(500);await bench.screenshot({path:evidence+'/commissioning-offline-3d.png',fullPage:true});
     });
     await check('shared DSL panel renders identical frozen PLC values in live view and report while paused offline',async()=>{
