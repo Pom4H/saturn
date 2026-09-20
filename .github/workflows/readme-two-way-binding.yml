@@ -1,0 +1,52 @@
+name: README two-way binding
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - docs/readme-two-way-binding
+    paths-ignore:
+      - docs/assets/two-way-binding.gif
+
+permissions:
+  contents: write
+
+concurrency:
+  group: saturn-readme-two-way-binding-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: [self-hosted]
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run site:check
+      - name: Verify ffmpeg
+        run: ffmpeg -version
+      - name: Capture real Saturn two-way binding
+        run: node scripts/readme-two-way-binding.mjs
+      - name: Commit generated GIF
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/assets/two-way-binding.gif
+          git diff --cached --quiet || git commit -m "docs: add real Saturn two-way binding GIF"
+          git push origin HEAD:docs/readme-two-way-binding
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: saturn-readme-two-way-binding
+          path: |
+            docs/assets/two-way-binding.gif
+            test-results/readme-two-way-binding/frames/
+          retention-days: 14
