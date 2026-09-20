@@ -13,9 +13,16 @@ export interface ServerSession {
   csrf: string;
 }
 
+class HttpResponseError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+    this.name = 'HttpResponseError';
+  }
+}
+
 async function json<T>(response: Response): Promise<T> {
   const value = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(typeof value?.error === 'string' ? value.error : `HTTP ${response.status}`);
+  if (!response.ok) throw new HttpResponseError(response.status, typeof value?.error === 'string' ? value.error : `HTTP ${response.status}`);
   return value as T;
 }
 
@@ -52,7 +59,9 @@ export async function serverPost<T>(session: ServerSession, action: string, inpu
       return await json<T>(response);
     } catch (error) {
       last = error;
-      if (error instanceof Error && /^HTTP /.test(error.message)) throw error;
+      // A completed HTTP response is authoritative, even when it is an error.
+      // Retry only failures where no response arrived (timeout/network/redirect).
+      if (error instanceof HttpResponseError) throw error;
     }
   }
   throw last instanceof Error ? last : new Error('Network request failed');
