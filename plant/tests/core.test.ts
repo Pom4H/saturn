@@ -11,6 +11,8 @@ import { join } from 'node:path';
 import { createECDH, randomBytes } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { compileProject, validateProject } from '../compiler';
+import * as projectDsl from '../dsl';
+import { entities as dslReferenceEntities, operators as dslReferenceOperators } from '../dsl-reference';
 import { demoFiles } from '../demo/files';
 import { Kernel, evaluate } from '../kernel';
 import { updateAlarms, acknowledge } from '../alarms';
@@ -42,6 +44,12 @@ export default project('minimal', {
     assert.equal(compileProject({ 'plant.ts': source }).id, 'minimal');
     assert.equal(compileProject({ 'plant.ts': source.replace('@saturn/core', '@scada/plant') }).id, 'minimal');
 });
+test('interactive DSL reference covers every public DSL function', () => {
+    const publicFunctions = Object.entries(projectDsl).filter(([, value]) => typeof value === 'function').map(([name]) => name).sort();
+    const documented = [...dslReferenceEntities.map(entity => entity.name), ...dslReferenceOperators.map(([name]) => name)].sort();
+    assert.deepEqual(documented, publicFunctions);
+});
+
 for (const [name, source] of Object.entries({ execute: 'globalThis.process.exit()', getter: 'const a={get b(){return 1;}};', prototype: 'const a={constructor: 1};', import: 'import { x } from "../../outside";', loop: 'while(true){}', function: 'const x=()=>1;' }))
     test(`DSL rejects ${name}`, () => assert.throws(() => compileProject({ ...demoFiles, 'plant.ts': source })));
 test('DSL rejects unknown signals and algebraic cycles', () => { assert.throws(() => compileProject({ ...demoFiles, 'core.ts': demoFiles['core.ts'].replace('"core.void"', '"missing.signal"') }), /Unknown signal/); assert.throws(() => compileProject({ ...demoFiles, 'core.ts': demoFiles['core.ts'].replace(/derived\("core.temperature",[^;]+;/, 'derived("core.temperature", signal("core.temperature"));') }), /cycle/); });
