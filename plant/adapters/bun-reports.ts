@@ -1,4 +1,6 @@
 import { fileURLToPath } from 'node:url';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { ReportTask, ReportArtifact } from '../types';
 
 interface BunSubprocess {
@@ -35,8 +37,10 @@ export function runReport(task: ReportTask, timeoutMs = 5000): Promise<ReportArt
             try { child?.kill('SIGKILL'); } catch { /* already exited */ }
             error ? reject(error) : resolve(value!);
         };
+        const siblingWorker = fileURLToPath(new URL('./report-worker.mjs', import.meta.url));
+        const worker = existsSync(siblingWorker) ? siblingWorker : resolve('.plant/report-worker.mjs');
         child = bunRuntime.spawn({
-            cmd: [process.execPath, fileURLToPath(new URL('./report-worker.mjs', import.meta.url))],
+            cmd: [process.execPath, worker],
             stdin: 'ignore',
             stdout: 'ignore',
             stderr: 'ignore',
