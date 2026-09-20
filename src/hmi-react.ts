@@ -1,8 +1,8 @@
 import type { HmiEquipmentNode, HmiNode, HmiPrimitive, HmiRuntime, HmiSnapshot } from './hmi';
 
 export interface ReactLike {
-  Fragment: unknown;
-  createElement(type: unknown, props: Record<string, unknown> | null, ...children: unknown[]): unknown;
+  Fragment: any;
+  createElement(type: any, props: any, ...children: any[]): any;
   useSyncExternalStore(subscribe: (listener: () => void) => () => void, getSnapshot: () => HmiSnapshot, getServerSnapshot?: () => HmiSnapshot): HmiSnapshot;
 }
 export interface HmiReactEquipmentProps {
@@ -10,7 +10,7 @@ export interface HmiReactEquipmentProps {
   runtime: HmiRuntime;
   snapshot: HmiSnapshot;
 }
-export type HmiReactEquipment = (props: HmiReactEquipmentProps) => unknown;
+export type HmiReactEquipment = (props: HmiReactEquipmentProps) => any;
 export interface HmiReactProps {
   runtime: HmiRuntime;
   equipment?: Readonly<Record<string, HmiReactEquipment>>;
@@ -24,7 +24,7 @@ const formatReadout = (value: HmiPrimitive, digits?: number, unit?: string): str
 };
 
 export function createReactHmiRenderer(React: ReactLike) {
-  const renderNode = (runtime: HmiRuntime, snapshot: HmiSnapshot, equipment: Readonly<Record<string, HmiReactEquipment>>, node: HmiNode): unknown => {
+  const renderNode = (runtime: HmiRuntime, snapshot: HmiSnapshot, equipment: Readonly<Record<string, HmiReactEquipment>>, node: HmiNode): any => {
     const common = { key: node.id, id: node.id, className: node.className, style: node.style, 'data-hmi-node': node.type };
     if (node.type === 'group') {
       const tag = node.as ?? 'div';
@@ -54,7 +54,7 @@ export function createReactHmiRenderer(React: ReactLike) {
     }, node.equipmentId);
   };
 
-  function HmiRenderer({ runtime, equipment = {}, className = '' }: HmiReactProps): unknown {
+  function HmiRenderer({ runtime, equipment = {}, className = '' }: HmiReactProps): any {
     const snapshot = React.useSyncExternalStore(runtime.subscribe, runtime.snapshot, runtime.snapshot);
     const screen = runtime.currentScreen();
     const body = screen.body.map(node => renderNode(runtime, snapshot, equipment, node));
