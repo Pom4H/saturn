@@ -33,4 +33,4 @@ export function runCounterfactuals() {
 export { runControlTrace } from './control-trace';
 
 export {runTrainingSuite} from './stability-trace';
-export {compileController,plcFixture} from './plc-trace';
+export {compileController,plcFixture,plcProjectFixture} from './plc-trace';
