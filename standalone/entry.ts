@@ -15,6 +15,7 @@ import { ExtensionManager, runExtensionCommand } from './extensions';
 
 declare const SATURN_VERSION: string;
 declare const SATURN_DEMO_FILES: Record<string, string>;
+declare const SATURN_WEB_ASSETS: Record<string, string>;
 declare const SATURN_UPDATE_PUBLIC_KEY: string;
 declare const SATURN_UPDATE_MANIFEST_URL: string;
 
@@ -69,23 +70,18 @@ if (entryArg.endsWith('/standalone/entry.ts') || standaloneExecutable)
 
 const appData = applicationDataRoot();
 
-function embeddedPlantAsset(relativePath: string): Blob | null {
-    if (!standaloneExecutable)
-        return null;
-    const clean = relativePath.replaceAll('\\', '/').replace(/^\.\//, '').replace(/^\//, '');
-    const suffix = '/dist/plant/' + clean;
-    const file = Bun.embeddedFiles.find(candidate => {
-        const name = (candidate.name ?? '').replaceAll('\\', '/');
-        return name === 'dist/plant/' + clean || name.endsWith(suffix);
-    });
-    return file ?? null;
-}
-
+const decodedWebAssets = new Map<string, Uint8Array>();
 async function readEmbeddedPlantAsset(relativePath: string): Promise<Uint8Array> {
-    const file = embeddedPlantAsset(relativePath);
-    if (!file)
-        throw new Error(`Embedded Saturn asset not found: ${relativePath}`);
-    return new Uint8Array(await file.arrayBuffer());
+    const clean = relativePath.replaceAll('\\', '/').replace(/^\.\//, '').replace(/^\//, '');
+    const existing = decodedWebAssets.get(clean);
+    if (existing)
+        return existing;
+    const encoded = SATURN_WEB_ASSETS[clean];
+    if (!encoded)
+        throw new Error(`Embedded Saturn asset not found: ${clean}`);
+    const bytes = new Uint8Array(Buffer.from(encoded, 'base64'));
+    decodedWebAssets.set(clean, bytes);
+    return bytes;
 }
 
 
