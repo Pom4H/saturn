@@ -132,7 +132,7 @@ export function compileController(c: Controller, project?: Project) {
                 ...(element.visible?{visible:{...element.visible,ref:resolveHmiRef(element.visible.ref)}}:{}),
             }))};
         });
-        const initial=c.hmi.initial??screenModels[0].id;if(!ids.has(initial))throw new AppError('Unknown initial controller HMI screen');
+        const initial=c.hmi.shell?.auto&&project?screenModels[0].id:(c.hmi.initial??screenModels[0].id);if(!ids.has(initial))throw new AppError('Unknown initial controller HMI screen');
         if(!c.hmi.shell?.auto) for(const [from,map] of Object.entries(c.hmi.keys??{})){
             if(!ids.has(from))throw new AppError('Unknown controller HMI navigation source');
             for(const action of Object.values(map))if(typeof action==='string'&&!ids.has(action))throw new AppError('Unknown controller HMI navigation target');
