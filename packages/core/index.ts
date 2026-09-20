@@ -4,6 +4,7 @@
  * Project authors and language tooling import one stable module name.
  */
 export * from '../../plant/dsl';
+export * from '../../plant/diagnostics';
 export type {
   Actor,
   AlarmRule,
