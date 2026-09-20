@@ -31,7 +31,7 @@ try {
   await page.screenshot({ path: 'test-results/site-studio/landing.png' });
   await page.evaluate(() => { document.documentElement.style.scrollBehavior = 'auto'; window.scrollTo(0, document.getElementById('studio').offsetTop); });
   await page.locator('#studio-3d').click();
-  await page.locator('[data-node3d="V-01"]').click();
+  await page.locator('[data-node3d="V-01"]').focus(); await page.locator('[data-node3d="V-01"]').press('Enter');
   assert.equal(await page.locator('#studio-auto').count(), 0);
   await page.setViewportSize({ width: 1440, height: 600 });
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
