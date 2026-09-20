@@ -210,8 +210,9 @@ try {
         if (!asset.ok || !source.includes('customElements.define("test-motor"'))
             throw new Error('Installed extension browser entry was not served');
         const page = await fetch(origin + '/plant/app/', { headers: { Cookie: cookie } });
-        if (!page.ok || !(await page.text()).includes('data-tab="extensions"'))
-            throw new Error('Engineering UI does not expose Extensions panel');
+        const pageText = await page.text();
+        if (!page.ok || !pageText.includes('data-tab="extensions"'))
+            throw new Error(`Engineering UI does not expose Extensions panel (HTTP ${page.status}): ${pageText.slice(0, 240)}`);
         console.log('Extension application API + browser entry OK');
     } finally {
         appChild.kill();

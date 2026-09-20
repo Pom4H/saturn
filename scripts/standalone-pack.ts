@@ -49,6 +49,7 @@ const build = await Bun.build({
     target: 'bun',
     minify: true,
     sourcemap: 'none',
+    naming: { asset: '[dir]/[name].[ext]' },
     define: {
         SATURN_VERSION: JSON.stringify(buildVersion),
         SATURN_DEMO_FILES: JSON.stringify(demoFiles),
