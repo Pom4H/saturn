@@ -337,7 +337,7 @@ function renderEnvironmentStatus() {
     const env = status?.environment;
     if (!env) {
         $('environment-state').textContent = 'Runtime · локальный';
-        $('environment-connect').hidden = false;
+        $('environment-connect').hidden = status?.uiMode !== 'ide';
         $('environment-disconnect').hidden = true;
         return;
     }
@@ -370,7 +370,7 @@ async function start(memory = false) {
         editor = new EditorView({ parent: $('editor'), state: EditorState.create({ doc: '' }) });
         setupProject();
         renderFrame(frame);
-        const engineering = status.actor.role === 'engineer', operator = status.actor.role !== 'viewer';
+        const engineering = status.actor.role === 'engineer' && status.uiMode !== 'runtime' && status.uiMode !== 'kiosk', operator = runtimeRole() !== 'viewer';
         document.querySelector<HTMLElement>('[data-tab=project]')!.hidden = !engineering;
         $('restart').hidden = !engineering;
         $('pause').hidden = !operator;
