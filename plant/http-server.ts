@@ -32,6 +32,15 @@ export async function startPlantHttpServer(options: {
     autoTick?: boolean;
     pushSubject?: string;
     uiMode?: 'ide' | 'runtime' | 'kiosk';
+    application?: {
+        version: string;
+        extensions?: {
+            list(): Promise<Array<{ id: string; name: string; version: string; entry: string; capabilities: string[]; elements: Array<{ type: string; title: string; tag: string }> }>>;
+            install(specifier: string): Promise<{ id: string; name: string; version: string; entry: string; capabilities: string[]; elements: Array<{ type: string; title: string; tag: string }> }>;
+            remove(name: string): Promise<void>;
+            readAsset(id: string, path: string): Promise<Uint8Array>;
+        };
+    };
     embeddedStatic?: boolean;
     database: SqlDatabase;
     projectRepository: Repository;
@@ -120,6 +129,25 @@ export async function startPlantHttpServer(options: {
                 html(200, await readFile(resolve(root, 'index.html'), 'utf8'));
                 return;
             }
+            if (path.startsWith(`${prefix}/extensions/`) && req.method === 'GET') {
+                auth.session(req.headers.cookie, req.headers.authorization);
+                const host = options.application?.extensions;
+                if (!host)
+                    throw new AppError('Extensions are not available in this Saturn composition', 404);
+                const parts = path.slice(`${prefix}/extensions/`.length).split('/').filter(Boolean);
+                const id = parts.shift() ?? '';
+                const relative = parts.join('/');
+                try {
+                    const data = await host.readAsset(id, relative);
+                    const mime: Record<string, string> = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png' };
+                    res.writeHead(200, { 'Content-Type': mime[extname(relative)] ?? 'application/octet-stream', 'Cache-Control': 'no-store' });
+                    res.end(data);
+                }
+                catch (error) {
+                    throw new AppError(error instanceof Error ? error.message : String(error), 404);
+                }
+                return;
+            }
             if (path.startsWith(`${prefix}/api/`)) {
                 const session = auth.session(req.headers.cookie, req.headers.authorization), actor = session.actor;
                 if (req.method === 'POST' && !session.bearer && req.headers['x-csrf-token'] !== session.csrf)
@@ -179,6 +207,17 @@ export async function startPlantHttpServer(options: {
                 if (req.method === 'GET') {
                     if (action === 'session') {
                         json(200, { ...await service.status(actor), csrf: session.bearer ? undefined : session.csrf, push: push ? { publicKey: push.keys.publicKey } : null, environment: environments.descriptor(session.sessionId), uiMode: options.uiMode ?? 'ide' });
+                        return;
+                    }
+                    if (action === 'application') {
+                        const installed = await options.application?.extensions?.list() ?? [];
+                        json(200, {
+                            version: options.application?.version ?? null,
+                            extensions: installed.map(extension => ({
+                                ...extension,
+                                entryUrl: `${prefix}/extensions/${extension.id}/${extension.entry.split('/').map(encodeURIComponent).join('/')}`,
+                            })),
+                        });
                         return;
                     }
                     if (action === 'instance') {
@@ -244,6 +283,26 @@ export async function startPlantHttpServer(options: {
                 }
                 if (req.method === 'POST') {
                     const input = await body(req);
+                    if (action === 'extensions/install') {
+                        requireRole(actor, 'engineer');
+                        if (!options.application?.extensions)
+                            throw new AppError('Extension installation is not available in this Saturn composition', 503);
+                        if (typeof input.specifier !== 'string')
+                            throw new AppError('Extension package specifier required');
+                        const extension = await options.application.extensions.install(input.specifier);
+                        json(200, { ...extension, entryUrl: `${prefix}/extensions/${extension.id}/${extension.entry.split('/').map(encodeURIComponent).join('/')}` });
+                        return;
+                    }
+                    if (action === 'extensions/remove') {
+                        requireRole(actor, 'engineer');
+                        if (!options.application?.extensions)
+                            throw new AppError('Extension installation is not available in this Saturn composition', 503);
+                        if (typeof input.name !== 'string')
+                            throw new AppError('Extension package name required');
+                        await options.application.extensions.remove(input.name);
+                        json(200, { ok: true });
+                        return;
+                    }
                     if (action === 'logout') {
                         environments.disconnect(session.sessionId);
                         auth.logout(session.sessionId);

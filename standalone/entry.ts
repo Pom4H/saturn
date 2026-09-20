@@ -11,7 +11,7 @@ import { loadProjectDirectory } from './project-loader';
 import { WorkspaceRegistry } from './workspace';
 import { WorkspaceRepository } from './workspace-repository';
 import { applyStagedUpdate, runUpdateCommand } from './update';
-import { runExtensionCommand } from './extensions';
+import { ExtensionManager, runExtensionCommand } from './extensions';
 
 declare const SATURN_VERSION: string;
 declare const SATURN_DEMO_FILES: Record<string, string>;
@@ -103,6 +103,7 @@ if (args[0] === 'run' || args[0] === 'open')
 const kiosk = args.includes('--kiosk');
 const projectArgument = args.find(arg => !arg.startsWith('--')) ?? process.env.SATURN_PROJECT;
 const registry = new WorkspaceRegistry(resolve(appData, 'workspace.json'));
+const extensionManager = new ExtensionManager(resolve(appData, 'extensions'));
 
 let files = SATURN_DEMO_FILES;
 let projectDirectory: string | null = null;
@@ -141,6 +142,15 @@ const app = await startPlantHttpServer({
     autoTick: true,
     pushSubject: process.env.SCADA_PUSH_SUBJECT,
     uiMode: kiosk ? 'kiosk' : command === 'run' ? 'runtime' : 'ide',
+    application: {
+        version: SATURN_VERSION,
+        extensions: {
+            list: () => extensionManager.list(),
+            install: specifier => extensionManager.install(specifier),
+            remove: name => extensionManager.remove(name),
+            readAsset: (id, path) => extensionManager.readAsset(id, path),
+        },
+    },
     database,
     projectRepository,
     reportRunner: runStandaloneReport,

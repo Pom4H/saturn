@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { mkdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { dirname, resolve, sep } from 'node:path';
 
 export interface SaturnExtensionManifest {
     api: 1;
@@ -10,11 +10,12 @@ export interface SaturnExtensionManifest {
 }
 
 export interface InstalledExtension {
+    id: string;
     name: string;
     version: string;
-    path: string;
     entry: string;
     capabilities: SaturnExtensionManifest['capabilities'];
+    elements: NonNullable<SaturnExtensionManifest['elements']>;
 }
 
 interface ExtensionState {
@@ -146,6 +147,7 @@ export async function extractNpmTarball(tgz: Uint8Array, destination: string): P
 
 function statePath(root: string) { return resolve(root, 'state.json'); }
 function packageKey(name: string) { return name.replace(/^@/, '').replaceAll('/', '__'); }
+function extensionId(name: string, version: string) { return Buffer.from(`${name}@${version}`, 'utf8').toString('base64url'); }
 
 async function readState(root: string): Promise<ExtensionState> {
     try {
@@ -194,7 +196,7 @@ export class ExtensionManager {
             const path = resolve(this.root, 'packages', packageKey(name), version);
             const pkg = JSON.parse(await readFile(resolve(path, 'package.json'), 'utf8')) as RegistryVersion;
             const manifest = validateExtensionPackage(pkg);
-            result.push({ name, version, path, entry: resolve(path, manifest.entry), capabilities: manifest.capabilities });
+            result.push({ id: extensionId(name, version), name, version, entry: manifest.entry, capabilities: manifest.capabilities, elements: manifest.elements ?? [] });
         }
         return result.sort((a, b) => a.name.localeCompare(b.name));
     }
@@ -262,7 +264,24 @@ export class ExtensionManager {
         const state = await readState(this.root);
         state.active[name] = pkg.version;
         await writeState(this.root, state);
-        return { name, version: pkg.version, path: target, entry: resolve(target, manifest.entry), capabilities: manifest.capabilities };
+        return { id: extensionId(name, pkg.version), name, version: pkg.version, entry: manifest.entry, capabilities: manifest.capabilities, elements: manifest.elements ?? [] };
+    }
+
+    async readAsset(id: string, relative: string): Promise<Uint8Array> {
+        if (!/^[A-Za-z0-9_-]{4,400}$/.test(id) || !safeRelativePath(relative))
+            throw new Error('Invalid extension asset path');
+        const extension = (await this.list()).find(item => item.id === id);
+        if (!extension)
+            throw new Error('Extension not installed');
+        const root = resolve(this.root, 'packages', packageKey(extension.name), extension.version);
+        const rootReal = await realpath(root);
+        const target = await realpath(resolve(root, relative));
+        if (target !== rootReal && !target.startsWith(rootReal + sep))
+            throw new Error('Extension asset escapes package root');
+        const info = await stat(target);
+        if (!info.isFile() || info.size > 8 * 1024 * 1024)
+            throw new Error('Invalid extension asset');
+        return new Uint8Array(await readFile(target));
     }
 
     async remove(name: string): Promise<void> {

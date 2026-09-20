@@ -18,6 +18,9 @@ const base = new URL('../', location.href), demo = location.pathname.endsWith('/
 let client: Connection, status: Status, frame: Frame, scene: SceneView, system = '', selected: string | null = null, tab = 'scheme', file = 'plant.ts', files: Record<string, string> = {}, head: string | null = null, dirty = false, validDraft = true, editor: EditorView, loadingEditor = false, failed = false;
 let scene3d: SceneView3D | undefined, viewMode: '2d' | '3d' = '2d', changingView = false;
 let registration: ServiceWorkerRegistration | undefined, pendingInstall: any, noticeEnabled = false, closed = false;
+type ApplicationExtension = { id: string; name: string; version: string; entry: string; entryUrl: string; capabilities: string[]; elements: Array<{ type: string; title: string; tag: string }> };
+let applicationInfo: { version: string | null; extensions: ApplicationExtension[] } | null = null;
+const loadedExtensionEntries = new Set<string>();
 const fmt = (v: number | null | undefined, digits = 2) => typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—';
 const runtimeRole = () => status?.runtimeActor?.role ?? status?.actor?.role ?? 'viewer';
 const time = (v: number | null | undefined) => v ? new Date(v).toLocaleString('ru-RU') : '—';
@@ -38,6 +41,33 @@ async function command(action: string, extra: object = {}) { ensureActive(); con
     renderInspector(); return result; }
 async function refreshStatus() { const previous = status?.project; status = await client.request<Status>('session'); frame = status.frame; if (previous !== status.project && JSON.stringify(previous) !== JSON.stringify(status.project))
     setupProject(); renderFrame(frame); refreshActions(); }
+async function refreshApplicationExtensions(loadCode = false) {
+    if (demo)
+        return;
+    applicationInfo = await client.request<{ version: string | null; extensions: ApplicationExtension[] }>('application');
+    if (loadCode) {
+        for (const extension of applicationInfo.extensions) {
+            if (!extension.capabilities.includes('elements') || loadedExtensionEntries.has(extension.entryUrl))
+                continue;
+            try {
+                await import(new URL(extension.entryUrl, location.origin).href);
+                loadedExtensionEntries.add(extension.entryUrl);
+            }
+            catch (extensionError) {
+                console.error('Extension load failed:', extension.name, extensionError);
+            }
+        }
+    }
+    renderExtensions();
+}
+function renderExtensions() {
+    if (demo || !applicationInfo)
+        return;
+    $('extension-note').textContent = applicationInfo.version
+        ? `Saturn ${applicationInfo.version} · ${applicationInfo.extensions.length} installed`
+        : 'Extension host is not configured in this server composition.';
+    $('extension-list').innerHTML = applicationInfo.extensions.map(extension => `<article class="extension-card"><div><h3>${escape(extension.name)}</h3><p>${escape(extension.version)} · ${escape(extension.capabilities.join(', ') || 'no capabilities')}</p>${extension.elements.length ? `<small>${extension.elements.map(element => escape(element.title + ' · ' + element.tag)).join('<br>')}</small>` : ''}</div><button data-extension-remove="${escape(extension.name)}">Remove</button></article>`).join('') || '<p>Нет установленных extensions.</p>';
+}
 function setupProject() {
     $('title').textContent = status.project.title;
     $('description').textContent = status.project.description;
@@ -364,6 +394,8 @@ async function start(memory = false) {
         $('logout').hidden = demo;
         renderEnvironmentStatus();
         installEquipment();
+        if (!demo)
+            await refreshApplicationExtensions(true);
         scene = new SceneView($('diagram') as unknown as SVGSVGElement);
         scene.onSelect = selectEquipment;
         scene.onGroupFocus = focusSystem;
@@ -372,6 +404,7 @@ async function start(memory = false) {
         renderFrame(frame);
         const engineering = status.actor.role === 'engineer' && status.uiMode !== 'runtime' && status.uiMode !== 'kiosk', operator = runtimeRole() !== 'viewer';
         document.querySelector<HTMLElement>('[data-tab=project]')!.hidden = !engineering;
+        document.querySelector<HTMLElement>('[data-tab=extensions]')!.hidden = !engineering;
         $('restart').hidden = !engineering;
         $('pause').hidden = !operator;
         if (engineering)
@@ -446,6 +479,17 @@ $('environment-disconnect').onclick = () => void guard(async () => {
     renderEnvironmentStatus();
     toast('Live environment отключён. Runtime снова локальный.');
 });
+$('extensions-refresh').onclick = () => void guard(() => refreshApplicationExtensions(true));
+$('extension-add').onclick = () => void guard(async () => {
+    const input = $<HTMLInputElement>('extension-package');
+    const specifier = input.value.trim();
+    if (!specifier)
+        throw new Error('Введите package, например @company/custom-elements');
+    const installed = await client.request<ApplicationExtension>('extensions/install', { specifier });
+    input.value = '';
+    await refreshApplicationExtensions(true);
+    toast(`Installed ${installed.name}@${installed.version}`);
+});
 $('recover-draft').onclick = () => void guard(() => { const saved = JSON.parse(sessionStorage.getItem(`scada-draft:${demo ? 'demo' : 'server'}`) ?? 'null'); if (!saved?.files)
     throw new Error('Нет сохранённого черновика'); validateFiles(saved.files); files = saved.files; head = saved.head; file = saved.file in files ? saved.file : Object.keys(files)[0]; dirty = true; validDraft = false; populateFiles(); setEditor(); refreshActions(); toast('Черновик восстановлен с исходной базовой ревизией.'); });
 $('new-file').onclick = () => void guard(() => { const path = prompt('Имя нового модуля, например sensors.ts'); if (!path)
@@ -496,6 +540,13 @@ document.addEventListener('click', e => {
     if (!button)
         return;
     const d = button.dataset;
+    if (d.extensionRemove) void guard(async () => {
+        if (!confirm(`Удалить extension ${d.extensionRemove}?`))
+            return;
+        await client.request('extensions/remove', { name: d.extensionRemove });
+        await refreshApplicationExtensions(false);
+        toast(`Removed ${d.extensionRemove}`);
+    });
     if(d.viewCommand)void guard(async()=>{
         const v=status.project.views?.find(v=>v.id===$<HTMLSelectElement>('view-select').value);
         const action=v&&presentationActions(v.body).find(a=>a.target===d.viewCommand&&a.value===Number(d.viewSet));
