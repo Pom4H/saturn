@@ -59,6 +59,7 @@ export const benchControllers=[controller];
 export const benchControls=[level];
 export const benchModules=[expansion(module,controller,1)];
 export const benchWires=[
+ pipe('process-water',port(processTank,'outlet'),port(processPump,'inlet')),
  cable('dc-positive',port(psu,'plus'),port(controller,'DC+'),{medium:'power'}),
  cable('dc-return',port(psu,'minus'),port(controller,'DC-'),{medium:'power'}),
  cable('input-common',port(psu,'minus'),port(controller,'COM1'),{medium:'power'}),
