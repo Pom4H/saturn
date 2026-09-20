@@ -61,5 +61,5 @@ The engineering shell includes a **DSL** section generated from the canonical Sa
 - Saturn is the visible product name across the shell and PWA metadata.
 - New authored examples use `@saturn/core`.
 - Package/application identity no longer depends on the historical `@scada/*` namespace.
-- Existing projects keep opening while the compatibility alias exists.
+- Legacy project module aliases are rejected before production; migrations must update source explicitly.
 - New topology work should prefer `pipe()` / `cable()` over the legacy scene-level `connect()`.
