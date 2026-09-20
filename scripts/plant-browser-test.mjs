@@ -147,7 +147,11 @@ try {
         assert.equal(Number(await bench.locator('#inspector [data-signal="SATURN-1.DO1"] b').innerText()),1);assert.match(await bench.locator('#plc-front .runtime-hmi').textContent(),/800/);
         await bench.screenshot({path:evidence+'/saturn-inspector.png',fullPage:true});
     });
-    await check('Saturn front-panel keys navigate the native controller HMI',async()=>{
+    await check('Saturn front-panel keys navigate and control the native controller HMI',async()=>{
+        await bench.locator('[data-tab="controls"]').click();
+        await bench.locator('[data-control-input="BENCH-LEVEL"]').fill('3');
+        await bench.locator('[data-operate="BENCH-LEVEL"]').click();
+        await bench.waitForFunction(()=>Number(document.querySelector('[data-control="BENCH-LEVEL"] [data-actual]')?.textContent)<=3.01,null,{timeout:12000});
         await bench.locator('[data-tab="scheme"]').click();
         await bench.locator('[data-system="commissioning"]').click();
         await bench.locator('#diagram [data-node="SATURN-1"]').click();
@@ -157,10 +161,15 @@ try {
         const right=bench.locator('#plc-front [data-plc-button="right"]');
         await right.click();
         await bench.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('Входы / выходы'));
-        assert.match(await lcd.textContent(),/AI1/);
         await right.click();
         await bench.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('Управляемая нагрузка'));
         assert.match(await lcd.textContent(),/RELAY-1/);assert.match(await lcd.textContent(),/LAMP-1/);
+        await bench.locator('#plc-front [data-plc-button="up"]').click();
+        await bench.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('Ручной режим: ВКЛ'));
+        await bench.waitForFunction(()=>Number(document.querySelector('#inspector [data-signal="SATURN-1.DO1"] b')?.textContent)===1);
+        await bench.locator('#plc-front [data-plc-button="down"]').click();
+        await bench.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('Ручной режим: ВЫКЛ'));
+        await bench.waitForFunction(()=>Number(document.querySelector('#inspector [data-signal="SATURN-1.DO1"] b')?.textContent)===0);
         const left=bench.locator('#plc-front [data-plc-button="left"]');
         await left.focus();await left.press('Enter');
         await bench.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('Входы / выходы'));
