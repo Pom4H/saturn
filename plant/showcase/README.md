@@ -6,7 +6,7 @@ Standalone fictional booster skid for demonstrating the 320×240 physical HMI sh
 
     npm run plant:showcase
 
-Open `http://127.0.0.1:4177/plant/`.
+Open `http://127.0.0.1:4177/plant/app/`.
 
 Local demo login: `engineer / showcase-demo-2026`. This credential exists only in the local showcase runner.
 
