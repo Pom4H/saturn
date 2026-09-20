@@ -16,7 +16,7 @@ async function key(name,note,wait=900){if(note)await caption(note,600);await pag
 try{
   await page.goto(base+'login');
   await page.locator('input[name="user"]').fill('engineer');
-  await page.locator('input[name="password"]').fill(process.env.SCADA_PASSWORD??'showcase');
+  await page.locator('input[name="password"]').fill(process.env.SCADA_PASSWORD??'showcase-demo-2026');
   await page.locator('#login').evaluate(form=>(form).requestSubmit());
   await page.locator('#application').waitFor({state:'visible'});
   await page.evaluate(()=>{
