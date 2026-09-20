@@ -23,7 +23,11 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(origin);
   await page.waitForSelector('#studio-spatial canvas', { state: 'attached' });
-  assert.equal(await page.locator('h1').innerText(), 'Saturn SCADA');
+  assert.equal(await page.locator('h1').innerText(), 'Инженерная IDE для автоматизации');
+  assert.equal(await page.title(), 'Saturn — инженерная IDE для автоматизации');
+  assert.equal(await page.locator('.product-story').count(), 1);
+  assert((await page.locator('.product-story').innerText()).includes('TypeScript'));
+  assert.equal(await page.locator('.target-rail span').count(), 6);
   assert.equal(await page.locator('.project-section,.operator,.delivery').count(), 0, 'Old landing sections must be replaced');
   await mkdir('test-results/site-studio', { recursive: true });
   await page.screenshot({ path: 'test-results/site-studio/landing.png' });
@@ -135,7 +139,11 @@ try {
   await page.locator('#inspector-close').click(); await page.locator('#studio-3d').click(); await page.waitForTimeout(250); await page.screenshot({ path: 'test-results/site-studio/fullscreen-3d.png' });
   await page.locator('#studio-2d').click(); await page.waitForTimeout(250); await page.screenshot({ path: 'test-results/site-studio/fullscreen-ide.png' });
   const mobile = await context.newPage(); await mobile.setViewportSize({ width: 390, height: 844 });
-  await mobile.goto(origin + '/#workspace'); await mobile.waitForFunction(() => document.body.classList.contains('shell-fullscreen'));
+  await mobile.goto(origin); await mobile.waitForSelector('#studio-spatial canvas', { state: 'attached' });
+  assert(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Mobile landing must not overflow horizontally');
+  assert(await mobile.locator('.hero-lead').isVisible());
+  await mobile.screenshot({ path: 'test-results/site-studio/mobile-landing.png', fullPage: true });
+  await mobile.goto(origin + '/#workspace'); await mobile.reload(); await mobile.waitForFunction(() => document.body.classList.contains('shell-fullscreen'));
   assert(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
   await mobile.locator('#studio-code').click();
   assert(await mobile.locator('#studio-editor .cm-content').isVisible());
@@ -156,5 +164,5 @@ try {
   await checkShell(browser, origin);
   await checkInteractions(browser, origin);
   assert.deepEqual(errors, []);
-  console.log('PASS: NEW landing; scroll preserves view; explicit 2D/3D; same mounted Shell and selection in fullscreen; modified example→independent project; saved projects; source diagnostics/undo/redo/drag; blank/add/connect/delete; .ts/standalone HTML/share; offline reload; mobile Shell; WebGL fallback.');
+  console.log('PASS: engineering IDE landing; scroll preserves view; explicit 2D/3D; same mounted Shell and selection in fullscreen; modified example→independent project; saved projects; source diagnostics/undo/redo/drag; blank/add/connect/delete; .ts/standalone HTML/share; offline reload; mobile Shell; WebGL fallback.');
 } finally { await browser?.close(); server.kill('SIGTERM'); }
