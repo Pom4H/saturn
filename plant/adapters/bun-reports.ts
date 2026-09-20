@@ -16,6 +16,8 @@ interface BunSpawnRuntime {
         timeout: number;
         killSignal: string;
         serialization: 'advanced';
+        env: Record<string, string | undefined>;
+        cgroup?: string;
         ipc(message: unknown): void;
         onExit(_subprocess: unknown, exitCode: number | null, signalCode: number | null, error?: unknown): void;
     }): BunSubprocess;
@@ -47,6 +49,8 @@ export function runReport(task: ReportTask, timeoutMs = 5000): Promise<ReportArt
             timeout: timeoutMs,
             killSignal: 'SIGKILL',
             serialization: 'advanced',
+            env: { TZ: 'UTC' },
+            ...(process.platform === 'linux' && process.env.SCADA_REPORT_CGROUP ? { cgroup: process.env.SCADA_REPORT_CGROUP } : {}),
             ipc(message: unknown) {
                 const value = message as { error?: string; result?: ReportArtifact };
                 done(value.error ? new Error(value.error) : null, value.result);
