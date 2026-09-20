@@ -31,6 +31,7 @@ export async function startPlantHttpServer(options: {
     root?: string;
     autoTick?: boolean;
     pushSubject?: string;
+    uiMode?: 'ide' | 'runtime' | 'kiosk';
     embeddedStatic?: boolean;
     database: SqlDatabase;
     projectRepository: Repository;
@@ -177,7 +178,7 @@ export async function startPlantHttpServer(options: {
                 }
                 if (req.method === 'GET') {
                     if (action === 'session') {
-                        json(200, { ...await service.status(actor), csrf: session.bearer ? undefined : session.csrf, push: push ? { publicKey: push.keys.publicKey } : null, environment: environments.descriptor(session.sessionId) });
+                        json(200, { ...await service.status(actor), csrf: session.bearer ? undefined : session.csrf, push: push ? { publicKey: push.keys.publicKey } : null, environment: environments.descriptor(session.sessionId), uiMode: options.uiMode ?? 'ide' });
                         return;
                     }
                     if (action === 'instance') {
