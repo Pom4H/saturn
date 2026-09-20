@@ -147,6 +147,27 @@ try {
         assert.equal(Number(await bench.locator('#inspector [data-signal="SATURN-1.DO1"] b').innerText()),1);assert.match(await bench.locator('#plc-front .runtime-hmi').textContent(),/800/);
         await bench.screenshot({path:evidence+'/saturn-inspector.png',fullPage:true});
     });
+    await check('Saturn front-panel keys navigate the native controller HMI',async()=>{
+        await bench.locator('[data-tab="scheme"]').click();
+        await bench.locator('[data-system="commissioning"]').click();
+        await bench.locator('#diagram [data-node="SATURN-1"]').click();
+        const lcd=bench.locator('#plc-front .runtime-hmi');
+        await bench.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('SATURN-1'));
+        assert.match(await lcd.textContent(),/Стенд управления/);
+        const right=bench.locator('#plc-front [data-plc-button="right"]');
+        await right.click();
+        await bench.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('Входы / выходы'));
+        assert.match(await lcd.textContent(),/AI1/);
+        await right.click();
+        await bench.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('Управляемая нагрузка'));
+        assert.match(await lcd.textContent(),/RELAY-1/);assert.match(await lcd.textContent(),/LAMP-1/);
+        const left=bench.locator('#plc-front [data-plc-button="left"]');
+        await left.focus();await left.press('Enter');
+        await bench.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('Входы / выходы'));
+        await left.click();
+        await bench.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('SATURN-1'));
+        await bench.screenshot({path:evidence+'/saturn-native-hmi-navigation.png',fullPage:true});
+    });
     await check('HMI as code navigates and drives the exact Saturn PLC runtime in the browser',async()=>{
         await bench.locator('[data-tab="hmi"]').click();
         await bench.locator('#hmi-root [data-hmi-screen="overview"]').waitFor();
