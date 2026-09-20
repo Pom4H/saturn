@@ -8,10 +8,22 @@ const oid = (v: string) => /^[a-f0-9]{40,64}$/.test(v);
 const gitNull = process.platform === 'win32' ? 'NUL' : devNull;
 /** Immutable Git object I/O, no checkout, hooks, project execution or shell interpolation. */
 export class GitRepository implements Repository {
-    readonly activeRef = 'refs/scada/plant/published';
-    constructor(readonly directory: string, readonly branch = 'refs/heads/main') {
-        if (!/^refs\/heads\/[A-Za-z0-9_/-]+$/.test(branch) || branch.includes('..'))
-            throw new AppError('Invalid configured project branch');
+    private tracking: { remote: string; sourceBranch: string; releaseBranch: string } | null = null;
+    constructor(
+        readonly directory: string,
+        readonly branch = 'refs/heads/main',
+        readonly activeRef = 'refs/scada/plant/published',
+    ) {
+        const validRef = (ref: string) => /^refs\/(?:heads|remotes|scada)\/[A-Za-z0-9._/-]+$/.test(ref) && !ref.includes('..');
+        if (!validRef(branch) || !validRef(activeRef))
+            throw new AppError('Invalid configured project ref');
+    }
+    track(remote: string, sourceBranch = 'main', releaseBranch = 'production'): this {
+        const validName = (value: string) => /^[A-Za-z0-9._/-]+$/.test(value) && !value.includes('..') && !value.startsWith('/') && !value.endsWith('/');
+        if (!/^[A-Za-z0-9._-]+$/.test(remote) || !validName(sourceBranch) || !validName(releaseBranch))
+            throw new AppError('Invalid Git tracking configuration');
+        this.tracking = { remote, sourceBranch, releaseBranch };
+        return this;
     }
     private git(args: string[], input?: string, extra: Record<string, string> = {}, quietFailure = false): Promise<string> {
         return new Promise((accept, reject) => {
@@ -69,8 +81,24 @@ export class GitRepository implements Repository {
     } }
     head() { return this.ref(this.branch); }
     desired() { return this.ref(this.activeRef); }
-    async publish(sha: string, expected: string | null) { if (!oid(sha))
-        throw new AppError('Invalid revision'); await this.read(sha); await this.git(['update-ref', this.activeRef, sha, expected ?? '0'.repeat(sha.length)]); }
+    async refresh() {
+        if (!this.tracking)
+            return;
+        const { remote, sourceBranch, releaseBranch } = this.tracking;
+        await this.git([
+            'fetch', '--no-tags', '--prune', remote,
+            `+refs/heads/${sourceBranch}:refs/remotes/${remote}/${sourceBranch}`,
+            `+refs/heads/${releaseBranch}:refs/remotes/${remote}/${releaseBranch}`,
+        ]);
+    }
+    async publish(sha: string, expected: string | null) {
+        if (!this.activeRef.startsWith('refs/heads/') && !this.activeRef.startsWith('refs/scada/'))
+            throw new AppError('Tracked release ref is read-only; publish through Git/CI', 409);
+        if (!oid(sha))
+            throw new AppError('Invalid revision');
+        await this.read(sha);
+        await this.git(['update-ref', this.activeRef, sha, expected ?? '0'.repeat(sha.length)]);
+    }
     async read(sha: string): Promise<Revision> {
         if (!oid(sha))
             throw new AppError('Invalid revision');
@@ -100,6 +128,8 @@ export class GitRepository implements Repository {
         return []; const result: Revision[] = []; for (const sha of (await this.git(['rev-list', `--max-count=${Math.min(100, Math.max(1, limit))}`, head])).trim().split('\n'))
         result.push(await this.read(sha)); return result; }
     async commit(files: Record<string, string>, expected: string | null, message: string, actor: string): Promise<Revision> {
+        if (!this.branch.startsWith('refs/heads/'))
+            throw new AppError('Tracked source ref is read-only; edit and push from an engineering workspace', 409);
         validateFiles(files);
         if (await this.head() !== expected)
             throw new AppError('Git revision changed', 409);
