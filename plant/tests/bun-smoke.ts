@@ -6,6 +6,7 @@ import { BunSql } from '../adapters/bun-sql';
 import { Store } from '../store';
 import { startPlantServer } from '../bun-server';
 import { runReport } from '../adapters/bun-reports';
+import { ModbusTcpClient } from '../adapters/modbus-tcp';
 import type { ReportTask } from '../types';
 
 const sql = new BunSql(':memory:');
@@ -51,6 +52,68 @@ const reportTask: ReportTask = {
 const report = await runReport(reportTask);
 assert.equal(report.rows[0].average, 15);
 assert.match(report.html, /Summary/);
+
+const u16 = (buffer: Uint8Array, offset: number) => (buffer[offset] << 8) | buffer[offset + 1];
+const put16 = (buffer: Uint8Array, offset: number, value: number) => {
+    buffer[offset] = (value >>> 8) & 0xff;
+    buffer[offset + 1] = value & 0xff;
+};
+interface SmokeTcpSocket { write(data: Uint8Array): number }
+interface SmokeTcpServer { port: number; stop(closeActiveConnections?: boolean): void }
+interface SmokeBunRuntime {
+    listen(options: {
+        hostname: string;
+        port: number;
+        socket: { data(socket: SmokeTcpSocket, data: Uint8Array): void };
+    }): SmokeTcpServer;
+}
+const native = (globalThis as typeof globalThis & { Bun?: SmokeBunRuntime }).Bun;
+assert.ok(native, 'Bun runtime is required for native smoke tests');
+const registers = [123, 456, 789];
+const modbusServer = native.listen({
+    hostname: '127.0.0.1',
+    port: 0,
+    socket: {
+        data(socket, request) {
+            assert.equal(u16(request, 2), 0);
+            const unit = request[6], fn = request[7], address = u16(request, 8);
+            if (fn === 3 || fn === 4) {
+                const count = u16(request, 10);
+                const response = new Uint8Array(9 + count * 2);
+                response.set(request.subarray(0, 4), 0);
+                put16(response, 4, 3 + count * 2);
+                response[6] = unit;
+                response[7] = fn;
+                response[8] = count * 2;
+                for (let i = 0; i < count; i++) put16(response, 9 + i * 2, registers[address + i] ?? 0);
+                socket.write(response);
+                return;
+            }
+            if (fn === 6) {
+                registers[address] = u16(request, 10);
+                socket.write(request.slice(0, 12));
+                return;
+            }
+            const response = new Uint8Array(9);
+            response.set(request.subarray(0, 4), 0);
+            put16(response, 4, 3);
+            response[6] = unit;
+            response[7] = fn | 0x80;
+            response[8] = 1;
+            socket.write(response);
+        },
+    },
+});
+const modbus = new ModbusTcpClient({ host: '127.0.0.1', port: modbusServer.port, timeoutMs: 1000 });
+try {
+    assert.deepEqual(await modbus.readHoldingRegisters(0, 2), [123, 456]);
+    assert.deepEqual(await modbus.readInputRegisters(2, 1), [789]);
+    await modbus.writeSingleRegister(1, 321);
+    assert.deepEqual(await modbus.readHoldingRegisters(1, 1), [321]);
+} finally {
+    modbus.close();
+    modbusServer.stop(true);
+}
 
 const dir = await mkdtemp(join(tmpdir(), 'saturn-bun-'));
 const password = 'saturn-bun-smoke-2026';
@@ -124,4 +187,4 @@ try {
     await rm(dir, { recursive: true, force: true });
 }
 
-console.log('Bun server smoke: SQLite, report isolation, auth, origin guard and WebSocket live stream OK');
+console.log('Bun server smoke: SQLite, report isolation, Modbus TCP, auth, origin guard and WebSocket live stream OK');
