@@ -1,4 +1,8 @@
-# SCADA playground
+# Saturn Engineering IDE
+
+Saturn is an open-source engineering IDE for automated systems. The TypeScript project is the source of truth for equipment models, signals, behavior, HMI, scenarios, tests and deployment targets. The same revision can be inspected in 2D/3D, executed against simulation or connected runtime, and delivered as server/PWA/HMI artifacts.
+
+SCADA, historian, alarms and operator screens are platform capabilities built on top of the engineering project rather than the definition of the product.
 
 ## Node.js / offline PWA workbench
 
@@ -19,7 +23,7 @@ Run `npm run plant:check` and `npm run plant:test:browser` for the new workbench
 
 [Open the editor](https://pom4h.github.io/scada/) · [DSL reference](docs/dsl.md) · [Architecture](docs/architecture.md) · [Experimental 3D lab and catalog](docs/3d-foundation.md)
 
-A browser workbench for designing animated SCADA diagrams in TypeScript. Code, canvas and property inspector edit **one TS document per scene**. A server can also deliver a Git-backed project containing scenes and reference files. The editor works as a static site. The optional local Node server adds durable synthetic equipment runs, authenticated signals, history and replay. No hardware connection is included.
+A browser engineering workbench for authoring executable automation projects in TypeScript. Code, canvas and property inspector edit **one TS document per scene**. A server can also deliver a Git-backed project containing scenes and reference files. The editor also works as a static site. The local runtime adds durable equipment runs, authenticated signals, history and replay. Saturn PLC is an integrated hardware target with compiled runtime/HMI support; additional hardware depends on installed drivers.
 
 ```ts
 import { tank, pump, valve, outlet, connect } from "@scada/core";
