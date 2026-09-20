@@ -1,5 +1,6 @@
 import { SATURN_TERMINAL_ANCHORS, SATURN_SERVICE_ANCHORS } from './vendor/saturn/src/view';
-import { AppError, type Project, type Device, type Expr } from './types';
+import { type Project, type Device, type Expr } from './types';
+import { failDiagnostic } from './diagnostics';
 export type Medium = 'pipe' | 'power' | 'control' | 'bus';
 export type Side = 'left' | 'right' | 'up' | 'down';
 export interface Terminal { x:number;y:number;z:number;side:Side;medium:Medium;family:string;role:'source'|'sink'|'passive';max:number;signal?:string;input?:string;failValue?:number; }
@@ -38,26 +39,30 @@ const profiles:Record<string,Record<string,Terminal>>={
 };
 profiles.saturn=Object.fromEntries([...SATURN_TERMINAL_ANCHORS.map(a=>[a.id,t(a.x*.5,a.y*.5,a.side==='top'?'up':'down','control',a.signal,a.direction==='input'?'sink':'source',{z:1,max:a.direction==='output'?8:1,signal:a.direction==='output'?a.id:undefined})] as const),
  ...SATURN_SERVICE_ANCHORS.map(a=>[a.id,t(a.x*.5,a.y*.5,a.side==='top'?'up':'down',a.id.startsWith('RS')?'bus':'power',a.family,a.id.startsWith('RS')?'passive':'sink',{z:1})] as const)]);
-export function terminals(type:string):Record<string,Terminal>{const p=Object.hasOwn(profiles,type)?profiles[type]:undefined;if(!p)throw new AppError('No physical port profile: '+type);return p;}
+export function terminals(type:string):Record<string,Terminal>{const p=Object.hasOwn(profiles,type)?profiles[type]:undefined;if(!p)failDiagnostic('SATURN_PORT_PROFILE_MISSING','ports.profileMissing',{type},{type});return p;}
 export function footprint(type:string){return type==='saturn'?{width:310,height:190}:{width:150,height:118};}
 export const physicalTypes=()=>Object.keys(profiles);
-export function resolvePort(p:Project,e:Endpoint):{device:Device;terminal:Terminal}{const device=p.devices.find(d=>d.id===e.device);const ports=device&&terminals(device.type);const terminal=ports&&Object.hasOwn(ports,e.port)?ports[e.port]:undefined;if(!device||!terminal)throw new AppError(`Unknown terminal ${e.device}.${e.port}`);return{device,terminal};}
+export function resolvePort(p:Project,e:Endpoint):{device:Device;terminal:Terminal}{const device=p.devices.find(d=>d.id===e.device);const ports=device&&terminals(device.type);const terminal=ports&&Object.hasOwn(ports,e.port)?ports[e.port]:undefined;if(!device||!terminal)failDiagnostic('SATURN_PORT_UNKNOWN','ports.unknownTerminal',{device:e.device,port:e.port},{endpoint:e});return{device,terminal};}
 export function validateConnections(p:Project):void {
- if(!Array.isArray(p.connections??[])||(p.connections?.length??0)>512)throw new AppError('At most 512 connections');
+ if(!Array.isArray(p.connections??[])||(p.connections?.length??0)>512)failDiagnostic('SATURN_CONNECTION_LIMIT','ports.connectionLimit',undefined,{count:p.connections?.length??0});
  const ids=new Set<string>(),degree=new Map<string,number>();
- for(const w of p.connections??[]){if(!w||!w.from||!w.to||typeof w.from.device!=='string'||typeof w.to.device!=='string'||typeof w.from.port!=='string'||typeof w.to.port!=='string'||!['pipe','power','control','bus'].includes(w.medium))throw new AppError('Malformed physical connection');if(!/^[\w.-]{1,80}$/.test(w.id)||ids.has(w.id))throw new AppError('Invalid or duplicate wire ID');ids.add(w.id);
+ for(const w of p.connections??[]){
+  if(!w||!w.from||!w.to||typeof w.from.device!=='string'||typeof w.to.device!=='string'||typeof w.from.port!=='string'||typeof w.to.port!=='string'||!['pipe','power','control','bus'].includes(w.medium))
+   failDiagnostic('SATURN_CONNECTION_INVALID','ports.malformedConnection',undefined,{connection:w});
+  if(!/^[\w.-]{1,80}$/.test(w.id)||ids.has(w.id))failDiagnostic('SATURN_CONNECTION_ID','ports.duplicateConnection',{id:w.id},{id:w.id});ids.add(w.id);
   const a=resolvePort(p,w.from),b=resolvePort(p,w.to);
-  if(w.from.device===w.to.device)throw new AppError('Self-wiring is not supported; use a junction');
-  if(a.terminal.medium!==w.medium||b.terminal.medium!==w.medium||a.terminal.family!==b.terminal.family)throw new AppError(`Incompatible connection ${w.id}`);
-  if(a.terminal.role==='sink'||b.terminal.role==='source')throw new AppError(`Reversed driver or two sources: ${w.id}`);
-  for(const [endpoint,port] of [[w.from,a.terminal],[w.to,b.terminal]] as const){const key=endpoint.device+'.'+endpoint.port;const n=(degree.get(key)??0)+1;degree.set(key,n);if(n>port.max)throw new AppError(`Occupied terminal ${key}; use a distribution terminal`);}
-  if(w.scale!==undefined&&(!Number.isFinite(w.scale)||Math.abs(w.scale)>1e6))throw new AppError('Invalid signal scale');
-  if(w.medium==='pipe'&&w.scale!==undefined)throw new AppError('Pipe is topology, not signal scaling');
-  if(w.via!==undefined&&(!Array.isArray(w.via)||w.via.length>16||w.via.some(v=>!Number.isFinite(v.x)||!Number.isFinite(v.y)||Math.abs(v.x)>15000||Math.abs(v.y)>15000)))throw new AppError('Invalid route points');
+  if(w.from.device===w.to.device)failDiagnostic('SATURN_CONNECTION_SELF','ports.selfConnection',undefined,{connectionId:w.id,device:w.from.device});
+  if(a.terminal.medium!==w.medium||b.terminal.medium!==w.medium||a.terminal.family!==b.terminal.family)
+   failDiagnostic('SATURN_CONNECTION_INCOMPATIBLE','ports.incompatibleConnection',{id:w.id,fromFamily:a.terminal.family,toFamily:b.terminal.family},{connectionId:w.id,connectionKind:w.medium,from:w.from,to:w.to,fromFamily:a.terminal.family,toFamily:b.terminal.family});
+  if(a.terminal.role==='sink'||b.terminal.role==='source')failDiagnostic('SATURN_CONNECTION_DIRECTION','ports.reversedConnection',{id:w.id},{connectionId:w.id,fromRole:a.terminal.role,toRole:b.terminal.role});
+  for(const [endpoint,terminal] of [[w.from,a.terminal],[w.to,b.terminal]] as const){const key=endpoint.device+'.'+endpoint.port;const n=(degree.get(key)??0)+1;degree.set(key,n);if(n>terminal.max)failDiagnostic('SATURN_PORT_OCCUPIED','ports.occupiedTerminal',{terminal:key},{endpoint,connections:n,max:terminal.max});}
+  if(w.scale!==undefined&&(!Number.isFinite(w.scale)||Math.abs(w.scale)>1e6))failDiagnostic('SATURN_SIGNAL_SCALE','ports.invalidScale',undefined,{connectionId:w.id,scale:w.scale});
+  if(w.medium==='pipe'&&w.scale!==undefined)failDiagnostic('SATURN_PIPE_SIGNAL_SCALE','ports.pipeScale',undefined,{connectionId:w.id});
+  if(w.via!==undefined&&(!Array.isArray(w.via)||w.via.length>16||w.via.some(v=>!Number.isFinite(v.x)||!Number.isFinite(v.y)||Math.abs(v.x)>15000||Math.abs(v.y)>15000)))failDiagnostic('SATURN_ROUTE_POINTS','ports.invalidRoute',undefined,{connectionId:w.id});
  }
- for(const a of p.controllers??[])for(const b of p.controllers??[])if(a.id<b.id&&busConnected(p,{device:a.id,port:'RS-A'},{device:b.id,port:'RS-A'}))throw new AppError('Multiple PLC bus owners are not supported');
+ for(const a of p.controllers??[])for(const b of p.controllers??[])if(a.id<b.id&&busConnected(p,{device:a.id,port:'RS-A'},{device:b.id,port:'RS-A'}))failDiagnostic('SATURN_BUS_OWNERS','ports.multipleBusOwners',undefined,{controllers:[a.id,b.id]});
  const slots=new Set<string>(),assigned=new Set<string>();
- for(const a of p.attachments??[]){if(a.profile!=='virtual-io4'||!p.controllers?.some(c=>c.id===a.controller)||p.devices.find(d=>d.id===a.device)?.type!=='ioModule'||!Number.isInteger(a.slot)||a.slot<1||a.slot>8||slots.has(a.controller+':'+a.slot)||assigned.has(a.device))throw new AppError('Invalid expansion slot');slots.add(a.controller+':'+a.slot);assigned.add(a.device);}
+ for(const a of p.attachments??[]){if(a.profile!=='virtual-io4'||!p.controllers?.some(c=>c.id===a.controller)||p.devices.find(d=>d.id===a.device)?.type!=='ioModule'||!Number.isInteger(a.slot)||a.slot<1||a.slot>8||slots.has(a.controller+':'+a.slot)||assigned.has(a.device))failDiagnostic('SATURN_EXPANSION_SLOT','ports.invalidExpansion',undefined,{attachment:a});slots.add(a.controller+':'+a.slot);assigned.add(a.device);}
 }
 export function connectionExpression(p:Project,w:Connection):Expr|undefined {if(w.signal!==undefined)return w.signal;const {device,terminal}=resolvePort(p,w.from);return terminal.signal?device.signals[terminal.signal]:undefined;}
 
