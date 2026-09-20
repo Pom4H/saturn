@@ -5,7 +5,44 @@ export const benchSystem=system('commissioning','PLC · стенд подклю�
 export const level=control('BENCH-LEVEL',{title:'Датчик уровня · тестовый сигнал',system:'commissioning',min:0,max:10,initial:3,rate:1,unit:'V'});
 export const psu=simulation('PSU-24','dc-supply',{system:'commissioning',at:{x:80,y:3100}});
 export const sensor=simulation('LEVEL-TX','transmitter',{system:'commissioning',at:{x:480,y:3480},inputs:{value:level.value}});
-export const controller=plc('SATURN-1',{system:'commissioning',at:{x:760,y:3100},outputs:{DO1:gt(pin('AI1'),500)},hmi:{view:view('plc-screen',{title:'PLC',body:benchPanel,bindings:{input:pin('AI1'),output:gt(pin('AI1'),500)}}),title:'Commissioning bench',rows:[{label:'AI1 x100',pin:'AI1'},{label:'Relay DO1',pin:'DO1'}]}});
+export const controller=plc('SATURN-1',{
+ system:'commissioning',at:{x:760,y:3100},outputs:{DO1:gt(pin('AI1'),500)},
+ hmi:{
+  title:'Commissioning bench',rows:[{label:'AI1 x100',pin:'AI1'},{label:'Relay DO1',pin:'DO1'}],
+  initial:'main',
+  screens:[
+   {id:'main',title:'SATURN-1',screenType:'main',period:100,elements:[
+    {id:'head',primitive:'rect',position:{x:0,y:0},width:320,height:32,color:16904},
+    {id:'title',primitive:'text',label:'SATURN-1',position:{x:10,y:8},font:1,color:65535},
+    {id:'subtitle',primitive:'text',label:'Стенд управления',position:{x:10,y:48}},
+    {id:'ai1',primitive:'value',label:'AI1 x100: ',position:{x:10,y:82},binding:{source:'input',ref:'AI1',format:'int'}},
+    {id:'do1',primitive:'status',label:'Реле DO1: ',position:{x:10,y:118},binding:{source:'output',ref:'DO1',format:'bool'}},
+    {id:'hint',primitive:'text',label:'RIGHT I/O   DOWN LOAD',position:{x:10,y:205},color:33808},
+   ]},
+   {id:'io',title:'I/O',screenType:'diagnostics',period:100,elements:[
+    {id:'head',primitive:'rect',position:{x:0,y:0},width:320,height:32,color:16904},
+    {id:'title',primitive:'text',label:'Входы / выходы',position:{x:10,y:8},font:1,color:65535},
+    {id:'ai1',primitive:'value',label:'AI1: ',position:{x:10,y:58},binding:{source:'input',ref:'AI1',format:'int'}},
+    {id:'do1',primitive:'status',label:'DO1: ',position:{x:10,y:98},binding:{source:'output',ref:'DO1',format:'bool'}},
+    {id:'route',primitive:'text',label:'AI1 >500 -> DO1',position:{x:10,y:148}},
+    {id:'hint',primitive:'text',label:'LEFT MAIN   RIGHT LOAD',position:{x:10,y:205},color:33808},
+   ]},
+   {id:'load',title:'Нагрузка',screenType:'manual',period:100,elements:[
+    {id:'head',primitive:'rect',position:{x:0,y:0},width:320,height:32,color:16904},
+    {id:'title',primitive:'text',label:'Управляемая нагрузка',position:{x:10,y:8},font:1,color:65535},
+    {id:'relay',primitive:'status',label:'RELAY-1: ',position:{x:10,y:64},binding:{source:'output',ref:'DO1',format:'bool'}},
+    {id:'lamp',primitive:'status',label:'LAMP-1: ',position:{x:10,y:106},binding:{source:'output',ref:'DO1',format:'bool'}},
+    {id:'logic',primitive:'text',label:'Источник: SATURN-1.DO1',position:{x:10,y:154}},
+    {id:'hint',primitive:'text',label:'LEFT I/O   RIGHT MAIN',position:{x:10,y:205},color:33808},
+   ]},
+  ],
+  keys:{
+   main:{right:'io',down:'load',left:'load',up:'io'},
+   io:{left:'main',right:'load',up:'main',down:'load'},
+   load:{left:'io',right:'main',up:'io',down:'main'},
+  },
+ }
+});
 export const relay=simulation('RELAY-1','contactor',{system:'commissioning',at:{x:1370,y:3100}});
 export const lamp=simulation('LAMP-1','indicator',{system:'commissioning',at:{x:1780,y:3100}});
 export const module=simulation('EXP-AI4','io-module',{system:'commissioning',at:{x:1150,y:3480}});
