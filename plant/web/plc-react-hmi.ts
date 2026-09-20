@@ -151,6 +151,125 @@ function networkScene(page:Extract<PlcShellPage,{kind:'network'}>,controllerId:s
     ...footer('< overview   UP process   DN I/O'),
   ]};
 }
+
+function compactHeader(title:string,index:number,total:number):DisplayNode[]{
+  return[
+    rect('c-head',0,0,320,18,rgb565(7,24,31),rgb565(7,24,31),0),
+    line('c-head-rule',0,18,320,18,rgb565(29,66,78),1),
+    {id:'c-live',kind:'circle',cx:9,cy:9,r:3,fill:C.green},
+    text('c-title',17,12,title,8,C.text,750),
+    text('c-count',310,12,`${index+1}/${total}`,7,C.muted,600,'end',true),
+  ];
+}
+function compactFooter(hint:string):DisplayNode[]{
+  return[
+    rect('c-foot',0,224,320,16,rgb565(7,24,31),rgb565(7,24,31),0),
+    line('c-foot-rule',0,224,320,224,rgb565(29,66,78),1),
+    text('c-hint',10,236,hint,7,C.muted,600,'start',true),
+  ];
+}
+function compactOverview(project:Project,controllerId:string,page:PlcShellPage,index:number,total:number):SaturnDisplayScene{
+  const pump=byType(project,controllerId,'pump'),tank=byType(project,controllerId,'reservoir'),filter=byType(project,controllerId,'filter'),valve=byType(project,controllerId,'valve'),acc=byType(project,controllerId,'accumulator');
+  const level=tank?sig(tank.id,'level'):sig(controllerId,'AI1'),rpm=pump?sig(pump.id,'rpm'):sig(controllerId,'DO1'),flow=pump?sig(pump.id,'flow'):sig(controllerId,'DO1');
+  const fouling=filter?sig(filter.id,'fouling'):sig(controllerId,'AI2'),opening=valve?sig(valve.id,'opening'):sig(controllerId,'DO2'),pressure=acc?sig(acc.id,'pressure'):sig(controllerId,'AI2'),accLevel=acc?sig(acc.id,'level'):sig(controllerId,'AI2');
+  const nodes:DisplayNode[]=[
+    ...compactHeader(page.title,index,total),
+    text('c-mode',9,31,'LIVE PROCESS',7,C.cyan,800),
+    {id:'tank',kind:'tank',x:10,y:43,width:51,height:92,level:{signal:level,scale:.01,min:0,max:1},shell:C.muted,background:C.dark,water:C.water,waterLine:C.water2,waveAmplitude:2,waveLength:18,waveSpeed:.01,radius:7},
+    text('c-tank',35.5,146,tank?.id??'TANK',7,C.muted,700,'middle'),
+    {id:'flow-a',kind:'flow',points:[{x:61,y:91},{x:88,y:91}],value:{signal:flow},background:C.line,color:C.cyan,width:3,backgroundWidth:7,packetRadius:2,packetSpacing:12,speed:60},
+    {id:'pump',kind:'pump',cx:113,cy:91,r:23,rpm:{signal:rpm},shell:C.dark,body:C.panel2,bladeA:C.cyan,bladeB:rgb565(38,137,154),hub:C.white},
+    text('c-pump',113,128,pump?.id??'PUMP',7,C.muted,700,'middle'),
+    {id:'flow-b',kind:'flow',points:[{x:139,y:91},{x:155,y:91}],value:{signal:flow},background:C.line,color:C.cyan,width:3,backgroundWidth:7,packetRadius:2,packetSpacing:11,speed:60},
+    rect('c-filter-box',155,72,34,38,C.panel2,C.muted,5),text('c-filter-f',172,88,'F',11,C.cyan,800,'middle'),
+    readout('c-fouling',172,103,fouling,'','%',0,7,C.muted,'middle'),
+    {id:'flow-c',kind:'flow',points:[{x:189,y:91},{x:207,y:91}],value:{signal:flow},background:C.line,color:C.cyan,width:3,backgroundWidth:7,packetRadius:2,packetSpacing:11,speed:60},
+    {id:'c-valve-ring',kind:'circle',cx:222,cy:91,r:14,fill:C.dark,stroke:C.cyan,strokeWidth:2},
+    line('c-valve-blade',212,101,232,81,C.cyan,3),readout('c-opening',222,119,opening,'','%',0,7,C.muted,'middle'),
+    {id:'flow-d',kind:'flow',points:[{x:237,y:91},{x:258,y:91}],value:{signal:flow},background:C.line,color:C.cyan,width:3,backgroundWidth:7,packetRadius:2,packetSpacing:11,speed:60},
+    {id:'acc',kind:'tank',x:260,y:43,width:49,height:92,level:{signal:accLevel,scale:.01,min:0,max:1},shell:C.muted,background:C.dark,water:rgb565(29,121,159),waterLine:C.cyan,waveAmplitude:1.5,waveLength:18,waveSpeed:.007,radius:10},
+    text('c-acc',284.5,146,acc?.id??'ACC',7,C.muted,700,'middle'),
+    rect('kpi-a',8,158,96,55,C.panel2,C.line,6),text('kpi-a-l',16,172,'LEVEL',6,C.muted,700),readout('kpi-a-v',16,197,level,'','%',0,18,C.text),
+    rect('kpi-b',112,158,96,55,C.panel2,C.line,6),text('kpi-b-l',120,172,'PUMP',6,C.muted,700),readout('kpi-b-v',120,197,rpm,'','',0,18,C.text),text('kpi-b-u',194,205,'rpm',6,C.muted,600,'end'),
+    rect('kpi-c',216,158,96,55,C.panel2,C.line,6),text('kpi-c-l',224,172,'PRESSURE',6,C.muted,700),readout('kpi-c-v',224,197,pressure,'','',2,18,C.cyan),
+    ...compactFooter('< home   > equipment   UP net   DN diag'),
+  ];
+  return{background:C.bg,nodes};
+}
+function compactDevice(project:Project,controllerId:string,page:Extract<PlcShellPage,{kind:'device'}>,index:number,total:number):SaturnDisplayScene{
+  const id=page.deviceId,visual=page.visual;
+  const nodes:DisplayNode[]=[...compactHeader(id,index,total)];
+  if(visual==='pump'||visual==='motor'||visual==='fan'){
+    const rpm=sig(id,'rpm'),flow=sig(id,visual==='pump'?'flow':visual==='fan'?'airflow':'speed'),power=sig(id,visual==='pump'?'power':'load');
+    nodes.push(
+      {id:'pump',kind:'pump',cx:91,cy:112,r:54,rpm:{signal:rpm},shell:C.dark,body:C.panel2,bladeA:C.cyan,bladeB:rgb565(38,137,154),hub:C.white},
+      text('d-machine',91,187,visual.toUpperCase(),7,C.muted,700,'middle'),
+      rect('d-rpm',169,36,137,45,C.panel2),text('d-rpm-l',178,50,'RPM',6,C.muted,700),readout('d-rpm-v',178,72,rpm,'','',0,17,C.text),
+      rect('d-flow',169,88,137,45,C.panel2),text('d-flow-l',178,102,visual==='pump'?'FLOW':'LOAD',6,C.muted,700),readout('d-flow-v',178,124,flow,'','',2,17,C.cyan),
+      rect('d-power',169,140,137,45,C.panel2),text('d-power-l',178,154,'POWER',6,C.muted,700),readout('d-power-v',178,176,power,'','',2,17,C.text),
+      page.controlSetpoint?boolText('d-state',306,211,sig(controllerId,page.driver??'DO1'),'','RUN','STOP',8,C.green,'end'):text('d-monitor',306,211,'MONITOR',8,C.muted,700,'end',true),
+    );
+  } else if(visual==='reservoir'||visual==='accumulator'){
+    const level=sig(id,'level'),pressure=visual==='accumulator'?sig(id,'pressure'):sig(id,'flow');
+    nodes.push(
+      {id:'tank',kind:'tank',x:28,y:32,width:121,height:174,level:{signal:level,scale:.01,min:0,max:1},shell:C.muted,background:C.dark,water:C.water,waterLine:C.water2,waveAmplitude:3,waveLength:25,waveSpeed:.008,radius:12},
+      rect('d-level',169,48,137,58,C.panel2),text('d-level-l',180,64,'LEVEL',6,C.muted,700),readout('d-level-v',180,94,level,'','%',0,22,C.text),
+      rect('d-second',169,116,137,58,C.panel2),text('d-second-l',180,132,visual==='accumulator'?'PRESSURE':'FLOW',6,C.muted,700),readout('d-second-v',180,162,pressure,'','',2,22,C.cyan),
+      text('d-vessel',237,201,visual.toUpperCase(),7,C.muted,700,'middle'),
+    );
+  } else if(visual==='valve'){
+    const opening=sig(id,'opening'),flow=sig(id,'flow');
+    nodes.push(
+      {id:'v-ring',kind:'circle',cx:100,cy:108,r:57,fill:C.dark,stroke:C.cyan,strokeWidth:3},
+      line('v-blade',61,147,139,69,C.cyan,7),{id:'v-hub',kind:'circle',cx:100,cy:108,r:8,fill:C.white},
+      rect('v-open',177,52,129,55,C.panel2),text('v-open-l',187,68,'OPENING',6,C.muted,700),readout('v-open-v',187,96,opening,'','%',0,21,C.text),
+      rect('v-flow',177,119,129,55,C.panel2),text('v-flow-l',187,135,'FLOW',6,C.muted,700),readout('v-flow-v',187,163,flow,'','',2,21,C.cyan),
+      page.controlSetpoint?boolText('v-cmd',306,207,sig(controllerId,page.driver??'DO2'),'CMD ','OPEN','CLOSE',8,C.green,'end'):text('v-mon',306,207,'MONITOR',8,C.muted,700,'end',true),
+    );
+  } else if(visual==='filter'){
+    const fouling=sig(id,'fouling'),dp=sig(id,'pressureDrop'),res=sig(id,'resistance');
+    nodes.push(
+      rect('f-body',35,47,122,135,C.panel2,C.muted,14),
+      line('f-grid1',55,65,137,164,C.line,3),line('f-grid2',75,57,151,150,C.line,3),line('f-grid3',43,94,112,178,C.line,3),
+      text('f-title',96,204,'STRAINER',7,C.muted,700,'middle'),
+      rect('f-a',177,45,129,47,C.panel2),text('f-a-l',187,60,'FOULING',6,C.muted,700),readout('f-a-v',187,84,fouling,'','%',0,18,fouling?C.amber:C.text),
+      rect('f-b',177,101,129,47,C.panel2),text('f-b-l',187,116,'DELTA P',6,C.muted,700),readout('f-b-v',187,140,dp,'','',2,18,C.cyan),
+      rect('f-c',177,157,129,47,C.panel2),text('f-c-l',187,172,'RESISTANCE',6,C.muted,700),readout('f-c-v',187,196,res,'','',2,18,C.text),
+    );
+  } else {
+    nodes.push(...genericDetail(project,page,index,total).nodes.filter(n=>!String(n.id??'').startsWith('header')&&!String(n.id??'').startsWith('footer')));
+  }
+  nodes.push(...compactFooter(page.controlSetpoint?'< home   > next   UP start/open   DN stop/close':'< home   > next'));
+  return{background:C.bg,nodes};
+}
+function compactIo(page:Extract<PlcShellPage,{kind:'io'}>,controllerId:string,index:number,total:number):SaturnDisplayScene{
+  const nodes:DisplayNode[]=[...compactHeader('I/O DIAGNOSTICS',index,total)];
+  page.signals.slice(0,8).forEach((name,n)=>{
+    const col=n%2,row=Math.floor(n/2),x=8+col*156,y=28+row*45,digital=/^[D][IO]/.test(name),signal=sig(controllerId,name);
+    nodes.push(rect('cio-'+n,x,y,148,37,C.panel2,C.line,6),text('cio-l-'+n,x+9,y+14,name,7,C.muted,700));
+    nodes.push(digital?boolText('cio-v-'+n,x+137,y+26,signal,'','ON','OFF',12,C.text,'end'):readout('cio-v-'+n,x+137,y+26,signal,'','',0,12,C.text,'end'));
+  });
+  nodes.push(...compactFooter('< home   > network   UP home'));return{background:C.bg,nodes};
+}
+function compactNetwork(page:Extract<PlcShellPage,{kind:'network'}>,controllerId:string,index:number,total:number):SaturnDisplayScene{
+  const healthy=sig(controllerId,'healthy'),peer=page.peers[0]??'NO MODULE';
+  return{background:C.bg,nodes:[
+    ...compactHeader('NETWORK',index,total),
+    rect('cn-plc',18,58,112,72,C.panel2,C.green,9),text('cn-plc-t',30,77,'SATURN PLC',7,C.muted,750),text('cn-plc-id',30,102,controllerId,10,C.text,700,'start',true),
+    {id:'cn-link',kind:'flow',points:[{x:130,y:94},{x:190,y:94}],value:{signal:healthy,fallback:1},background:C.line,color:C.cyan,width:2,backgroundWidth:5,packetRadius:2.5,packetSpacing:16,speed:48,threshold:.1},
+    rect('cn-peer',190,58,112,72,C.panel2,page.peers.length?C.cyan:C.line,9),text('cn-peer-t',202,77,'EXPANSION',7,C.muted,750),text('cn-peer-id',202,102,peer,9,page.peers.length?C.text:C.muted,650,'start',true),
+    rect('cn-health',18,150,284,52,C.panel2,C.line,7),text('cn-health-l',30,168,'BUS / RUNTIME',6,C.muted,700),boolText('cn-health-v',30,191,healthy,'','HEALTHY','DEGRADED',14,C.green),
+    ...compactFooter('< home   > home   DN diagnostics'),
+  ]};
+}
+function compactSceneFor(project:Project,controllerId:string,page:PlcShellPage,index:number,total:number):SaturnDisplayScene{
+  if(page.kind==='overview')return compactOverview(project,controllerId,page,index,total);
+  if(page.kind==='device')return compactDevice(project,controllerId,page,index,total);
+  if(page.kind==='io')return compactIo(page,controllerId,index,total);
+  if(page.kind==='network')return compactNetwork(page,controllerId,index,total);
+  return compactOverview(project,controllerId,page,index,total);
+}
+
 function sceneFor(project:Project,controllerId:string,page:PlcShellPage,index:number,total:number):SaturnDisplayScene{
   if(page.kind==='overview')return overview(project as Project,{} as Frame,controllerId,page,index,total);
   if(page.kind==='process')return process(project,controllerId,page,index,total);
@@ -177,10 +296,11 @@ function renderCommand(command:DisplayDrawCommand,index:number):React.ReactNode{
 export function SaturnPlcHmi({project,frame,controllerId}:SaturnPlcHmiProps){
   const emulatorRef=React.useRef<SaturnDisplayEmulator|null>(null);if(!emulatorRef.current)emulatorRef.current=new SaturnDisplayEmulator();
   const model=generatePlcShell(project,controllerId),index=frame.controllerScreens?.[controllerId]??0,page=shellPage(model,index);
-  let scene=sceneFor(project,controllerId,page,index,model.pages.length);
-  // Overview needs the same live bindings as process; its static scene builder is
-  // intentionally free of Frame so all motion remains inside Firmverse.
-  if(page.kind==='overview')scene=overview(project,frame,controllerId,page,index,model.pages.length);
+  const compact=controller(project,controllerId)?.hmi.shell?.mode==='compact';
+  let scene=compact?compactSceneFor(project,controllerId,page,index,model.pages.length):sceneFor(project,controllerId,page,index,model.pages.length);
+  // Classic overview keeps its legacy static scene builder. Compact overview is
+  // already a full process screen and needs no duplicate Process page.
+  if(!compact&&page.kind==='overview')scene=overview(project,frame,controllerId,page,index,model.pages.length);
   const display=emulatorRef.current.render(scene,signalsFor(frame),frame.time);
   return h(React.Fragment,null,
     h('style',null,'@keyframes firmverseCompatMarker{from{opacity:0}to{opacity:0}}'),
