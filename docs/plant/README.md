@@ -28,6 +28,10 @@ Optional environment configuration:
 | `HOST`, `PORT` | Default `127.0.0.1`, `4176` |
 | `SCADA_DATABASE` | SQLite path; default `data-plant/plant.sqlite3` |
 | `SCADA_PROJECT_REPO` | Dedicated Git repository; default `data-plant/project.git` |
+| `SCADA_PROJECT_REMOTE` | Optional existing Git remote to fetch from |
+| `SCADA_PROJECT_BRANCH` | Source branch on that remote; default `main` |
+| `SCADA_PROJECT_RELEASE_BRANCH` | Release branch on that remote; default `production` |
+| `SCADA_PROJECT_REF`, `SCADA_PROJECT_RELEASE_REF` | Advanced explicit ref overrides |
 | `SCADA_PUBLIC_URL` | Public HTTPS origin behind a reverse proxy; must match browser Origin |
 | `SCADA_USER`, `SCADA_PASSWORD` | Initial named account; password at least 12 characters; existing users are not silently overwritten |
 | `SCADA_PUSH_SUBJECT` | Operator contact `mailto:` or HTTPS URL; enables Web Push |
@@ -69,7 +73,7 @@ The server repository uses `refs/heads/main` for authoring and `refs/scada/plant
 
 The server watches the desired ref. It retains a working applied checkpoint if an external candidate fails validation. The desired Git ref is durable before the applied SQLite checkpoint; restart reconciles a crash between them. Layout, report and archive-policy-only changes preserve the compatible simulation run. Dynamic model/wiring changes create a new run. A rollback creates a new commit containing old files and publishes that commit; it does not erase commits, measurements, report artifacts, or physical actions.
 
-The native Git adapter does not add remote credentials or automatic `git fetch/push`. Repository transport can be handled by deployment tooling outside the service; the previous PR #11 Git project implementation remains available for its original scenes. Browser revisions have opaque `local:` identifiers and are not advertised as real Git object IDs. JSON import/export transfers project files, not an automatic merged history.
+The native Git adapter never stores remote credentials and never pushes automatically. When `SCADA_PROJECT_REMOTE` is configured, it may automatically fetch only the configured source and release branches into read-only remote-tracking refs. Without that configuration, repository transport remains external deployment tooling. The previous PR #11 Git project implementation remains available for its original scenes. Browser revisions have opaque `local:` identifiers and are not advertised as real Git object IDs. JSON import/export transfers project files, not an automatic merged history.
 
 Installed model implementation changes require an application release and a model version change. Checkpoints reject incompatible model versions; there is no invented state migration. Back up the SQLite database **and** repository before upgrading. Stop the service for a straightforward file backup, or use SQLite's backup facilities; do not copy a live main database without accounting for WAL. Browser project JSON export is not an archive/checkpoint backup. Automated backup orchestration is not included.
 
