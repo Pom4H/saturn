@@ -67,7 +67,7 @@ function tankVisual(id:string,level:number|null,x:number,y:number,width:number,h
   const wave=`M${x+5} ${waterY+2} q10 ${-3+Math.sin(phase)*2} 20 0 t20 0 t20 0 t20 0`;
   return h('g',{'data-equipment':id},
     h('rect',{x,y,width,height,rx:large?12:8,fill:'#0a1d25',stroke:'#507784',strokeWidth:2}),
-    h('rect',{x:x+5,y:waterY,width:width-10,height:waterH,rx:4,fill:'url(#plc-water)',opacity:.82,'data-water':true}),
+    h('rect',{x:x+5,y:waterY,width:width-10,height:waterH,rx:4,fill:'var(--plc-water)',opacity:.82,'data-water':true}),
     h('path',{d:wave,stroke:C.water2,strokeWidth:2,fill:'none',opacity:fill>2?.9:0}),
     h('line',{x1:x+8,y1:y+height*.35,x2:x+width-8,y2:y+height*.35,stroke:'#234955',strokeWidth:1}),
     h('line',{x1:x+8,y1:y+height*.65,x2:x+width-8,y2:y+height*.65,stroke:'#234955',strokeWidth:1}),
@@ -86,7 +86,7 @@ function pumpVisual(id:string,rpm:number|null,x:number,y:number,r:number){
   const seconds=running?clamp(72/Math.max(120,rpm??120),.12,1.2):1;
   return h('g',{'data-equipment':id},
     h('circle',{cx:x,cy:y,r:r+5,fill:'#071a22',stroke:'#426c79',strokeWidth:2}),
-    h('circle',{cx:x,cy:y,r,fill:'url(#plc-pump)',stroke:'#2d9bac',strokeWidth:1}),
+    h('circle',{cx:x,cy:y,r,fill:'var(--plc-pump)',stroke:'#2d9bac',strokeWidth:1}),
     h('g',{'data-rotor':true,style:{transformBox:'fill-box',transformOrigin:'center',animation:running?`plcHmiSpin ${seconds}s linear infinite`:'none'}},...rotorBlades(x,y,r*.8)),
     h('circle',{cx:x,cy:y,r:r*.2,fill:'#0a2730',stroke:'#6be7f1',strokeWidth:1}),
   );
@@ -94,8 +94,8 @@ function pumpVisual(id:string,rpm:number|null,x:number,y:number,r:number){
 function lampVisual(id:string,on:boolean,x:number,y:number,r:number,time:number){
   const pulse=on?.72+.18*Math.sin(time/180):.1;
   return h('g',{'data-equipment':id,'data-on':String(on)},
-    h('circle',{cx:x,cy:y,r:r+12,fill:C.green,opacity:on?pulse:.03,filter:on?'url(#plc-glow)':undefined}),
-    h('circle',{cx:x,cy:y,r,fill:on?'url(#plc-lamp)':'#263c45',stroke:on?'#b9ffe6':'#55717b',strokeWidth:2}),
+    h('circle',{cx:x,cy:y,r:r+12,fill:C.green,opacity:on?pulse:.03,filter:on?'var(--plc-glow)':undefined}),
+    h('circle',{cx:x,cy:y,r,fill:on?'var(--plc-lamp)':'#263c45',stroke:on?'#b9ffe6':'#55717b',strokeWidth:2}),
     h('circle',{cx:x-r*.25,cy:y-r*.28,r:r*.18,fill:'#fff',opacity:on?.72:.08}),
   );
 }
@@ -176,7 +176,7 @@ function genericDevice(project:Project,frame:Frame,page:Extract<PlcShellPage,{ki
   return h('g',{className:'plc-hmi-page',key:page.id,'data-hmi-page':page.id},
     header(page,index,total),
     text('kind',12,47,page.visual.toUpperCase(),8,C.cyan,800),
-    roundedRect('device',68,67,184,93,'url(#plc-panel)',C.line,12),
+    roundedRect('device',68,67,184,93,'var(--plc-panel)',C.line,12),
     h('circle',{cx:102,cy:113,r:20,fill:'#102d36',stroke:C.cyan,strokeWidth:2}),
     h('circle',{cx:102,cy:113,r:6,fill:C.cyan,opacity:.8}),
     text('device-id',135,102,page.deviceId,12,C.text,800),
@@ -211,7 +211,7 @@ function networkScreen(frame:Frame,controllerId:string,page:Extract<PlcShellPage
     mono('local-id',28,119,controllerId,10,C.text),
     h('line',{x1:124,y1:108,x2:194,y2:108,stroke:C.line,strokeWidth:4}),
     h('line',{x1:124,y1:108,x2:194,y2:108,stroke:C.cyan,strokeWidth:2,strokeDasharray:'7 6',style:{animation:'plcHmiFlow .7s linear infinite'}}),
-    h('circle',{cx:142,cy:108,r:5,fill:C.text,filter:'url(#plc-glow)',style:{animation:'plcHmiPacket 1.6s ease-in-out infinite'}}),
+    h('circle',{cx:142,cy:108,r:5,fill:C.text,filter:'var(--plc-glow)',style:{animation:'plcHmiPacket 1.6s ease-in-out infinite'}}),
     roundedRect('peer',194,76,110,64,C.panel2,page.peers.length?C.cyan:C.line,9),
     text('peer-title',206,95,page.peers.length?'PEER':'BUS',8,C.muted,750),
     mono('peer-id',206,119,peer,9,page.peers.length?C.text:C.muted),
@@ -231,15 +231,23 @@ export function SaturnPlcHmi({project,frame,controllerId}:SaturnPlcHmiProps){
   else if(page.visual==='reservoir')body=tankDetail(frame,page,index,model.pages.length);
   else if(page.visual==='indicator')body=indicatorDetail(frame,page,index,model.pages.length);
   else body=genericDevice(project,frame,page,index,model.pages.length);
-  const id=safeId(controllerId);
+  const id=safeId(controllerId),uid=React.useId().replace(/:/g,'');
+  const ids={bg:`plc-bg-${id}-${uid}`,water:`plc-water-${uid}`,pump:`plc-pump-${uid}`,lamp:`plc-lamp-${uid}`,panel:`plc-panel-${uid}`,glow:`plc-glow-${uid}`};
+  const vars={
+    '--plc-water':`url(#${ids.water})`,
+    '--plc-pump':`url(#${ids.pump})`,
+    '--plc-lamp':`url(#${ids.lamp})`,
+    '--plc-panel':`url(#${ids.panel})`,
+    '--plc-glow':`url(#${ids.glow})`,
+  } as React.CSSProperties;
   return h(React.Fragment,null,
     h('defs',null,
-      h('linearGradient',{id:'plc-bg-'+id,x1:'0',y1:'0',x2:'1',y2:'1'},h('stop',{offset:'0%',stopColor:'#06141b'}),h('stop',{offset:'100%',stopColor:'#0a222c'})),
-      h('linearGradient',{id:'plc-water',x1:'0',y1:'0',x2:'0',y2:'1'},h('stop',{offset:'0%',stopColor:C.water2}),h('stop',{offset:'100%',stopColor:C.water})),
-      h('radialGradient',{id:'plc-pump'},h('stop',{offset:'0%',stopColor:'#173a43'}),h('stop',{offset:'100%',stopColor:'#0a2028'})),
-      h('radialGradient',{id:'plc-lamp'},h('stop',{offset:'0%',stopColor:'#d9fff0'}),h('stop',{offset:'35%',stopColor:'#5cf0b1'}),h('stop',{offset:'100%',stopColor:'#1c9a6e'})),
-      h('linearGradient',{id:'plc-panel',x1:'0',y1:'0',x2:'1',y2:'1'},h('stop',{offset:'0%',stopColor:'#102f3a'}),h('stop',{offset:'100%',stopColor:'#0a2028'})),
-      h('filter',{id:'plc-glow',x:'-100%',y:'-100%',width:'300%',height:'300%'},h('feGaussianBlur',{stdDeviation:4,result:'b'}),h('feMerge',null,h('feMergeNode',{in:'b'}),h('feMergeNode',{in:'SourceGraphic'}))),
+      h('linearGradient',{id:ids.bg,x1:'0',y1:'0',x2:'1',y2:'1'},h('stop',{offset:'0%',stopColor:'#06141b'}),h('stop',{offset:'100%',stopColor:'#0a222c'})),
+      h('linearGradient',{id:ids.water,x1:'0',y1:'0',x2:'0',y2:'1'},h('stop',{offset:'0%',stopColor:C.water2}),h('stop',{offset:'100%',stopColor:C.water})),
+      h('radialGradient',{id:ids.pump},h('stop',{offset:'0%',stopColor:'#173a43'}),h('stop',{offset:'100%',stopColor:'#0a2028'})),
+      h('radialGradient',{id:ids.lamp},h('stop',{offset:'0%',stopColor:'#d9fff0'}),h('stop',{offset:'35%',stopColor:'#5cf0b1'}),h('stop',{offset:'100%',stopColor:'#1c9a6e'})),
+      h('linearGradient',{id:ids.panel,x1:'0',y1:'0',x2:'1',y2:'1'},h('stop',{offset:'0%',stopColor:'#102f3a'}),h('stop',{offset:'100%',stopColor:'#0a2028'})),
+      h('filter',{id:ids.glow,x:'-100%',y:'-100%',width:'300%',height:'300%'},h('feGaussianBlur',{stdDeviation:4,result:'b'}),h('feMerge',null,h('feMergeNode',{in:'b'}),h('feMergeNode',{in:'SourceGraphic'}))),
     ),
     h('style',null,`
       @keyframes plcHmiSpin{to{transform:rotate(360deg)}}
@@ -248,7 +256,7 @@ export function SaturnPlcHmi({project,frame,controllerId}:SaturnPlcHmiProps){
       @keyframes plcHmiEnter{from{opacity:.15;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
       .plc-hmi-page{animation:plcHmiEnter .18s ease-out}
     `),
-    h('rect',{x:0,y:0,width:320,height:240,fill:`url(#plc-bg-${id})`}),
-    h('g',{'data-react-plc-hmi':true,'data-controller-id':controllerId},body),
+    h('rect',{x:0,y:0,width:320,height:240,fill:`url(#${ids.bg})`}),
+    h('g',{'data-react-plc-hmi':true,'data-controller-id':controllerId,style:vars},body),
   );
 }
