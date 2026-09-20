@@ -42,7 +42,8 @@ async function selfHealthcheck(expectedVersion?: string): Promise<void> {
             host: '127.0.0.1',
             password: 'saturn-healthcheck-password',
             root: resolve(import.meta.dir, 'dist/plant'),
-            embeddedStatic: true,
+            embeddedStatic: standaloneExecutable,
+            staticReader: standaloneExecutable ? readEmbeddedPlantAsset : undefined,
             autoTick: false,
             uiMode: 'runtime',
             database,
@@ -67,6 +68,27 @@ if (entryArg.endsWith('/standalone/entry.ts') || standaloneExecutable)
     args = args.slice(1);
 
 const appData = applicationDataRoot();
+
+function embeddedPlantAsset(relativePath: string): Blob | null {
+    if (!standaloneExecutable)
+        return null;
+    const clean = relativePath.replaceAll('\\', '/').replace(/^\.\//, '').replace(/^\//, '');
+    const suffix = '/dist/plant/' + clean;
+    const file = Bun.embeddedFiles.find(candidate => {
+        const name = (candidate.name ?? '').replaceAll('\\', '/');
+        return name === 'dist/plant/' + clean || name.endsWith(suffix);
+    });
+    return file ?? null;
+}
+
+async function readEmbeddedPlantAsset(relativePath: string): Promise<Uint8Array> {
+    const file = embeddedPlantAsset(relativePath);
+    if (!file)
+        throw new Error(`Embedded Saturn asset not found: ${relativePath}`);
+    return new Uint8Array(await file.arrayBuffer());
+}
+
+
 
 if (args[0] === '__apply-update') {
     await applyStagedUpdate(args.slice(1));
@@ -151,7 +173,8 @@ app = await startPlantHttpServer({
     user: process.env.SCADA_USER,
     password: process.env.SCADA_PASSWORD,
     root: resolve(import.meta.dir, 'dist/plant'),
-    embeddedStatic: true,
+    embeddedStatic: standaloneExecutable,
+    staticReader: standaloneExecutable ? readEmbeddedPlantAsset : undefined,
     autoTick: true,
     pushSubject: process.env.SCADA_PUSH_SUBJECT,
     uiMode: kiosk ? 'kiosk' : command === 'run' ? 'runtime' : 'ide',

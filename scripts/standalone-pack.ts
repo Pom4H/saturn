@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, stat } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const args = process.argv.slice(2);
@@ -40,17 +40,6 @@ const updatePublicKey = updatePublicKeyFile ? await readFile(resolve(updatePubli
 const updateManifestUrl = value('--update-manifest-url') ?? '';
 const demoNames = ['views.ts','commissioning.ts','wiring.ts','plant.ts','core.ts','cooling.ts','steam.ts','safety.ts','reports.ts','auxiliary.ts','services.ts','training.ts'];
 const demoFiles = Object.fromEntries(await Promise.all(demoNames.map(async name => [name, await readFile(resolve('plant/demo', name), 'utf8')] as const)));
-const webAssets: string[] = [];
-for (const relative of await readdir(resolve('dist/plant'), { recursive: true })) {
-    const normalized = String(relative).replaceAll('\\', '/');
-    const source = resolve('dist/plant', normalized);
-    if ((await stat(source)).isFile())
-        webAssets.push('dist/plant/' + normalized);
-}
-webAssets.sort();
-if (!webAssets.length)
-    throw new Error('No built Saturn web assets found in dist/plant');
-
 const defaultName = target.includes('windows') ? 'saturn.exe' : 'saturn';
 const outfile = resolve(value('--outfile') ?? resolve('dist/standalone', defaultName));
 await mkdir(resolve(outfile, '..'), { recursive: true });
@@ -60,7 +49,6 @@ const build = await Bun.build({
     target: 'bun',
     minify: true,
     sourcemap: 'none',
-    naming: { asset: '[dir]/[name].[ext]' },
     define: {
         SATURN_VERSION: JSON.stringify(buildVersion),
         SATURN_DEMO_FILES: JSON.stringify(demoFiles),
@@ -70,7 +58,7 @@ const build = await Bun.build({
     compile: {
         target,
         outfile,
-        assets: webAssets,
+        assets: ['dist/plant'],
         autoloadBunfig: false,
         autoloadDotenv: true,
         autoloadPackageJson: false,

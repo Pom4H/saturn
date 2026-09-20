@@ -46,6 +46,7 @@ export async function startPlantHttpServer(options: {
         };
     };
     embeddedStatic?: boolean;
+    staticReader?: (relativePath: string) => Promise<Uint8Array>;
     database: SqlDatabase;
     projectRepository: Repository;
     reportRunner: (task: ReportTask) => Promise<ReportArtifact>;
@@ -72,6 +73,14 @@ export async function startPlantHttpServer(options: {
             throw new AppError('Path rejected', 403);
         return file;
     };
+    const readStatic = async (relativePath: string): Promise<Buffer> => {
+        const normalized = relativePath.replaceAll('\\', '/').replace(/^\.\//, '').replace(/^\//, '');
+        if (!normalized || normalized.split('/').some(part => part === '..' || part === '.'))
+            throw new AppError('Path rejected', 403);
+        if (options.staticReader)
+            return Buffer.from(await options.staticReader(normalized));
+        return readFile(await staticFile(normalized));
+    };
     const streams = new Set<import('node:http').ServerResponse>();
     let origin = options.publicUrl ? new URL(options.publicUrl).origin : '';
     const server = createServer(async (req, res) => {
@@ -94,7 +103,7 @@ export async function startPlantHttpServer(options: {
                 throw new AppError('Cross-origin write blocked', 403);
             if (path === '/') {
                 if (!['GET', 'HEAD'].includes(req.method ?? '')) throw new AppError('Method not allowed', 405);
-                html(200, req.method === 'HEAD' ? '' : (await readFile(resolve(root, 'site/index.html'), 'utf8')).replaceAll('/plant/', `${prefix}/`));
+                html(200, req.method === 'HEAD' ? '' : (await readStatic('site/index.html')).toString('utf8').replaceAll('/plant/', `${prefix}/`));
                 return;
             }
             if (path === `${prefix}/api/health` && req.method === 'GET') {
@@ -130,7 +139,7 @@ export async function startPlantHttpServer(options: {
                     res.writeHead(302, { Location: `${prefix}/login`, 'Cache-Control': 'no-store' }).end();
                     return;
                 }
-                html(200, await readFile(resolve(root, 'index.html'), 'utf8'));
+                html(200, (await readStatic('index.html')).toString('utf8'));
                 return;
             }
             if (path.startsWith(`${prefix}/extensions/`) && req.method === 'GET') {
@@ -380,26 +389,26 @@ export async function startPlantHttpServer(options: {
                 throw new AppError('Method not allowed', 405);
             if (path === '/saturn-sw.js') {
                 res.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/' });
-                res.end(req.method === 'HEAD' ? undefined : await readFile(resolve(root, 'site/saturn-sw.js')));
+                res.end(req.method === 'HEAD' ? undefined : await readStatic('site/saturn-sw.js'));
                 return;
             }
             if (path.startsWith('/site/assets/')) {
                 const file = await staticFile('site/assets/' + path.slice('/site/assets/'.length));
                 const mime: Record<string, string> = { '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.txt': 'text/plain', '.md': 'text/plain; charset=utf-8' };
                 res.writeHead(200, { 'Content-Type': mime[extname(file)] ?? 'application/octet-stream', 'Cache-Control': 'no-cache' });
-                res.end(req.method === 'HEAD' ? undefined : await readFile(file));
+                res.end(req.method === 'HEAD' ? undefined : await readStatic('site/assets/' + path.slice('/site/assets/'.length)));
                 return;
             }
             if (path === `${prefix}/demo/`) {
-                html(200, await readFile(resolve(root, 'index.html'), 'utf8'));
+                html(200, (await readStatic('index.html')).toString('utf8'));
                 return;
             }
             if (path === `${prefix}/demo/manifest.webmanifest`) {
-                res.writeHead(200, { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'no-cache' }).end(await readFile(resolve(root, 'demo/manifest.webmanifest')));
+                res.writeHead(200, { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'no-cache' }).end(await readStatic('demo/manifest.webmanifest'));
                 return;
             }
             if (path === `${prefix}/manifest.webmanifest`) {
-                const manifest = JSON.parse(await readFile(resolve(root, 'manifest.webmanifest'), 'utf8'));
+                const manifest = JSON.parse((await readStatic('manifest.webmanifest')).toString('utf8'));
                 manifest.start_url = './app/';
                 res.writeHead(200, { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'no-cache' }).end(JSON.stringify(manifest));
                 return;
@@ -409,7 +418,7 @@ export async function startPlantHttpServer(options: {
             const file = await staticFile('.' + path.slice(prefix.length));
             const mime: Record<string, string> = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.wasm': 'application/wasm', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png' };
             res.writeHead(200, { 'Content-Type': mime[extname(file)] ?? 'application/octet-stream', 'Cache-Control': 'no-cache' });
-            res.end(req.method === 'HEAD' ? undefined : await readFile(file));
+            res.end(req.method === 'HEAD' ? undefined : await readStatic('.' + path.slice(prefix.length)));
         }
         catch (error) {
             if (res.headersSent) {
