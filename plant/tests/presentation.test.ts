@@ -18,6 +18,16 @@ test('shared presentation remains available while controller compiles native int
  const vm=new ControllerVM(controller),main=vm.scan({AI1:700},100,0);assert.equal(main.outputs.DO1,1);assert.ok(main.hmi.some(c=>c.type==='text'&&c.text.includes('700')));
  const io=vm.scan({AI1:700},100,1);assert.ok(io.hmi.some(c=>c.type==='text'&&c.text.includes('Входы')));
 });
+test('native Saturn HMI setpoint survives in the FBD runtime and can drive outputs',()=>{
+ const c=project().controllers![0],vm=new ControllerVM(c);
+ assert.equal(vm.getSetpoint('MANUAL').value,0);
+ assert.equal(vm.scan({AI1:300},100,2).outputs.DO1,0);
+ vm.setSetpoint('MANUAL',1);
+ assert.equal(vm.getSetpoint('MANUAL').value,1);
+ const frame=vm.scan({AI1:300},100,2);assert.equal(frame.outputs.DO1,1);
+ assert.ok(frame.hmi.some(command=>command.type==='text'&&command.text.includes('Ручной режим: ВКЛ')));
+ vm.setSetpoint('MANUAL',0);assert.equal(vm.scan({AI1:300},100,2).outputs.DO1,0);
+});
 test('presentation escapes content, preserves bad quality and disables commands in report mode',()=>{
  const v=view('escape',{title:'Example',bindings:{a:pin('value')},body:panel([label('<script>x</script>'),readout('X','a'),commandButton('Start','control',1)])});
  const html=renderPresentation(v,{values:bindPresentation(v,{value:{value:7,quality:'bad',time:0}},0)});
