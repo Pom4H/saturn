@@ -87,7 +87,8 @@ try {
   page.once('dialog', dialog => dialog.accept());
   await click('#level7', '7 V → команда проходит через audited operator API');
   await page.waitForFunction(() => document.querySelector('#doReadout')?.textContent === '1', null, { timeout: 12000 });
-  await page.waitForFunction(() => document.querySelector('#plcFront .runtime-hmi')?.textContent?.includes('700'), null, { timeout: 5000 });
+  await page.waitForFunction(() => document.querySelector('#aiReadout')?.textContent === '700', null, { timeout: 12000 });
+  await page.waitForTimeout(900); // let the observation-only PLC LCD show the following scan
   await caption('AI1 = 700 → FBD вычисляет DO1 = 1 → реле и лампа включены', 2200);
 
   await click('#plcBack', 'Возвращаемся на обзор HMI');
