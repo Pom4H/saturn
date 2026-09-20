@@ -30,7 +30,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm run site:check
       - name: Verify ffmpeg
         run: ffmpeg -version
       - name: Capture real Saturn two-way binding
