@@ -29,8 +29,22 @@ $candidates = @(
 if (${env:ProgramFiles(x86)}) { $candidates += (Join-Path ${env:ProgramFiles(x86)} 'Microsoft VS Code\Code.exe') }
 $code = $candidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 if (-not $code) {
-  Write-Host 'Installed VS Code not found; downloading official stable archive.'
-  Invoke-WebRequest 'https://update.code.visualstudio.com/latest/win32-x64-archive/stable' -UseBasicParsing -OutFile $codeZip
+  $codeCommand = Get-Command code.cmd -ErrorAction SilentlyContinue
+  if (-not $codeCommand) { $codeCommand = Get-Command code -ErrorAction SilentlyContinue }
+  if ($codeCommand) {
+    $commandPath = $codeCommand.Source
+    if ($commandPath.ToLowerInvariant().EndsWith('.cmd')) {
+      $candidate = Join-Path (Split-Path (Split-Path $commandPath -Parent) -Parent) 'Code.exe'
+      if (Test-Path $candidate) { $code = $candidate }
+    } elseif ($commandPath.ToLowerInvariant().EndsWith('code.exe')) {
+      $code = $commandPath
+    }
+  }
+}
+if (-not $code) {
+  Write-Host 'Installed VS Code not found; downloading official stable archive with curl.'
+  & curl.exe -L --fail --retry 2 'https://update.code.visualstudio.com/latest/win32-x64-archive/stable' -o $codeZip
+  if ($LASTEXITCODE -ne 0) { throw "VS Code download failed with exit code $LASTEXITCODE" }
   Expand-Archive -Path $codeZip -DestinationPath $downloadedCodeRoot -Force
   $code = Join-Path $downloadedCodeRoot 'Code.exe'
 } else {
