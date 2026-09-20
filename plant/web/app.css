@@ -57,3 +57,12 @@
 /* Installed Saturn extensions */
 .extension-install{display:flex;gap:8px;margin:0 0 16px}.extension-install input{flex:1;min-width:220px;font-family:ui-monospace,monospace}
 .extension-list{display:grid;gap:8px}.extension-card{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:14px;border:1px solid #cbdbe2;background:#f8fbfc}.extension-card h3{margin:0 0 4px;font-size:14px}.extension-card p{margin:0;color:#527383;font:12px ui-monospace,monospace}.extension-card small{display:block;margin-top:8px;color:#526b75;line-height:1.45}
+
+
+/* Saturn application update: appears only when a signed update is available. */
+.shell-update{position:fixed;left:14px;bottom:14px;z-index:90;display:flex;align-items:center;gap:9px;min-height:42px;padding:7px 11px 7px 8px;border:1px solid #b9c8cf;border-radius:9px;background:#fff;color:#173746;box-shadow:0 8px 26px #17374618;text-align:left}
+.shell-update[hidden]{display:none}.shell-update:hover{border-color:#8faab6;background:#f7fafb}.shell-update:focus-visible{outline:2px solid #17879a;outline-offset:2px}.shell-update:disabled{cursor:wait;opacity:.72}
+.shell-update-mark{display:grid;place-items:center;width:26px;height:26px;border-radius:7px;background:#173746;color:#fff;font-size:15px;line-height:1}
+.shell-update-copy{display:flex;flex-direction:column;gap:1px}.shell-update-copy strong{font-size:12px;line-height:1.05}.shell-update-copy small{font:10px ui-monospace,SFMono-Regular,Consolas,monospace;color:#6a818c}
+.shell-update.installing .shell-update-mark{animation:saturn-update-pulse 1s ease-in-out infinite}@keyframes saturn-update-pulse{50%{opacity:.45;transform:translateY(-1px)}}
+@media(max-width:680px){.shell-update{left:10px;bottom:10px}}

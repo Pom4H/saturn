@@ -20,6 +20,8 @@ let scene3d: SceneView3D | undefined, viewMode: '2d' | '3d' = '2d', changingView
 let registration: ServiceWorkerRegistration | undefined, pendingInstall: any, noticeEnabled = false, closed = false;
 type ApplicationExtension = { id: string; name: string; version: string; entry: string; entryUrl: string; capabilities: string[]; elements: Array<{ type: string; title: string; tag: string }> };
 let applicationInfo: { version: string | null; extensions: ApplicationExtension[] } | null = null;
+type ApplicationUpdateStatus = { configured: boolean; available: boolean; currentVersion: string | null; version?: string; channel?: string; publishedAt?: string; target?: string };
+let applicationUpdate: ApplicationUpdateStatus | null = null;
 const loadedExtensionEntries = new Set<string>();
 const fmt = (v: number | null | undefined, digits = 2) => typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—';
 const runtimeRole = () => status?.runtimeActor?.role ?? status?.actor?.role ?? 'viewer';
@@ -41,6 +43,60 @@ async function command(action: string, extra: object = {}) { ensureActive(); con
     renderInspector(); return result; }
 async function refreshStatus() { const previous = status?.project; status = await client.request<Status>('session'); frame = status.frame; if (previous !== status.project && JSON.stringify(previous) !== JSON.stringify(status.project))
     setupProject(); renderFrame(frame); refreshActions(); }
+function renderShellUpdate() {
+    const button = $<HTMLButtonElement>('shell-update');
+    const visible = !demo && status?.actor?.role === 'engineer' && status?.uiMode !== 'kiosk' && !!applicationUpdate?.available && !!applicationUpdate.version;
+    button.hidden = !visible;
+    if (!visible)
+        return;
+    $('shell-update-version').textContent = applicationUpdate!.version!;
+    button.title = `Install Saturn ${applicationUpdate!.version}`;
+}
+async function checkShellUpdate() {
+    if (demo || status?.actor?.role !== 'engineer' || status?.uiMode === 'kiosk') {
+        applicationUpdate = null;
+        renderShellUpdate();
+        return;
+    }
+    try {
+        applicationUpdate = await client.request<ApplicationUpdateStatus>('application/update');
+    }
+    catch (updateError) {
+        console.info('Saturn update check unavailable:', updateError);
+        applicationUpdate = null;
+    }
+    renderShellUpdate();
+}
+async function installShellUpdate() {
+    if (!applicationUpdate?.available || !applicationUpdate.version)
+        return;
+    if (dirty && !confirm('Есть несохранённый черновик. Установить обновление Saturn и перезапустить приложение?'))
+        return;
+    const button = $<HTMLButtonElement>('shell-update');
+    const version = applicationUpdate.version;
+    button.disabled = true;
+    button.classList.add('installing');
+    button.querySelector('strong')!.textContent = 'Updating…';
+    $('shell-update-version').textContent = version;
+    await client.request('application/update', {});
+    button.querySelector('strong')!.textContent = 'Restarting…';
+    for (let attempt = 0; attempt < 120; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        try {
+            const response = await fetch(new URL('api/application', base), { credentials: 'same-origin', cache: 'no-store' });
+            if (!response.ok)
+                continue;
+            const current = await response.json() as { version?: string };
+            if (current.version === version) {
+                location.reload();
+                return;
+            }
+        }
+        catch { }
+    }
+    throw new Error('Saturn updated, but the restarted shell did not become ready');
+}
+
 async function refreshApplicationExtensions(loadCode = false) {
     if (demo)
         return;
@@ -308,17 +364,8 @@ catch (e) {
 async function setupPwa() {
     const manifest = document.querySelector<HTMLLinkElement>('link[rel=manifest]')!;
     manifest.href = demo ? new URL('manifest.webmanifest', location.href).href : new URL('manifest.webmanifest', base).href;
-    if ('serviceWorker' in navigator) {
+    if ('serviceWorker' in navigator)
         registration = await navigator.serviceWorker.register(new URL('sw.js', base), { scope: base.pathname });
-        const offer = () => { if (registration?.waiting && navigator.serviceWorker.controller)
-            $('update').hidden = false; };
-        offer();
-        registration.addEventListener('updatefound', () => registration?.installing?.addEventListener('statechange', offer));
-        let reload = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => { if (reload)
-            return; reload = true; if ($('update').dataset.accepted === 'yes')
-            location.reload(); });
-    }
 }
 async function enableNotifications() {
     if (!('Notification' in window) || !registration)
@@ -394,8 +441,10 @@ async function start(memory = false) {
         $('logout').hidden = demo;
         renderEnvironmentStatus();
         installEquipment();
-        if (!demo)
+        if (!demo) {
             await refreshApplicationExtensions(true);
+            void checkShellUpdate();
+        }
         scene = new SceneView($('diagram') as unknown as SVGSVGElement);
         scene.onSelect = selectEquipment;
         scene.onGroupFocus = focusSystem;
@@ -504,8 +553,7 @@ function populateFiles() { $('file').innerHTML = Object.keys(files).map(path => 
 $('memory').onclick = () => void start(true);
 $('notifications').onclick = () => void guard(enableNotifications);
 $('install').onclick = () => void guard(async () => { await pendingInstall?.prompt(); $('install').hidden = true; });
-$('update').onclick = () => { if (dirty && !confirm('Обновить приложение? Сначала сохраните или экспортируйте черновик.'))
-    return; $('update').dataset.accepted = 'yes'; registration?.waiting?.postMessage({ type: 'ACTIVATE' }); };
+$('shell-update').onclick = () => void guard(installShellUpdate);
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); pendingInstall = e; $('install').hidden = false; });
 $('logout').onclick = () => void guard(async () => { await client.request('logout', {}); client.close(); sessionStorage.removeItem('scada-draft:server'); location.href = new URL('login', base).href; });
 $('pause').onclick = () => void guard(() => command(frame.paused ? 'resume' : 'pause'));
@@ -585,6 +633,8 @@ window.addEventListener('beforeunload', e => { if (dirty) {
 setInterval(() => { if (!status || failed || closed)
     return; if (tab === 'reports' || tab === 'events')
     void guard(refreshPanel); void updateTrend(); }, 3000);
+setInterval(() => { if (!closed)
+    void checkShellUpdate(); }, 30 * 60 * 1000);
 
 function selectEquipment(id: string | null) {
     selected = id; scene.select(id); scene3d?.select(id); drawDependencies(); renderInspector();

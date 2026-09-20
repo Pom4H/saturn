@@ -28,6 +28,17 @@ export interface UpdateContext {
     appData: string;
     executable: string;
     standaloneExecutable: boolean;
+    restartArgs?: string[];
+}
+
+export interface ApplicationUpdateStatus {
+    configured: boolean;
+    available: boolean;
+    currentVersion: string;
+    version?: string;
+    channel?: UpdateChannel;
+    publishedAt?: string;
+    target?: string;
 }
 
 const versionPattern = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/;
@@ -149,10 +160,17 @@ function spawnAndWait(file: string, args: string[]): Promise<number> {
 }
 
 export async function applyStagedUpdate(args: string[]): Promise<void> {
-    const [pidText, target, staged, backup, expectedVersion] = args;
+    const [pidText, target, staged, backup, expectedVersion, restartEncoded] = args;
     const pid = Number(pidText);
     if (!Number.isSafeInteger(pid) || pid <= 0 || !target || !staged || !backup || !expectedVersion || !versionPattern.test(expectedVersion))
         throw new Error('Invalid internal update arguments');
+    let restartArgs: string[] = [];
+    if (restartEncoded) {
+        const parsed = JSON.parse(Buffer.from(restartEncoded, 'base64url').toString('utf8'));
+        if (!Array.isArray(parsed) || parsed.length > 32 || parsed.some(value => typeof value !== 'string' || value.length > 4096))
+            throw new Error('Invalid update restart arguments');
+        restartArgs = parsed;
+    }
     await waitForExit(pid);
     const temporary = target + '.next';
     await rm(temporary, { force: true });
@@ -168,7 +186,7 @@ export async function applyStagedUpdate(args: string[]): Promise<void> {
             throw new Error(`Updated Saturn failed health check with exit code ${health}`);
         await rm(staged, { force: true });
         if (process.env.SATURN_UPDATE_NO_RELAUNCH !== '1') {
-            const child = spawn(target, [], { detached: true, stdio: 'ignore', windowsHide: true });
+            const child = spawn(target, restartArgs, { detached: true, stdio: 'ignore', windowsHide: true });
             child.unref();
         }
     }
@@ -188,13 +206,56 @@ export async function scheduleUpdateApply(context: UpdateContext, staged: string
     if (process.platform !== 'win32')
         await chmod(helper, 0o755);
     const backup = resolve(dirname(context.executable), process.platform === 'win32' ? 'saturn.previous.exe' : 'saturn.previous');
-    const child = spawn(helper, ['__apply-update', String(process.pid), context.executable, staged, backup, expectedVersion], {
+    const restartEncoded = Buffer.from(JSON.stringify(context.restartArgs ?? []), 'utf8').toString('base64url');
+    const child = spawn(helper, ['__apply-update', String(process.pid), context.executable, staged, backup, expectedVersion, restartEncoded], {
         detached: true,
         stdio: 'ignore',
         shell: false,
         windowsHide: true,
     });
     child.unref();
+}
+
+function manifestUrl(context: UpdateContext): string {
+    return process.env.SATURN_UPDATE_MANIFEST_URL ?? context.defaultManifestUrl;
+}
+
+async function resolveUpdate(context: UpdateContext, channel: UpdateChannel) {
+    if (!context.standaloneExecutable || !context.publicKeyPem.trim() || !manifestUrl(context))
+        return null;
+    const manifest = await fetchUpdateManifest(manifestUrl(context));
+    if (manifest.channel !== channel)
+        throw new Error(`Manifest channel is ${manifest.channel}, expected ${channel}`);
+    const target = updateTarget();
+    const artifact = verifyUpdateArtifact(manifest, target, context.publicKeyPem);
+    return { manifest, target, artifact, comparison: compareVersions(context.currentVersion, manifest.version) };
+}
+
+export async function checkApplicationUpdate(context: UpdateContext, channel: UpdateChannel = 'stable'): Promise<ApplicationUpdateStatus> {
+    const candidate = await resolveUpdate(context, channel);
+    if (!candidate)
+        return { configured: false, available: false, currentVersion: context.currentVersion };
+    return {
+        configured: true,
+        available: candidate.comparison < 0,
+        currentVersion: context.currentVersion,
+        version: candidate.manifest.version,
+        channel: candidate.manifest.channel,
+        publishedAt: candidate.manifest.publishedAt,
+        target: candidate.target,
+    };
+}
+
+export async function installApplicationUpdate(context: UpdateContext, channel: UpdateChannel = 'stable'): Promise<{ scheduled: true; version: string }> {
+    const candidate = await resolveUpdate(context, channel);
+    if (!candidate)
+        throw new Error('Saturn self-update is not configured in this build');
+    if (candidate.comparison >= 0)
+        throw new Error(candidate.comparison === 0 ? 'Saturn is already up to date' : 'The configured update is older than this Saturn build');
+    const updateDir = resolve(context.appData, 'updates', candidate.manifest.version);
+    const staged = await downloadAndVerifyUpdate(candidate.manifest, candidate.target, candidate.artifact, updateDir);
+    await scheduleUpdateApply(context, staged, candidate.manifest.version);
+    return { scheduled: true, version: candidate.manifest.version };
 }
 
 function option(args: string[], name: string): string | undefined {

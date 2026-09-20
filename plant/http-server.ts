@@ -40,6 +40,10 @@ export async function startPlantHttpServer(options: {
             remove(name: string): Promise<void>;
             readAsset(id: string, path: string): Promise<Uint8Array>;
         };
+        update?: {
+            check(): Promise<{ configured: boolean; available: boolean; currentVersion: string; version?: string; channel?: string; publishedAt?: string; target?: string }>;
+            install(): Promise<{ scheduled: true; version: string }>;
+        };
     };
     embeddedStatic?: boolean;
     database: SqlDatabase;
@@ -209,6 +213,22 @@ export async function startPlantHttpServer(options: {
                         json(200, { ...await service.status(actor), csrf: session.bearer ? undefined : session.csrf, push: push ? { publicKey: push.keys.publicKey } : null, environment: environments.descriptor(session.sessionId), uiMode: options.uiMode ?? 'ide' });
                         return;
                     }
+                    if (action === 'application/update') {
+                        requireRole(actor, 'engineer');
+                        const updater = options.application?.update;
+                        if (!updater) {
+                            json(200, { configured: false, available: false, currentVersion: options.application?.version ?? null });
+                            return;
+                        }
+                        try {
+                            json(200, await updater.check());
+                        }
+                        catch (error) {
+                            console.warn('Saturn update check failed:', error);
+                            json(200, { configured: true, available: false, currentVersion: options.application?.version ?? null });
+                        }
+                        return;
+                    }
                     if (action === 'application') {
                         const installed = await options.application?.extensions?.list() ?? [];
                         json(200, {
@@ -283,6 +303,13 @@ export async function startPlantHttpServer(options: {
                 }
                 if (req.method === 'POST') {
                     const input = await body(req);
+                    if (action === 'application/update') {
+                        requireRole(actor, 'engineer');
+                        if (!options.application?.update)
+                            throw new AppError('Application self-update is not available in this Saturn composition', 503);
+                        json(202, await options.application.update.install());
+                        return;
+                    }
                     if (action === 'extensions/install') {
                         requireRole(actor, 'engineer');
                         if (!options.application?.extensions)

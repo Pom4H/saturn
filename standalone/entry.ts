@@ -10,7 +10,7 @@ import { runStandaloneReport } from './reports';
 import { loadProjectDirectory } from './project-loader';
 import { WorkspaceRegistry } from './workspace';
 import { WorkspaceRepository } from './workspace-repository';
-import { applyStagedUpdate, runUpdateCommand } from './update';
+import { applyStagedUpdate, checkApplicationUpdate, installApplicationUpdate, runUpdateCommand, type UpdateChannel } from './update';
 import { ExtensionManager, runExtensionCommand } from './extensions';
 
 declare const SATURN_VERSION: string;
@@ -89,6 +89,7 @@ if (args[0] === 'update') {
         appData,
         executable: process.execPath,
         standaloneExecutable,
+        restartArgs: [],
     });
     process.exit(0);
 }
@@ -97,6 +98,7 @@ if (args[0] === 'extension' || args[0] === 'extensions') {
     process.exit(0);
 }
 
+const runtimeInvocationArgs = args.slice();
 const command = args[0] === 'run' ? 'run' : args[0] === 'open' ? 'open' : 'open';
 if (args[0] === 'run' || args[0] === 'open')
     args = args.slice(1);
@@ -131,7 +133,18 @@ const projectRepository = projectDirectory
     ? await new WorkspaceRepository(repositoryStore, projectDirectory).initialize(files)
     : new LocalRepository(repositoryStore, () => `standalone:${crypto.randomUUID()}`);
 
-const app = await startPlantHttpServer({
+const updateChannel = ((process.env.SATURN_UPDATE_CHANNEL ?? 'stable') as UpdateChannel);
+const updateContext = {
+    currentVersion: SATURN_VERSION,
+    publicKeyPem: SATURN_UPDATE_PUBLIC_KEY,
+    defaultManifestUrl: SATURN_UPDATE_MANIFEST_URL,
+    appData,
+    executable: process.execPath,
+    standaloneExecutable,
+    restartArgs: runtimeInvocationArgs,
+};
+let app: Awaited<ReturnType<typeof startPlantHttpServer>>;
+app = await startPlantHttpServer({
     port: Number(process.env.PORT ?? 4176),
     host: process.env.HOST ?? '127.0.0.1',
     publicUrl: process.env.SCADA_PUBLIC_URL,
@@ -149,6 +162,14 @@ const app = await startPlantHttpServer({
             install: specifier => extensionManager.install(specifier),
             remove: name => extensionManager.remove(name),
             readAsset: (id, path) => extensionManager.readAsset(id, path),
+        },
+        update: {
+            check: () => checkApplicationUpdate(updateContext, updateChannel),
+            install: async () => {
+                const result = await installApplicationUpdate(updateContext, updateChannel);
+                setTimeout(() => void app.close().finally(() => process.exit(0)), 500);
+                return result;
+            },
         },
     },
     database,
