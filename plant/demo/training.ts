@@ -1,4 +1,4 @@
-import { system, simulation, control, alarm, report } from '@scada/plant';
+import { system, simulation, control, alarm, report } from '@saturn/core';
 // Deliberately independent of the historical reactor schematic. No real reactor commands,
 // operating limits or protective-system bypasses. Only normalized fictional heat balance.
 export const trainingSystem = system('training', 'Тепловой стенд · восстановление устойчивости', 'site');
