@@ -19,7 +19,7 @@ export interface PlcShellModel {
   outputs:string[];
 }
 
-const interesting = new Set(['pump','reservoir','valve','indicator','contactor','transmitter','ioModule','motor','fan','tower']);
+const interesting = new Set(['pump','reservoir','valve','filter','accumulator','checkvalve','relief','indicator','contactor','transmitter','ioModule','motor','fan','tower']);
 const inputPin = /^(?:AI[12]|DI(?:[1-9]|10))$/;
 const displayText=(value:string)=>value
   .replace(/[·•]/g,'/')
@@ -91,7 +91,7 @@ export function generatePlcShell(project:Project, controllerId:string):PlcShellM
     if(wire.to.device===controllerId) connected.add(wire.from.device);
   }
   const ordered=[...systemDevices].sort((a,b)=>Number(connected.has(b.id))-Number(connected.has(a.id))||a.layout.x-b.layout.x||a.id.localeCompare(b.id));
-  const detailPriority:Record<string,number>={pump:0,reservoir:1,valve:2,motor:3,fan:4,contactor:5,indicator:6,transmitter:7,ioModule:8,tower:9};
+  const detailPriority:Record<string,number>={pump:0,reservoir:1,valve:2,filter:3,accumulator:4,motor:5,fan:6,contactor:7,indicator:8,transmitter:9,ioModule:10,tower:11,checkvalve:12,relief:13};
   const outputs=Object.keys(controller.outputs??{}).sort();
   const inputs=new Set<string>();
   for(const expr of Object.values(controller.outputs??{}))refs(expr,controller,inputs);
