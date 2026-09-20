@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { BunSql } from '../adapters/bun-sql';
 import { Store } from '../store';
 import { startPlantServer } from '../bun-server';
+import { runReport } from '../adapters/bun-reports';
+import type { ReportTask } from '../types';
 
 const sql = new BunSql(':memory:');
 const portableStore = new Store(sql);
@@ -17,6 +19,38 @@ sql.transaction(() => {
 assert.equal(portableStore.meta('tx-a', 0), 1);
 assert.equal(portableStore.meta('tx-b', 0), 2);
 sql.close();
+
+const reportTask: ReportTask = {
+    id: 'bun-report-smoke',
+    report: {
+        id: 'summary',
+        title: 'Summary',
+        on: { workflow_dispatch: {} },
+        signals: ['flow'],
+        sql: 'SELECT AVG(value) AS average FROM samples WHERE quality = \'good\'',
+        window: 1000,
+        columns: [{ key: 'average', title: 'Average' }],
+        notify: false,
+    },
+    revision: 'smoke',
+    runId: 'smoke',
+    trigger: 'workflow_dispatch',
+    actor: 'bun-smoke',
+    createdAt: 0,
+    from: 0,
+    to: 1000,
+    inputs: {},
+    data: {
+        samples: [
+            { signal: 'flow', time: 0, value: 10, quality: 'good' },
+            { signal: 'flow', time: 1000, value: 20, quality: 'good' },
+        ],
+        segments: [],
+    },
+};
+const report = await runReport(reportTask);
+assert.equal(report.rows[0].average, 15);
+assert.match(report.html, /Summary/);
 
 const dir = await mkdtemp(join(tmpdir(), 'saturn-bun-'));
 const password = 'saturn-bun-smoke-2026';
@@ -90,4 +124,4 @@ try {
     await rm(dir, { recursive: true, force: true });
 }
 
-console.log('Bun server smoke: SQLite, auth, origin guard and WebSocket live stream OK');
+console.log('Bun server smoke: SQLite, report isolation, auth, origin guard and WebSocket live stream OK');
