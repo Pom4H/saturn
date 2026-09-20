@@ -1,5 +1,5 @@
 import { benchPanel } from './views';
-import { system, simulation, control, plc, pin, gt, port, cable, expansion, alarm, view } from '@scada/plant';
+import { system, simulation, control, plc, pin, gt, port, cable, expansion, alarm, view } from '@saturn/core';
 // Generic isolated low-voltage commissioning bench; never connected to reactor controls.
 export const benchSystem=system('commissioning','PLC · стенд подключения клемм','site');
 export const level=control('BENCH-LEVEL',{title:'Датчик уровня · тестовый сигнал',system:'commissioning',min:0,max:10,initial:3,rate:1,unit:'V'});
