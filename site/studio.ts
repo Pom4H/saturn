@@ -55,7 +55,7 @@ export async function mountStudio() {
     return EditorState.create({ doc: source, extensions: [lineNumbers(), drawSelection(), history(), foldGutter(), highlightActiveLine(), ...(path.endsWith('.ts') || path.endsWith('.json') ? [javascript({ typescript: path.endsWith('.ts') })] : []), bracketMatching(), closeBrackets(), syntaxHighlighting(HighlightStyle.define([{ tag: tags.keyword, color: 'var(--code-keyword)' }, { tag: tags.string, color: 'var(--code-string)' }, { tag: tags.number, color: 'var(--code-number)' }, { tag: tags.comment, color: 'var(--code-comment)' }, { tag: [tags.function(tags.variableName), tags.definition(tags.variableName)], color: 'var(--code-function)' }, { tag: tags.propertyName, color: 'var(--code-property)' }, { tag: tags.variableName, color: 'var(--text)' }])), editorTheme,
       autocompletion({ override: [context => { const word = context.matchBefore(/[\w-]*/); if (isPlant()) return null; if (!word || word.from === word.to && !context.explicit) return null; return { from: word.from, options: dslCompletions(context.state.doc.toString(), context.pos, compiled.scene) }; }] }),
       keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab, { key: 'Mod-s', run: () => { download(); return true; } }]),
-      EditorView.contentAttributes.of({ 'aria-label': 'Исходник установки TypeScript', spellcheck: 'false' }),
+      EditorView.contentAttributes.of({ 'aria-label': tr('Исходник установки TypeScript', 'Installation TypeScript source'), spellcheck: 'false' }),
       EditorView.updateListener.of(update => { documents.capture(update.state); syncHistory(update.state); if (update.docChanged) refresh(true); }),
     ] });
   }
@@ -92,7 +92,7 @@ export async function mountStudio() {
       shell.dataset.role = session.actor.role;
       $('server-role').hidden = false;
       $('server-role').textContent = session.actor.role;
-      $('server-role').title = `Пользователь ${session.actor.id}`;
+      $('server-role').title = `${tr('Пользователь', 'User')} ${session.actor.id}`;
     } else {
       delete shell.dataset.role;
       $('server-role').hidden = true;
@@ -229,7 +229,7 @@ export async function mountStudio() {
   const fileNavigator = new FileNavigator(() => ({ paths: [...documents.states.keys()], active: documents.active,
     dirty: new Set([...documents.states.keys()].filter(path => documents.dirty(path))),
     errors: new Set(errorPath ? [errorPath] : []),
-    title: serverRevision ? plant?.project.title ?? 'Серверный проект' : currentDocument(workspace).title,
+    title: serverRevision ? plant?.project.title ?? tr('Серверный проект', 'Server project') : currentDocument(workspace).title,
   }), openFile);
   async function ensurePlant() { plantTools ??= await import('./plant-project'); }
   function openFile(path: string, pinned = false, show = true) {
@@ -247,7 +247,7 @@ export async function mountStudio() {
       const button = document.createElement('button'); button.textContent = path.split('/').at(-1)! + (documents.dirty(path) ? ' ●' : ''); button.title = path; button.dataset.tab = path;
       button.setAttribute('aria-pressed', String(path === documents.active)); button.onclick = () => openFile(path, true); tab.append(button);
       if (documents.tabs.length > 1 && !documents.dirty(path)) {
-        const close = document.createElement('button'); close.textContent = '×'; close.setAttribute('aria-label', `Закрыть ${path}`);
+        const close = document.createElement('button'); close.textContent = '×'; close.setAttribute('aria-label', `${tr('Закрыть', 'Close')} ${path}`);
         close.onclick = () => { documents.capture(editor.state); if (documents.close(path)) { editor.setState(documents.state); renderFiles(); syncPanels(); } }; tab.append(close);
       } tabs.append(tab);
     }
@@ -255,18 +255,18 @@ export async function mountStudio() {
     $('file-path').hidden = !documents.active.includes('/');
     $('file-server-state').hidden = !serverRevision && !serverLoading;
     $('file-origin').replaceChildren();
-    const label = document.createElement('span'); label.textContent = serverRevision ? `Сервер · ${serverRevision.id.slice(0, 8)}` : `Локальный проект`; $('file-origin').append(label);
-    if (serverRevision) { const refresh = document.createElement('button'); refresh.textContent = 'Обновить'; refresh.id = 'server-refresh'; refresh.disabled = serverLoading; refresh.onclick = () => void loadServer(); $('file-origin').append(refresh); }
+    const label = document.createElement('span'); label.textContent = serverRevision ? `${tr('Сервер', 'Server')} · ${serverRevision.id.slice(0, 8)}` : tr('Локальный проект', 'Local project'); $('file-origin').append(label);
+    if (serverRevision) { const refresh = document.createElement('button'); refresh.textContent = tr('Обновить', 'Refresh'); refresh.id = 'server-refresh'; refresh.disabled = serverLoading; refresh.onclick = () => void loadServer(); $('file-origin').append(refresh); }
     $('server-update').hidden = !pendingRevision;
     $('server-apply').toggleAttribute('disabled', documents.dirty());
-    $('server-update-hint').textContent = pendingRevision && documents.dirty() ? 'Скопируйте черновик или отмените изменения перед обновлением.' : '';
+    $('server-update-hint').textContent = pendingRevision && documents.dirty() ? tr('Скопируйте черновик или отмените изменения перед обновлением.', 'Copy the draft or discard your changes before updating.') : '';
     $('studio-shell').dataset.projectKind = isPlant() ? 'plant' : 'core';
     $('studio-shell').dataset.serverProject = String(!!serverRevision);
-    $('studio-context').textContent = isPlant() ? 'Черновик' : 'Демо';
-    $('studio-context').title = isPlant() ? 'Исходники и схема; runtime не подключён' : 'Расчётная демонстрационная модель';
+    $('studio-context').textContent = isPlant() ? tr('Черновик', 'Draft') : tr('Демо', 'Demo');
+    $('studio-context').title = isPlant() ? tr('Исходники и схема; runtime не подключён', 'Source and diagram; runtime disconnected') : tr('Расчётная демонстрационная модель', 'Calculated demonstration model');
     window.dispatchEvent(new Event('saturn-project-change'));
     syncServerActions(); syncTelemetry();
-    $('studio-message').textContent = serverRevision ? (documents.dirty() ? 'Черновик в памяти' : 'Серверная ревизия') : isPlant() ? 'Черновик · без runtime' : $('studio-message').textContent;
+    $('studio-message').textContent = serverRevision ? (documents.dirty() ? tr('Черновик в памяти', 'Draft in memory') : tr('Серверная ревизия', 'Server revision')) : isPlant() ? tr('Черновик · без runtime', 'Draft · runtime disconnected') : $('studio-message').textContent;
   }
   async function openPlantExample() {
     try { await ensurePlant(); const files = plantTools!.nestedStarter(); plantTools!.plantProjection(files); persist();
@@ -317,7 +317,7 @@ export async function mountStudio() {
   function patchPlantFields(id: string, patch: Record<string, Value>) {
     if (error || !plant) return;
     const target = plant.objects.get(id); if (!target) return;
-    const changes = Object.entries(patch).map(([key, value]) => { const f = target.fields.find(f => f.key === key); if (!f || typeof value !== 'number' || !Number.isFinite(value)) throw new Error('Измените выражение в исходнике'); return { from: f.from, to: f.to, insert: String(value) }; });
+    const changes = Object.entries(patch).map(([key, value]) => { const f = target.fields.find(f => f.key === key); if (!f || typeof value !== 'number' || !Number.isFinite(value)) throw new Error(tr('Измените выражение в исходнике', 'Edit the expression in source')); return { from: f.from, to: f.to, insert: String(value) }; });
     if (!changes.length) return;
     openFile(target.path, true, false);
     editor.dispatch({ changes, annotations: isolateHistory.of('full'), userEvent: 'input.visual' });
@@ -415,7 +415,7 @@ export async function mountStudio() {
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); projectMenu.open = false; projectMenu.querySelector('summary')?.focus(); }
   });
 
-  $('studio-diagnostics').onclick = () => { if (errorPath) openFile(errorPath, true); else if (error) toast($('studio-diagnostics').textContent ?? 'Ошибка проекта'); };
+  $('studio-diagnostics').onclick = () => { if (errorPath) openFile(errorPath, true); else if (error) toast($('studio-diagnostics').textContent ?? tr('Ошибка проекта', 'Project error')); };
   document.querySelectorAll<HTMLButtonElement>('[data-server-open]').forEach(button => button.onclick = () => { $('server-error').textContent = ''; $<HTMLDialogElement>('server-dialog').showModal(); });
   $('server-close').onclick = () => $<HTMLDialogElement>('server-dialog').close();
   $('server-load').onclick = () => void loadServer();
@@ -442,7 +442,7 @@ export async function mountStudio() {
         serverSession = { ...serverSession, head: revision.id };
         activateServer(revision);
         $<HTMLDialogElement>('server-commit-dialog').close();
-        toast('Ревизия сохранена. Runtime ещё работает на опубликованной версии.');
+        toast(tr('Ревизия сохранена. Runtime ещё работает на опубликованной версии.', 'Revision saved. Runtime is still using the published version.'));
       } catch (e) { $('server-commit-error').textContent = e instanceof Error ? e.message : String(e); }
     })();
   };
@@ -454,7 +454,7 @@ export async function mountStudio() {
       serverSession = { ...status, csrf };
       telemetry = { state: 'live', frame: status.frame, message: '', lastSeenAt: Date.now(), retryInMs: 0 };
       runtimeRevision = null;
-      syncTelemetry(); renderMeta(); toast('Ревизия опубликована и применена');
+      syncTelemetry(); renderMeta(); toast(tr('Ревизия опубликована и применена', 'Revision published and applied'));
     } catch (e) { toast(e instanceof Error ? e.message : String(e)); }
   })();
 
@@ -462,10 +462,10 @@ export async function mountStudio() {
   function toast(text: string) { $('shell-toast').textContent = text; $('shell-toast').hidden = false; clearTimeout(toastTimer); toastTimer = window.setTimeout(() => $('shell-toast').hidden = true, 4500); }
   function persist() {
     documents.capture(editor.state);
-    if (serverRevision) { message(documents.dirty() ? 'Черновик в памяти' : 'Без изменений'); renderFiles(); return true; }
+    if (serverRevision) { message(documents.dirty() ? tr('Черновик в памяти', 'Draft in memory') : tr('Без изменений', 'No changes')); renderFiles(); return true; }
     if (isPlant()) updateFiles(workspace, documents.files); else updateSource(workspace, documents.files['station.ts']);
-    try { localStorage.setItem(workspaceKey, JSON.stringify(workspace)); storageAvailable = true; message('Сохранено'); return true; }
-    catch { storageAvailable = false; message('Не сохранено · скачайте .ts'); return false; }
+    try { localStorage.setItem(workspaceKey, JSON.stringify(workspace)); storageAvailable = true; message(tr('Сохранено', 'Saved')); return true; }
+    catch { storageAvailable = false; message(tr('Не сохранено · скачайте .ts', 'Not saved · download the .ts file')); return false; }
   }
   function refresh(save: boolean) {
     try {
@@ -481,11 +481,11 @@ export async function mountStudio() {
       editor.dispatch(setDiagnostics(editor.state, []));
       if (!compiled.scene.nodes.some(n => n.id === selected) && !compiled.scene.links.some(l => l.id === selected)) selected = null;
       const warnings = plant ? [] : [...view.warnings, ...view.notes];
-      $('studio-diagnostics').textContent = warnings.length ? warnings.join(' · ') : '✓ Нет ошибок';
+      $('studio-diagnostics').textContent = warnings.length ? warnings.join(' · ') : `✓ ${tr('Нет ошибок', 'No errors')}`;
       $('studio-diagnostics').dataset.error = 'false'; $('studio-diagnostics').title = '';
       renderTree(); select(selected); renderSignals();
       $('empty-canvas').hidden = compiled.scene.nodes.length > 0;
-      $('studio-count').textContent = `${compiled.scene.nodes.length} объектов · ${compiled.scene.links.length} связей`;
+      $('studio-count').textContent = `${compiled.scene.nodes.length} ${tr('объектов', 'objects')} · ${compiled.scene.links.length} ${tr('связей', 'connections')}`;
     } catch (e) {
       error = true;
       const text = e instanceof Error ? e.message : String(e);
@@ -513,27 +513,27 @@ export async function mountStudio() {
   }
   function renderMeta() {
     const picker = $<HTMLSelectElement>('project-switch'); picker.replaceChildren();
-    const exampleGroup = document.createElement('optgroup'); exampleGroup.label = 'Примеры';
+    const exampleGroup = document.createElement('optgroup'); exampleGroup.label = tr('Примеры', 'Examples');
     for (const [id, example] of Object.entries(examples)) { const option = document.createElement('option'); option.value = `example:${id}`; option.textContent = example.title; exampleGroup.append(option); }
-    const template = document.createElement('option'); template.value = 'template:plant'; template.textContent = 'Многофайловая установка'; exampleGroup.append(template);
+    const template = document.createElement('option'); template.value = 'template:plant'; template.textContent = tr('Многофайловая установка', 'Multi-file installation'); exampleGroup.append(template);
     picker.append(exampleGroup);
     if (workspace.projects.length) {
-      const group = document.createElement('optgroup'); group.label = 'Проекты';
+      const group = document.createElement('optgroup'); group.label = tr('Проекты', 'Projects');
       for (const project of workspace.projects) { const option = document.createElement('option'); option.value = `project:${project.id}`; option.textContent = project.title; group.append(option); }
       picker.append(group);
     }
-    if (serverRevision || runtimeOnly || serverDraft) { const option = document.createElement('option'); option.value = 'server:current'; option.textContent = plant?.project.title ?? serverSession?.project.title ?? 'Серверный проект'; picker.append(option); picker.value = serverRevision || runtimeOnly ? option.value : `${workspace.active.kind}:${workspace.active.id}`; }
+    if (serverRevision || runtimeOnly || serverDraft) { const option = document.createElement('option'); option.value = 'server:current'; option.textContent = plant?.project.title ?? serverSession?.project.title ?? tr('Серверный проект', 'Server project'); picker.append(option); picker.value = serverRevision || runtimeOnly ? option.value : `${workspace.active.kind}:${workspace.active.id}`; }
     else picker.value = `${workspace.active.kind}:${workspace.active.id}`;
     $('project-create').hidden = runtimeOnly || !serverRevision && workspace.active.kind !== 'example';
-    $('project-create').textContent = serverRevision ? 'Скопировать проект' : 'Создать проект';
+    $('project-create').textContent = serverRevision ? tr('Скопировать проект', 'Copy project') : tr('Создать проект', 'Create project');
     $('project-duplicate').hidden = runtimeOnly || !!serverRevision || workspace.active.kind !== 'project';
     $('studio-html').hidden = isPlant() || runtimeOnly; $('studio-share').hidden = isPlant() || runtimeOnly;
     $('equipment-toggle').hidden = isPlant() || runtimeOnly; $('studio-connect').hidden = isPlant() || runtimeOnly;
-    $('studio-download').hidden = runtimeOnly; $('studio-download').textContent = isPlant() ? 'Скачать проект (.json)' : 'Скачать исходник (.ts)';
+    $('studio-download').hidden = runtimeOnly; $('studio-download').textContent = isPlant() ? tr('Скачать проект (.json)', 'Download project (.json)') : tr('Скачать исходник (.ts)', 'Download source (.ts)');
     syncServerActions();
     documentTitle(); renderProjects();
   }
-  function documentTitle() { document.title = fullscreen ? `${(serverRevision || runtimeOnly ? plant?.project.title ?? serverSession?.project.title ?? 'Установка' : currentDocument(workspace).title)} — Saturn SCADA` : 'Saturn SCADA'; }
+  function documentTitle() { document.title = fullscreen ? `${(serverRevision || runtimeOnly ? plant?.project.title ?? serverSession?.project.title ?? tr('Установка', 'Installation') : currentDocument(workspace).title)} — Saturn SCADA` : 'Saturn SCADA'; }
   function select(id: string | null) {
     if (id && id !== selected) propertiesVisible = true;
     if (!id) propertiesVisible = false;
@@ -565,12 +565,12 @@ export async function mountStudio() {
     const host = $('studio-fields'); host.replaceChildren();
     const node = compiled.scene.nodes.find(n => n.id === selected), edge = compiled.scene.links.find(l => l.id === selected);
     syncPanels();
-    $('studio-selected').textContent = node?.id ?? (edge ? 'Соединение' : '');
+    $('studio-selected').textContent = node?.id ?? (edge ? tr('Соединение', 'Connection') : '');
     $('studio-kind').textContent = node ? catalog[node.kind]?.label ?? node.kind : edge ? `${edge.from.node} → ${edge.to.node}` : '';
     $('object-source').toggleAttribute('disabled', error);
     $('object-source').hidden = runtimeOnly || !node || (isPlant() ? !plant?.objects.has(node.id) : !compiled.objects.has(node.id));
     if (runtimeOnly) {
-      if (!node && !edge) $('studio-kind').textContent = 'Выберите объект';
+      if (!node && !edge) $('studio-kind').textContent = tr('Выберите объект', 'Select an object');
       return;
     }
     if (node && isPlant()) {
@@ -582,10 +582,10 @@ export async function mountStudio() {
         input.onchange = () => { if (input.value.trim() && input.checkValidity()) { try { patchPlantFields(node.id, { [field.key]: Number(input.value) }); } catch (e) { toast(String(e)); } } };
         label.append(input); host.append(label);
       }
-      if (!source) { const note = document.createElement('p'); note.textContent = 'Задано выражением в проекте'; host.append(note); }
+      if (!source) { const note = document.createElement('p'); note.textContent = tr('Задано выражением в проекте', 'Defined by a project expression'); host.append(note); }
       return;
     }
-    if (!node && !edge) { $('studio-kind').textContent = 'Выберите объект'; return; }
+    if (!node && !edge) { $('studio-kind').textContent = tr('Выберите объект', 'Select an object'); return; }
     if (node) for (const [key, field] of Object.entries(catalog[node.kind].fields)) {
       if (['nominalFlow', 'degradationRate', 'startDelay', 'maintenanceSeconds'].includes(key)) continue;
       const label = document.createElement('label'); label.textContent = field.label + (field.unit ? ` · ${field.unit}` : '');
@@ -594,14 +594,14 @@ export async function mountStudio() {
       else { input.type = 'number'; input.min = String(field.min ?? -9999); input.max = String(field.max ?? 9999); input.step = String(field.step ?? 1); }
       input.value = String(node.props[key]); input.setAttribute('aria-label', `${node.id}: ${field.label}`);
       input.disabled = error || !editable(compiled, node.id, key);
-      if (!editable(compiled, node.id, key)) input.title = 'Задано выражением. Измените исходник.';
+      if (!editable(compiled, node.id, key)) input.title = tr('Задано выражением. Измените исходник.', 'Defined by an expression. Edit the source.');
       input.onchange = () => {
         if (!input.value.trim() || !input.checkValidity()) { input.reportValidity(); input.value = String(node.props[key]); return; }
         fields(node.id, { [key]: typeof field.default === 'number' ? Number(input.value) : input.value });
       };
       label.append(input); host.append(label);
     }
-    const remove = document.createElement('button'); remove.className = 'studio-delete'; remove.textContent = edge ? 'Удалить связь' : 'Удалить объект'; remove.disabled = error; remove.onclick = removeSelected; host.append(remove);
+    const remove = document.createElement('button'); remove.className = 'studio-delete'; remove.textContent = edge ? tr('Удалить связь', 'Delete connection') : tr('Удалить объект', 'Delete object'); remove.disabled = error; remove.onclick = removeSelected; host.append(remove);
   }
   function renderSignals() {
     const rows = $('signal-rows'); rows.replaceChildren();
@@ -617,8 +617,8 @@ export async function mountStudio() {
       return;
     }
     for (const node of compiled.scene.nodes) {
-      const data = Object.entries(catalog[node.kind].fields).filter(([key, field]) => typeof field.default === 'number' && !['x', 'y', 'at', 'offset', 'nominalFlow', 'degradationRate', 'startDelay', 'maintenanceSeconds'].includes(key)).map(([key, field]) => [field.label, `${node.props[key]} ${field.unit ?? ''}`, 'Задано в проекте']);
-      if (view.flows.has(node.id)) data.push(['Расход', view.flows.get(node.id) === null ? 'Неизвестно' : `${view.flows.get(node.id)!.toFixed(1)} м³/ч`, 'Расчёт учебной модели']);
+      const data = Object.entries(catalog[node.kind].fields).filter(([key, field]) => typeof field.default === 'number' && !['x', 'y', 'at', 'offset', 'nominalFlow', 'degradationRate', 'startDelay', 'maintenanceSeconds'].includes(key)).map(([key, field]) => [field.label, `${node.props[key]} ${field.unit ?? ''}`, tr('Задано в проекте', 'Defined in project')]);
+      if (view.flows.has(node.id)) data.push([tr('Расход', 'Flow'), view.flows.get(node.id) === null ? tr('Неизвестно', 'Unknown') : `${view.flows.get(node.id)!.toFixed(1)} m³/h`, tr('Расчёт учебной модели', 'Calculated training model')]);
       for (const cells of data) { const row = document.createElement('tr'); for (const value of [node.id, ...cells]) { const cell = document.createElement('td'); cell.textContent = value; row.append(cell); } rows.append(row); }
     }
   }
@@ -784,13 +784,13 @@ export async function mountStudio() {
     const object = compiled.scene.nodes.find(n => n.id === node);
     if (!object) return;
     if (connecting === 'choose') {
-      if (catalog[object.kind].ports[port]?.role !== 'out') { toast('Сначала выберите выходной порт'); return; }
-      connecting = { node, port }; $('studio-mode-note').textContent = 'Выберите вход'; $('studio-mode-note').hidden = false; return;
+      if (catalog[object.kind].ports[port]?.role !== 'out') { toast(tr('Сначала выберите выходной порт', 'Select an output port first')); return; }
+      connecting = { node, port }; $('studio-mode-note').textContent = tr('Выберите вход', 'Select an input'); $('studio-mode-note').hidden = false; return;
     }
     try { const source = appendConnection(editor.state.doc.toString(), connecting, { node, port }); editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: source }, annotations: isolateHistory.of('full'), userEvent: 'input' }); clearConnection(); }
     catch (e) { toast(e instanceof Error ? e.message : String(e)); }
   }
-  $('studio-connect').onclick = () => { if (connecting) clearConnection(); else { connecting = 'choose'; shell.classList.add('connecting'); $('studio-connect').setAttribute('aria-pressed', 'true'); $('studio-mode-note').textContent = 'Выберите выход'; $('studio-mode-note').hidden = false; } };
+  $('studio-connect').onclick = () => { if (connecting) clearConnection(); else { connecting = 'choose'; shell.classList.add('connecting'); $('studio-connect').setAttribute('aria-pressed', 'true'); $('studio-mode-note').textContent = tr('Выберите выход', 'Select an output'); $('studio-mode-note').hidden = false; } };
   canvas.addEventListener('keydown', event => { const target = event.target as SVGElement; if ((event.key === 'Enter' || event.key === ' ') && target.dataset.port && connecting) { event.preventDefault(); choosePort(target.dataset.owner!, target.dataset.port); } });
   document.addEventListener('keydown', event => {
     if (event.defaultPrevented || document.querySelector('dialog[open], :popover-open')) return;
@@ -825,7 +825,7 @@ export async function mountStudio() {
   reduced.addEventListener('change', () => { if (reduced.matches) paused = true; updatePause(); animateState(); });
   function download() { if (isPlant()) downloadFile('saturn-project.json', JSON.stringify(documents.files, null, 2)); else downloadFile('saturn-station.ts', documents.files['station.ts']); }
   $('studio-html').onclick = async () => { try { const source = editor.state.doc.toString(); await exportHTML(source, compile(source).scene); } catch (e) { toast(e instanceof Error ? e.message : String(e)); } };
-  $('studio-share').onclick = async () => { try { await navigator.clipboard.writeText(shareURL(editor.state.doc.toString())); toast('Ссылка с исходником скопирована'); } catch (e) { toast(e instanceof Error ? e.message : String(e)); } };
+  $('studio-share').onclick = async () => { try { await navigator.clipboard.writeText(shareURL(editor.state.doc.toString())); toast(tr('Ссылка с исходником скопирована', 'Source link copied')); } catch (e) { toast(e instanceof Error ? e.message : String(e)); } };
   let resizing = false;
   function resizeSource(clientX: number) { const area = $('studio-editor-pane').getBoundingClientRect(); const width = Math.max(230, Math.min($('studio-editor-pane').parentElement!.clientWidth * .65, clientX - area.left)); shell.style.setProperty('--source-width', `${width}px`); editor.requestMeasure(); }
   $('source-splitter').onpointerdown = event => { resizing = true; $('source-splitter').setPointerCapture(event.pointerId); event.preventDefault(); };
@@ -850,9 +850,9 @@ export async function mountStudio() {
     const input = $<HTMLInputElement>('studio-file'), file = input.files?.[0]; if (!file) return;
     try {
       if (/\.json$/i.test(file.name)) { await ensurePlant(); const files = JSON.parse(await file.text()); plantTools!.validateFiles(files); plantTools!.plantProjection(files); persist(); const oldServer = serverRevision; createProject(workspace, file.name.replace(/\.json$/i, '').slice(0,80), files['plant.ts']); if (oldServer) serverDraft = { revision: oldServer, documents }; serverRevision = null; pendingRevision = null; updateFiles(workspace, files); switchDocument(workspace.active, false); filesVisible = true; syncPanels(); input.value = ''; return; }
-      if (file.size > 120000) throw new Error('Размер файла должен быть меньше 120 КБ');
-      const source = await file.text(); compile(source); persist(); if (serverRevision) serverDraft = { revision: serverRevision, documents }; createProject(workspace, file.name.replace(/\.ts$/i, '').slice(0, 80) || 'Импорт', source);
-      serverRevision = null; pendingRevision = null; documents = new Documents({ 'station.ts': source }, editorState, 'station.ts'); editor.setState(documents.state); selected = null; refresh(false); fitScene(); persist(); renderMeta(); setSurface('scene'); setMode('2d'); toast('Исходник импортирован в новый проект');
+      if (file.size > 120000) throw new Error(tr('Размер файла должен быть меньше 120 КБ', 'File size must be under 120 KB'));
+      const source = await file.text(); compile(source); persist(); if (serverRevision) serverDraft = { revision: serverRevision, documents }; createProject(workspace, file.name.replace(/\.ts$/i, '').slice(0, 80) || tr('Импорт', 'Import'), source);
+      serverRevision = null; pendingRevision = null; documents = new Documents({ 'station.ts': source }, editorState, 'station.ts'); editor.setState(documents.state); selected = null; refresh(false); fitScene(); persist(); renderMeta(); setSurface('scene'); setMode('2d'); toast(tr('Исходник импортирован в новый проект', 'Source imported into a new project'));
     } catch (e) { toast(e instanceof Error ? e.message : String(e)); }
     input.value = '';
   };
@@ -871,7 +871,7 @@ export async function mountStudio() {
   window.addEventListener('saturn-language-change', () => {
     spatial?.setHint(t(compact.matches ? 'scene3d.hintTouch' : 'scene3d.hint'));
     spatial?.setMessages({ preview: t('scene3d.preview'), noData: t('scene3d.noData'), moreAlarms: t('scene3d.moreAlarms'), warning: tr('Предупреждение', 'Warning'), trip: tr('Авария', 'Trip'), aria: tr('3D схема. Стрелки меняют ракурс, плюс и минус — масштаб, F — вписать. Оборудование можно выбрать клавишей Tab.', '3D diagram. Arrow keys orbit, plus and minus zoom, F fits the view. Use Tab to select equipment.') });
-    updatePause(); setFullscreen(fullscreen); applyTelemetry(); if (surface === 'projects') renderProjects();
+    renderFiles(); renderMeta(); renderInspector(); updatePause(); setFullscreen(fullscreen); applyTelemetry(); if (surface === 'projects') renderProjects();
   });
   const observer = new IntersectionObserver(entries => { visible = entries[0].isIntersecting; animateState(); }, { rootMargin: '80px' }); observer.observe(stage);
   window.addEventListener('pagehide', persist);
@@ -889,7 +889,7 @@ export async function mountStudio() {
   } catch {}
   if (isPlant()) await ensurePlant();
   view.render(compiled.scene); refresh(false); fitScene(); updatePause(); renderMeta(); syncPanels();
-  message(storageAvailable ? '' : 'Хранилище недоступно');
+  message(storageAvailable ? '' : tr('Хранилище недоступно', 'Storage unavailable'));
   // Authentication/runtime activation is part of the critical path. Never make
   // an operator wait for optional 3D/WebGL initialization before the 2D HMI works.
   const requestedServer = !shared && new URLSearchParams(location.search).get('project') === 'server';
@@ -901,7 +901,7 @@ export async function mountStudio() {
     spatial.setHint(t(compact.matches ? 'scene3d.hintTouch' : 'scene3d.hint'));
     spatial.setMessages({ preview: t('scene3d.preview'), noData: t('scene3d.noData'), moreAlarms: t('scene3d.moreAlarms'), warning: tr('Предупреждение', 'Warning'), trip: tr('Авария', 'Trip'), aria: tr('3D схема. Стрелки меняют ракурс, плюс и минус — масштаб, F — вписать. Оборудование можно выбрать клавишей Tab.', '3D diagram. Arrow keys orbit, plus and minus zoom, F fits the view. Use Tab to select equipment.') });
     spatial.render(compiled.scene); spatial.setRuntime(observedRuntime ?? plant?.runtime ?? null); spatial.select(selected); setMode(explicit);
-  } catch { $('studio-3d').setAttribute('disabled', ''); present(1); toast('WebGL недоступен. Работайте с 2D-схемой.'); }
+  } catch { $('studio-3d').setAttribute('disabled', ''); present(1); toast(tr('WebGL недоступен. Работайте с 2D-схемой.', 'WebGL is unavailable. Use the 2D diagram.')); }
   if (runtimeOnly || matchMedia('(display-mode: standalone)').matches || location.hash === '#studio' || location.hash === '#workspace' || shared) setFullscreen(true);
   if (shared) persist();
   // probeRuntime owns authenticated activation. Only unauthenticated server links
