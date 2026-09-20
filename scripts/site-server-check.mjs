@@ -169,7 +169,7 @@ export async function checkServerFiles(browser) {
     assert(await page.locator('#server-publish').isDisabled(), 'Published revision is no longer offered again');
 
     // Operator opens the same root PWA and gets runtime/HMI, not the engineering IDE.
-    operatorContext = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+    operatorContext = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block', locale: 'en-US' });
     const operatorPage = await operatorContext.newPage(), operatorErrors = []; operatorPage.on('pageerror', error => operatorErrors.push(error.message));
     await operatorPage.goto(app.origin);
     const operatorLoginStatus = await operatorPage.evaluate(async credentials => {
@@ -196,16 +196,29 @@ export async function checkServerFiles(browser) {
     assert(topbarBox && topbarBox.height <= 60, 'Operator mobile chrome stays compact');
     await operatorPage.locator('#runtime-controls').click();
     assert(await operatorPage.locator('#runtime-pause').isVisible());
+    assert.match((await operatorPage.locator('#runtime-state').textContent()) ?? '', /runtime active|paused/, 'Runtime status follows the English system language');
+    const enabledOperate = operatorPage.locator('.runtime-control-edit button:not([disabled])').first();
+    assert(await enabledOperate.count(), 'Operator has at least one actionable control');
+    assert.equal((await enabledOperate.textContent())?.trim(), 'Apply');
+    let rejectedCommands = 0;
+    await operatorPage.route('**/plant/api/command', async route => {
+      rejectedCommands++;
+      await route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'forced rejection' }) });
+    });
+    await enabledOperate.click();
+    await operatorPage.waitForTimeout(3600);
+    assert.equal(rejectedCommands, 1, 'Completed HTTP command errors are never retried');
+    await operatorPage.unroute('**/plant/api/command');
     await operatorPage.locator('#runtime-pause').click();
     await operatorPage.waitForFunction(() => document.getElementById('studio-shell')?.dataset.telemetry === 'paused');
     await operatorPage.locator('#runtime-pause').click();
     await operatorPage.waitForFunction(() => document.getElementById('studio-shell')?.dataset.telemetry === 'live');
-    await mkdir('test-results/site-studio', { recursive: true });
-    await operatorPage.screenshot({ path: 'test-results/site-studio/operator-mobile.png' });
+    await mkdir('site-browser-results/site-studio', { recursive: true });
+    await operatorPage.screenshot({ path: 'site-browser-results/site-studio/operator-mobile.png' });
     assert.deepEqual(operatorErrors, []);
 
     // Viewer gets the same live projection but no command surface.
-    viewerContext = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+    viewerContext = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block', locale: 'en-US' });
     const viewerPage = await viewerContext.newPage(), viewerErrors = []; viewerPage.on('pageerror', error => viewerErrors.push(error.message));
     await viewerPage.goto(app.origin);
     const viewerLoginStatus = await viewerPage.evaluate(async credentials => {
