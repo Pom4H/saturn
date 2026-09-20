@@ -99,8 +99,8 @@ export function drawPlcShell(svg:SVGSVGElement,project:Project,frame:Frame,contr
  for(const node of svg.querySelectorAll<SVGTextElement>('[data-level]'))node.textContent=n(level);
  const water=svg.querySelector<SVGRectElement>('[data-water]');if(water&&level!==null){const fill=Math.max(0,Math.min(100,level)),base=page.kind==='device'?178:158,scale=page.kind==='device'?1.15:.72;water.setAttribute('y',String(base-fill*scale));water.setAttribute('height',String(fill*scale));}
  const flowNode=svg.querySelector<SVGPathElement>('[data-flow]');if(flowNode)flowNode.setAttribute('class','ps-flow '+((flow??0)>.02?'':'off'));
- const lamp=svg.querySelector<SVGCircleElement>('[data-lamp]');if(lamp){const controller=project.controllers?.find(c=>c.id===controllerId),system=controller?.system;const v=system?project.devices.find(d=>d.type==='indicator'&&d.system===system):undefined;const on=(v?sample(frame,v.id+'.brightness'):sample(frame,controllerId+'.DO1')??0)>.5;lamp.setAttribute('class','ps-lamp '+(on?'on':''));}
+ const lamp=svg.querySelector<SVGCircleElement>('[data-lamp]');if(lamp){const controller=project.controllers?.find(c=>c.id===controllerId),system=controller?.system;const v=system?project.devices.find(d=>d.type==='indicator'&&d.system===system):undefined;const current=v?sample(frame,v.id+'.brightness'):sample(frame,controllerId+'.DO1');const on=(current??0)>.5;lamp.setAttribute('class','ps-lamp '+(on?'on':''));}
  for(const node of svg.querySelectorAll<SVGTextElement>('[data-generic]'))node.textContent=n(sample(frame,node.dataset.generic!));
- for(const chip of svg.querySelectorAll<SVGRectElement>('[data-io]')){const v=sample(frame,controllerId+'.'+chip.dataset.io);chip.setAttribute('class','ps-chip '+((v??0)!==0?'active':''));}
- for(const node of svg.querySelectorAll<SVGTextElement>('[data-io-value]'))node.textContent=n(sample(frame,controllerId+'.'+node.dataset.ioValue!));
+ for(const chip of svg.querySelectorAll<SVGRectElement>('[data-io]')){const key=chip.dataset.io;if(!key)continue;const v=sample(frame,controllerId+'.'+key);chip.setAttribute('class','ps-chip '+((v??0)!==0?'active':''));}
+ for(const node of svg.querySelectorAll<SVGTextElement>('[data-io-value]'))const key=node.dataset.ioValue;if(key)node.textContent=n(sample(frame,controllerId+'.'+key));
 }
