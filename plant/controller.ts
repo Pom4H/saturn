@@ -1,6 +1,7 @@
 import { presentationHmi } from './presentation-hmi';
 import type { Presentation } from './presentation';
-import { AppError, type Expr, type Layout } from './types';
+import { AppError, type Expr, type Layout, type Project } from './types';
+import { generatePlcShellScreens } from './plc-shell';
 import { FbdRuntime, type HmiDrawCommand } from './vendor/saturn/src/runtime';
 import { buildSchema, type ElementSpec } from './vendor/saturn/src/builder';
 import { ELEM } from './vendor/saturn/src/format';
@@ -65,7 +66,7 @@ export function controllerKeyAction(c:Controller,current:number,key:ControllerKe
 }
 
 /** Named blocks compile once; stateful execution is checkpointed by Firmverse. */
-export function compileController(c: Controller) {
+export function compileController(c: Controller, project?: Project) {
     if(c.profile !== 'saturn-fbd' || !c.outputs || Object.keys(c.outputs).length<1 || Object.keys(c.outputs).length>13) throw new AppError('Invalid Saturn profile');
     const elements: ElementSpec[] = []; const used = new Set<string>(); const built=new Map<string,string>(),spBuilt=new Map<string,string>(),active=new Set<string>();const setpointOrder:string[]=[];let serial=0;
     for(const name of Object.keys(c.blocks??{})){if(!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(name)||Object.hasOwn(inputPins,name)||Object.hasOwn(c.setpoints??{},name))throw new AppError('Invalid or ambiguous PLC block ID');}
@@ -117,11 +118,12 @@ export function compileController(c: Controller) {
         if(Object.hasOwn(c.blocks??{},ref)||Object.hasOwn(c.setpoints??{},ref)) return expr({ref});
         return ref;
     };
+    const sourceScreens=c.hmi.shell?.auto&&project?generatePlcShellScreens(project,c.id):c.hmi.screens;
     let screenModels: HmiScreenModel[];
-    if(c.hmi.screens?.length) {
-        if(c.hmi.screens.length>16) throw new AppError('At most 16 controller HMI screens');
+    if(sourceScreens?.length) {
+        if(sourceScreens.length>16) throw new AppError('At most 16 controller HMI screens');
         const ids=new Set<string>();
-        screenModels=c.hmi.screens.map(screen=>{
+        screenModels=sourceScreens.map(screen=>{
             if(!/^[A-Za-z][A-Za-z0-9_.-]{0,95}$/.test(screen.id)||ids.has(screen.id))throw new AppError('Invalid or duplicate controller HMI screen');
             ids.add(screen.id);
             return {...screen,elements:screen.elements.map(element=>({
@@ -131,7 +133,7 @@ export function compileController(c: Controller) {
             }))};
         });
         const initial=c.hmi.initial??screenModels[0].id;if(!ids.has(initial))throw new AppError('Unknown initial controller HMI screen');
-        for(const [from,map] of Object.entries(c.hmi.keys??{})){
+        if(!c.hmi.shell?.auto) for(const [from,map] of Object.entries(c.hmi.keys??{})){
             if(!ids.has(from))throw new AppError('Unknown controller HMI navigation source');
             for(const action of Object.values(map))if(typeof action==='string'&&!ids.has(action))throw new AppError('Unknown controller HMI navigation target');
             else if(action&&typeof action==='object'){if(action.screen!==undefined&&!ids.has(action.screen))throw new AppError('Unknown controller HMI navigation target');if(!Object.hasOwn(c.setpoints??{},action.setpoint))throw new AppError('Unknown controller HMI setpoint');}
@@ -149,7 +151,7 @@ export function compileController(c: Controller) {
 }
 export class ControllerVM {
     readonly artifact: ReturnType<typeof compileController>; private runtime:FbdRuntime;
-    constructor(readonly controller:Controller) { this.artifact=compileController(controller);this.runtime=FbdRuntime.createSync();const loaded=this.runtime.load(this.artifact.fbdbin);if(!loaded.ok)throw new AppError(loaded.message); }
+    constructor(readonly controller:Controller, project?:Project) { this.artifact=compileController(controller,project);this.runtime=FbdRuntime.createSync();const loaded=this.runtime.load(this.artifact.fbdbin);if(!loaded.ok)throw new AppError(loaded.message); }
     snapshot():RuntimeSnapshot {return this.runtime.snapshot();}
     restore(snapshot:RuntimeSnapshot):void {this.runtime.restore(snapshot);}
     reset():void {this.runtime.reset();}
