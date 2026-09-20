@@ -14,7 +14,7 @@ const [{startPlantServer},{showcaseFiles}]=await Promise.all([
   import(pathToFileURL(resolve('.plant/showcase-video-files.mjs'))),
 ]);
 const directory=await mkdtemp(join(tmpdir(),'saturn-hmi-showcase-'));
-const password='showcase';
+const password='showcase-demo-2026';
 let server;
 try{
   server=await startPlantServer({port:0,data:join(directory,'db.sqlite'),repository:join(directory,'project.git'),seed:showcaseFiles,user:'engineer',password});
