@@ -15,15 +15,27 @@ public static class NativeWindow {
 
 $root = Join-Path $env:RUNNER_TEMP 'saturn-vscode'
 $codeZip = Join-Path $root 'vscode.zip'
-$codeRoot = Join-Path $root 'code'
+$downloadedCodeRoot = Join-Path $root 'code'
 $userData = Join-Path $root 'user-data'
 $extensions = Join-Path $root 'extensions'
 $extensionTarget = Join-Path $extensions 'saturn.saturn-vscode-0.1.0'
 Remove-Item -Recurse -Force $root -ErrorAction SilentlyContinue
-New-Item -ItemType Directory -Force -Path $root,$codeRoot,$userData,$extensions,$extensionTarget | Out-Null
+New-Item -ItemType Directory -Force -Path $root,$downloadedCodeRoot,$userData,$extensions,$extensionTarget | Out-Null
 
-Invoke-WebRequest 'https://update.code.visualstudio.com/latest/win32-x64-archive/stable' -UseBasicParsing -OutFile $codeZip
-Expand-Archive -Path $codeZip -DestinationPath $codeRoot -Force
+$candidates = @(
+  (Join-Path $env:LOCALAPPDATA 'Programs\Microsoft VS Code\Code.exe'),
+  (Join-Path $env:ProgramFiles 'Microsoft VS Code\Code.exe')
+)
+if (${env:ProgramFiles(x86)}) { $candidates += (Join-Path ${env:ProgramFiles(x86)} 'Microsoft VS Code\Code.exe') }
+$code = $candidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+if (-not $code) {
+  Write-Host 'Installed VS Code not found; downloading official stable archive.'
+  Invoke-WebRequest 'https://update.code.visualstudio.com/latest/win32-x64-archive/stable' -UseBasicParsing -OutFile $codeZip
+  Expand-Archive -Path $codeZip -DestinationPath $downloadedCodeRoot -Force
+  $code = Join-Path $downloadedCodeRoot 'Code.exe'
+} else {
+  Write-Host "Using installed VS Code: $code"
+}
 Copy-Item -Recurse -Force 'vscode\*' $extensionTarget
 
 $settingsDir = Join-Path $userData 'User'
@@ -52,7 +64,6 @@ $saturnExe = (Join-Path $env:RUNNER_TEMP 'saturn.exe').Replace('\','\\')
 
 $workspace = (Resolve-Path 'plant\demo').Path
 $file = (Resolve-Path 'plant\demo\plant.ts').Path
-$code = Join-Path $codeRoot 'Code.exe'
 $args = @(
   '--user-data-dir', $userData,
   '--extensions-dir', $extensions,
