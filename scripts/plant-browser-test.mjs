@@ -186,13 +186,13 @@ try {
         await bench.waitForFunction(()=>document.querySelector('#aiReadout')?.textContent==='300',null,{timeout:5000});
         assert.equal(await bench.locator('#doReadout').innerText(),'0');
         assert.equal(await bench.locator('#plcLamp').getAttribute('data-on'),'false');
-        assert.match(await bench.locator('#plcFront .runtime-hmi').textContent(),/300/);
+        assert.match(await bench.locator('#plcFront .runtime-hmi').textContent(),/AUTO SHELL/);
         bench.once('dialog',dialog=>dialog.accept());
         await bench.locator('#level7').click();
         await bench.waitForFunction(()=>document.querySelector('#levelReadout')?.textContent==='7.0 V',null,{timeout:12000});
         await bench.waitForFunction(()=>document.querySelector('#doReadout')?.textContent==='1',null,{timeout:5000});
         assert.equal(await bench.locator('#plcLamp').getAttribute('data-on'),'true');
-        await bench.waitForFunction(()=>document.querySelector('#plcFront .runtime-hmi')?.textContent?.includes('700'),null,{timeout:5000});
+        await bench.waitForFunction(()=>document.querySelector('#plcFront .runtime-hmi')?.textContent?.includes('AUTO SHELL'),null,{timeout:5000});
         assert.ok(await bench.locator('#plcLamp .hmi-lamp-bulb').evaluate(element=>element.getAnimations().length>0));
         await bench.screenshot({path:evidence+'/hmi-saturn-plc-live.png',fullPage:true});
         await bench.locator('#plcBack').click();
