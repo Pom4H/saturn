@@ -375,22 +375,28 @@ async function revealEquipment(id) {
   void vscode.window.showInformationMessage(`Saturn: source for ${id} was not found.`);
 }
 
-async function insertEquipment(equipment) {
+async function insertEquipment(equipment, forcedId) {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
     await vscode.window.showWarningMessage('Open a TypeScript project file first.');
-    return;
+    return false;
   }
-  const id = await vscode.window.showInputBox({
+  const id = forcedId ?? await vscode.window.showInputBox({
     title: `Add ${equipment.title}`,
     prompt: 'Equipment ID',
     value: equipment.type.toUpperCase().replace(/[^A-Z0-9]+/g, '-').slice(0, 8) + '-101',
     validateInput: value => /^[A-Za-z0-9_.-]{1,80}$/.test(value) ? null : 'Use letters, digits, _, . or -',
   });
-  if (!id) return;
+  if (!id) return false;
   const type = JSON.stringify(equipment.type);
-  const snippet = `\nconst ${id.replace(/[^A-Za-z0-9_$]/g, '_')} = simulation(${JSON.stringify(id)}, ${type}, {\n  at: { x: 0, y: 0 },\n});\n`;
-  await editor.edit(builder => builder.insert(editor.selection.active, snippet));
+  const snippet = `\n// Added from Saturn Equipment Catalog\nconst ${id.replace(/[^A-Za-z0-9_$]/g, '_')} = simulation(${JSON.stringify(id)}, ${type}, {\n  system: "main",\n  at: { x: 0, y: 0 },\n});\n`;
+  const position = editor.document.positionAt(editor.document.getText().length);
+  await editor.edit(builder => builder.insert(position, snippet));
+  const start = editor.document.positionAt(editor.document.getText().length - snippet.length);
+  const end = editor.document.positionAt(editor.document.getText().length);
+  editor.selection = new vscode.Selection(start, end);
+  editor.revealRange(new vscode.Range(start, end), vscode.TextEditorRevealType.InCenter);
+  return true;
 }
 
 async function chooseTarget(provider, action, kind) {
@@ -412,6 +418,69 @@ async function chooseTarget(provider, action, kind) {
     { title: `Saturn: ${action}` }
   );
   return picked?.target ?? null;
+}
+
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+async function showEntryFile() {
+  const root = workspaceRoot();
+  if (!root) return null;
+  const uri = vscode.Uri.file(path.join(root, config().get('project.entry', 'plant.ts')));
+  const document = await vscode.workspace.openTextDocument(uri);
+  return vscode.window.showTextDocument(document, { viewColumn: vscode.ViewColumn.One, preserveFocus: false });
+}
+
+async function runRecordedTour(catalog, targets, terminal) {
+  await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+  await showEntryFile();
+  await vscode.commands.executeCommand('workbench.view.extension.saturn');
+  await catalog.reload();
+  targets.reload();
+  await sleep(3500);
+
+  await vscode.commands.executeCommand('saturn.openDiagram');
+  await sleep(6000);
+
+  const root = workspaceRoot();
+  if (root) {
+    try {
+      const diagram = await runCliJson(['ide', 'diagram', '--project', root, '--json']);
+      const first = diagram?.scene?.nodes?.[0]?.id;
+      if (first) {
+        await revealEquipment(first);
+        await sleep(3500);
+      }
+    } catch {}
+  }
+
+  await vscode.commands.executeCommand('workbench.view.extension.saturn');
+  await sleep(2500);
+
+  const groups = catalog.catalog;
+  const equipment = groups.flatMap(group => group.items).find(item => item.type === 'pump')
+    ?? groups.flatMap(group => group.items)[0];
+  if (equipment) {
+    const editor = await showEntryFile();
+    if (editor) {
+      editor.selection = new vscode.Selection(editor.document.lineAt(editor.document.lineCount - 1).range.end, editor.document.lineAt(editor.document.lineCount - 1).range.end);
+      await insertEquipment(equipment, 'VS-CODE-DEMO-101');
+      await sleep(4000);
+    }
+  }
+
+  terminal.runServer();
+  await sleep(7000);
+  await vscode.commands.executeCommand('workbench.view.extension.saturn');
+  await sleep(3000);
+
+  await vscode.commands.executeCommand('saturn.flashController');
+  await sleep(3500);
+
+  terminal.stop();
+  await sleep(2000);
+  await showEntryFile();
+  await vscode.commands.executeCommand('workbench.view.extension.saturn');
 }
 
 function activate(context) {
@@ -505,16 +574,13 @@ function activate(context) {
   void catalog.reload();
   targets.reload();
 
-  if (process.env.SATURN_VSCODE_CAPTURE === '1') {
+  if (process.env.SATURN_VSCODE_TOUR === '1') {
+    setTimeout(() => { void runRecordedTour(catalog, targets, terminal); }, 1800);
+  } else if (process.env.SATURN_VSCODE_CAPTURE === '1') {
     setTimeout(() => {
       void (async () => {
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
-        const root = workspaceRoot();
-        if (root) {
-          const uri = vscode.Uri.file(path.join(root, config().get('project.entry', 'plant.ts')));
-          const document = await vscode.workspace.openTextDocument(uri);
-          await vscode.window.showTextDocument(document, { viewColumn: vscode.ViewColumn.One, preserveFocus: false });
-        }
+        await showEntryFile();
         await vscode.commands.executeCommand('workbench.view.extension.saturn');
         await vscode.commands.executeCommand('saturn.openDiagram');
       })();
