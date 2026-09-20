@@ -1,4 +1,4 @@
-import { mkdirSync, createWriteStream, existsSync, readFileSync } from 'node:fs';
+import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -21,9 +21,12 @@ const child = spawn(exe, [], {
         SCADA_PASSWORD: 'standalone-ci-password',
         SATURN_DATA_DIR: data,
     },
-    stdio: ['ignore', createWriteStream(stdoutPath), createWriteStream(stderrPath)],
+    stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: false,
 });
+const stdout: Buffer[] = [], stderr: Buffer[] = [];
+child.stdout.on('data', chunk => stdout.push(Buffer.from(chunk)));
+child.stderr.on('data', chunk => stderr.push(Buffer.from(chunk)));
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 let healthy = false;
@@ -58,6 +61,8 @@ try {
     ]);
 }
 
+writeFileSync(stdoutPath, Buffer.concat(stdout));
+writeFileSync(stderrPath, Buffer.concat(stderr));
 for (const [label, path] of [['stdout', stdoutPath], ['stderr', stderrPath]]) {
     if (existsSync(path)) {
         const content = readFileSync(path, 'utf8').trim();
