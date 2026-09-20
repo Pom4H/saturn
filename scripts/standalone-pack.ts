@@ -1,4 +1,4 @@
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const args = process.argv.slice(2);
@@ -40,6 +40,22 @@ const updatePublicKey = updatePublicKeyFile ? await readFile(resolve(updatePubli
 const updateManifestUrl = value('--update-manifest-url') ?? '';
 const demoNames = ['views.ts','commissioning.ts','wiring.ts','plant.ts','core.ts','cooling.ts','steam.ts','safety.ts','reports.ts','auxiliary.ts','services.ts','training.ts'];
 const demoFiles = Object.fromEntries(await Promise.all(demoNames.map(async name => [name, await readFile(resolve('plant/demo', name), 'utf8')] as const)));
+const webAssetNames = (await readdir(resolve('dist/plant'), { recursive: true }))
+    .map(value => String(value).replaceAll('\\', '/'))
+    .sort();
+const webAssets: Record<string, string> = {};
+let webAssetBytes = 0;
+for (const name of webAssetNames) {
+    const file = resolve('dist/plant', name);
+    const info = await stat(file);
+    if (!info.isFile())
+        continue;
+    const bytes = await readFile(file);
+    webAssetBytes += bytes.length;
+    if (webAssetBytes > 32 * 1024 * 1024)
+        throw new Error('Saturn web assets exceed 32 MiB standalone embedding limit');
+    webAssets[name] = bytes.toString('base64');
+}
 const defaultName = target.includes('windows') ? 'saturn.exe' : 'saturn';
 const outfile = resolve(value('--outfile') ?? resolve('dist/standalone', defaultName));
 await mkdir(resolve(outfile, '..'), { recursive: true });
@@ -52,13 +68,13 @@ const build = await Bun.build({
     define: {
         SATURN_VERSION: JSON.stringify(buildVersion),
         SATURN_DEMO_FILES: JSON.stringify(demoFiles),
+        SATURN_WEB_ASSETS: JSON.stringify(webAssets),
         SATURN_UPDATE_PUBLIC_KEY: JSON.stringify(updatePublicKey),
         SATURN_UPDATE_MANIFEST_URL: JSON.stringify(updateManifestUrl),
     },
     compile: {
         target,
         outfile,
-        assets: ['dist/plant'],
         autoloadBunfig: false,
         autoloadDotenv: true,
         autoloadPackageJson: false,
@@ -82,4 +98,5 @@ if (!build.success) {
 }
 
 console.log(`Packed Saturn ${buildVersion} application -> ${outfile}`);
+console.log(`Embedded web assets: ${Object.keys(webAssets).length} files, ${(webAssetBytes / 1024 / 1024).toFixed(1)} MiB`);
 console.log(`Target: ${target}`);
