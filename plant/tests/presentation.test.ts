@@ -44,8 +44,10 @@ test('autoshell derives I\/O from the compiled PLC instead of hardcoded channel 
  const p=project(),model=generatePlcShell(p,'SATURN-1'),io=model.pages.find(page=>page.kind==='io')!;
  assert.deepEqual(model.inputs,['AI1']);assert.deepEqual(model.outputs,['DO1']);
  assert.deepEqual(io.kind==='io'?io.signals:[],['AI1','DO1']);
- const source=JSON.stringify(generatePlcShellScreens(p,'SATURN-1'));
+ const screens=generatePlcShellScreens(p,'SATURN-1'),source=JSON.stringify(screens);
  assert.ok(!source.includes('10.42.0.10'));assert.ok(!source.includes('MODBUS/TCP'));
+ const labels=screens.flatMap(screen=>screen.elements.map(element=>element.label??'')).join(' ');
+ assert.doesNotMatch(labels,/[·•…→←↑↓–—]/,'physical HMI labels must stay inside the Saturn display font repertoire');
 });
 test('physical arrow keys only operate equipment whose driver actually depends on the setpoint',()=>{
  const p=project(),model=generatePlcShell(p,'SATURN-1');
