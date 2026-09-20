@@ -94,7 +94,7 @@ export function generatePlcShell(project:Project, controllerId:string):PlcShellM
   const ioSignals=[...inputs].sort().concat(outputs);
   const pages:PlcShellPage[]=[
     {id:'overview',kind:'overview',title:system?.title??controllerId},
-    {id:'process',kind:'process',title:'Процесс',devices:ordered.slice(0,6).map(device=>device.id)},
+    {id:'process',kind:'process',title:'Процесс',devices:uniq([...detail.map(device=>device.id),...ordered.map(device=>device.id)]).slice(0,6)},
     ...detail.map(device=>{
       const driver=deviceDriver(project,controllerId,device.id,outputs);
       return {id:'device:'+device.id,kind:'device' as const,title:device.id,deviceId:device.id,visual:device.type,driver,controlSetpoint:setpointForOutput(controller,driver)};
