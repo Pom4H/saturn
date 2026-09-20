@@ -1,0 +1,37 @@
+name: VS Code host
+
+on:
+  pull_request:
+    paths:
+      - 'vscode/**'
+      - 'standalone/ide.ts'
+      - 'standalone/entry.ts'
+      - 'standalone/extensions.ts'
+      - 'scripts/saturn.mjs'
+      - 'scripts/vscode-check.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/vscode.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vscode-host-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run vscode:check
