@@ -262,7 +262,7 @@ export function validateProject(value: unknown): asserts value is Project {
     }
     if(!Array.isArray(p.controllers??[])||(p.controllers?.length??0)>4) throw new AppError('At most four PLC runtimes');
     unique([...(p.controllers??[]).map(c=>c.id), ...p.simulations.map(n => n.id)]);
-    for(const c of p.controllers??[]) { if(!groups.has(c.system))throw new AppError('PLC system missing');compileController(c); }
+    for(const c of p.controllers??[]) { if(!groups.has(c.system))throw new AppError('PLC system missing');compileController(c,p); }
     unique(p.simulations.map(n => n.id));
     unique(p.devices.map(n => n.id));
     unique(p.alarms.map(a => a.id));
