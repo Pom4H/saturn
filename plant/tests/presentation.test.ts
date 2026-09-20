@@ -49,6 +49,21 @@ test('autoshell derives I\/O from the compiled PLC instead of hardcoded channel 
  const labels=screens.flatMap(screen=>screen.elements.map(element=>element.label??'')).join(' ');
  assert.doesNotMatch(labels,/[·•…→←↑↓–—]/,'physical HMI labels must stay inside the Saturn display font repertoire');
 });
+test('autoshell stays bounded for sparse and crowded equipment topologies',()=>{
+ const sparse=project(),controller=sparse.controllers![0],system=controller.system;
+ sparse.devices=sparse.devices.filter(device=>device.id===controller.id||device.system!==system);sparse.connections=[];sparse.attachments=[];
+ const sparseModel=generatePlcShell(sparse,controller.id);assert.equal(sparseModel.pages.filter(page=>page.kind==='device').length,0);assert.equal(sparseModel.pages.length,4);
+ const crowded=project(),template=crowded.devices.find(device=>device.system===system&&device.type==='pump')!;
+ for(let i=0;i<20;i++)crowded.devices.push({...structuredClone(template),id:'AUTO-PUMP-'+i,layout:{x:500+i*20,y:500+i*10}});
+ const model=generatePlcShell(crowded,controller.id),screens=generatePlcShellScreens(crowded,controller.id);
+ assert.equal(model.pages.filter(page=>page.kind==='device').length,8);assert.ok(screens.length<=16);
+ for(const screen of screens)for(const element of screen.elements){
+  assert.ok(element.position.x>=0&&element.position.y>=0&&element.position.x<=320&&element.position.y<=240,screen.id+':'+element.id);
+  if(element.width!==undefined)assert.ok(element.position.x+element.width<=320,screen.id+':'+element.id+' width');
+  if(element.height!==undefined)assert.ok(element.position.y+element.height<=240,screen.id+':'+element.id+' height');
+ }
+});
+
 test('physical arrow keys only operate equipment whose driver actually depends on the setpoint',()=>{
  const p=project(),model=generatePlcShell(p,'SATURN-1');
  const pump=model.pages.findIndex(page=>page.kind==='device'&&page.deviceId==='PUMP-1');
