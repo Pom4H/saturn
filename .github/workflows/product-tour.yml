@@ -35,5 +35,5 @@ jobs:
           name: saturn-product-tour
           path: |
             product-tour/
-            test-results/site-studio/
+            site-browser-results/site-studio/
           retention-days: 14
