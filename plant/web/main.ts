@@ -403,7 +403,7 @@ function bindClient(target: Connection) {
         status.healthy = health;
     } };
     target.onNotification = n => { if (demo && noticeEnabled && registration && Notification.permission === 'granted')
-        void registration.showNotification(n.kind === 'alarm' ? 'SCADA · Аларм' : 'SCADA · Отчёт готов', { body: 'Откройте демонстрацию для подробностей.', tag: n.id, data: { url: new URL('demo/', base).href } }); };
+        void registration.showNotification(n.kind === 'alarm' ? 'Saturn · Аларм' : 'Saturn · Отчёт готов', { body: 'Откройте демонстрацию для подробностей.', tag: n.id, data: { url: new URL('demo/', base).href } }); };
 }
 function renderEnvironmentStatus() {
     if (demo) {
