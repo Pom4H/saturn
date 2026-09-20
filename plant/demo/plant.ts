@@ -1,4 +1,5 @@
 import { views } from './views';
+import { operatorHmi } from './hmi';
 import { benchSystem, benchNodes, benchControllers, benchControls, benchModules, benchWires, benchAlarm } from './commissioning';
 import { plantWires, userWires } from './wiring';
 import { project, system, alarm, signal } from '@scada/plant';
@@ -22,6 +23,7 @@ export default project('abstract-station', {
         { signal: 'BUILDING.damage', label: 'Повреждение здания', unit: 'доля', alarmAbove: 0.05 },
     ],
     description: 'Учебная модель связанных процессов. Нормированные величины; не реконструкция аварии и не расчёт ядерной безопасности.',
+    hmi: operatorHmi,
     views,
     controllers: benchControllers,
     connections: [...benchWires, ...plantWires, ...userWires],
