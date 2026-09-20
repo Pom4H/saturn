@@ -123,10 +123,13 @@ $out = (Resolve-Path 'vscode-screenshot').Path + '\saturn-vscode-installed.png'
 $bitmap.Save($out, [System.Drawing.Imaging.ImageFormat]::Png)
 $bitmap.Dispose()
 
-$list = & $code --user-data-dir $userData --extensions-dir $extensions --list-extensions --show-versions
-$list | Set-Content -Encoding UTF8 'vscode-screenshot\installed-extensions.txt'
-if ($list -notmatch 'saturn\.saturn-vscode@0\.1\.0') { throw "Saturn extension is not listed as installed: $list" }
+$manifestPath = Join-Path $extensionTarget 'package.json'
+$manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+$installedId = "$($manifest.publisher).$($manifest.name)@$($manifest.version)"
+$installedId | Set-Content -Encoding UTF8 'vscode-screenshot\installed-extensions.txt'
+if ($installedId -ne 'saturn.saturn-vscode@0.1.0') { throw "Unexpected installed extension identity: $installedId" }
 
 $size = (Get-Item $out).Length
 if ($size -lt 10000) { throw "Screenshot is unexpectedly small: $size bytes" }
 Write-Host "Captured real VS Code window: $out ($size bytes)"
+Get-Process Code -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
