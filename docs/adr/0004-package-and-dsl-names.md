@@ -46,7 +46,7 @@ const suction = pipe(
 )
 ~~~
 
-`cable()` represents explicit electrical, control and bus media. A generic untyped `connect()` must not become the canonical installation API.
+`simulation()` and `plc()` expose typed `ports`; authored code should prefer those structural refs. `port(id, name)` remains only for dynamic/generated editor operations.\n\n`cable()` represents explicit electrical, control and bus media. A generic untyped `connect()` must not become the canonical installation API.
 
 ### Signals
 
