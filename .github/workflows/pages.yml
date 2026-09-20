@@ -36,6 +36,7 @@ jobs:
           path: |
             playwright-report/
             test-results/
+            site-browser-results/
             runtime-playwright-report/
             runtime-test-results/
             challenge-results/
