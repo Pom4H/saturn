@@ -1,147 +1,203 @@
 # Saturn
 
-> System architecture: [ADR-0001 — Saturn system architecture](docs/adr/0001-saturn-system-architecture.md).
->
-> Developer guide: [TypeScript DSL, language tooling, i18n and coding agents](docs/developer/language-tooling.md).
+**Engineering systems as code.**
 
-## Application modes
+Saturn is an open-source engineering IDE and runtime for physical systems. Describe equipment, topology, signals, controls, HMI, history, alarms and reports as a typed TypeScript project — then use that same model in engineering, operation and deployment.
 
-Saturn is packaged once; projects stay ordinary source directories and are selected at runtime.
+![Saturn turns one typed engineering model into HMI, signals, history, reports, PLC bindings and deployment](docs/assets/saturn-domain-model.svg)
 
-~~~sh
-saturn open ./project
-saturn run ./project
-saturn run ./project --kiosk
-~~~
+[Open browser editor](https://pom4h.github.io/scada/) · [DSL reference](docs/plant/dsl.md) · [Architecture](docs/adr/0001-saturn-system-architecture.md) · [Developer guide](docs/developer/language-tooling.md)
 
-An engineering workspace can connect to another Saturn as a live environment: local source/Git remains local while telemetry, history and commands come from the operator runtime. Git synchronizes project/release configuration; the live Saturn protocol synchronizes operational state.
+## The project is the model
 
-See [standalone application and project workflow](docs/standalone.md).
+A traditional automation project tends to split one physical installation across PLC configuration, tag databases, HMI screens, historian setup, reports, deployment scripts and documentation.
 
-## Node.js / offline PWA workbench
-
-The new installation workbench runs the same process models, signal expressions, alarms, historian and report workflows in Node.js and a browser Worker. SQLite is native on the server and WASM/OPFS in the demo. Git-backed server releases and local browser revisions support explicit publication and rollback.
-
-```sh
-npm ci
-npm run plant
-```
-
-Open `http://127.0.0.1:4176/plant/app/` (initial password printed once), or `/plant/demo/` (autonomous public demo). `npm run build` includes the static PWA under `dist/plant/`. Nothing is automatically deployed.
-
-[Run, PWA, authentication and Web Push](docs/plant/README.md) · [Installation/report DSL](docs/plant/dsl.md) · [Chernobyl-inspired model and explicit limitations](docs/plant/model.md).
-
-**The accident demonstration is a normalized coupled-process model, not a full or validated historical Chernobyl/RBMK simulation.** Remote Web Push requires server configuration and device permission; the offline demo cannot execute continuously while the browser is closed.
-
-Run `npm run plant:check` and `npm run plant:test:browser` for the new workbench. The existing editor and its tests below are retained.
-
-[Open the editor](https://pom4h.github.io/scada/) · [DSL reference](docs/dsl.md) · [Architecture](docs/architecture.md) · [Experimental 3D lab and catalog](docs/3d-foundation.md)
-
-A browser workbench for designing animated SCADA diagrams in TypeScript. Code, canvas and property inspector edit **one TS document per scene**. A server can also deliver a Git-backed project containing scenes and reference files. The editor works as a static site. The optional local Node server adds durable synthetic equipment runs, authenticated signals, history and replay. No hardware connection is included.
+Saturn keeps the engineering model in ordinary source files.
 
 ```ts
-import { tank, pump, valve, outlet, connect } from "@scada/core";
+import {
+  system,
+  simulation,
+  pipe,
+  port,
+} from '@saturn/core'
 
-const source = tank("T-101", { x: 40, y: 250, level: 64 });
-const motor = pump("P-101", { x: 325, y: 338, rpm: 1500 });
-const gate = valve("V-101", { x: 700, y: 142, opening: 76 });
-const process = outlet("OUT", { x: 1000, y: 224 });
+export const water = system('water', 'Water system')
 
-connect(source.outlet, motor.inlet);
-connect(motor.outlet, gate.inlet);
-connect(gate.outlet, process.inlet);
+export const tank = simulation('T-101', 'reservoir', {
+  system: 'water',
+  at: { x: 80, y: 180 },
+})
+
+export const pump = simulation('P-101', 'pump', {
+  system: 'water',
+  at: { x: 360, y: 180 },
+})
+
+export const suction = pipe(
+  'suction',
+  port(tank, 'outlet'),
+  port(pump, 'inlet'),
+)
 ```
 
-Drag `P-101`: its literal `x` and `y` change in the editor. Change `opening`: the same property changes in TypeScript. A complete drag is one undo operation. Comments, surrounding code, quote style and unrelated properties survive these source edits. Code is never reconstructed from SVG or a separately saved JSON model.
+The TypeScript source is not an export format generated after the fact. It is the authored project.
 
-## Using the editor
+Saturn uses TypeScript for the things engineers already expect from serious software tooling: types, autocomplete, navigation, refactoring, diagnostics and source control. The Saturn compiler then adds domain rules for equipment, signals, topology, controls and deployment.
 
-Select equipment to edit its position, process parameters, quality and alarm. Drag equipment to move it; hold Alt for one-unit placement instead of the ten-unit grid. Click **Connect**, then an output and an input port. Select a pipe to add a pressure or temperature tap. Add equipment from the palette; Delete removes the selected item and dependent connections/taps. Undo and redo work across both code and visual edits.
+Projects use a bounded declarative subset. Saturn does not execute arbitrary project JavaScript.
 
-Scroll to zoom; drag empty space or Space-drag to pan; **Fit** or F fits the scene. The code-pane divider is draggable and keyboard-accessible. On a phone, use the Code / Diagram / Properties tabs. Zoom in to work on small equipment, then Fit to see the whole circuit.
+## One model, multiple projections
 
-Projects are saved locally as TypeScript. Export `.ts` for version control or transfer; import opens that exact source. Share copies a link with source encoded in its fragment: the optional selected server/run is included without credentials. Server recordings retain their original configuration separately. **HTML export** creates a standalone, animated, read-only diagram with the source embedded. Never put credentials or sensitive plant data in a public share link.
+The same stable equipment IDs and bindings drive:
 
-Syntax errors keep the last valid preview visible and block visual changes until the code is fixed. Computed properties such as `x: GRID * 3` are shown read-only in the inspector; the editor does not guess how to invert a formula.
+- **engineering views** — source, project tree, catalog, 2D/3D mnemonic and properties;
+- **operator HMI** — live state, controls, alarms and navigation;
+- **runtime** — signals, simulation or adapters, historian and replay;
+- **reports** — project-defined queries, tables and charts over recorded data;
+- **PLC and equipment integration** — controller definitions, ports, wiring and target providers;
+- **delivery** — Git revisions, validation, release state and standalone deployment.
 
-## Local development
+A renderer does not own another project model. A report does not invent another tag namespace. The VS Code host does not embed a second Saturn IDE. They are views over the same project and runtime contracts.
 
-Node.js **24 LTS** (exact tested version in `.nvmrc`):
+## Visual editing without a hidden project format
+
+The canvas is another editor for the source.
+
+```text
+drag P-101
+    ↓
+change x / y in TypeScript
+    ↓
+normal Git diff
+```
+
+Source-preserving edits keep comments and unrelated code intact. Invalid source keeps the last valid view visible instead of reconstructing the project from SVG or JSON.
+
+This also means coding agents and human engineers work on the same artifact.
+
+## Configuration and live state are different things
+
+Saturn deliberately separates Git from operational state.
+
+```text
+project source
+     │
+     ▼
+   head ──────► published ──────► applied
+     │                              │
+     │                              ▼
+     │                         live runtime
+     │                    signals · history
+     │                    alarms · commands
+     ▼
+normal Git workflow
+```
+
+Git is the configuration and release authority. The running Saturn instance is the authority for telemetry, history and operator commands.
+
+An engineering Saturn can connect to an operator Saturn while keeping local source and Git local. The UI shows source and applied revisions independently instead of pretending they are always the same commit.
+
+See [Standalone Saturn](docs/standalone.md) and [ADR-0001](docs/adr/0001-saturn-system-architecture.md).
+
+## Use Saturn where you engineer
+
+Saturn is one application; projects stay ordinary directories.
+
+```sh
+saturn open ./pump-station
+saturn run ./pump-station
+saturn run ./pump-station --kiosk
+```
+
+The standalone application is built once and opens projects at runtime. Windows, Linux and macOS targets are supported by the pack workflow.
+
+The same project can also be used from the browser/PWA and from the native VS Code host. VS Code keeps TypeScript in the normal editor, Git in native SCM, diagnostics in Problems, project/catalog/targets in TreeViews and the mnemonic as a separate visual view.
+
+## Extend the domain instead of forking the IDE
+
+Equipment catalogs and integration logic are extension points.
+
+```sh
+saturn extension add @factory/equipment
+saturn extension update @factory/equipment
+```
+
+Installed packages can contribute engineering entities and tooling without creating a second project format. First-party examples use the `@saturn/*` namespace; external vendors can use normal npm-compatible package scopes.
+
+The extension installer verifies package integrity, runs no lifecycle scripts and keeps project source separate from application code.
+
+See [extension architecture](docs/adr/0002-extension-packages.md).
+
+## Reports belong to the engineering model too
+
+Reports are declared alongside signals and history policy rather than implemented as one-off application pages.
+
+```ts
+export const flowHour = report('flow-hour', {
+  title: 'Flow history',
+  signals: ['P-101.flow'],
+  window: 3_600_000,
+  sql: `SELECT signal, AVG(value) AS average
+        FROM samples
+        WHERE quality = 'good'
+        GROUP BY signal`,
+  columns: [
+    { key: 'signal', title: 'Signal' },
+    { key: 'average', title: 'Average' },
+  ],
+})
+```
+
+The runtime exposes bounded read-only history tables to report capsules. Reports can produce tables and SVG charts and can run manually or on a schedule.
+
+See [report DSL](docs/plant/dsl.md#reports).
+
+## What is implemented
+
+The current codebase includes the typed `@saturn/core` DSL, AST validation, source-preserving visual edits, CodeMirror engineering shell, 2D/3D views, equipment catalog metadata, alarms, controls, historian, replay/comparison, project-defined reports, Git-backed project/release workflow, standalone packaging, extensions, signed application updates and a native VS Code host.
+
+The repository also contains simulation models used for development and demonstrations. They are intentionally bounded engineering models, not validated process solvers.
+
+## Safety and scope
+
+Saturn is engineering software under active development. The included demonstration models are not safety models, certified control logic or substitutes for equipment-specific engineering calculations.
+
+Real equipment control must pass through explicit adapters/providers with authentication, validation and capability boundaries. A visualization, simulator or report must never silently become a safety authority.
+
+## Develop Saturn
+
+Node.js 24 is used for the repository toolchain. Bun is used for standalone packaging.
 
 ```sh
 npm ci
+npm run check
 npm run dev
 ```
 
-Open **http://localhost:4173/scada/**. These commands also work in Windows PowerShell. `npm run dev` watches source changes, preserves the last valid build on errors, and reloads the browser after a successful build.
-
-The runtime server requires Node 24 and its built-in SQLite module. CI installs the pinned dependency tree using `package-lock.json` and `npm ci`.
+Run the installation workbench:
 
 ```sh
-npm run check                       # builds, strict TS, core, server/API, challenge and 3D tests
-npx playwright install --with-deps chromium webkit
-npm run test:e2e                    # editor Chromium/WebKit + runtime Chromium tests
+npm run plant
 ```
 
-For browser runtimes that deliberately disallow HTTP navigation, `SCADA_INJECT=1` injects the same built assets into an opaque-origin Chromium page. It skips the two tests that require an HTTP origin. CI never uses this mode.
-
-The optional equipment lab runs with `npm run lab` on **http://127.0.0.1:4174/**. It demonstrates three procedural 3D components, shared 2D/3D signal state, and a searchable index of 478 P&ID symbol names. It is separate from the editor and uses synthetic data. See the [architecture and harness instructions](docs/3d-foundation.md) and [review evidence](docs/evidence-3d/README.md).
-
-## A complete recorded scenario
+Build a standalone application:
 
 ```sh
-npm ci
-npm run demo
+npm run saturn -- pack --target windows-x64
 ```
 
-Open **http://127.0.0.1:4175/scada/**. Choose **Сервер · деградация насоса**, then copy the **OPERATOR token** printed by your local server into the separate token field and click **Подключиться**. The token is kept in memory only.
+Useful documentation:
 
-1. Select **Деградация насоса** and click **Новый прогон**. The measured flow falls and vibration rises while RPM stays independent. The demo example accelerates wear so the warning appears within roughly half a minute.
-2. Click **Поделиться**. Open that link in another browser and connect with the server's **VIEW token**. Both clients see one run; closing a tab or pausing animation does not stop it.
-3. Select the pump, click **Обслужить**, and observe the maintenance delay and recovery. **Заменить** creates another installed instance at the same equipment position. These are server commands, not edits to initial parameters.
-4. Click **Завершить запись**, then **История**. Scrub, play and pause the saved frames. **В эфир** returns to current server state.
-5. Create a **Нормальная работа** run from the same source. Select a reference run and click **Сравнить** to overlay recorded flow against model time. Public run names stay neutral so they do not reveal a diagnostic answer.
+- [Saturn system architecture](docs/adr/0001-saturn-system-architecture.md)
+- [Package and DSL names](docs/adr/0004-package-and-dsl-names.md)
+- [TypeScript DSL and language tooling](docs/developer/language-tooling.md)
+- [Standalone application](docs/standalone.md)
+- [Installation, historian and report DSL](docs/plant/dsl.md)
+- [VS Code host](docs/adr/0005-vscode-host.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security](SECURITY.md)
 
-Use **2D / 3D** to inspect the same IDs and observations. Three is fetched on the first 3D request. The 3D view provides orbit and selection; placement is still authored in 2D/TS. **В TS** explicitly writes destination/project/run metadata. Editing equipment configuration requires a matching run; incoming telemetry never changes source or undo.
+## License
 
-Recordings survive server restart in `data/runs.sqlite`. Keep the database and its WAL together or stop the server before copying it. After a restart the model continues from its saved checkpoint without inventing progress during downtime. Generated tokens change on restart; environment variables can provide stable tokens. See [server usage and model assumptions](docs/server-runtime.md), [extension contract](docs/architecture.md), and [actual verification/evidence](docs/runtime-validation.md).
-
-## What is included
-
-Tank, round pump, regulating valve, flanged inline flowmeter, heat exchanger, process outlet, pressure gauge and temperature sensor, plus a separately installed filter package; quality/alarm states; port-aware obstacle routing; real rotor and rectangular water-flow animations; a sampled flow trend; source-preserving AST edits; code completion, diagnostics, formatting and a shared undo history; file and HTML export; URL sharing; responsive layout; lazy spatial view, server-side synthetic behavior, SQLite recordings, playback/comparison, CI and explicit Pages deployment.
-
-This is a **declarative TypeScript subset**, interpreted from the TypeScript AST. It does not execute arbitrary JavaScript. It accepts named imports, `const`, DSL calls, literal property objects and scalar expressions. See the [language contract](docs/dsl.md).
-
-## Simulation boundary
-
-This workbench does not control equipment. The preview uses an explicitly simplified series-circuit model, not hydraulic simulation: one source, one pump, one outlet, no branches. Flow follows signed RPM and valve opening. A closed valve blocks the whole connected circuit; the independently powered rotor can keep spinning. A dry tank or trip blocks flow; uncertain quality makes flow unknown rather than presenting a guessed measurement. Incomplete or unsupported topologies produce diagnostics. Separate circuits are calculated independently.
-
-Pressure, temperature, level and vibration are demonstration samples. There is no fluid conservation, head curve, PLC protocol, PID controller, interlock verification or safety certification. Do not use this preview as an operational control or safety system.
-
-## GitHub Pages
-
-Pushes and pull requests run checks. Pages publishing requires an explicit manual `workflow_dispatch` on main, after the same checks; merging a change does not deploy it. Pages hosts the static editor only, not the Node runtime. It uploads Playwright reports and screenshots even on failures. Paths are relative, so the build works below `/scada/` as well as on a custom domain.
-
-For forks, select **Settings → Pages → Source → GitHub Actions**, then run **Check and deploy**. The first deployment requires Pages to be enabled by a repository administrator; ordinary workflow tokens may not be permitted to enable a new site.
-
-## Toolchain and updates
-
-The project is checked with TypeScript 7. The browser-side DSL parser uses Microsoft's `@typescript/typescript6` compatibility package for the JavaScript Compiler API. Test/build tools are development dependencies. Dependabot groups monthly npm and Actions updates rather than opening a PR per package.
-
-Parameter and quality changes retain existing SVG nodes and animation phases. Routing is recalculated only when topology, positions or tap placement change. This cache is disposable; the only saved project is still `scene.ts`.
-
-MIT © Roman Popov. See [CONTRIBUTING](CONTRIBUTING.md) and [SECURITY](SECURITY.md).
-
-## Git projects and developer workflow
-
-An authenticated server can deliver the project files, scene and exact Git
-revision directly to the editor. Committed changes hot-reload through the same
-validated mechanism in development and production. Invalid releases preserve
-the last good version; active runs keep their original revision. Local drafts
-are never overwritten automatically. Optional operator commits use Git
-compare-and-swap and require explicit writable-server configuration.
-
-See [Git project setup, remote tracking and API](docs/git-projects.md),
-[reliability fixes, signal history and SDK](docs/review-fixes.md),
-[standalone project example](examples/git-project) and
-[external SDK consumer](examples/consumer).
+MIT © Roman Popov.

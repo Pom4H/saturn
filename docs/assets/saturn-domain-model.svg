@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">Saturn domain model</title>
+  <desc id="desc">A typed TypeScript engineering model drives topology, HMI, signals, history, reports, PLC bindings and deployment.</desc>
+  <style>
+    :root { color-scheme: light dark; }
+    .bg { fill: #ffffff; }
+    .panel { fill: #ffffff; stroke: #d7dce2; }
+    .soft { fill: #f7f8fa; stroke: #d7dce2; }
+    .ink { fill: #17191c; }
+    .muted { fill: #68707a; }
+    .line { stroke: #9aa3ad; }
+    .accent { fill: #2563eb; }
+    .accent-line { stroke: #2563eb; }
+    .water { fill: #dbeafe; stroke: #2563eb; }
+    .ok { fill: #18864b; }
+    .warn { fill: #d97706; }
+    text { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #0d0f12; }
+      .panel { fill: #111419; stroke: #2d333b; }
+      .soft { fill: #15191f; stroke: #2d333b; }
+      .ink { fill: #f3f5f7; }
+      .muted { fill: #9aa4af; }
+      .line { stroke: #4d5661; }
+      .water { fill: #10294f; stroke: #60a5fa; }
+      .accent { fill: #60a5fa; }
+      .accent-line { stroke: #60a5fa; }
+      .ok { fill: #3fb950; }
+      .warn { fill: #e3b341; }
+    }
+  </style>
+
+  <rect class="bg" width="1280" height="720"/>
+
+  <!-- source -->
+  <rect class="panel" x="56" y="58" width="520" height="246" rx="10"/>
+  <rect class="soft" x="56" y="58" width="520" height="42" rx="10"/>
+  <line class="line" x1="56" y1="100" x2="576" y2="100" stroke-width="1"/>
+  <circle cx="78" cy="79" r="5" fill="#ef4444"/>
+  <circle cx="96" cy="79" r="5" fill="#f59e0b"/>
+  <circle cx="114" cy="79" r="5" fill="#22c55e"/>
+  <text class="muted mono" x="138" y="85" font-size="14">plant.ts</text>
+
+  <text class="muted mono" x="82" y="132" font-size="15">import</text>
+  <text class="ink mono" x="138" y="132" font-size="15">{ system, simulation, pipe }</text>
+  <text class="muted mono" x="82" y="160" font-size="15">from</text>
+  <text class="accent mono" x="128" y="160" font-size="15">'@saturn/core'</text>
+
+  <text class="muted mono" x="82" y="202" font-size="15">const</text>
+  <text class="ink mono" x="132" y="202" font-size="15">water = system('water', 'Water')</text>
+  <text class="muted mono" x="82" y="230" font-size="15">const</text>
+  <text class="ink mono" x="132" y="230" font-size="15">p1 = simulation('P-101', 'pump', …)</text>
+  <text class="ink mono" x="82" y="258" font-size="15">pipe('suction', tank.outlet, p1.inlet)</text>
+
+  <text class="muted" x="82" y="287" font-size="13">Typed source is the project. The canvas edits the same file.</text>
+
+  <!-- arrow source -> physical -->
+  <path class="accent-line" d="M316 320 V350" fill="none" stroke-width="2"/>
+  <path class="accent" d="M310 348 L316 358 L322 348 Z"/>
+
+  <!-- physical model -->
+  <rect class="panel" x="56" y="370" width="776" height="280" rx="10"/>
+  <text class="ink" x="82" y="406" font-size="17" font-weight="650">Physical system</text>
+  <text class="muted" x="82" y="430" font-size="13">stable identities · typed ports · topology · live bindings</text>
+
+  <!-- tank -->
+  <path class="line" d="M118 486 V580 Q118 598 136 598 H214 Q232 598 232 580 V486" fill="none" stroke-width="2"/>
+  <rect class="water" x="124" y="532" width="102" height="60" rx="2"/>
+  <line class="line" x1="118" y1="486" x2="232" y2="486" stroke-width="2"/>
+  <text class="ink mono" x="143" y="625" font-size="13">T-101</text>
+
+  <!-- pipe 1 -->
+  <line class="accent-line" x1="232" y1="548" x2="326" y2="548" stroke-width="6" stroke-linecap="round"/>
+  <circle class="panel" cx="274" cy="548" r="5" stroke-width="2"/>
+
+  <!-- pump -->
+  <circle class="panel" cx="382" cy="548" r="54" stroke-width="2"/>
+  <circle class="accent-line" cx="382" cy="548" r="20" fill="none" stroke-width="2"/>
+  <path class="accent-line" d="M382 528 L392 546 L374 554 Z M402 548 L384 558 L376 540 Z M382 568 L372 550 L390 542 Z" fill="none" stroke-width="2" stroke-linejoin="round"/>
+  <line class="accent-line" x1="436" y1="548" x2="510" y2="548" stroke-width="6" stroke-linecap="round"/>
+  <text class="ink mono" x="356" y="625" font-size="13">P-101</text>
+
+  <!-- valve -->
+  <path class="line" d="M510 524 L550 548 L510 572 Z M590 524 L550 548 L590 572 Z" fill="none" stroke-width="2"/>
+  <line class="line" x1="550" y1="510" x2="550" y2="548" stroke-width="2"/>
+  <circle class="panel" cx="550" cy="500" r="10" stroke-width="2"/>
+  <line class="accent-line" x1="590" y1="548" x2="676" y2="548" stroke-width="6" stroke-linecap="round"/>
+  <text class="ink mono" x="523" y="625" font-size="13">V-101</text>
+
+  <!-- sensor/output -->
+  <circle class="panel" cx="704" cy="548" r="28" stroke-width="2"/>
+  <path class="accent-line" d="M691 550 L700 559 L718 537" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <text class="ink mono" x="681" y="625" font-size="13">FIT-1</text>
+
+  <!-- status pills -->
+  <rect class="soft" x="82" y="449" width="146" height="28" rx="14"/>
+  <circle class="ok" cx="100" cy="463" r="5"/>
+  <text class="muted" x="113" y="468" font-size="12">live signals</text>
+
+  <rect class="soft" x="240" y="449" width="166" height="28" rx="14"/>
+  <circle class="accent" cx="258" cy="463" r="5"/>
+  <text class="muted" x="271" y="468" font-size="12">source revision</text>
+
+  <!-- fan-out connector -->
+  <path class="line" d="M832 510 H866 M866 510 V180 M866 180 H906 M866 262 H906 M866 344 H906 M866 426 H906 M866 508 H906 M866 590 H906" fill="none" stroke-width="1.5"/>
+  <circle class="accent" cx="866" cy="510" r="4"/>
+
+  <!-- projections -->
+  <text class="ink" x="906" y="108" font-size="17" font-weight="650">One model, many projections</text>
+  <text class="muted" x="906" y="132" font-size="13">No second proprietary project format.</text>
+
+  <g>
+    <rect class="panel" x="906" y="156" width="318" height="56" rx="8"/>
+    <text class="ink" x="930" y="180" font-size="14" font-weight="600">HMI / mnemonic</text>
+    <text class="muted" x="930" y="198" font-size="12">2D · 3D · operator shell</text>
+  </g>
+  <g>
+    <rect class="panel" x="906" y="238" width="318" height="56" rx="8"/>
+    <text class="ink" x="930" y="262" font-size="14" font-weight="600">Signals + alarms</text>
+    <text class="muted" x="930" y="280" font-size="12">quality · controls · diagnostics</text>
+  </g>
+  <g>
+    <rect class="panel" x="906" y="320" width="318" height="56" rx="8"/>
+    <text class="ink" x="930" y="344" font-size="14" font-weight="600">Historian + replay</text>
+    <text class="muted" x="930" y="362" font-size="12">SQLite · revisions · comparisons</text>
+  </g>
+  <g>
+    <rect class="panel" x="906" y="402" width="318" height="56" rx="8"/>
+    <text class="ink" x="930" y="426" font-size="14" font-weight="600">Reports</text>
+    <text class="muted" x="930" y="444" font-size="12">typed definitions · scheduled runs</text>
+  </g>
+  <g>
+    <rect class="panel" x="906" y="484" width="318" height="56" rx="8"/>
+    <text class="ink" x="930" y="508" font-size="14" font-weight="600">PLC + equipment</text>
+    <text class="muted" x="930" y="526" font-size="12">bindings · catalogs · extensions</text>
+  </g>
+  <g>
+    <rect class="panel" x="906" y="566" width="318" height="56" rx="8"/>
+    <text class="ink" x="930" y="590" font-size="14" font-weight="600">Git + deployment</text>
+    <text class="muted" x="930" y="608" font-size="12">head · published · applied</text>
+  </g>
+
+  <text class="muted" x="56" y="690" font-size="12">SATURN · engineering systems as code</text>
+</svg>
