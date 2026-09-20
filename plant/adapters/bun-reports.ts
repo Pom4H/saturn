@@ -18,8 +18,11 @@ interface BunSpawnRuntime {
         onExit(_subprocess: unknown, exitCode: number | null, signalCode: number | null, error?: unknown): void;
     }): BunSubprocess;
 }
-const bunRuntime = (globalThis as typeof globalThis & { Bun?: BunSpawnRuntime }).Bun;
-if (!bunRuntime) throw new Error('Bun report runner requires Bun');
+const bunRuntime = (() => {
+    const runtime = (globalThis as typeof globalThis & { Bun?: BunSpawnRuntime }).Bun;
+    if (!runtime) throw new Error('Bun report runner requires Bun');
+    return runtime;
+})();
 
 /** Disposable Bun process: native SQLite work can be killed at the process boundary. */
 export function runReport(task: ReportTask, timeoutMs = 5000): Promise<ReportArtifact> {
