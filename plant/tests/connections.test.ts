@@ -61,7 +61,7 @@ test('visual connection edit only patches the wiring array, stays a draft and re
  assert.throws(()=>appendConnection({...demoFiles,'plant.ts':demoFiles['plant.ts'].replace(', ...userWires','')},{id:'ignored',from:{device:'PSU-24',port:'minus'},to:{device:'SATURN-1',port:'COM2'},medium:'power'}),/not included/);
 });
 test('expansion adds a typed slot and real module declaration without overwriting other files',()=>{
- const next=addExpansionSource(demoFiles,'SATURN-1','EXP-SECOND','expansion-2.ts',"import {simulation} from '@scada/plant'; export const module=simulation('EXP-SECOND','io-module',{system:'commissioning',at:{x:1700,y:3850}});",2),p=compileProject(next);
+ const next=addExpansionSource(demoFiles,'SATURN-1','EXP-SECOND','expansion-2.ts',"import {simulation} from '@saturn/core'; export const module=simulation('EXP-SECOND','io-module',{system:'commissioning',at:{x:1700,y:3850}});",2),p=compileProject(next);
  assert.ok(p.devices.some(d=>d.id==='EXP-SECOND'));assert.equal(p.attachments!.length,2);assert.equal(next['core.ts'],demoFiles['core.ts']);
  p.attachments![1].slot=1;assert.throws(()=>validateConnections(p),/slot/);
 });
@@ -86,7 +86,7 @@ test('controller checkpoint rejects a changed runtime ABI rather than claiming d
 test('prototype members cannot masquerade as physical connectors',()=>{for(const port of ['__proto__','constructor','toString']){const p=project();p.connections![0].to.port=port;assert.throws(()=>validateProject(p),/Unknown terminal/);}assert.throws(()=>terminals('__proto__'),/No physical/);});
 
 test('a second virtual expansion is reachable by a two-conductor daisy chain, and a broken branch becomes unknown',()=>{
- const next=addExpansionSource(demoFiles,'SATURN-1','EXP-SECOND','expansion-2.ts',"import {simulation} from '@scada/plant'; export const module=simulation('EXP-SECOND','io-module',{system:'commissioning',at:{x:1600,y:3480}});",2),p=compileProject(next);
+ const next=addExpansionSource(demoFiles,'SATURN-1','EXP-SECOND','expansion-2.ts',"import {simulation} from '@saturn/core'; export const module=simulation('EXP-SECOND','io-module',{system:'commissioning',at:{x:1600,y:3480}});",2),p=compileProject(next);
  for(const [id,a,b,medium] of [['chain-a','busA','busA','bus'],['chain-b','busB','busB','bus'],['second-plus','plus','plus','power'],['second-minus','minus','minus','power']] as const)p.connections!.push({id,from:{device:medium==='bus'?'EXP-AI4':'PSU-24',port:a},to:{device:'EXP-SECOND',port:b},medium});
  p.connections!.find(w=>w.id==='level-input')!.to={device:'EXP-SECOND',port:'AI1'};validateProject(p);const a=new Kernel(p,'v','r',0);for(let i=0;i<30;i++)a.step();assert.equal(a.frame().samples['EXP-SECOND.channel1'].value,300);
  p.connections=p.connections!.filter(w=>w.id!=='module-b');validateProject(p);const b=new Kernel(p,'v','r',0);for(let i=0;i<30;i++)b.step();assert.equal(b.frame().samples['EXP-SECOND.channel1'].quality,'bad');
