@@ -28,6 +28,7 @@ export interface Status {
     instance?: RuntimeInstance;
     runtimeInstance?: RuntimeInstance;
     environment?: EnvironmentDescriptor | null;
+    uiMode?: 'ide' | 'runtime' | 'kiosk';
     project: Project;
     frame: Frame;
     head: string | null;
