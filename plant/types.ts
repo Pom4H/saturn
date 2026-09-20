@@ -215,6 +215,8 @@ export interface Repository {
     read(id: string): Promise<Revision>;
     log(limit?: number): Promise<Revision[]>;
     commit(files: Record<string, string>, expected: string | null, message: string, actor: string): Promise<Revision>;
+    /** Optional source refresh for filesystem/Git-backed workspaces. */
+    refresh?(): Promise<void>;
 }
 export interface SqlDatabase {
     exec(sql: string, bind?: unknown[] | Record<string, unknown>): void;
