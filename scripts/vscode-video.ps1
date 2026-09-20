@@ -1,13 +1,9 @@
 $ErrorActionPreference = 'Stop'
-Add-Type -AssemblyName System.Drawing
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
 public static class SaturnVideoWindow {
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
-  [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hwnd, IntPtr hdcBlt, uint nFlags);
-  public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
 }
 "@
 
@@ -75,6 +71,7 @@ $args = @(
   '--extensions-dir', $extensions,
   '--disable-updates',
   '--disable-workspace-trust',
+  '--remote-debugging-port=9222',
   '--new-window',
   $workspace,
   $file
@@ -91,72 +88,35 @@ for ($i=0; $i -lt 90; $i++) {
   if ($proc) { break }
 }
 if (-not $proc) { throw 'VS Code did not create a visible window.' }
-
 [SaturnVideoWindow]::ShowWindow($proc.MainWindowHandle, 3) | Out-Null
-Start-Sleep -Milliseconds 800
-
-$rect = New-Object SaturnVideoWindow+RECT
-if (-not [SaturnVideoWindow]::GetWindowRect($proc.MainWindowHandle, [ref]$rect)) { throw 'GetWindowRect failed.' }
-$sourceWidth = [Math]::Max(1, $rect.Right - $rect.Left)
-$sourceHeight = [Math]::Max(1, $rect.Bottom - $rect.Top)
-$targetWidth = [Math]::Min(1280, $sourceWidth)
-$targetHeight = [int][Math]::Floor($sourceHeight * $targetWidth / $sourceWidth)
-if ($targetHeight % 2 -ne 0) { $targetHeight-- }
 
 $outDir = Join-Path (Get-Location) 'vscode-video'
 $frames = Join-Path $outDir 'frames'
 Remove-Item -Recurse -Force $outDir -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $frames | Out-Null
 
-$fps = 8
-$durationSeconds = 50
-$totalFrames = $fps * $durationSeconds
-$periodMs = [int](1000 / $fps)
-$watch = [System.Diagnostics.Stopwatch]::StartNew()
+$env:VSCODE_CDP = 'http://127.0.0.1:9222'
+$env:VSCODE_FRAME_DIR = $frames
+$env:VSCODE_CAPTURE_FPS = '5'
+$env:VSCODE_CAPTURE_SECONDS = '50'
+& node scripts\vscode-capture-frames.mjs
+if ($LASTEXITCODE -ne 0) { throw "VS Code renderer capture failed with exit code $LASTEXITCODE" }
 
-Write-Host "Capturing $totalFrames real VS Code window frames with PrintWindow..."
-for ($i=0; $i -lt $totalFrames; $i++) {
-  $source = New-Object System.Drawing.Bitmap $sourceWidth, $sourceHeight
-  $graphics = [System.Drawing.Graphics]::FromImage($source)
-  $hdc = $graphics.GetHdc()
-  $ok = [SaturnVideoWindow]::PrintWindow($proc.MainWindowHandle, $hdc, 2)
-  $graphics.ReleaseHdc($hdc)
-  $graphics.Dispose()
-  if (-not $ok) {
-    $source.Dispose()
-    throw "PrintWindow failed at frame $i"
-  }
-
-  $target = New-Object System.Drawing.Bitmap $targetWidth, $targetHeight
-  $scaled = [System.Drawing.Graphics]::FromImage($target)
-  $scaled.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-  $scaled.DrawImage($source, 0, 0, $targetWidth, $targetHeight)
-  $scaled.Dispose()
-  $source.Dispose()
-
-  $path = Join-Path $frames ('frame_{0:D4}.jpg' -f $i)
-  $target.Save($path, [System.Drawing.Imaging.ImageFormat]::Jpeg)
-  $target.Dispose()
-
-  $targetMs = ($i + 1) * $periodMs
-  $remaining = $targetMs - $watch.ElapsedMilliseconds
-  if ($remaining -gt 0) { Start-Sleep -Milliseconds $remaining }
-}
-$watch.Stop()
-
-$sampleIndexes = @(0, [int]($totalFrames*.2), [int]($totalFrames*.4), [int]($totalFrames*.6), [int]($totalFrames*.8), $totalFrames-1)
+$captured = @(Get-ChildItem $frames -Filter 'frame_*.jpg' | Sort-Object Name)
+if ($captured.Count -lt 240) { throw "Expected about 250 frames, got $($captured.Count)" }
+$sampleIndexes = @(0, 50, 100, 150, 200, ($captured.Count - 1))
 $hashes = @()
 foreach ($index in $sampleIndexes) {
-  $hashes += (Get-FileHash (Join-Path $frames ('frame_{0:D4}.jpg' -f $index)) -Algorithm SHA256).Hash
+  $hashes += (Get-FileHash $captured[$index].FullName -Algorithm SHA256).Hash
 }
-if (($hashes | Sort-Object -Unique).Count -lt 3) { throw 'Captured tour is effectively static.' }
+if (($hashes | Sort-Object -Unique).Count -lt 4) { throw 'Captured tour is effectively static.' }
 
 $ffmpegCommand = Get-Command ffmpeg.exe -ErrorAction SilentlyContinue
 if (-not $ffmpegCommand) { $ffmpegCommand = Get-Command ffmpeg -ErrorAction SilentlyContinue }
 if (-not $ffmpegCommand) { throw 'ffmpeg is required on the Windows runner.' }
 $ffmpeg = $ffmpegCommand.Source
 $out = Join-Path $outDir 'saturn-vscode-tour.mp4'
-& $ffmpeg -hide_banner -loglevel warning -y -framerate $fps -i (Join-Path $frames 'frame_%04d.jpg') -c:v mpeg4 -q:v 4 -pix_fmt yuv420p -movflags +faststart $out
+& $ffmpeg -hide_banner -loglevel warning -y -framerate 5 -i (Join-Path $frames 'frame_%04d.jpg') -vf "scale=1280:-2" -c:v mpeg4 -q:v 4 -pix_fmt yuv420p -movflags +faststart $out
 if ($LASTEXITCODE -ne 0) { throw "ffmpeg encoding failed with exit code $LASTEXITCODE" }
 
 $info = Get-Item $out
