@@ -57,7 +57,7 @@ try {
   await page.locator('input[name="user"]').fill('engineer');
   await page.locator('input[name="password"]').fill('capture-password');
   await Promise.all([
-    page.waitForURL(/\/plant\/app\//),
+    page.waitForURL(url => url.pathname === '/' && url.searchParams.get('project') === 'server' && url.hash === '#workspace'),
     page.locator('form button').click(),
   ]);
   await page.waitForLoadState('networkidle').catch(()=>{});
