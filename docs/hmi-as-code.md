@@ -14,10 +14,12 @@ HmiApplication
    +-- dialogs
    |
    v
-renderer
+renderer / target
    |
-   +-- React -> HTML / SVG
-   +-- future native / 3D projections
+   +-- React -> HTML / SVG application shell
+   +-- Firmverse Saturn display emulator -> 320x240 vector frames
+   +-- FBD screen projection -> compatibility fallback
+   +-- future C23/satgui physical projection
 ```
 
 The application model stays serializable and inspectable by Studio. React is only a projection.
@@ -107,3 +109,43 @@ command('P101', 'start')
 ```
 
 The command adapter remains responsible for authorization, interlocks, live/revision checks and transport retry policy. A React button never gets direct PLC transport access.
+
+
+## Saturn 320x240 display target
+
+The front-panel preview is not allowed to invent equipment motion in CSS. A
+target-specific scene is evaluated by `SaturnDisplayEmulator` from Firmverse.
+
+```text
+topology + bindings
+        |
+        v
+SaturnDisplayScene
+        |
+        +-- tank(level)
+        +-- pump(rpm)
+        +-- flow(flow)
+        +-- lamp(state)
+        +-- text / geometry
+        |
+        v
+Firmverse SaturnDisplayEmulator
+        |
+        | model time + live signals
+        v
+DisplayDrawCommand[]     <- positions already animated here
+        |
+        v
+React SVG projection     <- drawing only
+```
+
+Rotor angle, moving flow packets, reservoir waterline and lamp pulse are
+calculated from supplied model time and signal values inside Firmverse. Rendering
+twice at the same model time is observation-only. Browser tests also assert that
+visible Firmverse commands have no CSS/WebAnimation motion.
+
+This contract is deliberately separate from the legacy FBD screen records. FBD
+screens stay useful as a bounded compatibility and diagnostic target. A richer
+physical Saturn implementation can map the same display scene/frame contract to
+the controller's native graphics API instead of reducing the design to FBD
+rectangles and text.
