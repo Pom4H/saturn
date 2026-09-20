@@ -1,5 +1,5 @@
 import { benchView } from './views';
-import { report } from '@scada/plant';
+import { report } from '@saturn/core';
 /** UTC cron and typed manual inputs. SQL sees only the declared signal data capsule. */
 export const thermalReport = report('thermal-balance', {
     title: 'Тепловое состояние и полнота данных',
