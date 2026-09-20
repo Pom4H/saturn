@@ -1,0 +1,48 @@
+name: Saturn HMI showcase video
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'plant/showcase/**'
+      - 'plant/plc-shell.ts'
+      - 'plant/web/plc-react-hmi.ts'
+      - 'plant/vendor/firmverse/display.ts'
+      - 'scripts/plant-showcase*.mjs'
+      - '.github/workflows/hmi-showcase.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hmi-showcase-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  video:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run plant:build
+      - run: npx playwright install --with-deps chromium-headless-shell
+      - name: Install TTS
+        run: |
+          python3 -m pip install --break-system-packages edge-tts
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq espeak-ng
+      - name: Record showcase with TTS
+        run: xvfb-run -a node scripts/plant-showcase-video.mjs
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: saturn-hmi-showcase
+          path: showcase-tour/
+          retention-days: 7
