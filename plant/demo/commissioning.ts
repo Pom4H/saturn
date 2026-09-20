@@ -1,5 +1,5 @@
 import { benchPanel } from './views';
-import { system, simulation, control, plc, pin, gt, port, cable, expansion, alarm, view } from '@saturn/core';
+import { system, simulation, control, plc, pin, gt, cable, expansion, alarm, view } from '@saturn/core';
 // Generic isolated low-voltage commissioning bench; never connected to reactor controls.
 export const benchSystem=system('commissioning','PLC · стенд подключения клемм','site');
 export const level=control('BENCH-LEVEL',{title:'Датчик уровня · тестовый сигнал',system:'commissioning',min:0,max:10,initial:3,rate:1,unit:'V'});
@@ -14,19 +14,19 @@ export const benchControllers=[controller];
 export const benchControls=[level];
 export const benchModules=[expansion(module,controller,1)];
 export const benchWires=[
- cable('dc-positive',port(psu,'plus'),port(controller,'DC+'),{medium:'power'}),
- cable('dc-return',port(psu,'minus'),port(controller,'DC-'),{medium:'power'}),
- cable('input-common',port(psu,'minus'),port(controller,'COM1'),{medium:'power'}),
- cable('sensor-common',port(psu,'minus'),port(sensor,'common'),{medium:'power'}),
- cable('level-input',port(sensor,'value'),port(controller,'AI1'),{medium:'control',scale:100}),
- cable('relay-coil',port(controller,'DO1'),port(relay,'coil'),{medium:'control'}),
- cable('relay-line',port(psu,'plus'),port(relay,'line'),{medium:'power'}),
- cable('relay-common',port(psu,'minus'),port(relay,'common'),{medium:'power'}),
- cable('lamp-power',port(relay,'out'),port(lamp,'input'),{medium:'power'}),
- cable('lamp-common',port(psu,'minus'),port(lamp,'common'),{medium:'power'}),
- cable('module-a',port(controller,'RS-A'),port(module,'busA'),{medium:'bus'}),
- cable('module-b',port(controller,'RS-B'),port(module,'busB'),{medium:'bus'}),
- cable('module-positive',port(psu,'plus'),port(module,'plus'),{medium:'power'}),
- cable('module-return',port(psu,'minus'),port(module,'minus'),{medium:'power'}),
+ cable('dc-positive',psu.ports.plus,controller.ports['DC+'],{medium:'power'}),
+ cable('dc-return',psu.ports.minus,controller.ports['DC-'],{medium:'power'}),
+ cable('input-common',psu.ports.minus,controller.ports.COM1,{medium:'power'}),
+ cable('sensor-common',psu.ports.minus,sensor.ports.common,{medium:'power'}),
+ cable('level-input',sensor.ports.value,controller.ports.AI1,{medium:'control',scale:100}),
+ cable('relay-coil',controller.ports.DO1,relay.ports.coil,{medium:'control'}),
+ cable('relay-line',psu.ports.plus,relay.ports.line,{medium:'power'}),
+ cable('relay-common',psu.ports.minus,relay.ports.common,{medium:'power'}),
+ cable('lamp-power',relay.ports.out,lamp.ports.input,{medium:'power'}),
+ cable('lamp-common',psu.ports.minus,lamp.ports.common,{medium:'power'}),
+ cable('module-a',controller.ports['RS-A'],module.ports.busA,{medium:'bus'}),
+ cable('module-b',controller.ports['RS-B'],module.ports.busB,{medium:'bus'}),
+ cable('module-positive',psu.ports.plus,module.ports.plus,{medium:'power'}),
+ cable('module-return',psu.ports.minus,module.ports.minus,{medium:'power'}),
 ];
 export const benchAlarm=alarm('plc-unhealthy',{title:'Стенд: PLC не готов · питание или входы',signal:gt(1, {ref:'SATURN-1.healthy'}),above:.5,clearBelow:.1,delay:2000});
