@@ -147,6 +147,7 @@ try {
   await page.locator('[name="app-language"][value="en"]').check();
   await page.waitForFunction(() => document.documentElement.lang === 'en');
   assert.equal((await page.locator('.hero p').textContent())?.trim(), 'Diagram and TypeScript in one project.');
+  assert.match((await page.locator('#studio-count').textContent()) ?? '', /objects/, 'Dynamic workspace metadata follows the active language');
   await page.locator('.app-settings-close').click();
   await page.locator('.export-options').evaluate(menu => menu.open = true); await page.locator('[data-new-project]').click();
   assert.equal((await page.locator('#project-dialog-title').textContent())?.trim(), 'New project', 'Dynamic dialogs follow the active language');
