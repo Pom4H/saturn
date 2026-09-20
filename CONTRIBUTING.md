@@ -17,6 +17,6 @@ For the isomorphic workbench also run `npm run plant:check` and `npm run plant:t
 
 ## Repository boundary
 
-This repository is the standalone MIT-licensed Saturn SCADA product. Do not add migration adapters, importers, wire-compatibility layers, customer schemas or historical product-specific formats to the core tree. Keep those in the repository that owns the external system.
+This repository is the standalone MIT-licensed Saturn Engineering IDE product. Do not add migration adapters, importers, wire-compatibility layers, customer schemas or historical product-specific formats to the core tree. Keep those in the repository that owns the external system.
 
 The deliberate vendor-specific exception is the Saturn PLC controller target under `plant/vendor/saturn` and the pinned PLC toolchain it requires. That code is a supported hardware target, not a legacy SCADA compatibility layer.
