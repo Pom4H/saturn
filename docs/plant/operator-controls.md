@@ -7,7 +7,7 @@ This extension is a normalized educational workbench, not a calibrated digital t
 `control()` declares a named input channel. An operator sets its **requested** value; the runtime changes its **actual** value at the declared maximum rate. The declaration is versioned in Git; live commands and checkpoints are stored in SQLite. Changing a demand does not edit the project or override a model coefficient.
 
 ```ts
-import { control, simulation, signal, gt } from '@scada/plant';
+import { control, simulation, signal, gt } from '@saturn/core';
 
 const demand = control('DRAW', {
   title: 'Water demand',
