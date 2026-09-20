@@ -39,7 +39,7 @@ for (const asset of assets)
     hash.update(await readFile('dist/plant/' + (asset === 'demo/' ? 'demo/index.html' : asset)));
 const sw = (await readFile('plant/web/sw.js', 'utf8')).replace('__VERSION__', hash.digest('hex').slice(0, 16)).replace('__ASSETS__', JSON.stringify(assets));
 await writeFile('dist/plant/sw.js', sw);
-console.log('Built Node server and installable /plant/demo/');
+console.log('Built Bun server and installable /plant/demo/');
 await buildSite('dist/plant/site');
 
 await cp('LICENSE', 'dist/plant/LICENSE');
