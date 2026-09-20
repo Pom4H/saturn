@@ -97,31 +97,31 @@ New-Item -ItemType Directory -Force -Path $frames | Out-Null
 
 $env:VSCODE_CDP = 'http://127.0.0.1:9222'
 $env:VSCODE_FRAME_DIR = $frames
-$env:VSCODE_CAPTURE_FPS = '5'
 $env:VSCODE_CAPTURE_SECONDS = '50'
-& node scripts\vscode-capture-frames.mjs
-if ($LASTEXITCODE -ne 0) { throw "VS Code renderer capture failed with exit code $LASTEXITCODE" }
+& node scripts\vscode-capture-screencast.mjs
+if ($LASTEXITCODE -ne 0) { throw "VS Code compositor capture failed with exit code $LASTEXITCODE" }
 
 $captured = @(Get-ChildItem $frames -Filter 'frame_*.jpg' | Sort-Object Name)
-if ($captured.Count -lt 240) { throw "Expected about 250 frames, got $($captured.Count)" }
-$sampleIndexes = @(0, 50, 100, 150, 200, ($captured.Count - 1))
+if ($captured.Count -lt 8) { throw "Expected at least 8 composited frames, got $($captured.Count)" }
+$sampleIndexes = @(0, [int][Math]::Floor($captured.Count * 0.25), [int][Math]::Floor($captured.Count * 0.5), [int][Math]::Floor($captured.Count * 0.75), ($captured.Count - 1))
 $hashes = @()
 foreach ($index in $sampleIndexes) {
   $hashes += (Get-FileHash $captured[$index].FullName -Algorithm SHA256).Hash
 }
-if (($hashes | Sort-Object -Unique).Count -lt 4) { throw 'Captured tour is effectively static.' }
+if (($hashes | Sort-Object -Unique).Count -lt 3) { throw 'Captured tour is effectively static.' }
 
 $ffmpegCommand = Get-Command ffmpeg.exe -ErrorAction SilentlyContinue
 if (-not $ffmpegCommand) { $ffmpegCommand = Get-Command ffmpeg -ErrorAction SilentlyContinue }
 if (-not $ffmpegCommand) { throw 'ffmpeg is required on the Windows runner.' }
 $ffmpeg = $ffmpegCommand.Source
 $out = Join-Path $outDir 'saturn-vscode-tour.mp4'
-& $ffmpeg -hide_banner -loglevel warning -y -framerate 5 -i (Join-Path $frames 'frame_%04d.jpg') -vf "scale=1280:-2" -c:v mpeg4 -q:v 4 -pix_fmt yuv420p -movflags +faststart $out
+$concat = Join-Path $frames 'concat.txt'
+& $ffmpeg -hide_banner -loglevel warning -y -f concat -safe 0 -i $concat -vf "fps=15,scale=1280:-2" -c:v mpeg4 -q:v 4 -pix_fmt yuv420p -movflags +faststart $out
 if ($LASTEXITCODE -ne 0) { throw "ffmpeg encoding failed with exit code $LASTEXITCODE" }
 
 $info = Get-Item $out
 if ($info.Length -lt 500000) { throw "Video is unexpectedly small: $($info.Length) bytes" }
-Write-Host "Recorded Saturn VS Code tour: $out ($($info.Length) bytes)"
+Write-Host "Recorded Saturn VS Code tour: $out ($($info.Length) bytes, $($captured.Count) compositor frames)"
 
 Remove-Item -Recurse -Force $frames
 Get-Process Code -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
