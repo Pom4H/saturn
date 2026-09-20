@@ -1,14 +1,6 @@
 name: VS Code installed screenshot
 
 on:
-  pull_request:
-    paths:
-      - 'vscode/**'
-      - 'standalone/**'
-      - 'plant/**'
-      - 'scripts/standalone-pack.ts'
-      - 'scripts/vscode-screenshot.ps1'
-      - '.github/workflows/vscode-screenshot.yml'
   workflow_dispatch:
 
 permissions:
