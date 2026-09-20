@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  HmiRuntime, ack, back, bind, button, close, command, confirm, dialog, hmi, navigate, open,
+  HmiRuntime, ack, back, bind, button, close, command, confirm, dialog, hmi, navigate, open, operate,
   readout, screen, sequence, text, toggle, write, matchPath, pathFor,
 } from '../src/hmi';
 import { createReactHmiRenderer } from '../src/hmi-react';
@@ -58,11 +58,12 @@ test('navigation, dialogs and back are runtime state, not component callbacks', 
 });
 
 test('operator actions cross an explicit adapter boundary', async () => {
-  const commands: unknown[] = [], writes: unknown[] = [], acknowledgements: unknown[] = [], scripts: string[] = [];
+  const commands: unknown[] = [], operations: unknown[] = [], writes: unknown[] = [], acknowledgements: unknown[] = [], scripts: string[] = [];
   let ids = 0;
   const runtime = new HmiRuntime(app, {
     commandId: () => `cmd-${++ids}`,
     command: value => { commands.push(value); },
+    operate: (control, value) => { operations.push([control, value]); },
     write: (signal, value) => { writes.push([signal, value]); },
     ack: alarm => { acknowledgements.push(alarm); },
     confirm: async () => true,
@@ -71,12 +72,14 @@ test('operator actions cross an explicit adapter boundary', async () => {
   runtime.updateSignals({ 'P101.auto': false, 'P101.current': 18.44 });
   await runtime.dispatch(sequence(
     confirm('Start?', command('P101', 'start')),
+    operate('P101.speed', 0.7),
     toggle('P101.auto'),
     write('P101.currentSetpoint', bind('P101.current')),
     ack('P101.fault'),
     { type: 'script', id: 'openDiagnostics' },
   ));
   assert.deepEqual(commands, [{ commandId: 'cmd-1', equipmentId: 'P101', command: 'start' }]);
+  assert.deepEqual(operations, [['P101.speed', 0.7]]);
   assert.deepEqual(writes, [['P101.auto', true], ['P101.currentSetpoint', 18.44]]);
   assert.deepEqual(acknowledgements, ['P101.fault']);
   assert.deepEqual(scripts, ['openDiagnostics']);
