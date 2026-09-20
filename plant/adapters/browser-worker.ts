@@ -4,7 +4,7 @@ import { Service } from '../service';
 import { demoFiles } from '../demo/files';
 import { compileProject } from '../compiler';
 import { AppError, type Actor, type ReportTask, type ReportArtifact } from '../types';
-import { errorPayload } from '../diagnostics';
+import { diagnosticLocale, errorPayload } from '../diagnostics';
 const actor: Actor = { id: 'demo-engineer', role: 'engineer' };
 let service: Service | null = null, initializing = false, ready = false, ticks = 0;
 const scope = self;
@@ -119,6 +119,6 @@ scope.onmessage = async (e) => {
         scope.postMessage({ id, result });
     }
     catch (error) {
-        scope.postMessage({ id, ...errorPayload(error, 'ru'), status: error instanceof AppError ? error.status : 500 });
+        scope.postMessage({ id, ...errorPayload(error, diagnosticLocale(navigator.language)), status: error instanceof AppError ? error.status : 500 });
     }
 };
