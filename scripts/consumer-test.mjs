@@ -3,9 +3,9 @@ import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { build } from 'esbuild';
 const modules = resolve('examples/consumer/node_modules');
-await mkdir(`${modules}/@pom4h`, {recursive:true});
+await mkdir(`${modules}/@saturn`, {recursive:true});
 try {
-  await symlink(resolve('.'), `${modules}/@pom4h/scada`, 'junction');
+  await symlink(resolve('.'), `${modules}/@saturn/scada`, 'junction');
   const compiler = resolve('node_modules/typescript/bin/tsc');
   let result = spawnSync(process.execPath, [compiler, '-p', 'examples/consumer/tsconfig.json'], {stdio:'inherit'});
   if (result.status !== 0) process.exitCode = result.status ?? 1;
