@@ -88,6 +88,7 @@ async function installShellUpdate() {
                 continue;
             const current = await response.json() as { version?: string };
             if (current.version === version) {
+                await registration?.unregister().catch(() => false);
                 location.reload();
                 return;
             }
