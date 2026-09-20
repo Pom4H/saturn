@@ -26,6 +26,11 @@ async function overlay() {
       #tour-cursor{position:fixed;z-index:999999;width:24px;height:24px;border:3px solid #10a6b5;border-radius:50%;pointer-events:none;transform:translate(-50%,-50%);box-shadow:0 0 0 5px #10a6b533,0 4px 14px #103b4c55;transition:left .38s cubic-bezier(.2,.8,.2,1),top .38s cubic-bezier(.2,.8,.2,1),transform .12s;background:#fff9}
       #tour-cursor.tap{transform:translate(-50%,-50%) scale(.62);background:#10a6b5}
       #tour-caption{position:fixed;left:50%;bottom:18px;z-index:999998;transform:translateX(-50%);min-width:520px;max-width:1050px;padding:12px 18px;background:#102f3dee;color:#fff;border:1px solid #5f8997;font:600 16px/1.35 system-ui,sans-serif;text-align:center;box-shadow:0 8px 30px #102d3a55;pointer-events:none}
+      body.tour-plc-focus #inspector{position:fixed!important;z-index:99990;left:90px;right:90px;top:70px;bottom:74px;max-height:none!important;overflow:auto;background:#f7fbfc;border:2px solid #179bad;padding:18px 28px;box-shadow:0 20px 70px #102d3a55}
+      body.tour-plc-focus #inspector>p.eyebrow,body.tour-plc-focus #inspector>h2{max-width:1040px;margin-left:auto;margin-right:auto}
+      body.tour-plc-focus #plc-front{max-width:1040px;margin:8px auto 12px}
+      body.tour-plc-focus #plc-front svg{width:100%!important;max-height:590px!important}
+      body.tour-plc-focus #inspector>.signals,body.tour-plc-focus #inspector>#build-plc,body.tour-plc-focus #inspector>.model-limit,body.tour-plc-focus #inspector>h3,body.tour-plc-focus #inspector>.terminal-panel{display:none!important}
     `;
     document.head.append(style);
     const cursor=document.createElement('div');cursor.id='tour-cursor';
@@ -57,7 +62,9 @@ try {
   await click('[data-system="commissioning"]','Открываем стенд Saturn PLC');
   await click('#diagram [data-node="SATURN-1"]','Выбираем контроллер SATURN-1');
   await page.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('SATURN-1'));
-  await caption('Главный экран: живой AI1, состояние DO1 и ручной режим',1500);
+  await page.evaluate(()=>document.body.classList.add('tour-plc-focus'));
+  await page.waitForTimeout(700);
+  await caption('Крупный план: это 320×240 дисплей контроллера и его четыре физические клавиши',1700);
 
   await click('#plc-front [data-plc-button="right"]','Правая физическая клавиша → экран I/O');
   await page.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('Входы / выходы'));
@@ -77,6 +84,8 @@ try {
   await page.waitForFunction(()=>Number(document.querySelector('#inspector [data-signal="SATURN-1.DO1"] b')?.textContent)===1);
   await caption('MANUAL=1 хранится внутри FBD runtime → DO1=1',1800);
 
+  await page.evaluate(()=>document.body.classList.remove('tour-plc-focus'));
+  await page.waitForTimeout(650);
   await click('#diagram [data-node="RELAY-1"]','Переходим к устройству, которым управляет DO1: RELAY-1');
   await page.waitForTimeout(700);
   await click('#diagram [data-node="LAMP-1"]','И дальше к LAMP-1 — лампа включена реальным выходом контроллера');
@@ -84,11 +93,15 @@ try {
 
   await click('#diagram [data-node="SATURN-1"]','Возвращаемся к Saturn PLC — состояние HMI сохранено');
   await page.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('Управляемая нагрузка'));
+  await page.evaluate(()=>document.body.classList.add('tour-plc-focus'));
+  await page.waitForTimeout(500);
   await click('#plc-front [data-plc-button="left"]','LEFT → обратно к I/O');
   await page.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('Входы / выходы'));
   await click('#plc-front [data-plc-button="left"]','LEFT → главный экран');
   await page.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('SATURN-1'));
 
+  await page.evaluate(()=>document.body.classList.remove('tour-plc-focus'));
+  await page.waitForTimeout(500);
   await click('#view-3d','Та же установка в 3D');
   await page.locator('#scene3d canvas').waitFor({state:'visible'});
   await page.waitForTimeout(900);
