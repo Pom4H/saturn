@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 
 /** Button journeys run in an isolated browser profile; no user projects are touched. */
 export async function checkInteractions(browser, origin) {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true, permissions: ['clipboard-read', 'clipboard-write'] });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true, permissions: ['clipboard-read', 'clipboard-write'], locale: 'en-US' });
   const page = await context.newPage(), errors = [];
   page.on('pageerror', error => errors.push(error.message));
   const menu = async selector => {
@@ -85,7 +85,7 @@ export async function checkInteractions(browser, origin) {
     assert.equal(new URL(share).searchParams.has('project'), false, 'Shared local source must not autoload the server');
     assert.equal(new URL(share).searchParams.has('source'), false);
     const shared = await context.newPage(); await shared.goto(share); await shared.waitForSelector('#studio-spatial canvas', { state: 'attached' });
-    assert.match(await shared.locator('#project-trigger').innerText(), /Проект по ссылке/); await shared.close();
+    assert.match(await shared.locator('#project-trigger').innerText(), /Project from link/); await shared.close();
 
     await signals();
     const picker = page.waitForEvent('filechooser'); await menu('#studio-import');
