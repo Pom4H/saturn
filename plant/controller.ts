@@ -12,6 +12,7 @@ export type ControllerKey = 'up'|'down'|'left'|'right';
 export interface PlcSetpoint { caption:string; min:number; max:number; initial:number; divider?:number; step?:number }
 export type ControllerKeyAction = string | { screen?:string; setpoint:string; value?:number; delta?:number };
 export interface ControllerHmi {
+    shell?: { auto: true };
     title: string;
     rows: { label: string; pin: string }[];
     view?: Presentation;
