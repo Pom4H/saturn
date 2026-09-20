@@ -163,6 +163,13 @@ export async function startPlantHttpServer(options: {
                     const query = new URLSearchParams(url.searchParams);
                     const input = req.method === 'POST' ? await body(req) : undefined;
                     const remote = await environments.request(session.sessionId, remoteAction, { method: req.method === 'POST' ? 'POST' : 'GET', query, body: input });
+                    if (remoteAction === 'session' && req.method === 'GET') {
+                        const value = await remote.json().catch(() => null) as any;
+                        if (!remote.ok)
+                            throw new AppError(value?.error ?? `Remote Saturn returned HTTP ${remote.status}`, remote.status);
+                        json(200, { ...value, csrf: session.csrf });
+                        return;
+                    }
                     const contentType = remote.headers.get('content-type') ?? 'application/json; charset=utf-8';
                     const payload = Buffer.from(await remote.arrayBuffer());
                     res.writeHead(remote.status, { 'Content-Type': contentType, 'Cache-Control': 'no-store' }).end(payload);
