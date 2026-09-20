@@ -79,6 +79,7 @@
     "./sdk": "./src/sdk.ts",
     "./plant": "./plant/dsl.ts",
     "./hmi": "./src/hmi.ts",
-    "./hmi/react": "./src/hmi-react.ts"
+    "./hmi/react": "./src/hmi-react.ts",
+    "./hmi/dom": "./src/hmi-dom.ts"
   }
 }
