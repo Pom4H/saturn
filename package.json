@@ -37,7 +37,9 @@
     "plant:test": "node scripts/plant-test.mjs",
     "plant:test:browser": "node scripts/plant-e2e.mjs",
     "plant:check": "npm run plant:build && npm run plant:typecheck && npm run plant:test",
-    "site:test:browser": "node scripts/site-studio-check.mjs"
+    "site:test:browser": "node scripts/site-studio-check.mjs",
+    "saturn": "node scripts/saturn.mjs",
+    "standalone:pack": "bun run scripts/standalone-pack.ts"
   },
   "keywords": [],
   "author": "Roman Popov",
@@ -78,5 +80,8 @@
     "./core": "./src/core.ts",
     "./sdk": "./src/sdk.ts",
     "./plant": "./plant/dsl.ts"
+  },
+  "bin": {
+    "saturn": "scripts/saturn.mjs"
   }
 }
