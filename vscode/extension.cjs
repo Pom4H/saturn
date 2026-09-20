@@ -507,9 +507,18 @@ function activate(context) {
 
   if (process.env.SATURN_VSCODE_CAPTURE === '1') {
     setTimeout(() => {
-      void vscode.commands.executeCommand('workbench.view.extension.saturn')
-        .then(() => vscode.commands.executeCommand('saturn.openDiagram'));
-    }, 1200);
+      void (async () => {
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+        const root = workspaceRoot();
+        if (root) {
+          const uri = vscode.Uri.file(path.join(root, config().get('project.entry', 'plant.ts')));
+          const document = await vscode.workspace.openTextDocument(uri);
+          await vscode.window.showTextDocument(document, { viewColumn: vscode.ViewColumn.One, preserveFocus: false });
+        }
+        await vscode.commands.executeCommand('workbench.view.extension.saturn');
+        await vscode.commands.executeCommand('saturn.openDiagram');
+      })();
+    }, 1500);
   }
 }
 
