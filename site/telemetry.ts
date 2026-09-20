@@ -50,7 +50,11 @@ export class SimulationStream {
     });
   }
 
-  start() {
+  start(initial?: Frame | null) {
+    if (initial && frame(initial)) {
+      this.current = initial;
+      this.lastSeenAt = Date.now();
+    }
     if (this.enabled) return;
     this.enabled = true;
     this.attempt = 0;
