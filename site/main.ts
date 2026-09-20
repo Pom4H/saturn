@@ -1,5 +1,5 @@
 import './styles.css';
-import './i18n';
+import { tr } from './i18n';
 import './studio.css';
 import { mountProjectPicker } from './project-picker';
 mountProjectPicker();
@@ -12,20 +12,20 @@ if (shortcut) shortcut.textContent = /Mac|iPhone|iPad/.test(navigator.platform) 
 import { mountStudio } from './studio';
 mountStudio().catch(error => {
   const status = document.getElementById('studio-diagnostics');
-  if (status) status.textContent = 'Не удалось открыть среду. Обновите страницу.';
+  if (status) status.textContent = tr('Не удалось открыть среду. Обновите страницу.', 'Could not open the workspace. Reload the page.');
   console.error(error);
 });
 
 // Updating is explicit, and the workspace can veto losing an in-memory draft.
 configureAppUpdates(async registration => {
   if (!window.dispatchEvent(new Event('saturn-before-update', { cancelable: true }))) {
-    throw new Error('Сначала сохраните копию серверного черновика или скачайте проект.');
+    throw new Error(tr('Сначала сохраните копию серверного черновика или скачайте проект.', 'Save a copy of the server draft or download the project first.'));
   }
   if (!registration.waiting) return;
   await new Promise<void>((resolve, reject) => {
     const timeout = window.setTimeout(() => {
       navigator.serviceWorker.removeEventListener('controllerchange', changed);
-      reject(new Error('Версия пока не активирована. Попробуйте ещё раз.'));
+      reject(new Error(tr('Версия пока не активирована. Попробуйте ещё раз.', 'The new version is not active yet. Try again.')));
     }, 12000);
     function changed() { clearTimeout(timeout); resolve(); location.reload(); }
     navigator.serviceWorker.addEventListener('controllerchange', changed, { once: true });
