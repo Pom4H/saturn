@@ -58,8 +58,8 @@ not turn this demo recorder into a production historian.
 
 ## SDK and completion
 
-The separate `examples/consumer` package imports `@pom4h/scada/core` and
-`@pom4h/scada/sdk` without internal relative paths. `defineComponent()` infers
+The separate `examples/consumer` package imports `@saturn/scada/core` and
+`@saturn/scada/sdk` without internal relative paths. `defineComponent()` infers
 field values, choices, ports, signal types and command arguments from literal
 metadata. The consumer test has expected compiler errors for misspelled fields,
 wrong values, invalid ports/directions and incorrect command parameters, plus an
