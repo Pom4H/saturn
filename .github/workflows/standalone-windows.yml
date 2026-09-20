@@ -40,6 +40,9 @@ jobs:
       - name: Typecheck plant runtime
         run: npm run plant:typecheck
 
+      - name: Test plant runtime
+        run: npm run plant:test
+
       - name: Build web assets
         run: npm run plant:build
 
