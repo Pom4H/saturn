@@ -9,3 +9,4 @@ export function runPlcTrace(){
 }
 export {compileController} from '../controller';
 export const plcFixture=()=>project().controllers![0];
+export const plcProjectFixture=project;
