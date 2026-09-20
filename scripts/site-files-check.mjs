@@ -32,7 +32,7 @@ export async function checkFiles(browser, origin) {
   await page.waitForFunction(() => document.getElementById('studio-diagnostics').dataset.error === 'false');
   await page.locator('#inspector-close').click();
   await page.locator('[data-file="systems/pumping.ts"]').click();
-  await page.screenshot({ path: 'test-results/site-studio/files-desktop.png' });
+  await page.screenshot({ path: 'site-browser-results/site-studio/files-desktop.png' });
   const workspace = await page.evaluate(() => JSON.parse(localStorage.getItem('saturn.shell.workspace.v1')));
   const fixture = workspace.projects.at(-1).files;
   assert(fixture['systems/pumping.ts'].includes('inertia: 2.4'));
@@ -85,7 +85,7 @@ export async function checkFiles(browser, origin) {
   await page.locator('[data-file="views.ts"]').click();
   assert(!await page.locator('#file-browser').isVisible()); assert(await source.isVisible());
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
-  await page.screenshot({ path: 'test-results/site-studio/files-mobile.png' });
+  await page.screenshot({ path: 'site-browser-results/site-studio/files-mobile.png' });
   assert.deepEqual(errors, []);
   await context.close();
   console.log('PASS: real nested files; per-document undo/redo; source navigation; multi-file diagnostics and persistence; authenticated server contract; protected drafts and revision update; independent local copy; mobile files.');
