@@ -69,8 +69,9 @@ export class WorkspaceRepository implements Repository {
             if (!head)
                 return;
             const current = await this.local.read(head);
-            const before = JSON.stringify(current.files);
-            const after = JSON.stringify(loaded.files);
+            const canonical = (files: Record<string, string>) => JSON.stringify(Object.fromEntries(Object.entries(files).sort(([a], [b]) => a.localeCompare(b))));
+            const before = canonical(current.files);
+            const after = canonical(loaded.files);
             if (before === after)
                 return;
             const revision = await this.local.commit(loaded.files, head, 'External workspace change', 'filesystem');
