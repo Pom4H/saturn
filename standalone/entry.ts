@@ -1,6 +1,7 @@
 import { dirname, join, resolve } from 'node:path';
 import { mkdirSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { homedir, tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { startPlantHttpServer } from '../plant/http-server';
 import { LocalRepository, Store } from '../plant/store';
@@ -9,9 +10,13 @@ import { runStandaloneReport } from './reports';
 import { loadProjectDirectory } from './project-loader';
 import { WorkspaceRegistry } from './workspace';
 import { WorkspaceRepository } from './workspace-repository';
+import { applyStagedUpdate, runUpdateCommand } from './update';
+import { runExtensionCommand } from './extensions';
 
 declare const SATURN_VERSION: string;
 declare const SATURN_DEMO_FILES: Record<string, string>;
+declare const SATURN_UPDATE_PUBLIC_KEY: string;
+declare const SATURN_UPDATE_MANIFEST_URL: string;
 
 if (typeof process.umask === 'function') process.umask(0o077);
 
@@ -23,17 +28,73 @@ function applicationDataRoot(): string {
     return resolve(process.env.XDG_STATE_HOME ?? join(homedir(), '.local', 'state'), 'saturn');
 }
 
+async function selfHealthcheck(): Promise<void> {
+    const directory = await mkdtemp(join(tmpdir(), 'saturn-health-'));
+    let app: Awaited<ReturnType<typeof startPlantHttpServer>> | undefined;
+    try {
+        const database = new BunSql(resolve(directory, 'health.sqlite3'));
+        const store = new Store(database);
+        const repository = new LocalRepository(store, () => `health:${crypto.randomUUID()}`);
+        app = await startPlantHttpServer({
+            port: 0,
+            host: '127.0.0.1',
+            password: 'saturn-healthcheck-password',
+            root: resolve(import.meta.dir, 'dist/plant'),
+            embeddedStatic: true,
+            autoTick: false,
+            uiMode: 'runtime',
+            database,
+            projectRepository: repository,
+            reportRunner: runStandaloneReport,
+            seed: SATURN_DEMO_FILES,
+        });
+        const response = await fetch(`${app.origin}/plant/api/health`, { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+        if (!response.ok || (await response.json() as any).status !== 'ok')
+            throw new Error('Saturn internal health check failed');
+    }
+    finally {
+        await app?.close().catch(() => {});
+        await rm(directory, { recursive: true, force: true });
+    }
+}
+
 let args = process.argv.slice(1);
 const entryArg = args[0]?.replaceAll('\\', '/') ?? '';
-if (entryArg.endsWith('/standalone/entry.ts') || entryArg.includes('/~BUN/'))
+const standaloneExecutable = entryArg.includes('/~BUN/');
+if (entryArg.endsWith('/standalone/entry.ts') || standaloneExecutable)
     args = args.slice(1);
+
+const appData = applicationDataRoot();
+
+if (args[0] === '__apply-update') {
+    await applyStagedUpdate(args.slice(1));
+    process.exit(0);
+}
+if (args[0] === '__healthcheck') {
+    await selfHealthcheck();
+    process.exit(0);
+}
+if (args[0] === 'update') {
+    await runUpdateCommand(args.slice(1), {
+        currentVersion: SATURN_VERSION,
+        publicKeyPem: SATURN_UPDATE_PUBLIC_KEY,
+        defaultManifestUrl: SATURN_UPDATE_MANIFEST_URL,
+        appData,
+        executable: process.execPath,
+        standaloneExecutable,
+    });
+    process.exit(0);
+}
+if (args[0] === 'extension' || args[0] === 'extensions') {
+    await runExtensionCommand(args.slice(1), appData);
+    process.exit(0);
+}
 
 const command = args[0] === 'run' ? 'run' : args[0] === 'open' ? 'open' : 'open';
 if (args[0] === 'run' || args[0] === 'open')
     args = args.slice(1);
 const kiosk = args.includes('--kiosk');
 const projectArgument = args.find(arg => !arg.startsWith('--')) ?? process.env.SATURN_PROJECT;
-const appData = applicationDataRoot();
 const registry = new WorkspaceRegistry(resolve(appData, 'workspace.json'));
 
 let files = SATURN_DEMO_FILES;

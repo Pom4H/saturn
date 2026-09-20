@@ -172,3 +172,46 @@ The target executable does not require Node or npm to run.
 ## Architecture
 
 The normative boundaries for source, Git releases, runtime authority, instance communication, extensions, persistence and application updates are defined in [ADR-0001](adr/0001-saturn-system-architecture.md).
+
+## Extensions
+
+Standalone Saturn installs trusted extension packages itself; Node/Bun/npm do not need to be installed on the target machine.
+
+~~~sh
+saturn extension list
+saturn extension add @factory/equipment
+saturn extension add @factory/equipment@1.4.2
+saturn extension update @factory/equipment
+saturn extension remove @factory/equipment
+~~~
+
+npm-compatible registries are used for naming, versions and tarball distribution. Saturn requires sha512 npm integrity, extracts packages with path/symlink bounds and never runs npm lifecycle scripts.
+
+Extension packages are required to be pre-bundled/self-contained. Private registry credentials can be supplied through SATURN_NPM_TOKEN and SATURN_NPM_REGISTRY and are not stored in the project.
+
+The package/trust contract is normative in [ADR-0002](adr/0002-extension-packages.md).
+
+## Application self-update
+
+Projects and runtime databases are not part of a Saturn application update.
+
+~~~sh
+saturn update --check
+saturn update
+saturn update --channel preview
+~~~
+
+Release artifacts are accepted only after Ed25519 metadata verification and SHA-256 content verification. On Windows Saturn copies the current executable to a temporary updater, exits, atomically replaces the application, starts the new binary in an internal health-check mode and restores saturn.previous.exe if that health gate fails.
+
+The public update key is embedded when Saturn is built:
+
+~~~sh
+npm run saturn -- pack \
+  --target windows-x64 \
+  --update-public-key-file ./release/update-public.pem \
+  --update-manifest-url https://updates.example/saturn/stable.json
+~~~
+
+The signing private key belongs in protected release infrastructure and must never be committed or embedded.
+
+The update protocol is defined in [ADR-0003](adr/0003-signed-application-updates.md).

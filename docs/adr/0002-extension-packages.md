@@ -1,0 +1,118 @@
+# ADR-0002: Extension packages and trust model
+
+- **Status:** Accepted
+- **Date:** 2026-09-20
+- **Depends on:** ADR-0001
+
+## Context
+
+Saturn needs equipment libraries, custom elements, industrial protocols, data sources, reports and IDE features without turning each installation into a fork of the application. The project model must remain reproducible, while the standalone application must not require Node, npm or Bun to be separately installed on the target machine.
+
+## Decision
+
+npm-compatible registries are the transport and version catalogue for Saturn extensions. Saturn is the installer and extension host.
+
+An extension package is ordinary npm package metadata plus a Saturn manifest:
+
+~~~json
+{
+  "name": "@factory/equipment",
+  "version": "1.4.2",
+  "saturn": {
+    "api": 1,
+    "entry": "dist/index.js",
+    "capabilities": ["elements"],
+    "elements": [
+      { "type": "factory.motor", "title": "Motor", "tag": "factory-motor" }
+    ]
+  }
+}
+~~~
+
+### Self-contained packages
+
+Installed extensions must be pre-bundled and have no runtime npm dependencies or optional dependencies.
+
+Saturn never executes npm lifecycle scripts and never runs an external package manager during installation. This makes installation deterministic and keeps standalone Saturn independent of Node/Bun/npm on the target machine.
+
+Development repositories may still use `bun add` or workspaces normally. The standalone installer consumes the published bundled artifact.
+
+### Integrity
+
+The installer:
+
+1. resolves an exact version through registry metadata;
+2. requires npm `sha512` integrity;
+3. downloads the tarball over HTTPS (loopback HTTP is allowed for tests);
+4. verifies integrity before extraction;
+5. rejects symlinks, path traversal, oversized archives and unexpected tar entry types;
+6. validates package identity and Saturn manifest again after extraction;
+7. atomically activates the exact version.
+
+Registry credentials are host/user configuration such as `SATURN_NPM_TOKEN`; they are never written to a project.
+
+### Scopes
+
+ADR-0001 defines installation/user scope and project scope.
+
+This implementation first establishes the installation store:
+
+~~~text
+Saturn application data/
+  extensions/
+    state.json
+    packages/
+      factory__equipment/
+        1.4.2/
+~~~
+
+Project manifests may later declare required/recommended extension ranges, but opening an untrusted project must never silently install executable extension code.
+
+### Trust
+
+Extensions are trusted application code, not declarative project data.
+
+Installing an extension is an explicit trust action. Its code may only execute through a Saturn extension host matching the manifest API and granted capabilities.
+
+Capability names in API v1 are:
+
+- `elements`
+- `protocol`
+- `datasource`
+- `panel`
+- `command`
+- `report`
+
+Future permissions that grant filesystem, network or process access require a separate explicit permission model; capability declaration alone does not grant those OS privileges.
+
+### CLI
+
+~~~sh
+saturn extension list
+saturn extension add @factory/equipment
+saturn extension add @factory/equipment@1.4.2
+saturn extension update @factory/equipment
+saturn extension remove @factory/equipment
+~~~
+
+### Consequences
+
+- one Saturn binary can gain domain-specific capabilities;
+- npm registry/versioning infrastructure is reused without embedding npm as a runtime dependency;
+- extension releases can be pinned independently of Saturn;
+- extension installation is intentionally stricter than arbitrary npm installation;
+- full host execution for each capability can evolve without changing package transport or trust boundaries.
+
+## Rejected alternatives
+
+### Execute arbitrary package install scripts
+
+Rejected because it makes target behavior non-reproducible and gives registry packages uncontrolled installation-time code execution.
+
+### Store extension code inside project Git
+
+Rejected because trusted executable application code and authored declarative project configuration have different trust and update lifecycles.
+
+### Invent a proprietary package registry
+
+Rejected because npm-compatible registries already solve naming, version metadata, private scopes and artifact distribution.

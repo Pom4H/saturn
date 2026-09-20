@@ -46,6 +46,9 @@ jobs:
       - name: Test plant runtime
         run: npm run plant:test
 
+      - name: Test standalone trust contracts
+        run: bun test standalone/update-extension.test.ts
+
       - name: Pack Windows executable
         run: npm run saturn -- pack --target windows-x64 --outfile dist/standalone/saturn.exe --skip-web-build
 
