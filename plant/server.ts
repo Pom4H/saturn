@@ -36,11 +36,12 @@ export async function startPlantServer(options: {
     root?: string;
     autoTick?: boolean;
     pushSubject?: string;
+    seed?: Record<string,string>;
 } = {}) {
     const store = new Store(new NodeSql(options.data ?? resolve('data-plant/plant.sqlite3')));
     const repository = await new GitRepository(options.repository ?? resolve('data-plant/project.git')).initialize();
     const service = new Service(store, repository, { reportRunner: runReport });
-    await service.start(demoFiles);
+    await service.start(options.seed ?? demoFiles);
     const auth = new Auth(store), password = options.password ?? randomBytes(18).toString('base64url'), username = options.user ?? 'engineer';
     const created = auth.seed(username, password);
     const push = options.pushSubject ? new Push(store, options.pushSubject) : null;
