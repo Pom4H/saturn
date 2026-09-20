@@ -41,3 +41,53 @@
 .terminal-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.terminal-grid button{display:flex;flex-direction:column;align-items:flex-start;min-width:0;padding:7px;font-family:ui-monospace,monospace}.terminal-grid small{font-size:10px;opacity:.7}.terminal-panel h3{margin:18px 0 8px}.terminal-panel p,.connection-list{font-size:11px;overflow-wrap:anywhere}.connection-list{border-top:1px solid #d4e1e6;margin-top:14px}.connection-list p{padding:5px 0}#plc-front svg{width:100%;height:auto}#plc-front{margin:12px -8px}.ports circle{cursor:crosshair}.ports circle:hover,.ports circle:focus{stroke:#dc8749;outline:none;stroke-width:3}.node[data-kind="plant_saturn"] .ports circle{stroke-width:.8}.node[data-kind="plant_saturn"] .ports circle:hover{stroke-width:1.5}[data-connection]:focus path:first-of-type{stroke:#dd934e}.terminal-panel button[data-disconnect]{font-size:10px;padding:3px 6px}
 
 .legend-pipe{color:#7e9aa8}.legend-power{color:#836344}.legend-control{color:#148c8f}.legend-bus{color:#72628e}
+
+
+/* HMI as code: the browser renders project HMI IR; live values stay in-place between scans. */
+.hmi-panel{background:#eef4f6!important;padding:20px!important}
+.hmi-root{max-width:1180px;margin:0 auto}
+.hmi-dom-screen{display:grid;gap:18px}
+.hmi-page-head{padding:20px 22px;background:#123b4d;color:#fff;border:1px solid #123b4d}
+.hmi-page-head h1{margin:0 0 7px;font-size:28px;color:#fff}
+.hmi-page-head p{margin:0;color:#c9dce3}
+.hmi-page-head .hmi-back{margin:0 0 16px;background:transparent;color:#dbe9ed;border-color:#668896}
+.hmi-eyebrow{font:700 10px ui-monospace,monospace;letter-spacing:1.6px!important;color:#78c9d1!important}
+.hmi-process{position:relative;display:grid;grid-template-columns:minmax(0,2fr) minmax(180px,.7fr);align-items:center;gap:56px;padding:30px;background:#f9fcfd;border:1px solid #cbdbe2;overflow:hidden}
+.hmi-process::before{content:"";position:absolute;left:58%;right:19%;top:50%;height:5px;background:#b9cbd3;transform:translateY(-50%);z-index:0}
+.hmi-process:has(.hmi-lamp-card[data-on="true"])::after{content:"";position:absolute;left:58%;right:19%;top:50%;height:5px;transform:translateY(-50%);z-index:1;background:repeating-linear-gradient(90deg,#15a2ae 0 18px,transparent 18px 31px);animation:hmi-flow .65s linear infinite}
+@keyframes hmi-flow{to{background-position:31px 0}}
+.hmi-equipment{position:relative;z-index:2;min-width:0}
+.hmi-plc-card{padding:14px;background:#fff;border:1px solid #c4d5dc;box-shadow:0 8px 24px #31586a12}
+.hmi-plc-card[data-healthy="false"]{border-style:dashed;opacity:.65}
+.hmi-plc-visual svg{display:block;width:100%;height:auto;max-height:330px}
+.hmi-plc-state{display:flex;gap:10px;align-items:center;padding:10px 4px 0;font:11px ui-monospace,monospace;color:#536f7c}
+.hmi-plc-state span{padding:5px 7px;background:#edf4f6}
+.hmi-plc-state span:last-child{margin-left:auto}
+.hmi-plc-card[data-on="true"] .hmi-plc-state [data-do]{color:#087f66}
+.hmi-lamp-card{display:grid;justify-items:center;gap:9px;text-align:center}
+.hmi-lamp-halo{display:grid;place-items:center;width:132px;height:132px;border:1px solid #c8d7dd;border-radius:50%;background:#edf3f5;transition:background .18s,box-shadow .18s}
+.hmi-lamp-bulb{width:66px;height:66px;border-radius:50%;border:8px solid #455d69;background:#7e9098;box-shadow:inset 0 0 0 3px #dce5e8;transition:background .18s,box-shadow .18s,transform .18s}
+.hmi-lamp-card[data-on="true"] .hmi-lamp-halo{background:#e8fff6;box-shadow:0 0 38px #24c89155}
+.hmi-lamp-card[data-on="true"] .hmi-lamp-bulb{background:#28d99a;box-shadow:inset 0 0 0 3px #eafff6,0 0 20px #20c58b,0 0 55px #20c58b88;animation:hmi-lamp-live 1.35s ease-in-out infinite}
+@keyframes hmi-lamp-live{50%{transform:scale(1.045);box-shadow:inset 0 0 0 3px #eafff6,0 0 27px #20c58b,0 0 72px #20c58baa}}
+.hmi-lamp-card strong{font:700 13px ui-monospace,monospace}.hmi-lamp-card span{font-size:11px;color:#647d8b}
+.hmi-values{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.hmi-value-card{display:grid;gap:7px;padding:16px 18px;background:#fff;border:1px solid #ccdbe1}
+.hmi-value-card label{font-size:11px;color:#637d89}
+.hmi-readout{font:650 27px ui-monospace,SFMono-Regular,monospace;color:#173f50}
+.hmi-readout[data-quality="bad"]{color:#81939b}
+.hmi-open{min-height:64px;background:#14697d;color:#fff;border-color:#14697d;font-weight:650}
+.hmi-command-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hmi-command{min-height:54px;font-weight:650}
+.hmi-command-primary{background:#14697d;color:#fff;border-color:#14697d}
+.hmi-command-primary:hover{background:#105c6d;color:#fff}
+.hmi-note{padding:12px 14px;margin:0!important;border-left:3px solid #2096a7;background:#f6fafb;font-size:12px!important}
+.hmi-dom-dialog{border:1px solid #aebfc7;box-shadow:0 20px 70px #173c4d44;padding:22px;max-width:420px;color:#173c4d}
+.hmi-dom-dialog::backdrop{background:#102d3a66}
+@media(max-width:760px){
+ .hmi-panel{padding:12px!important}.hmi-page-head{padding:17px}.hmi-page-head h1{font-size:23px}
+ .hmi-process{grid-template-columns:1fr;gap:22px;padding:16px}.hmi-process::before,.hmi-process::after{display:none}
+ .hmi-lamp-halo{width:92px;height:92px}.hmi-lamp-bulb{width:48px;height:48px;border-width:6px}
+ .hmi-values{grid-template-columns:1fr 1fr}.hmi-values>.hmi-open{grid-column:1/-1}
+ .hmi-command-row{grid-template-columns:1fr}
+}
