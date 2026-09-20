@@ -171,6 +171,8 @@ try {
         await bench.locator('#plcBack').click();
         await bench.locator('#hmi-root [data-hmi-screen="overview"]').waitFor();
         assert.match(await bench.locator('#overviewOutputValue').innerText(),/^1$/);
+        await bench.locator('[data-tab="scheme"]').click();
+        await bench.locator('[data-system="commissioning"]').click();
     });
     await check('clicking two terminals and removing a connection only edits a validated source draft',async()=>{
         await bench.locator('#diagram [data-node="PSU-24"]').click();await bench.locator('[data-connect-port="minus"]').click();
