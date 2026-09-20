@@ -36,7 +36,7 @@ export async function mountStudio() {
   try { const raw = localStorage.getItem(workspaceKey); if (raw) workspace = parseWorkspace(raw); }
   catch { storageAvailable = false; }
   let shared = false;
-  try { const source = readSharedSource(location.hash); if (source) { compile(source); createProject(workspace, 'Проект по ссылке', source); shared = true; } } catch { storageAvailable = false; }
+  try { const source = readSharedSource(location.hash); if (source) { compile(source); createProject(workspace, tr('Проект по ссылке', 'Project from link'), source); shared = true; } } catch { storageAvailable = false; }
   let compiled: Compiled = compile(examples.pump.source), spatial: SceneView3D | undefined;
   let errorPath: string | null = null;
   let error = false, selected: string | null = null, surface: Surface = 'scene';
@@ -271,7 +271,7 @@ export async function mountStudio() {
   async function openPlantExample() {
     try { await ensurePlant(); const files = plantTools!.nestedStarter(); plantTools!.plantProjection(files); persist();
       if (serverRevision) serverDraft = { revision: serverRevision, documents };
-      const project = createProject(workspace, 'Насосная установка', files['plant.ts']);
+      const project = createProject(workspace, tr('Насосная установка', 'Pumping installation'), files['plant.ts']);
       serverRevision = null; pendingRevision = null; updateFiles(workspace, files);
       switchDocument({ kind: 'project', id: project.id }, false); filesVisible = true; codeVisible = true; syncPanels();
     } catch (e) { toast(e instanceof Error ? e.message : String(e)); renderMeta(); }
