@@ -1,4 +1,5 @@
 import { ControllerVM, inputPins, CONTROLLER_ABI, controllerKeyAction, initialControllerScreen, type ControllerKey } from './controller';
+import { shellKey } from './plc-shell';
 import { connectionExpression, terminals, busConnected } from './ports';
 import { model } from './models';
 import { AppError, clone, finite, type Checkpoint, type Expr, type Frame, type Project, type Sample } from './types';
@@ -163,8 +164,11 @@ export class Kernel {
         const controller=this.project.controllers?.find(c=>c.id===target),state=this.state.plc?.[target];
         if(!controller||!state)throw new AppError('Unknown controller');
         if(!['up','down','left','right'].includes(key))throw new AppError('Unknown controller key');
-        const action=controllerKeyAction(controller,state.screen,key as ControllerKey);state.screen=action.screen;
-        if(action.setpoint){const vm=this.controllers.get(target)!;vm.setSetpoint(action.setpoint,action.value,action.delta);state.snapshot=vm.snapshot();}
+        const action=controller.hmi.shell?.auto
+            ? shellKey(this.project,target,state.screen,key as ControllerKey)
+            : controllerKeyAction(controller,state.screen,key as ControllerKey);
+        state.screen=action.screen;
+        if(action.setpoint){const vm=this.controllers.get(target)!;vm.setSetpoint(action.setpoint,action.value,(action as any).delta);state.snapshot=vm.snapshot();}
     }
     operate(target: string, value: number): void {
         const c = this.project.controls?.find(c => c.id === target);
