@@ -16,7 +16,7 @@ export class Kernel {
         this.state.controllerAbi=CONTROLLER_ABI;
         this.state.plc ??= {};
         for(const c of project.controllers??[]) {
-            const vm=new ControllerVM(c); this.controllers.set(c.id,vm);
+            const vm=new ControllerVM(c,project); this.controllers.set(c.id,vm);
             const saved=this.state.plc[c.id];if(saved?.snapshot)vm.restore(saved.snapshot);else if(checkpoint)throw new AppError('Missing controller runtime snapshot');
             this.state.plc[c.id] ??= {inputs:{},outputs:Object.fromEntries(Object.keys(c.outputs).map(k=>[k,0])),healthy:false,powered:false,screen:initialControllerScreen(c),snapshot:vm.snapshot()};
             if(!Number.isInteger(this.state.plc[c.id].screen)) this.state.plc[c.id].screen=initialControllerScreen(c);
