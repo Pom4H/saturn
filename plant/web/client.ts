@@ -1,6 +1,33 @@
 import type { Frame, Project, Actor, Revision, ReportArtifact, ReportData } from '../types';
+export interface RuntimeInstance {
+    protocol: number;
+    instanceId: string;
+    authority: 'runtime';
+    actor: Actor;
+    projectId: string;
+    head: string | null;
+    published: string | null;
+    applied: string;
+    runId: string;
+    healthy: boolean;
+}
+export interface EnvironmentDescriptor {
+    name: string;
+    url: string;
+    instanceId: string;
+    projectId: string;
+    applied: string;
+    published: string | null;
+    head: string | null;
+    runId: string;
+    role: Actor['role'];
+}
 export interface Status {
     actor: Actor;
+    runtimeActor?: Actor;
+    instance?: RuntimeInstance;
+    runtimeInstance?: RuntimeInstance;
+    environment?: EnvironmentDescriptor | null;
     project: Project;
     frame: Frame;
     head: string | null;
@@ -119,3 +146,66 @@ export class RemoteClient implements Connection {
     close() { this.stream?.close(); clearInterval(this.watchdog); }
 }
 export type { Frame, Project, Actor, Revision, ReportArtifact, ReportData };
+
+
+/**
+ * One engineering workspace + one live runtime.
+ *
+ * Project/revision writes stay on the authoring connection. Runtime commands,
+ * history, alarms, reports and telemetry are routed to the operator Saturn.
+ */
+export class LinkedClient implements Connection {
+    onFrame = (_frame: Frame) => { };
+    onFailure = (_message: string) => { };
+    onNotification = (_notice: Notice) => { };
+    private sourceStatus!: Status;
+    private runtimeStatus!: Status;
+    private readonly runtimeActions = new Set([
+        'command', 'restart', 'events', 'reports', 'history', 'report-artifact',
+        'subscribe', 'unsubscribe'
+    ]);
+
+    constructor(readonly source: Connection, readonly runtime: Connection) {
+        source.onFailure = message => this.onFailure(`Workspace: ${message}`);
+        runtime.onFailure = message => this.onFailure(`Environment: ${message}`);
+        runtime.onFrame = frame => this.onFrame(frame);
+        runtime.onNotification = notice => this.onNotification(notice);
+    }
+
+    private merge(source: Status, runtime: Status): Status {
+        if (source.project.id !== runtime.project.id)
+            throw new Error(`Environment project mismatch: workspace ${source.project.id}, runtime ${runtime.project.id}`);
+        return {
+            ...source,
+            frame: runtime.frame,
+            healthy: runtime.healthy,
+            releaseError: runtime.releaseError,
+            runtimeActor: runtime.actor,
+            runtimeInstance: runtime.instance,
+        };
+    }
+
+    async start(memory = false): Promise<Status> {
+        this.sourceStatus = await this.source.start(memory);
+        this.runtimeStatus = await this.runtime.start();
+        return this.merge(this.sourceStatus, this.runtimeStatus);
+    }
+
+    async request<T>(action: string, input?: unknown): Promise<T> {
+        if (action === 'session') {
+            const [source, runtime] = await Promise.all([
+                this.source.request<Status>('session'),
+                this.runtime.request<Status>('session'),
+            ]);
+            this.sourceStatus = source;
+            this.runtimeStatus = runtime;
+            return this.merge(source, runtime) as T;
+        }
+        return (this.runtimeActions.has(action) ? this.runtime : this.source).request<T>(action, input);
+    }
+
+    close(): void {
+        this.source.close();
+        this.runtime.close();
+    }
+}
