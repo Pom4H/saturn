@@ -11,10 +11,12 @@ import { executeReport } from '../workflows';
 import { NodeSql } from '../adapters/node-sql';
 import type { ReportTask } from '../types';
 const project=()=>compileProject(demoFiles);
-test('one DSL tree is shared by live HMI, report and the compiled controller screen',()=>{
- const p=project(),v=p.views![0];assert.deepEqual(v.body,p.reports.find(r=>r.id==='bench-state')!.view!.body);
- assert.deepEqual(v.body,p.controllers![0].hmi.view!.body);
- const vm=new ControllerVM(p.controllers![0]),result=vm.scan({AI1:700},100);assert.equal(result.outputs.DO1,1);assert.ok(result.hmi.some(c=>c.type==='text'&&c.text==='700'));
+test('shared presentation remains available while controller compiles native interactive screens',()=>{
+ const p=project(),v=p.views![0],controller=p.controllers![0];assert.deepEqual(v.body,p.reports.find(r=>r.id==='bench-state')!.view!.body);
+ assert.deepEqual(v.body,controller.hmi.view!.body);
+ const artifact=compileController(controller);assert.equal(artifact.screenCount,3);
+ const vm=new ControllerVM(controller),main=vm.scan({AI1:700},100,0);assert.equal(main.outputs.DO1,1);assert.ok(main.hmi.some(c=>c.type==='text'&&c.text.includes('700')));
+ const io=vm.scan({AI1:700},100,1);assert.ok(io.hmi.some(c=>c.type==='text'&&c.text.includes('Входы')));
 });
 test('presentation escapes content, preserves bad quality and disables commands in report mode',()=>{
  const v=view('escape',{title:'Example',bindings:{a:pin('value')},body:panel([label('<script>x</script>'),readout('X','a'),commandButton('Start','control',1)])});
