@@ -56,7 +56,9 @@
     "@typescript/typescript6": "6.0.2",
     "codemirror": "6.0.2",
     "three": "0.185.1",
-    "web-push": "3.6.7"
+    "web-push": "3.6.7",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   },
   "private": true,
   "type": "module",
@@ -73,7 +75,9 @@
     "@types/three": "0.185.0",
     "@types/web-push": "3.6.4",
     "esbuild": "0.28.2",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0"
   },
   "exports": {
     "./core": "./src/core.ts",
