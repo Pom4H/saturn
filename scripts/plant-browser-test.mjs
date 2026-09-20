@@ -190,6 +190,17 @@ try {
         assert.equal(await bench.locator('#clock').innerText(),clock);
         await bench.screenshot({path:evidence+'/shared-report-panel.png',fullPage:true});
     });
+    await check('hourly historian report uses the Saturn report design system',async()=>{
+        await bench.locator('[data-tab="reports"]').click();await bench.locator('[data-run="pump-a-hourly-flow"]').click();
+        const row=bench.locator('#report-runs tr').filter({hasText:'pump-a-hourly-flow'}).filter({has:bench.locator('.success')}).first();
+        await row.waitFor();await row.locator('[data-artifact]').click();
+        const report=bench.frameLocator('#report-preview');
+        await report.locator('.report-sheet').waitFor();
+        assert.equal(await report.locator('.report-brand').innerText(),'Saturn');
+        assert.ok(await report.locator('.report-metrics').count());
+        assert.equal(await report.locator('[data-chart-type="bar"]').getAttribute('data-chart-type'),'bar');
+        await bench.screenshot({path:evidence+'/modern-hourly-report.png',fullPage:true});
+    });
     await check('DSL operator actions use audited commands and telemetry preserves keyboard focus',async()=>{
         await bench.locator('[data-tab="views"]').click();await bench.locator('#view-select').selectOption('bench-operator');
         const button=bench.locator('#live-view [data-view-set="7"]');await button.click();
