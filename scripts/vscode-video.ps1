@@ -101,7 +101,7 @@ New-Item -ItemType Directory -Force -Path 'vscode-video' | Out-Null
 $out = (Resolve-Path 'vscode-video').Path + '\saturn-vscode-tour.mp4'
 Start-Sleep -Milliseconds 600
 Write-Host "Recording real VS Code desktop with $ffmpeg"
-& $ffmpeg -hide_banner -loglevel warning -y -f gdigrab -framerate 30 -draw_mouse 1 -i desktop -t 52 -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -preset veryfast -crf 22 -pix_fmt yuv420p -movflags +faststart $out
+& $ffmpeg -hide_banner -loglevel warning -y -f gdigrab -framerate 30 -draw_mouse 1 -i desktop -t 52 -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v mpeg4 -q:v 4 -pix_fmt yuv420p -movflags +faststart $out
 if ($LASTEXITCODE -ne 0) { throw "ffmpeg recording failed with exit code $LASTEXITCODE" }
 
 $info = Get-Item $out
