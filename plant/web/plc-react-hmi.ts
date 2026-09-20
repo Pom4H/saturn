@@ -32,8 +32,8 @@ const sig=(id:string,key:string)=>id+'.'+key;
 const rect=(id:string,x:number,y:number,width:number,height:number,fill=C.panel2,stroke=C.line,radius=7):DisplayNode=>({id,kind:'rect',x,y,width,height,fill,stroke,strokeWidth:1,radius});
 const line=(id:string,x1:number,y1:number,x2:number,y2:number,color=C.line,width=1):DisplayNode=>({id,kind:'line',x1,y1,x2,y2,color,width});
 const text=(id:string,x:number,y:number,value:string,size=10,color=C.text,weight=600,align:'start'|'middle'|'end'='start',mono=false):DisplayNode=>({id,kind:'text',x,y,text:value,color,size,weight,align,mono});
-const readout=(id:string,x:number,y:number,signal:string,prefix='',suffix='',digits=0,size=11,color=C.text,align:'start'|'middle'|'end'='start'):DisplayNode=>({
-  id,kind:'text',x,y,text:{value:{signal},prefix,suffix,digits},color,size,weight:650,align,mono:true,
+const readout=(id:string,x:number,y:number,signal:string,prefix='',suffix='',digits=0,size=11,color=C.text,align:'start'|'middle'|'end'='start',scale=1):DisplayNode=>({
+  id,kind:'text',x,y,text:{value:{signal,scale},prefix,suffix,digits},color,size,weight:650,align,mono:true,
 });
 const boolText=(id:string,x:number,y:number,signal:string,prefix='',on='ON',off='OFF',size=9,color=C.text,align:'start'|'middle'|'end'='start'):DisplayNode=>({
   id,kind:'text',x,y,text:{value:{signal},prefix,on,off},color,size,weight:700,align,mono:true,
@@ -60,7 +60,7 @@ function overview(project:Project,frame:Frame,controllerId:string,page:PlcShellP
   return{background:C.bg,nodes:[
     ...header(page,index,total),
     text('overview-kicker',12,48,'SYSTEM OVERVIEW',8,C.cyan,800),
-    rect('overview-card-a',12,63,91,61,C.panel2),text('overview-a-label',22,80,'LEVEL',7,C.muted,700),readout('overview-a',22,107,level,'',' %',0,18,C.text),
+    rect('overview-card-a',12,63,91,61,C.panel2),text('overview-a-label',22,80,'LEVEL',7,C.muted,700),readout('overview-a',22,107,level,'',' %',0,18,C.text,'start',100),
     rect('overview-card-b',114,63,91,61,C.panel2),text('overview-b-label',124,80,'PUMP RPM',7,C.muted,700),readout('overview-b',124,107,rpm,'','',0,18,C.text),
     rect('overview-card-c',216,63,91,61,C.panel2),text('overview-c-label',226,80,'FLOW',7,C.muted,700),readout('overview-c',226,107,flow,'','',2,18,C.cyan),
     line('overview-pipe',28,158,292,158,C.line,8),
@@ -77,7 +77,7 @@ function process(project:Project,controllerId:string,page:PlcShellPage,index:num
   return{background:C.bg,nodes:[
     ...header(page,index,total),text('process-mode',12,47,'PROCESS',8,C.cyan,800),
     {id:'tank',kind:'tank',x:18,y:70,width:68,height:100,level:{signal:level,min:0,max:1},shell:C.muted,background:C.dark,water:C.water,waterLine:C.water2,waveAmplitude:2.5,waveLength:23,waveSpeed:.009,radius:8},
-    text('tank-name',52,185,tank?.id??'TANK',8,C.muted,700,'middle'),readout('tank-level',52,199,level,'',' %',0,10,C.text,'middle'),
+    text('tank-name',52,185,tank?.id??'TANK',8,C.muted,700,'middle'),readout('tank-level',52,199,level,'',' %',0,10,C.text,'middle',100),
     {id:'flow-in',kind:'flow',points:[{x:86,y:121},{x:127,y:121}],value:{signal:flow},background:C.line,color:C.cyan,width:4,backgroundWidth:10,packetRadius:2.5,packetSpacing:16,speed:58},
     {id:'pump',kind:'pump',cx:160,cy:121,r:30,rpm:{signal:rpm},shell:C.dark,body:C.panel2,bladeA:C.cyan,bladeB:rgb565(39,138,155),hub:C.white},
     {id:'flow-out',kind:'flow',points:[{x:193,y:121},{x:239,y:121}],value:{signal:flow},background:C.line,color:C.cyan,width:4,backgroundWidth:10,packetRadius:2.5,packetSpacing:17,speed:58},
@@ -108,7 +108,7 @@ function tankDetail(page:Extract<PlcShellPage,{kind:'device'}>,index:number,tota
   return{background:C.bg,nodes:[
     ...header(page,index,total),text('tank-kind',12,47,'RESERVOIR',8,C.cyan,800),
     {id:'tank',kind:'tank',x:89,y:59,width:142,height:133,level:{signal:level,min:0,max:1},shell:C.muted,background:C.dark,water:C.water,waterLine:C.water2,waveAmplitude:3,waveLength:27,waveSpeed:.008,radius:12},
-    rect('level-card',18,82,58,53),text('level-label',47,99,'LEVEL',7,C.muted,700,'middle'),readout('level-value',47,123,level,'',' %',0,17,C.text,'middle'),
+    rect('level-card',18,82,58,53),text('level-label',47,99,'LEVEL',7,C.muted,700,'middle'),readout('level-value',47,123,level,'',' %',0,17,C.text,'middle',100),
     line('gauge-bg',244,70,244,187,C.line,5),text('g100',286,78,'100',7,C.muted,600,'end',true),text('g50',286,131,'50',7,C.muted,600,'end',true),text('g0',286,188,'0',7,C.muted,600,'end',true),
     ...footer('< process   > next   monitor only'),
   ]};
