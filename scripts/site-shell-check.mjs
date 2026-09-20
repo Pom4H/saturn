@@ -7,6 +7,7 @@ export async function checkShell(browser, origin) {
   const errors = [];
   try {
     await context.addInitScript(() => {
+      localStorage.setItem('saturn.ui.language', 'ru');
       const state = window.__shellNotificationTest = { permission: 'default', requests: 0, shows: [], nextPermission: 'granted' };
       // Never ask the host browser for permission or display a host notification.
       Object.defineProperty(Notification, 'permission', { configurable: true, get: () => state.permission });
