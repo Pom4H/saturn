@@ -143,10 +143,10 @@ try {
   await page.locator('#shell-settings').click();
   await page.locator('[name="app-language"][value="ru"]').check();
   await page.waitForFunction(() => document.documentElement.lang === 'ru');
-  assert.equal(await page.locator('.hero p').innerText(), 'Схема и TypeScript в одном проекте.');
+  assert.equal((await page.locator('.hero p').textContent())?.trim(), 'Схема и TypeScript в одном проекте.');
   await page.locator('[name="app-language"][value="en"]').check();
   await page.waitForFunction(() => document.documentElement.lang === 'en');
-  assert.equal(await page.locator('.hero p').innerText(), 'Diagram and TypeScript in one project.');
+  assert.equal((await page.locator('.hero p').textContent())?.trim(), 'Diagram and TypeScript in one project.');
   await page.locator('[name="app-language"][value="ru"]').check();
   await page.waitForFunction(() => document.documentElement.lang === 'ru');
   await page.locator('.app-settings-close').click();
