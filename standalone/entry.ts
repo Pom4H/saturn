@@ -11,7 +11,8 @@ import { loadProjectDirectory } from './project-loader';
 import { WorkspaceRegistry } from './workspace';
 import { WorkspaceRepository } from './workspace-repository';
 import { applyStagedUpdate, checkApplicationUpdate, installApplicationUpdate, runUpdateCommand, type UpdateChannel } from './update';
-import { ExtensionManager, runExtensionCommand } from './extensions';\nimport { runIdeCommand } from './ide';
+import { ExtensionManager, runExtensionCommand } from './extensions';
+import { runIdeCommand } from './ide';
 
 declare const SATURN_VERSION: string;
 declare const SATURN_DEMO_FILES: Record<string, string>;
