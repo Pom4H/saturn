@@ -3,14 +3,11 @@ import { readFile, realpath } from 'node:fs/promises';
 import { resolve, sep, extname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomBytes } from 'node:crypto';
-import { NodeSql } from './adapters/node-sql';
-import { GitRepository } from './adapters/git';
 import { Auth } from './adapters/auth';
 import { Push } from './adapters/push';
-import { runReport } from './adapters/node-reports';
 import { Store } from './store';
 import { Service } from './service';
-import { AppError, requireRole } from './types';
+import { AppError, requireRole, type Repository, type SqlDatabase, type ReportTask, type ReportArtifact } from './types';
 import { demoFiles } from './demo/files';
 const prefix = '/plant';
 async function body(req: IncomingMessage): Promise<any> { if (!req.headers['content-type']?.startsWith('application/json'))
@@ -36,11 +33,17 @@ export async function startPlantServer(options: {
     root?: string;
     autoTick?: boolean;
     pushSubject?: string;
+    database?: SqlDatabase;
+    projectRepository?: Repository;
+    reportRunner?: (task: ReportTask) => Promise<ReportArtifact>;
+    seed?: Record<string, string>;
 } = {}) {
-    const store = new Store(new NodeSql(options.data ?? resolve('data-plant/plant.sqlite3')));
-    const repository = await new GitRepository(options.repository ?? resolve('data-plant/project.git')).initialize();
-    const service = new Service(store, repository, { reportRunner: runReport });
-    await service.start(demoFiles);
+    const database = options.database ?? new (await import('./adapters/node-sql')).NodeSql(options.data ?? resolve('data-plant/plant.sqlite3'));
+    const store = new Store(database);
+    const repository = options.projectRepository ?? await new (await import('./adapters/git')).GitRepository(options.repository ?? resolve('data-plant/project.git')).initialize();
+    const reportRunner = options.reportRunner ?? (await import('./adapters/node-reports')).runReport;
+    const service = new Service(store, repository, { reportRunner });
+    await service.start(options.seed ?? demoFiles);
     const auth = new Auth(store), password = options.password ?? randomBytes(18).toString('base64url'), username = options.user ?? 'engineer';
     const created = auth.seed(username, password);
     const push = options.pushSubject ? new Push(store, options.pushSubject) : null;
