@@ -116,6 +116,7 @@ export const expansion=(device:{node:Simulation},controller:{controller:Controll
 
 /** Controller-local stable block identity; separate from a physical terminal. */
 export const block=(name:string):Expr=>({ref:id(name)});
+export const setpoint=(name:string):Expr=>({ref:id(name)});
 export const functionBlock=(type:PlcBlock['type'],inputs:Expr[],params:number[]=[]):PlcBlock=>({type,inputs,params});
 
 /** Shared report/live-HMI blueprint; binding environments are explicit at each use. */
