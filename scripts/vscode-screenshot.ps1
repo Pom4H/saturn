@@ -85,11 +85,12 @@ $args = @(
   '--extensions-dir', $extensions,
   '--disable-updates',
   '--disable-workspace-trust',
+  '--remote-debugging-port=9222',
   '--new-window',
   $workspace,
   $file
 )
-$env:SATURN_VSCODE_CAPTURE = '1'
+Remove-Item Env:SATURN_VSCODE_CAPTURE -ErrorAction SilentlyContinue
 Start-Process -FilePath $code -ArgumentList $args | Out-Null
 
 $proc = $null
@@ -101,7 +102,10 @@ for ($i=0; $i -lt 90; $i++) {
 if (-not $proc) { throw 'VS Code did not create a visible window on the runner.' }
 
 [NativeWindow]::ShowWindow($proc.MainWindowHandle, 3) | Out-Null
-Start-Sleep -Seconds 12
+$env:VSCODE_CDP = 'http://127.0.0.1:9222'
+& node scripts\vscode-drive.mjs
+if ($LASTEXITCODE -ne 0) { throw "VS Code CDP driver failed with exit code $LASTEXITCODE" }
+Start-Sleep -Seconds 2
 
 $rect = New-Object NativeWindow+RECT
 if (-not [NativeWindow]::GetWindowRect($proc.MainWindowHandle, [ref]$rect)) { throw 'GetWindowRect failed.' }
