@@ -1,6 +1,8 @@
 # Saturn
 
 > System architecture: [ADR-0001 — Saturn system architecture](docs/adr/0001-saturn-system-architecture.md).
+>
+> Developer guide: [TypeScript DSL, language tooling, i18n and coding agents](docs/developer/language-tooling.md).
 
 ## Application modes
 
