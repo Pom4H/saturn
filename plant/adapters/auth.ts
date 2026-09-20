@@ -39,12 +39,16 @@ export class Auth {
         this.store.db.exec('INSERT INTO sessions VALUES(?,?,?,?)', [hash(token), user, csrf, now + 8 * 3600000]);
         return { token, csrf, actor: { id: user, role: row.role } };
     }
-    session(cookie: string | undefined) { const token = /(?:^|;\s*)scada_session=([A-Za-z0-9_-]{43})(?:;|$)/.exec(cookie ?? '')?.[1]; if (!token)
-        throw new AppError('Sign in required', 401); const sessionId = hash(token); const row = this.store.db.all<{
+    session(cookie: string | undefined, authorization?: string) {
+        const bearer = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(authorization ?? '')?.[1];
+        const token = bearer ?? /(?:^|;\s*)scada_session=([A-Za-z0-9_-]{43})(?:;|$)/.exec(cookie ?? '')?.[1];
+        if (!token)
+            throw new AppError('Sign in required', 401);
+        const sessionId = hash(token); const row = this.store.db.all<{
         user_id: string;
         role: Actor['role'];
         csrf: string;
     }>('SELECT s.user_id,u.role,s.csrf FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=? AND s.expires>?', [sessionId, Date.now()])[0]; if (!row)
-        throw new AppError('Session expired', 401); return { actor: { id: row.user_id, role: row.role }, csrf: row.csrf, sessionId }; }
+        throw new AppError('Session expired', 401); return { actor: { id: row.user_id, role: row.role }, csrf: row.csrf, sessionId, bearer: !!bearer }; }
     logout(sessionId: string) { this.store.db.transaction(() => { this.store.db.exec('DELETE FROM sessions WHERE id=?', [sessionId]); this.store.db.exec('DELETE FROM subscriptions WHERE session_id=?', [sessionId]); }); }
 }
