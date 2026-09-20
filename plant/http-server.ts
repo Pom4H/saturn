@@ -30,6 +30,7 @@ export async function startPlantHttpServer(options: {
     root?: string;
     autoTick?: boolean;
     pushSubject?: string;
+    embeddedStatic?: boolean;
     database: SqlDatabase;
     projectRepository: Repository;
     reportRunner: (task: ReportTask) => Promise<ReportArtifact>;
@@ -43,7 +44,19 @@ export async function startPlantHttpServer(options: {
     const auth = new Auth(store), password = options.password ?? randomBytes(18).toString('base64url'), username = options.user ?? 'engineer';
     const created = auth.seed(username, password);
     const push = options.pushSubject ? new Push(store, options.pushSubject) : null;
-    const root = await realpath(options.root ?? resolve('dist/plant'));
+    const configuredRoot = resolve(options.root ?? resolve('dist/plant'));
+    const root = options.embeddedStatic ? configuredRoot : await realpath(configuredRoot);
+    const staticFile = async (relativePath: string) => {
+        const candidate = resolve(root, relativePath);
+        if (candidate !== root && !candidate.startsWith(root + sep))
+            throw new AppError('Path rejected', 403);
+        if (options.embeddedStatic)
+            return candidate;
+        const file = await realpath(candidate);
+        if (file !== root && !file.startsWith(root + sep))
+            throw new AppError('Path rejected', 403);
+        return file;
+    };
     const streams = new Set<import('node:http').ServerResponse>();
     let origin = options.publicUrl ? new URL(options.publicUrl).origin : '';
     const server = createServer(async (req, res) => {
@@ -218,9 +231,7 @@ export async function startPlantHttpServer(options: {
                 return;
             }
             if (path.startsWith('/site/assets/')) {
-                const siteRoot = resolve(root, 'site/assets');
-                const file = await realpath(resolve(siteRoot, path.slice('/site/assets/'.length)));
-                if (!file.startsWith(siteRoot + sep)) throw new AppError('Path rejected', 403);
+                const file = await staticFile('site/assets/' + path.slice('/site/assets/'.length));
                 const mime: Record<string, string> = { '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.txt': 'text/plain', '.md': 'text/plain; charset=utf-8' };
                 res.writeHead(200, { 'Content-Type': mime[extname(file)] ?? 'application/octet-stream', 'Cache-Control': 'no-cache' });
                 res.end(req.method === 'HEAD' ? undefined : await readFile(file));
@@ -242,9 +253,7 @@ export async function startPlantHttpServer(options: {
             }
             if (!path.startsWith(`${prefix}/assets/`) && path !== `${prefix}/sw.js`)
                 throw new AppError('File not found', 404);
-            const file = await realpath(resolve(root, '.' + path.slice(prefix.length)));
-            if (!file.startsWith(root + sep))
-                throw new AppError('Path rejected', 403);
+            const file = await staticFile('.' + path.slice(prefix.length));
             const mime: Record<string, string> = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.wasm': 'application/wasm', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png' };
             res.writeHead(200, { 'Content-Type': mime[extname(file)] ?? 'application/octet-stream', 'Cache-Control': 'no-cache' });
             res.end(req.method === 'HEAD' ? undefined : await readFile(file));
