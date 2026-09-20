@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import { createECDH, randomBytes } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { compileProject, validateProject } from '../compiler';
+import { formatDiagnostic, SaturnDiagnosticError } from '../diagnostics';
 import * as projectDsl from '../dsl';
 import { entities as dslReferenceEntities, operators as dslReferenceOperators } from '../dsl-reference';
 import { demoFiles } from '../demo/files';
@@ -30,7 +31,7 @@ const engineer: Actor = { id: 'engineer', role: 'engineer' }, viewer: Actor = { 
 const project = () => compileProject(demoFiles);
 const makeService = async (files = demoFiles) => { const store = new Store(new NodeSql()); let serial = 0; const repo = new LocalRepository(store, () => `local:${++serial}`); const service = new Service(store, repo, { now: () => 1000000, uuid: () => `id-${++serial}`, reportRunner: async (task) => executeReport(task, new NodeSql()) }); await service.start(files); return service; };
 test('multi-file DSL compiles hierarchy and typed signal sources', () => { const p = project(); assert.equal(p.simulations.length, 46); assert.equal(p.systems.length, 18); assert.equal(p.reports.length, 4); assert.deepEqual(p.simulations.find(n => n.id === 'PUMP-A')!.inputs.voltage, { ref: 'GRID.voltage' }); });
-test('canonical @saturn/core import compiles while @scada/plant remains a compatibility alias', () => {
+test('canonical @saturn/core import compiles and legacy DSL namespaces are rejected', () => {
     const source = `import { project, system } from '@saturn/core';
 export default project('minimal', {
   title: 'Minimal',
@@ -42,12 +43,25 @@ export default project('minimal', {
   reports: [],
 });`;
     assert.equal(compileProject({ 'plant.ts': source }).id, 'minimal');
-    assert.equal(compileProject({ 'plant.ts': source.replace('@saturn/core', '@scada/plant') }).id, 'minimal');
+    assert.throws(() => compileProject({ 'plant.ts': source.replace('@saturn/core', '@scada/plant') }), /@saturn\/core/);
 });
 test('interactive DSL reference covers every public DSL function', () => {
     const publicFunctions = Object.entries(projectDsl).filter(([, value]) => typeof value === 'function').map(([name]) => name).sort();
     const documented = [...dslReferenceEntities.map(entity => entity.name), ...dslReferenceOperators.map(([name]) => name)].sort();
     assert.deepEqual(documented, publicFunctions);
+});
+test('physical topology diagnostics keep stable codes and localize presentation', () => {
+    const p = project();
+    const wire = p.connections?.find(connection => connection.medium === 'pipe');
+    assert.ok(wire);
+    wire!.to = { device: 'TR', port: 'primary' };
+    assert.throws(() => validateProject(p), error => {
+        assert.ok(error instanceof SaturnDiagnosticError);
+        assert.equal(error.diagnostic.code, 'SATURN_CONNECTION_INCOMPATIBLE');
+        assert.match(formatDiagnostic(error.diagnostic, 'en'), /Incompatible connection/);
+        assert.match(formatDiagnostic(error.diagnostic, 'ru'), /Несовместимое соединение/);
+        return true;
+    });
 });
 
 for (const [name, source] of Object.entries({ execute: 'globalThis.process.exit()', getter: 'const a={get b(){return 1;}};', prototype: 'const a={constructor: 1};', import: 'import { x } from "../../outside";', loop: 'while(true){}', function: 'const x=()=>1;' }))
