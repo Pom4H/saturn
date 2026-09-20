@@ -183,9 +183,9 @@ try {
   await fallback.waitForFunction(() => document.getElementById('studio-3d').disabled);
   assert.equal(await fallback.locator('#studio-shell').getAttribute('data-mode'), '2d');
   assert.equal(await fallback.locator('#studio-svg [data-node]').count(), 5);
-  const sharedContext = await browser.newContext(); const shared = await sharedContext.newPage(); await shared.goto(sharedURL);
+  const sharedContext = await browser.newContext({ locale: 'en-US' }); const shared = await sharedContext.newPage(); await shared.goto(sharedURL);
   await shared.waitForFunction(() => document.body.classList.contains('shell-fullscreen'));
-  assert.equal(await shared.locator('#project-switch option:checked').textContent(), 'Проект по ссылке');
+  assert.equal(await shared.locator('#project-switch option:checked').textContent(), 'Project from link');
   await checkFiles(browser, origin);
   await checkServerFiles(browser);
   await checkTelemetry(browser);
