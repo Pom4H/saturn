@@ -890,6 +890,10 @@ export async function mountStudio() {
   if (isPlant()) await ensurePlant();
   view.render(compiled.scene); refresh(false); fitScene(); updatePause(); renderMeta(); syncPanels();
   message(storageAvailable ? '' : 'Хранилище недоступно');
+  // Authentication/runtime activation is part of the critical path. Never make
+  // an operator wait for optional 3D/WebGL initialization before the 2D HMI works.
+  const requestedServer = !shared && new URLSearchParams(location.search).get('project') === 'server';
+  await probeRuntime();
   try {
     const { SceneView3D } = await import('../src/view3d'); spatial = new SceneView3D(spatialHost, { landing: true }); spatial.onSelect = select;
     spatial.canMove = id => !connecting && canMoveNode(id);
@@ -898,8 +902,6 @@ export async function mountStudio() {
     spatial.setMessages({ preview: t('scene3d.preview'), noData: t('scene3d.noData'), moreAlarms: t('scene3d.moreAlarms') });
     spatial.render(compiled.scene); spatial.setRuntime(observedRuntime ?? plant?.runtime ?? null); spatial.select(selected); setMode(explicit);
   } catch { $('studio-3d').setAttribute('disabled', ''); present(1); toast('WebGL недоступен. Работайте с 2D-схемой.'); }
-  const requestedServer = !shared && new URLSearchParams(location.search).get('project') === 'server';
-  await probeRuntime();
   if (runtimeOnly || matchMedia('(display-mode: standalone)').matches || location.hash === '#studio' || location.hash === '#workspace' || shared) setFullscreen(true);
   if (shared) persist();
   // probeRuntime owns authenticated activation. Only unauthenticated server links
