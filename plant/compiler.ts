@@ -388,10 +388,32 @@ export function validateProject(value: unknown): asserts value is Project {
             throw new AppError('Invalid report SQL/columns');
         if (typeof r.title !== 'string' || r.title.length > 150 || r.columns.length > 32 || (r.on.schedule?.length ?? 0) > 8 || Object.keys(r.on.workflow_dispatch?.inputs ?? {}).length > 16)
             throw new AppError('Report declaration exceeds limits');
+        if (r.description !== undefined && (typeof r.description !== 'string' || r.description.length > 500))
+            throw new AppError('Invalid report description');
         for (const column of r.columns) {
             id(column.key);
-            if (typeof column.title !== 'string' || column.title.length > 150)
+            if (typeof column.title !== 'string' || column.title.length > 150 || (column.unit !== undefined && (typeof column.unit !== 'string' || column.unit.length > 30)))
                 throw new AppError('Invalid report column');
+        }
+        if (r.summary !== undefined) {
+            if (!Array.isArray(r.summary) || r.summary.length > 8)
+                throw new AppError('At most eight report summary metrics');
+            for (const metric of r.summary) {
+                id(metric.key);
+                if (typeof metric.label !== 'string' || !metric.label.trim() || metric.label.length > 100 || !['sum','avg','min','max','last'].includes(metric.aggregate))
+                    throw new AppError('Invalid report summary metric');
+                if (metric.unit !== undefined && (typeof metric.unit !== 'string' || metric.unit.length > 30))
+                    throw new AppError('Invalid report summary unit');
+                if (metric.digits !== undefined && (!Number.isInteger(metric.digits) || metric.digits < 0 || metric.digits > 6))
+                    throw new AppError('Invalid report summary precision');
+                if (metric.emphasis !== undefined && !['primary','secondary'].includes(metric.emphasis))
+                    throw new AppError('Invalid report summary emphasis');
+            }
+        }
+        if (r.chart) {
+            id(r.chart.x); id(r.chart.y);
+            if (typeof r.chart.title !== 'string' || !r.chart.title.trim() || r.chart.title.length > 150 || (r.chart.type !== undefined && !['line','bar'].includes(r.chart.type)) || (r.chart.unit !== undefined && (typeof r.chart.unit !== 'string' || r.chart.unit.length > 30)))
+                throw new AppError('Invalid report chart');
         }
         for (const s of r.on.schedule ?? [])
             validateCron(s.cron);
