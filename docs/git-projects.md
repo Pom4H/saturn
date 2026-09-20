@@ -175,3 +175,30 @@ from an explicitly authored source document.
 Git's object model and ref-update behavior are documented at
 https://git-scm.com/book/en/v2/Git-Internals-Git-Objects and
 https://git-scm.com/docs/git-update-ref .
+
+## Saturn source and production refs
+
+For the current engineering/runtime architecture, Git synchronizes authored configuration while the Saturn live protocol carries operational state. See [ADR-0001](adr/0001-saturn-system-architecture.md).
+
+A production repository should keep source integration separate from release selection. The default convention is:
+
+~~~text
+main          engineering source
+production    explicit runtime release
+~~~
+
+An operator runtime may configure a bare repository with an existing remote and let Saturn fetch only those exact branches:
+
+~~~sh
+SCADA_PROJECT_REPO=/srv/saturn/project.git \\
+SCADA_PROJECT_REMOTE=origin \\
+SCADA_PROJECT_BRANCH=main \\
+SCADA_PROJECT_RELEASE_BRANCH=production \\
+npm run plant
+~~~
+
+In this mode the tracked refs are read-only from the operator API. Saturn periodically fetches them, exposes source HEAD separately from the release revision, validates the release candidate and applies it only if valid. A failed candidate leaves the last-good applied revision running.
+
+Git authentication remains host configuration (SSH agent, credential helper, deployment key, etc.). Saturn does not put Git credentials into project files.
+
+The engineer advances the production branch through the normal Git/CI process. There is deliberately no peer-to-peer source merge between the engineer and operator Saturn instances.
