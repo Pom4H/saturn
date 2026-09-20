@@ -60,21 +60,25 @@ The same stable equipment IDs and bindings drive:
 
 A renderer does not own another project model. A report does not invent another tag namespace. The VS Code host does not embed a second Saturn IDE. They are views over the same project and runtime contracts.
 
-## Visual editing without a hidden project format
+## Two-way binding: diagram ↔ TypeScript
 
-The canvas is another editor for the source.
+The canvas and the source editor are two views of the same project.
+
+![Real Saturn IDE: moving the pump updates its TypeScript coordinates](docs/assets/two-way-binding.gif)
+
+Move equipment on the diagram and Saturn patches the exact TypeScript literal ranges. Edit the source and the same scene recompiles from that source.
 
 ```text
-drag P-101
-    ↓
-change x / y in TypeScript
-    ↓
-normal Git diff
+diagram drag
+    ↕
+typed TypeScript
+    ↕
+Git diff
 ```
 
-Source-preserving edits keep comments and unrelated code intact. Invalid source keeps the last valid view visible instead of reconstructing the project from SVG or JSON.
+Source-preserving edits keep comments and unrelated code intact. Invalid source keeps the last valid view visible instead of reconstructing the project from SVG or a hidden JSON document.
 
-This also means coding agents and human engineers work on the same artifact.
+That boundary is also useful for coding agents: an agent reads and changes the same typed source that the engineer sees, while Saturn remains responsible for domain validation and visual projection.
 
 ## Configuration and live state are different things
 
