@@ -4,7 +4,6 @@ import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { startPlantHttpServer } from '../plant/http-server';
 import { LocalRepository, Store } from '../plant/store';
-import { demoFiles } from '../plant/demo/files';
 import { BunSql } from './bun-sql';
 import { runStandaloneReport } from './reports';
 import { loadProjectDirectory } from './project-loader';
@@ -12,6 +11,7 @@ import { WorkspaceRegistry } from './workspace';
 import { WorkspaceRepository } from './workspace-repository';
 
 declare const SATURN_VERSION: string;
+declare const SATURN_DEMO_FILES: Record<string, string>;
 
 if (typeof process.umask === 'function') process.umask(0o077);
 
@@ -35,7 +35,7 @@ const projectArgument = args.find(arg => !arg.startsWith('--')) ?? process.env.S
 const appData = applicationDataRoot();
 const registry = new WorkspaceRegistry(resolve(appData, 'workspace.json'));
 
-let files = demoFiles;
+let files = SATURN_DEMO_FILES;
 let projectDirectory: string | null = null;
 let projectId = 'demo';
 let projectTitle = 'Saturn demo';
