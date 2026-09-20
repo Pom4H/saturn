@@ -1,8 +1,8 @@
 # SCADA playground
 
-## Node.js / offline PWA workbench
+## Bun server / offline PWA workbench
 
-The new installation workbench runs the same process models, signal expressions, alarms, historian and report workflows in Node.js and a browser Worker. SQLite is native on the server and WASM/OPFS in the demo. Git-backed server releases and local browser revisions support explicit publication and rollback.
+The new installation workbench runs the same process models, signal expressions, alarms, historian and report workflows in Bun and a browser Worker. The native server uses `bun:sqlite`; the demo uses SQLite WASM/OPFS. Git-backed server releases and local browser revisions support explicit publication and rollback.
 
 ```sh
 npm ci
@@ -19,7 +19,7 @@ Run `npm run plant:check` and `npm run plant:test:browser` for the new workbench
 
 [Open the editor](https://pom4h.github.io/scada/) · [DSL reference](docs/dsl.md) · [Architecture](docs/architecture.md) · [Experimental 3D lab and catalog](docs/3d-foundation.md)
 
-A browser workbench for designing animated SCADA diagrams in TypeScript. Code, canvas and property inspector edit **one TS document per scene**. A server can also deliver a Git-backed project containing scenes and reference files. The editor works as a static site. The optional local Node server adds durable synthetic equipment runs, authenticated signals, history and replay. No hardware connection is included.
+A browser workbench for designing animated SCADA diagrams in TypeScript. Code, canvas and property inspector edit **one TS document per scene**. A server can also deliver a Git-backed project containing scenes and reference files. The editor works as a static site. The optional local Bun server adds durable synthetic equipment runs, authenticated signals, history and replay. No hardware connection is included.
 
 ```ts
 import { tank, pump, valve, outlet, connect } from "@scada/core";
@@ -57,7 +57,7 @@ npm run dev
 
 Open **http://localhost:4173/scada/**. These commands also work in Windows PowerShell. `npm run dev` watches source changes, preserves the last valid build on errors, and reloads the browser after a successful build.
 
-The runtime server requires Node 24 and its built-in SQLite module. CI installs the pinned dependency tree using `package-lock.json` and `npm ci`.
+The native plant server requires the Bun version pinned in `.bun-version`; Node 24 remains the build/test toolchain. CI installs both runtimes and the pinned dependency tree using `package-lock.json` and `npm ci`.
 
 ```sh
 npm run check                       # builds, strict TS, core, server/API, challenge and 3D tests
@@ -102,7 +102,7 @@ Pressure, temperature, level and vibration are demonstration samples. There is n
 
 ## GitHub Pages
 
-Pushes and pull requests run checks. Pages publishing requires an explicit manual `workflow_dispatch` on main, after the same checks; merging a change does not deploy it. Pages hosts the static editor only, not the Node runtime. It uploads Playwright reports and screenshots even on failures. Paths are relative, so the build works below `/scada/` as well as on a custom domain.
+Pushes and pull requests run checks. Pages publishing requires an explicit manual `workflow_dispatch` on main, after the same checks; merging a change does not deploy it. Pages hosts the static editor only, not the Bun runtime. It uploads Playwright reports and screenshots even on failures. Paths are relative, so the build works below `/scada/` as well as on a custom domain.
 
 For forks, select **Settings → Pages → Source → GitHub Actions**, then run **Check and deploy**. The first deployment requires Pages to be enabled by a repository administrator; ordinary workflow tokens may not be permitted to enable a new site.
 
