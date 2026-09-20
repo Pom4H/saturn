@@ -87,6 +87,7 @@ $args = @(
   $workspace,
   $file
 )
+$env:SATURN_VSCODE_CAPTURE = '1'
 Start-Process -FilePath $code -ArgumentList $args | Out-Null
 
 $proc = $null
@@ -98,12 +99,7 @@ for ($i=0; $i -lt 90; $i++) {
 if (-not $proc) { throw 'VS Code did not create a visible window on the runner.' }
 
 [NativeWindow]::ShowWindow($proc.MainWindowHandle, 3) | Out-Null
-[NativeWindow]::SetForegroundWindow($proc.MainWindowHandle) | Out-Null
-Start-Sleep -Seconds 4
-[System.Windows.Forms.SendKeys]::SendWait('^%s')
-Start-Sleep -Seconds 3
-[System.Windows.Forms.SendKeys]::SendWait('^%d')
-Start-Sleep -Seconds 8
+Start-Sleep -Seconds 12
 
 $rect = New-Object NativeWindow+RECT
 if (-not [NativeWindow]::GetWindowRect($proc.MainWindowHandle, [ref]$rect)) { throw 'GetWindowRect failed.' }
