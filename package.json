@@ -33,7 +33,7 @@
     "standalone:pack": "bun run scripts/standalone-pack.ts",
     "update:manifest": "node scripts/sign-update-manifest.mjs",
     "vscode:test": "node --test vscode/test/*.test.cjs",
-    "vscode:check": "node --check vscode/extension.cjs && node --check vscode/lib/model.cjs && npm run vscode:test"
+    "vscode:check": "node scripts/vscode-check.mjs && npm run vscode:test"
   },
   "keywords": [],
   "author": "Roman Popov",
