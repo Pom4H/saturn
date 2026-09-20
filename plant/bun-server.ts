@@ -3,7 +3,7 @@ import { resolve, sep, extname } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { BunSql } from './adapters/bun-sql';
 import { GitRepository } from './adapters/git';
-import { Auth } from './adapters/auth';
+import { BunAuth } from './adapters/bun-auth';
 import { Push } from './adapters/push';
 import { runReport } from './adapters/bun-reports';
 import { Store } from './store';
@@ -106,10 +106,10 @@ export async function startPlantServer(options: {
     const service = new Service(store, repository, { reportRunner: runReport });
     await service.start(demoFiles);
 
-    const auth = new Auth(store);
+    const auth = new BunAuth(store);
     const password = options.password ?? randomBytes(18).toString('base64url');
     const username = options.user ?? 'engineer';
-    const created = auth.seed(username, password);
+    const created = await auth.seed(username, password);
     const push = options.pushSubject ? new Push(store, options.pushSubject) : null;
     const root = await realpath(options.root ?? resolve('dist/plant'));
     const sockets = new Set<ServerWebSocketLike<WebSocketData>>();
@@ -159,7 +159,7 @@ export async function startPlantServer(options: {
 
                 if (path === `${prefix}/api/login` && request.method === 'POST') {
                     const input = await body(request);
-                    const session = auth.login(input.user, input.password, server.requestIP(request)?.address ?? 'unknown');
+                    const session = await auth.login(input.user, input.password, server.requestIP(request)?.address ?? 'unknown');
                     const secure = origin.startsWith('https:') ? '; Secure' : '';
                     return json(200, { actor: session.actor, csrf: session.csrf }, {
                         'Set-Cookie': `scada_session=${session.token}; HttpOnly; SameSite=Strict; Path=${prefix}/; Max-Age=28800${secure}`,
