@@ -12,8 +12,7 @@ import type { Signals } from './next/model';
 
 const v = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const primarySignal: Record<string, string> = { tank: 'level', pump: 'rpm', valve: 'opening', pressure: 'value', temperature: 'value', exchanger: 'temperature' };
-const unitLabel = (unit: string) => ({ 'm3/h': 'м³/ч', rpm: 'об/мин', 'mm/s': 'мм/с', bar: 'бар' })[unit] ?? unit;
-const alarmLabel = { none: '', warning: 'Предупреждение', trip: 'Авария' };
+const unitLabel = (unit: string) => ({ 'm3/h': 'm³/h', rpm: 'rpm', 'mm/s': 'mm/s', bar: 'bar' })[unit] ?? unit;
 function addMesh(root: THREE.Object3D, geometry: THREE.BufferGeometry, material: THREE.Material, position = v()) {
   const mesh = new THREE.Mesh(geometry, material); mesh.position.copy(position); mesh.castShadow = true; mesh.receiveShadow = true; root.add(mesh); return mesh;
 }
@@ -153,11 +152,18 @@ export class SceneView3D {
   private ground = new THREE.Plane(v(0, 0, 1), 0);
   private down: { x: number; y: number; id: string | null; moved: boolean; offset?: THREE.Vector3; layoutX?: number; layoutY?: number } | null = null;
   private note!: HTMLDivElement;
-  private messages = { preview: 'Preview · telemetry disconnected', noData: 'No data', moreAlarms: 'More alarms' };
+  private messages = {
+    preview: 'Preview · telemetry disconnected',
+    noData: 'No data',
+    moreAlarms: 'More alarms',
+    warning: 'Warning',
+    trip: 'Trip',
+    aria: '3D diagram. Arrow keys orbit, plus and minus zoom, F fits the view. Use Tab to select equipment.',
+  };
   constructor(public host: HTMLElement, options: { landing?: boolean } = {}) {
     host.classList.add('scene3d');
     this.canvas = document.createElement('canvas'); this.canvas.tabIndex = 0;
-    this.canvas.setAttribute('aria-label', '3D схема. Стрелки меняют ракурс, плюс и минус — масштаб, F — вписать. Оборудование можно выбрать клавишей Tab.');
+    this.canvas.setAttribute('aria-label', this.messages.aria);
     this.labels = document.createElement('div'); this.labels.className = 'scene3d-labels';
     this.leaders = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); this.leaders.classList.add('scene3d-leaders'); this.leaders.setAttribute('aria-hidden', 'true'); this.labels.appendChild(this.leaders);
     this.alert = document.createElement('div'); this.alert.className = 'scene3d-alert'; this.alert.setAttribute('role', 'status'); this.alert.hidden = true;
@@ -260,7 +266,7 @@ export class SceneView3D {
     this.host.dataset.embedded = String(embedded);
   }
   setHint(text: string) { this.note.textContent = text; this.note.hidden = !text; }
-  setMessages(messages: Partial<typeof this.messages>) { Object.assign(this.messages, messages); this.advance(0); this.draw(); }
+  setMessages(messages: Partial<typeof this.messages>) { Object.assign(this.messages, messages); this.canvas.setAttribute('aria-label', this.messages.aria); this.advance(0); this.draw(); }
   private ndc(clientX: number, clientY: number) {
     const rect = this.canvas.getBoundingClientRect(), bottom = rect.width <= 650 ? 77 : 0, drawingHeight = Math.max(1, rect.height - bottom);
     if (clientY - rect.top > drawingHeight) return null;
@@ -380,9 +386,10 @@ export class SceneView3D {
       const sample = observation(this.scene, this.frame, equipment.id, key), value = key === 'flow' ? this.flows.get(equipment.id) ?? null : numeric(sample);
       text.textContent = value === null ? '—' : `${value.toFixed(key === 'rpm' || key === 'level' ? 0 : 1)} ${unitLabel(sample?.unit ?? (key === 'flow' ? 'm3/h' : ''))}`;
       const qualityLabel = quality === 'stale' ? 'STALE' : quality === 'bad' ? 'BAD' : quality === 'offline' ? 'OFFLINE' : '';
-      state.textContent = [alarmLabel[alarm], qualityLabel].filter(Boolean).join(' · ');
+      const alarmText = alarm === 'warning' ? this.messages.warning : alarm === 'trip' ? this.messages.trip : '';
+      state.textContent = [alarmText, qualityLabel].filter(Boolean).join(' · ');
       label.dataset.quality = quality; label.dataset.alarm = alarm; label.dataset.instanceId = this.frame?.equipment[equipment.id]?.instanceId ?? '';
-      if (alarm !== 'none') alerts.push(`${equipment.id} · ${alarmLabel[alarm]}`);
+      if (alarm !== 'none') alerts.push(`${equipment.id} · ${alarmText}`);
       if (quality === 'stale') stale++;
       else if (quality !== 'good') unavailable++;
     }
