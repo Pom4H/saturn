@@ -113,7 +113,7 @@ export function compileController(c: Controller) {
     const resolveHmiRef=(ref:string):string=>{
         if(bindings[ref]) return bindings[ref];
         if(Object.hasOwn(inputPins,ref)) return bindings[ref]=expr({ref});
-        if(Object.hasOwn(c.blocks??{},ref)) return expr({ref});
+        if(Object.hasOwn(c.blocks??{},ref)||Object.hasOwn(c.setpoints??{},ref)) return expr({ref});
         return ref;
     };
     let screenModels: HmiScreenModel[];
