@@ -1,8 +1,8 @@
-# SCADA playground
+# Saturn
 
 > System architecture: [ADR-0001 — Saturn system architecture](docs/adr/0001-saturn-system-architecture.md).
 
-## Saturn application modes
+## Application modes
 
 Saturn is packaged once; projects stay ordinary source directories and are selected at runtime.
 
