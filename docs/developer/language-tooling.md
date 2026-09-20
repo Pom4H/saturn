@@ -34,7 +34,7 @@ Today Saturn already has:
 - runtime/project separation;
 - installed model metadata;
 - a first interactive DSL reference in the shell;
-- `@saturn/core` as the canonical project import, with `@scada/plant` accepted temporarily as a migration alias.
+- `@saturn/core` as the only accepted project DSL import.
 
 The important limitation is that CodeMirror currently knows TypeScript syntax, but not the complete semantic project model. Existing manual completion logic is transitional.
 
@@ -1089,7 +1089,7 @@ Do not:
 
 ## 20. Implementation sequence
 
-The migration should be incremental.
+The implementation may be incremental, but pre-production compatibility aliases must not survive once their callers are migrated.
 
 ### Phase 1 — common diagnostics and i18n
 
