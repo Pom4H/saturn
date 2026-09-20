@@ -1,4 +1,4 @@
-import { pipe, cable, port } from '@scada/plant';
+import { pipe, cable, port } from '@saturn/core';
 // Declared physical schematic routes. They do not imply a calibrated hydraulic or circuit solver.
 export const plantWires=[
  pipe('aux-water-out',port('AUX-TANK','outlet'),port('AUX-VALVE','inlet')),
