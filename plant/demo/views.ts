@@ -1,4 +1,4 @@
-import { panel, label, readout, view, signal, commandButton } from '@scada/plant';
+import { panel, label, readout, view, signal, commandButton } from '@saturn/core';
 // This very same tree is used by the web view, a frozen report and the compiled PLC HMI.
 export const benchPanel = panel([
     label('Стенд управления'),
