@@ -51,7 +51,7 @@ test('reordered equipment produces the same result and checkpoint restart keeps 
 test('every installed model has a real SVG renderer; no silent sensor fallback',()=>{
     installEquipment();const kinds=new Set(svgVisualKinds());for(const m of models())assert.ok(kinds.has(m.visual),m.kind);
     const p=compileProject(demoFiles), scene=sceneFor(p), frame=visualFrame(p,new Kernel(p,'r','run',0).frame());
-    assert.equal(scene.nodes.length,47);assert.equal(Object.keys(frame.equipment).length,47);
+    assert.equal(scene.nodes.length,p.devices.length);assert.equal(Object.keys(frame.equipment).length,p.devices.length);
     for(const node of scene.nodes)assert.ok(frame.equipment[node.id],node.id);
 });
 test('one-way valve prevents reverse flow and relief responds to pressure rather than time',()=>{
