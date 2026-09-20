@@ -1,4 +1,27 @@
 import type { Frame, Project, Actor, Revision, ReportArtifact, ReportData } from '../types';
+import type { SaturnErrorPayload } from '../diagnostics';
+
+export class SaturnClientError extends Error {
+    readonly status?: number;
+    readonly code?: string;
+    readonly severity?: SaturnErrorPayload['severity'];
+    readonly messageKey?: string;
+    readonly messageArgs?: SaturnErrorPayload['messageArgs'];
+    readonly data?: Record<string, unknown>;
+    readonly locale?: SaturnErrorPayload['locale'];
+    constructor(payload: SaturnErrorPayload, status?: number) {
+        super(payload.error);
+        this.name = 'SaturnClientError';
+        this.status = status;
+        this.code = payload.code;
+        this.severity = payload.severity;
+        this.messageKey = payload.messageKey;
+        this.messageArgs = payload.messageArgs;
+        this.data = payload.data;
+        this.locale = payload.locale;
+    }
+}
+const clientError = (payload: SaturnErrorPayload, status?: number) => new SaturnClientError(payload, status);
 export interface RuntimeInstance {
     protocol: number;
     instanceId: string;
@@ -85,7 +108,7 @@ export class LocalClient implements Connection {
         if (p) {
             clearTimeout(p.timer);
             this.pending.delete(m.id);
-            m.error ? p.reject(new Error(m.error)) : p.resolve(m.result);
+            m.error ? p.reject(clientError(m, m.status)) : p.resolve(m.result);
         }
     } }; this.worker.onerror = e => { this.rejectReady(new Error(e.message)); this.onFailure(e.message); }; }
     start(memory = false): Promise<Status> { return new Promise((resolve, reject) => { this.resolveReady = resolve; this.rejectReady = reject; this.worker.postMessage({ action: 'initialize', input: { memory } }); }); }
@@ -129,7 +152,7 @@ export class RemoteClient implements Connection {
         const response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', credentials: 'same-origin', headers: body === undefined ? {} : { 'Content-Type': 'application/json', 'X-CSRF-Token': this.csrf }, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(15000), cache: 'no-store', redirect: 'error' });
         if (!response.ok) {
             const error = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-            throw new Error(error.error);
+            throw clientError(error, response.status);
         }
         return action === 'report-artifact' ? { html: await response.text(), rows: [] } as T : await response.json();
     }
