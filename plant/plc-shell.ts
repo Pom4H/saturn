@@ -143,7 +143,7 @@ export function shellKey(project:Project,controllerId:string,current:number,key:
 }
 
 const at=(id:string,primitive:HmiElementModel['primitive'],x:number,y:number,extra:Omit<HmiElementModel,'id'|'primitive'|'position'>={}):HmiElementModel=>({id,primitive,position:{x,y},...extra});
-const text=(id:string,label:string,x:number,y:number,font=0,color=HMI_COLOR.TEXT)=>at(id,'text',x,y,{label:clip(label,font===1?20:38),font,color});
+const text=(id:string,label:string,x:number,y:number,font:number=0,color:number=HMI_COLOR.TEXT)=>at(id,'text',x,y,{label:clip(label,font===1?20:38),font,color});
 const header=(page:PlcShellPage,index:number,total:number):HmiElementModel[]=>[
   at('head','rect',0,0,{width:320,height:32,color:HMI_COLOR.HEADER}),
   text('title',page.title,10,7,1), text('count',`${index+1}/${total}`,274,10,0,HMI_COLOR.ACCENT),
