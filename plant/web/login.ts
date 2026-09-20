@@ -4,7 +4,7 @@ form.addEventListener('submit', async (e) => { e.preventDefault(); const data = 
     const result = await response.json();
     if (!response.ok)
         throw new Error(result.error);
-    location.assign('/?project=server#workspace');
+    location.assign('./');
 }
 catch (error) {
     message.textContent = error instanceof Error ? error.message : String(error);
