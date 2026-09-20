@@ -21,7 +21,17 @@ export interface PlcShellModel {
 
 const interesting = new Set(['pump','reservoir','valve','indicator','contactor','transmitter','ioModule','motor','fan','tower']);
 const inputPin = /^(?:AI[12]|DI(?:[1-9]|10))$/;
-const clip=(value:string,max:number)=>value.length<=max?value:value.slice(0,Math.max(1,max-1))+'…';
+const displayText=(value:string)=>value
+  .replace(/[·•]/g,'/')
+  .replace(/→/g,'>')
+  .replace(/←/g,'<')
+  .replace(/↑/g,'UP')
+  .replace(/↓/g,'DN')
+  .replace(/[–—]/g,'-');
+const clip=(value:string,max:number)=>{
+  const safe=displayText(value);
+  return safe.length<=max?safe:safe.slice(0,Math.max(1,max-2))+'..';
+};
 const uniq=<T>(items:T[])=>[...new Set(items)];
 
 function refs(expr:Expr | undefined, controller:any, result:Set<string>, seen=new Set<string>()):void {
