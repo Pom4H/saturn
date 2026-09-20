@@ -32,6 +32,8 @@ jobs:
       - run: xvfb-run -a npm run plant:test:browser
         env:
           PWA_ONLY_PLC: '1'
+      - name: Verify Firmverse drives visible HMI motion
+        run: xvfb-run -a node scripts/plant-firmverse-display.mjs
       - name: Record Saturn PLC HMI emulator tour
         run: xvfb-run -a npm run plant:hmi:video
       - uses: actions/upload-artifact@v7.0.1
