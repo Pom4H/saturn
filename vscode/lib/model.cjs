@@ -1,60 +1,24 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const CORE_EQUIPMENT = [
-  ['pump', 'Pump'],
-  ['tank', 'Tank'],
-  ['valve', 'Valve'],
-  ['flowmeter', 'Flow meter'],
-  ['heat-exchanger', 'Heat exchanger'],
-  ['pressure-gauge', 'Pressure gauge'],
-  ['temperature-sensor', 'Temperature sensor'],
-  ['filter', 'Filter'],
-];
-
-function normalizeExtensionList(value) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .filter(item => item && typeof item.name === 'string' && typeof item.version === 'string')
-    .map(item => ({
-      name: item.name,
-      version: item.version,
-      capabilities: Array.isArray(item.capabilities) ? item.capabilities.filter(x => typeof x === 'string') : [],
-      elements: Array.isArray(item.elements)
-        ? item.elements
-            .filter(element => element && typeof element.type === 'string' && typeof element.title === 'string')
-            .map(element => ({
-              type: element.type,
-              title: element.title,
-              tag: typeof element.tag === 'string' ? element.tag : '',
-            }))
-        : [],
-    }));
-}
-
-function buildCatalog(extensionList) {
-  const groups = [{
-    id: 'core',
-    title: 'Saturn Core',
-    source: '@saturn/core',
-    items: CORE_EQUIPMENT.map(([type, title]) => ({ type, title, source: '@saturn/core' })),
-  }];
-
-  for (const extension of normalizeExtensionList(extensionList)) {
-    if (!extension.elements.length) continue;
-    groups.push({
-      id: extension.name,
-      title: extension.name,
-      source: `${extension.name}@${extension.version}`,
-      items: extension.elements.map(element => ({
-        type: element.type,
-        title: element.title,
-        tag: element.tag,
-        source: extension.name,
-      })),
-    });
-  }
-  return groups;
+function buildCatalog(document) {
+  if (!document || document.schema !== 1 || !Array.isArray(document.catalogs)) return [];
+  return document.catalogs
+    .filter(group => group && typeof group.id === 'string' && typeof group.title === 'string' && Array.isArray(group.items))
+    .map(group => ({
+      id: group.id,
+      title: group.title,
+      source: typeof group.source === 'string' ? group.source : group.id,
+      items: group.items
+        .filter(item => item && typeof item.type === 'string' && typeof item.title === 'string')
+        .map(item => ({
+          type: item.type,
+          title: item.title,
+          source: typeof item.source === 'string' ? item.source : group.id,
+          tag: typeof item.tag === 'string' ? item.tag : '',
+        })),
+    }))
+    .filter(group => group.items.length);
 }
 
 function readTargets(workspace) {
@@ -123,9 +87,7 @@ function targetCommand(cli, action, target, workspace, platform = process.platfo
 }
 
 module.exports = {
-  CORE_EQUIPMENT,
   buildCatalog,
-  normalizeExtensionList,
   quoteArg,
   readTargets,
   targetCommand,
