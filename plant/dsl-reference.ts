@@ -131,7 +131,7 @@ const pumps = system('pumps', 'Насосная группа', 'water')`,
     name: 'port',
     signature: 'port(device, name) → Endpoint',
     category: 'Topology',
-    summary: 'Типизированная ссылка на физический терминал устройства или PLC. Используется соединениями и редактором топологии.',
+    summary: 'Динамический escape hatch для ссылки на порт по имени. В обычном TypeScript-коде предпочитайте типизированные refs вроде pump.ports.inlet.',
     relations: ['simulation', 'equipment', 'plc', 'pipe', 'cable'],
     example: `const inlet = port(pump, 'inlet')
 const outlet = port(pump, 'outlet')`,
