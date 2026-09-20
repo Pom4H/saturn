@@ -24,7 +24,7 @@ const child = spawn(exe, [], {
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: false,
 });
-const stdout: Buffer[] = [], stderr: Buffer[] = [];
+const stdout = [], stderr = [];
 child.stdout.on('data', chunk => stdout.push(Buffer.from(chunk)));
 child.stderr.on('data', chunk => stderr.push(Buffer.from(chunk)));
 
