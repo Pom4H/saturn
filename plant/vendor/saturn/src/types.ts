@@ -38,7 +38,13 @@ export interface HmiElementModel {
   width?: number;
   height?: number;
   color?: number;
+  backgroundColor?: number;
   font?: number;
+  /** Physical line width in pixels for line primitives. */
+  strokeWidth?: number;
+  /** Gauge upper bound in the controller's integer signal units. */
+  maxValue?: number;
+  orientation?: "horizontal" | "vertical";
   binding?: HmiBinding;
   visible?: HmiVisibilityModel;
 }
