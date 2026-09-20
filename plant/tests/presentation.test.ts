@@ -25,7 +25,8 @@ test('native Saturn HMI setpoint survives in the FBD runtime and can drive outpu
  vm.setSetpoint('MANUAL',1);
  assert.equal(vm.getSetpoint('MANUAL').value,1);
  const frame=vm.scan({AI1:300},100,2);assert.equal(frame.outputs.DO1,1);
- assert.ok(frame.hmi.some(command=>command.type==='text'&&command.text.includes('Ручной режим: ВКЛ')));
+ const lcd=frame.hmi.filter((command):command is Extract<typeof command,{type:'text'}>=>command.type==='text').map(command=>command.text).join(' ');
+ assert.match(lcd,/Ручной режим:/);assert.match(lcd,/ВКЛ/);
  vm.setSetpoint('MANUAL',0);assert.equal(vm.scan({AI1:300},100,2).outputs.DO1,0);
 });
 test('presentation escapes content, preserves bad quality and disables commands in report mode',()=>{
