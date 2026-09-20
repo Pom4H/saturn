@@ -1,4 +1,4 @@
-import { ControllerVM, inputPins, CONTROLLER_ABI } from './controller';
+import { ControllerVM, inputPins, CONTROLLER_ABI, controllerScreenAfterKey, initialControllerScreen, type ControllerKey } from './controller';
 import { connectionExpression, terminals, busConnected } from './ports';
 import { model } from './models';
 import { AppError, clone, finite, type Checkpoint, type Expr, type Frame, type Project, type Sample } from './types';
