@@ -41,18 +41,22 @@ export class BunSql implements SqlDatabase {
         return statement;
     }
 
+    private named(bind: Record<string, unknown>): Record<string, unknown> {
+        return Object.fromEntries(Object.entries(bind).map(([key, value]) => [key.replace(/^[:@$]/, ''), value]));
+    }
+
     exec(sql: string, bind?: unknown[] | Record<string, unknown>): void {
         if (!bind) {
             this.db.exec(sql);
             return;
         }
         const statement = this.query(sql);
-        Array.isArray(bind) ? statement.run(...bind) : statement.run(bind);
+        Array.isArray(bind) ? statement.run(...bind) : statement.run(this.named(bind));
     }
 
     all<T = Record<string, unknown>>(sql: string, bind: unknown[] | Record<string, unknown> = []): T[] {
         const statement = this.query(sql);
-        return (Array.isArray(bind) ? statement.all(...bind) : statement.all(bind)) as T[];
+        return (Array.isArray(bind) ? statement.all(...bind) : statement.all(this.named(bind))) as T[];
     }
 
     transaction<T>(fn: () => T): T {
