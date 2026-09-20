@@ -203,7 +203,7 @@ export class Service {
     firmware(controllerId:string, revision:string, actor:Actor) {
         requireRole(actor,'engineer');if(revision!==this.kernel.state.revision)throw new AppError('Project revision changed',409);
         const c=this.project.controllers?.find(c=>c.id===controllerId);if(!c)throw new AppError('Unknown PLC',404);
-        const artifact=compileController(c);
+        const artifact=compileController(c,this.project);
         return { ...artifact,fbdbin:Array.from(artifact.fbdbin),revision,controllerId,
           connections:(this.project.connections??[]).filter(w=>w.from.device===controllerId||w.to.device===controllerId),
           expansions:(this.project.attachments??[]).filter(a=>a.controller===controllerId),
