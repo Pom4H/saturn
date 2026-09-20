@@ -9,9 +9,12 @@
   "engines": {
     "vscode": "^1.95.0"
   },
-  "categories": ["Other"],
+  "categories": [
+    "Other"
+  ],
   "main": "./extension.cjs",
   "activationEvents": [
+    "workspaceContains:plant.ts",
     "onView:saturn.project",
     "onView:saturn.catalog",
     "onView:saturn.targets",
