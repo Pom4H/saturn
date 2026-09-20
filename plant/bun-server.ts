@@ -33,9 +33,11 @@ interface BunServerLike {
     timeout(request: Request, seconds: number): void;
     stop(closeActiveConnections?: boolean): Promise<void>;
 }
+interface BunCronJobLike { stop(): unknown }
 interface BunRuntimeLike {
     serve(options: Record<string, unknown>): BunServerLike;
     file(path: string): Blob;
+    cron(expression: string, callback: () => void | Promise<void>): BunCronJobLike;
 }
 const bunRuntime = (() => {
     const runtime = (globalThis as typeof globalThis & { Bun?: BunRuntimeLike }).Bun;
@@ -95,6 +97,9 @@ export async function startPlantServer(options: {
     root?: string;
     autoTick?: boolean;
     pushSubject?: string;
+    unix?: string;
+    tls?: { cert: string; key: string; ca?: string[] };
+    http2?: boolean;
 } = {}) {
     const store = new Store(new BunSql(options.data ?? resolve('data-plant/plant.sqlite3')));
     const repository = await new GitRepository(options.repository ?? resolve('data-plant/project.git')).initialize();
@@ -110,11 +115,26 @@ export async function startPlantServer(options: {
     const sockets = new Set<ServerWebSocketLike<WebSocketData>>();
     let streamCount = 0;
     let origin = options.publicUrl ? new URL(options.publicUrl).origin : '';
+    if (options.unix && !origin)
+        throw new Error('SCADA_PUBLIC_URL is required when the Bun server listens on a Unix socket');
+    const listen = options.unix
+        ? { unix: options.unix }
+        : {
+            hostname: options.host ?? '127.0.0.1',
+            port: options.port ?? 4176,
+            http2: options.http2 ?? !!options.tls,
+            ...(options.tls ? {
+                tls: {
+                    cert: bunRuntime.file(options.tls.cert),
+                    key: bunRuntime.file(options.tls.key),
+                    ...(options.tls.ca?.length ? { ca: options.tls.ca.map(path => bunRuntime.file(path)) } : {}),
+                },
+            } : {}),
+        };
 
     const server = bunRuntime.serve({
         id: 'saturn-plant',
-        hostname: options.host ?? '127.0.0.1',
-        port: options.port ?? 4176,
+        ...listen,
         development: false,
         idleTimeout: 15,
         maxRequestBodySize: maxBodySize,
@@ -338,7 +358,8 @@ export async function startPlantServer(options: {
     if (!origin) {
         const host = options.host ?? '127.0.0.1';
         const urlHost = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host.includes(':') ? `[${host}]` : host;
-        origin = `http://${urlHost}:${server.port ?? options.port ?? 4176}`;
+        const scheme = options.tls ? 'https' : 'http';
+        origin = `${scheme}://${urlHost}:${server.port ?? options.port ?? 4176}`;
     }
 
     const unsubscribeWebSockets = service.subscribe(frame => {
@@ -356,9 +377,13 @@ export async function startPlantServer(options: {
     };
     if (options.autoTick !== false) timer = setTimeout(step, service.project.stepMs);
 
+    const schedule = options.autoTick === false ? undefined : bunRuntime.cron('* * * * *', () => {
+        try { service.schedule(); }
+        catch (error) { console.error(error); }
+    });
+
     const control = options.autoTick === false ? undefined : setInterval(() => {
         try {
-            service.schedule();
             void service.refreshRelease().catch(console.error);
             void push?.flush().catch(console.error);
         } catch (error) { console.error(error); }
@@ -378,6 +403,7 @@ export async function startPlantServer(options: {
             stopping = true;
             if (timer) clearTimeout(timer);
             if (control) clearInterval(control);
+            schedule?.stop();
             clearInterval(socketAuth);
             unsubscribeWebSockets();
             for (const socket of sockets) socket.close(1001, 'Server shutdown');
