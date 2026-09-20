@@ -2,8 +2,8 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0d1115"><title>Saturn SCADA</title>
-  <meta name="description" content="SCADA-редактор: схема, TypeScript и свойства в одном проекте.">
+  <meta name="theme-color" content="#0d1115"><title>Saturn — инженерная IDE для автоматизации</title>
+  <meta name="description" content="Saturn — open-source инженерная IDE: модель, PLC, HMI, симуляция, тесты и deployment в одном TypeScript-проекте.">
   <link rel="icon" href="/site/assets/mark.svg" type="image/svg+xml"><link rel="manifest" href="/site/assets/manifest.json"><link rel="apple-touch-icon" href="/site/assets/icon-192.png">
   <link rel="stylesheet" href="/site/assets/site.css"><script type="module" src="/site/assets/site.js"></script>
 </head>
@@ -25,11 +25,16 @@
   <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
 <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol><symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.2 2.4c-.7.3-.7 1-.7 1.6M12 16h.01"/></symbol><symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></symbol><symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol><symbol id="i-undo" viewBox="0 0 24 24"><path d="m8 4-5 5 5 5M3 9h11a6 6 0 0 1 0 12"/></symbol><symbol id="i-redo" viewBox="0 0 24 24"><path d="m16 4 5 5-5 5m5-5H10a6 6 0 0 0 0 12"/></symbol><symbol id="i-link" viewBox="0 0 24 24"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M5 8v4h14v4"/></symbol><symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></symbol><symbol id="i-play" viewBox="0 0 24 24"><path d="m7 4 14 8-14 8Z"/></symbol><symbol id="i-fit" viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><rect x="8" y="8" width="8" height="8" rx="1"/></symbol><symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol><symbol id="i-inspector" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M18 8h.01M18 12h.01"/></symbol></defs></svg>
-<a class="skip-link" href="#studio-shell">К редактору</a>
-<header class="site-header"><a class="brand" href="#top"><img src="/site/assets/saturn-icon.png" alt="" width="30" height="30">Saturn</a><div><a href="https://github.com/Pom4H/saturn" target="_blank" rel="noopener">GitHub ↗</a><button data-install-studio>Установить</button></div></header>
+<a class="skip-link" href="#studio-shell">К IDE</a>
+<header class="site-header"><a class="brand" href="#top"><img src="/site/assets/saturn-icon.png" alt="" width="30" height="30"><span>Saturn</span><span class="brand-scope">Engineering IDE</span></a><div><a href="#model-title">Как устроено</a><a href="https://github.com/Pom4H/saturn" target="_blank" rel="noopener">GitHub ↗</a><button data-install-studio>Установить</button></div></header>
 <main id="top">
-  <section class="hero" aria-labelledby="hero-title"><h1 id="hero-title">Saturn SCADA</h1><p>Схема и TypeScript в одном проекте.</p></section>
-  <section class="shell-stage" id="studio" aria-label="SCADA-редактор">
+  <section class="hero" aria-labelledby="hero-title">
+    <h1 id="hero-title">Инженерная IDE для автоматизации</h1>
+    <p class="hero-lead">Описывайте оборудование, сигналы, поведение, HMI и проверки одним TypeScript-проектом. Подключайте PLC или симуляцию, проверяйте изменения и разворачивайте ту же ревизию на сервере, в PWA и на физическом HMI.</p>
+    <div class="hero-actions"><a class="cta primary-link" href="#studio">Открыть рабочую среду</a><a class="cta secondary-link" href="https://github.com/Pom4H/saturn" target="_blank" rel="noopener">GitHub ↗</a></div>
+    <div class="hero-proof" aria-label="Ключевые свойства"><span>model</span><span>bindings</span><span>scenarios</span><span>tests</span><span>targets</span><span>deploy</span></div>
+  </section>
+  <section class="shell-stage" id="studio" aria-label="Инженерная IDE Saturn">
     <div class="shell-frame">
       <div class="shell" id="studio-shell" data-mode="3d" data-view="scene" style="--studio-progress:0">
         <header class="shell-topbar">
@@ -42,13 +47,13 @@
           <button id="command-launcher" aria-label="Найти команду" title="Команды · Ctrl/⌘ K"><svg aria-hidden="true"><use href="#i-search"/></svg><span>Команды…</span><kbd>⌘ K</kbd></button>
           <div class="shell-actions">
           <button data-create-project id="project-create" class="primary">Создать проект</button>
-          <button id="mobile-scene" class="icon-button" aria-label="Схема" title="Схема" aria-pressed="true"><svg aria-hidden="true"><use href="#i-grid"/></svg></button><button id="studio-code" class="icon-button" aria-label="Код" title="Код" aria-pressed="false"><svg aria-hidden="true"><use href="#i-code"/></svg></button><button id="inspector-toggle" class="icon-button" aria-label="Свойства" title="Свойства" aria-pressed="false"><svg aria-hidden="true"><use href="#i-inspector"/></svg></button><button class="icon-button" data-shell-view="signals" aria-label="Сигналы" title="Сигналы"><svg aria-hidden="true"><use href="#i-signal"/></svg></button><button id="runtime-controls" class="icon-button" data-shell-view="controls" aria-label="Управление" title="Управление" hidden><svg aria-hidden="true"><use href="#i-settings"/></svg></button><button id="runtime-alarms" class="icon-button" data-shell-view="alarms" aria-label="Алармы" title="Алармы" hidden><svg aria-hidden="true"><use href="#i-bell"/></svg><span id="runtime-alarm-count" class="alarm-count" hidden>0</span></button><button id="server-save" class="icon-button engineer-only" aria-label="Сохранить ревизию" title="Сохранить ревизию" hidden><svg aria-hidden="true"><use href="#i-check"/></svg></button><button id="server-publish" class="icon-button engineer-only" aria-label="Опубликовать ревизию" title="Опубликовать ревизию" hidden><svg aria-hidden="true"><use href="#i-arrow"/></svg></button>
+          <button id="mobile-scene" class="icon-button" aria-label="Схема" title="Схема" aria-pressed="true"><svg aria-hidden="true"><use href="#i-grid"/></svg></button><button id="studio-code" class="icon-button" aria-label="Код" title="Код" aria-pressed="false"><svg aria-hidden="true"><use href="#i-code"/></svg></button><button id="inspector-toggle" class="icon-button" aria-label="Свойства" title="Свойства" aria-pressed="false"><svg aria-hidden="true"><use href="#i-inspector"/></svg></button><button class="icon-button" data-shell-view="signals" aria-label="Сигналы и I/O" title="Сигналы и I/O"><svg aria-hidden="true"><use href="#i-signal"/></svg></button><button id="runtime-controls" class="icon-button" data-shell-view="controls" aria-label="Управление" title="Управление" hidden><svg aria-hidden="true"><use href="#i-settings"/></svg></button><button id="runtime-alarms" class="icon-button" data-shell-view="alarms" aria-label="Алармы" title="Алармы" hidden><svg aria-hidden="true"><use href="#i-bell"/></svg><span id="runtime-alarm-count" class="alarm-count" hidden>0</span></button><button id="server-save" class="icon-button engineer-only" aria-label="Сохранить ревизию" title="Сохранить ревизию" hidden><svg aria-hidden="true"><use href="#i-check"/></svg></button><button id="server-publish" class="icon-button engineer-only" aria-label="Опубликовать ревизию" title="Опубликовать ревизию" hidden><svg aria-hidden="true"><use href="#i-arrow"/></svg></button>
           <span class="toolbar-divider"></span>
           <button id="shell-notifications" class="icon-button" aria-label="Уведомления" title="Уведомления" data-app-settings="notifications"><svg aria-hidden="true"><use href="#i-bell"/></svg></button><button id="shell-help" class="icon-button" aria-label="Справка · F1" title="Справка · F1" ><svg aria-hidden="true"><use href="#i-help"/></svg></button><button id="shell-settings" class="icon-button" aria-label="Настройки" title="Настройки" data-app-settings><svg aria-hidden="true"><use href="#i-settings"/></svg></button><button id="shell-fullscreen" class="icon-button" aria-label="Развернуть на весь экран" title="Развернуть на весь экран" ><svg aria-hidden="true"><use href="#i-expand"/></svg></button>
           </div>
         </header>
         <div class="shell-workspace">
-          <section class="scene-panel" id="scene-panel" aria-label="Установка">
+          <section class="scene-panel" id="scene-panel" aria-label="Инженерная модель">
             <div class="studio-workarea">
               <aside id="file-browser" hidden aria-label="Навигатор проекта">
                 <div class="navigator-heading"><span>Проект</span><div class="navigator-actions">
@@ -62,14 +67,14 @@
                 <div id="server-update" hidden><span>Новая ревизия</span><button id="server-apply">Применить</button><span id="server-update-hint"></span></div>
                 <div id="files-resizer" role="separator" aria-label="Ширина навигатора" aria-orientation="vertical" aria-valuemin="200" aria-valuemax="400" aria-valuenow="244" tabindex="0"></div>
               </aside>
-              <aside class="equipment-browser" id="equipment-browser" hidden><div class="panel-heading">Оборудование<button id="equipment-close" aria-label="Закрыть каталог">×</button></div><div class="studio-add-box"><select id="studio-catalog" aria-label="Тип оборудования"><option value="pump">Насос</option><option value="tank">Резервуар</option><option value="valve">Клапан</option><option value="flowmeter">Расходомер</option><option value="exchanger">Теплообменник</option><option value="outlet">Выход</option><option value="pressure">Манометр на трубе</option><option value="temperature">Термометр на трубе</option></select><button id="studio-add">Добавить</button></div><div id="studio-tree"></div></aside>
+              <aside class="equipment-browser" id="equipment-browser" hidden><div class="panel-heading">Модель<button id="equipment-close" aria-label="Закрыть каталог">×</button></div><div class="studio-add-box"><select id="studio-catalog" aria-label="Тип компонента"><option value="pump">Насос</option><option value="tank">Резервуар</option><option value="valve">Клапан</option><option value="flowmeter">Расходомер</option><option value="exchanger">Теплообменник</option><option value="outlet">Выход</option><option value="pressure">Манометр на трубе</option><option value="temperature">Термометр на трубе</option></select><button id="studio-add">Добавить</button></div><div id="studio-tree"></div></aside>
               <div id="studio-editor-pane" class="studio-editor-pane" hidden><div id="file-tabs" aria-label="Открытые файлы"></div><div id="file-path"></div><div id="studio-editor"></div></div>
               <div id="source-splitter" role="separator" aria-label="Ширина кода" aria-orientation="vertical" tabindex="0" hidden></div>
               <div class="studio-viewport"><div class="canvas-toolbar"><div class="canvas-tools"><button id="equipment-toggle" aria-expanded="false"><svg aria-hidden="true"><use href="#i-plus"/></svg><span>Добавить</span></button><button id="studio-connect" class="icon-button" aria-label="Соединить" title="Соединить" aria-pressed="false" disabled><svg aria-hidden="true"><use href="#i-link"/></svg></button><span class="toolbar-divider"></span><button id="studio-undo" class="icon-button" aria-label="Отменить · Ctrl/⌘ Z" title="Отменить · Ctrl/⌘ Z" ><svg aria-hidden="true"><use href="#i-undo"/></svg></button><button id="studio-redo" class="icon-button" aria-label="Повторить · Ctrl/⌘ Shift Z" title="Повторить · Ctrl/⌘ Shift Z" ><svg aria-hidden="true"><use href="#i-redo"/></svg></button></div><div class="canvas-tools canvas-view"><div class="view-switch" role="group" aria-label="Вид"><button id="studio-2d" aria-pressed="false">2D</button><button id="studio-3d" aria-pressed="true">3D</button></div><button id="studio-play" class="icon-button" aria-label="Приостановить демонстрацию" title="Приостановить демонстрацию" aria-pressed="true"><svg aria-hidden="true"><use href="#i-pause"/></svg></button></div></div><div class="canvas-zoom"><button id="studio-minus" aria-label="Уменьшить масштаб">−</button><button id="studio-fit" class="icon-button" aria-label="Вписать · F" title="Вписать · F" ><svg aria-hidden="true"><use href="#i-fit"/></svg></button><button id="studio-plus" aria-label="Увеличить масштаб">+</button></div><div id="studio-spatial"></div><div id="studio-flat" inert><svg id="studio-svg" xmlns="http://www.w3.org/2000/svg"></svg></div><div id="empty-canvas" hidden><button id="empty-add" class="primary">＋ Добавить оборудование</button></div><div id="studio-mode-note" role="status" hidden></div></div>
               <aside class="studio-inspector" hidden><div class="panel-heading">Свойства<button id="inspector-close" aria-label="Закрыть свойства">×</button></div><h3 id="studio-selected"></h3><button id="object-source" hidden>В исходник ↗</button><p id="studio-kind"></p><div id="studio-fields"></div></aside>
             </div>
           </section>
-          <section class="signals-panel shell-content" id="signals-panel" hidden><div class="content-heading"><h2>Сигналы</h2><button data-shell-view="scene">← Схема</button></div><div class="signal-table-wrap"><table><thead><tr><th>Объект</th><th>Параметр</th><th>Значение</th><th>Источник</th></tr></thead><tbody id="signal-rows"></tbody></table></div></section>
+          <section class="signals-panel shell-content" id="signals-panel" hidden><div class="content-heading"><h2>Сигналы и I/O</h2><button data-shell-view="scene">← Схема</button></div><div class="signal-table-wrap"><table><thead><tr><th>Объект</th><th>Параметр</th><th>Значение</th><th>Источник</th></tr></thead><tbody id="signal-rows"></tbody></table></div></section>
           <section class="controls-panel shell-content" id="controls-panel" hidden><div class="content-heading"><div><h2>Управление</h2><p id="runtime-state"></p></div><div class="runtime-heading-actions"><button id="runtime-pause">Пауза</button><button data-shell-view="scene">← Схема</button></div></div><div id="runtime-control-list" class="runtime-control-list"></div></section>
           <section class="alarms-panel shell-content" id="alarms-panel" hidden><div class="content-heading"><div><h2>Алармы</h2><p>Активные и неподтверждённые события текущего прогона.</p></div><button data-shell-view="scene">← Схема</button></div><div id="runtime-alarm-list" class="runtime-alarm-list"></div></section>
           <section class="projects-panel shell-content" id="projects-panel" hidden><div class="content-heading"><h2>Проекты</h2><button data-shell-view="scene">← Схема</button></div><div id="project-list"></div></section>
@@ -77,6 +82,61 @@
         <footer class="shell-status"><button id="studio-diagnostics" aria-live="polite">Загрузка…</button><span id="studio-count"></span><span class="toolbar-space"></span><span id="studio-message" role="status"></span><span id="server-role" hidden></span><span id="studio-network">Локально</span><span id="studio-context" title="Расчётная демонстрационная модель, без подключения к оборудованию">Демо</span></footer>
       </div>
     </div>
+  </section>
+
+  <section class="product-story" aria-labelledby="model-title">
+    <div class="section-heading">
+      <h2 id="model-title">Инженерная модель — центр проекта</h2>
+      <p>Saturn хранит не набор экранов, а исполняемое описание системы. Оборудование, сигналы, связи, поведение, HMI, проверки и цели сборки живут в одной ревизии.</p>
+    </div>
+    <div class="workflow" aria-label="Рабочий цикл Saturn">
+      <article><span>01</span><div><h3>Модель</h3><p>Компоненты, сигналы, состояния, поведение и ограничения описываются типизированным TypeScript.</p></div></article>
+      <article><span>02</span><div><h3>Связи</h3><p>Device, driver и binding связывают модель с PLC, протоколами и реальными I/O без логики, спрятанной в экране.</p></div></article>
+      <article><span>03</span><div><h3>Проверка</h3><p>Сценарии, тесты, диагностика и replay позволяют проверить изменение до того, как оно окажется на объекте.</p></div></article>
+      <article><span>04</span><div><h3>Сборка</h3><p>Из одной ревизии собираются сервер, PWA, HMI, отчёты и другие targets. Git фиксирует, что именно запущено.</p></div></article>
+    </div>
+    <div class="project-graph" aria-label="Архитектура инженерного проекта">
+      <code>project.ts</code><span>→</span><code>model</code><span>→</span><code>scenario + test</code><span>→</span><code>targets</code>
+    </div>
+  </section>
+
+  <section class="owner-engineer" aria-labelledby="owner-title">
+    <div class="section-heading compact">
+      <h2 id="owner-title">Когда вы отвечаете и за систему, и за стоимость её изменений</h2>
+    </div>
+    <div class="decision-grid">
+      <article>
+        <h3>Как инженер</h3>
+        <p>Вы видите исходник, типы, связи и диагностику. 2D, 3D и HMI читают одну модель. Изменение можно воспроизвести сценарием, проверить тестом и сравнить как обычный Git diff.</p>
+      </article>
+      <article>
+        <h3>Как владелец проекта</h3>
+        <p>Знание не запирается в файлах конкретного конфигуратора. Проекты и компоненты переиспользуются, сервер разворачивается у вас, а стоимость следующего изменения не начинается с ручной синхронизации пяти разных систем.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="targets-section" aria-labelledby="targets-title">
+    <div class="section-heading compact">
+      <h2 id="targets-title">Один проект — несколько целей исполнения</h2>
+      <p>Runtime не подменяет инженерную модель. Он исполняет конкретную зафиксированную версию проекта и возвращает наблюдения обратно в ту же среду.</p>
+    </div>
+    <div class="target-rail" aria-label="Цели проекта">
+      <span>PLC</span><span>Bun server</span><span>PWA</span><span>HMI</span><span>Отчёты</span><span>CI</span>
+    </div>
+    <div class="evidence-line">
+      <span>TypeScript source of truth</span>
+      <span>Git revisions</span>
+      <span>2D + 3D</span>
+      <span>HMI as code</span>
+      <span>Self-hosted</span>
+      <span>MIT</span>
+    </div>
+  </section>
+
+  <section class="closing-cta" aria-labelledby="closing-title">
+    <h2 id="closing-title">Откройте Saturn и опишите реальный инженерный объект как проект, который можно запустить и проверить.</h2>
+    <div class="hero-actions"><a class="cta primary-link" href="#studio">Открыть IDE</a><a class="cta secondary-link" href="https://github.com/Pom4H/saturn" target="_blank" rel="noopener">Исходный код ↗</a></div>
   </section>
 </main>
 <div id="project-picker" popover="auto" role="dialog" aria-label="Переключить проект">
