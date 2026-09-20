@@ -3,6 +3,7 @@ import { terminals, resolvePort, type Endpoint, type Connection as PhysicalConne
 import { appendConnection, addExpansionSource, removeConnection } from '../connection-edit';
 import { renderSaturnPlcSvg } from '../saturn-view';
 import { drawHmiSvg } from '../hmi-view';
+import { drawPlcShell } from '../plc-shell-view';
 import type { SceneView3D } from '../../src/view3d';
 import { EditorState } from '@codemirror/state';
 import { EditorView, basicSetup } from 'codemirror';
@@ -40,6 +41,11 @@ async function command(action: string, extra: object = {}) { ensureActive(); con
     renderInspector(); return result; }
 async function refreshStatus() { const previous = status?.project; status = await client.request<Status>('session'); frame = status.frame; if (previous !== status.project && JSON.stringify(previous) !== JSON.stringify(status.project))
     setupProject(); renderFrame(frame); refreshActions(); }
+function drawControllerDisplay(svg:SVGSVGElement,id:string){
+    const controller=status.project.controllers?.find(item=>item.id===id);
+    if(controller?.hmi.shell?.auto) drawPlcShell(svg,status.project,frame,id,frame.controllerScreens?.[id]??0);
+    else drawHmiSvg(svg,id);
+}
 function hmiProp(node: HmiEquipmentNode, key: string, runtime: HmiRuntime): HmiPrimitive {
     const value = node.props?.[key];
     return value === undefined ? null : runtime.resolve(value);
@@ -58,7 +64,7 @@ const hmiEquipment: Record<string, HmiDomEquipmentRenderer> = {
             card.querySelector('[data-ai]')!.textContent = typeof input === 'number' ? input.toFixed(0) : '—';
             card.querySelector('[data-do]')!.textContent = typeof output === 'number' ? output.toFixed(0) : '—';
             card.querySelector('[data-health]')!.textContent = Number(healthy) > .5 ? 'RUN' : 'NO DATA';
-            if (lcd) drawHmiSvg(lcd, node.equipmentId);
+            if (lcd) drawControllerDisplay(lcd, node.equipmentId);
         } };
     },
     lamp: (node, runtime) => {
@@ -211,7 +217,7 @@ function renderFrame(next: Frame) {
     if (scene3d) { scene3d.paused = frame.paused; scene3d.setRuntime(observation); }
     refreshControls();
     if(tab==='views')refreshView();
-    const plcScreen=document.querySelector<SVGSVGElement>('#plc-front .runtime-hmi');if(plcScreen&&selected)drawHmiSvg(plcScreen,selected);
+    const plcScreen=document.querySelector<SVGSVGElement>('#plc-front .runtime-hmi');if(plcScreen&&selected)drawControllerDisplay(plcScreen,selected);
     if (scene)
         scene.paused = frame.paused;
     if (selected)
