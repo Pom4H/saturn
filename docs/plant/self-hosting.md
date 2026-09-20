@@ -52,7 +52,7 @@ npm run plant
 
 Пример ниже рассчитан на Linux с systemd. Нужны Git, Node.js из `.nvmrc`, npm, Bun из `.bun-version`, права sudo и домен. Здесь `saturn.example.com` — пример: замените его своим доменом во всех файлах.
 
-Установите Node.js, npm, Bun и Git так, чтобы они были доступны системному пользователю, а Bun был виден службе через её `PATH`, а не только из интерактивного shell. Для HTTPS установите [Caddy официальным способом](https://caddyserver.com/docs/install), который добавляет службу `caddy`.
+Установите Node.js, npm, Bun и Git так, чтобы они были доступны системному пользователю, а Bun был виден службе через её `PATH`, а не только из интерактивного shell. HTTPS можно завершать в Caddy либо непосредственно в `Bun.serve`. Caddy удобнее для автоматического выпуска сертификатов; прямой TLS уменьшает число процессов в закрытой сети.
 
 ### Приложение и данные
 
@@ -75,7 +75,7 @@ SCADA_DATABASE=/var/lib/saturn/plant.sqlite3
 SCADA_PROJECT_REPO=/var/lib/saturn/project.git
 ```
 
-Это переменные окружения для службы. Сам Saturn не загружает `.env` автоматически. `SCADA_PUBLIC_URL` должен совпадать с HTTPS-адресом в браузере, без пути `/plant/`. Внешние подключения проходят через HTTPS-прокси, а процесс Saturn слушает loopback.
+Это переменные окружения для службы. Сам Saturn не загружает `.env` автоматически. `SCADA_PUBLIC_URL` должен совпадать с HTTPS-адресом в браузере, без пути `/plant/`. В этом варианте внешние подключения проходят через HTTPS-прокси, а процесс Saturn слушает loopback. Вместо TCP-порта можно задать `SCADA_UNIX_SOCKET=/run/saturn/server.sock`; тогда `SCADA_PUBLIC_URL` обязателен.
 
 ### Автозапуск
 
@@ -133,6 +133,30 @@ sudo systemctl reload caddy
 ```
 
 Этот пример предполагает уже запущенную службу Caddy. Она получает и обновляет сертификат для настроенного публичного домена. Для закрытой сети используйте HTTPS-прокси с сертификатом, которому доверяют устройства команды. Подробнее: [reverse proxy](https://caddyserver.com/docs/quick-starts/reverse-proxy) и [служба Caddy](https://caddyserver.com/docs/running#using-the-service).
+
+### Прямой TLS в Bun
+
+Если внешний reverse proxy не нужен, Saturn может слушать HTTPS сам:
+
+```ini
+HOST=0.0.0.0
+PORT=443
+SCADA_PUBLIC_URL=https://saturn.example.com
+SCADA_TLS_CERT=/etc/saturn/tls/cert.pem
+SCADA_TLS_KEY=/etc/saturn/tls/key.pem
+```
+
+При прямом TLS HTTP/2 включён по умолчанию; `SCADA_HTTP2=0` отключает его. Сертификат и закрытый ключ должны читаться пользователем `saturn`. Saturn не выпускает и не обновляет сертификаты, поэтому для публичного домена Caddy обычно удобнее.
+
+### Изоляция отчётов
+
+Отчёты запускаются в отдельных Bun-процессах с минимальным окружением и жёстким timeout. На Linux можно дополнительно создать cgroup с лимитами памяти/процессов и указать:
+
+```ini
+SCADA_REPORT_CGROUP=/sys/fs/cgroup/saturn-reports
+```
+
+Сам Saturn не создаёт cgroup и не меняет его лимиты: это остаётся частью конфигурации ОС.
 
 ## 3. Подключение и PWA
 
