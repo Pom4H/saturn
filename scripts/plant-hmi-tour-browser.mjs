@@ -60,18 +60,18 @@ try {
   await click('[data-tab="scheme"]');
   await click('[data-system="commissioning"]','Открываем стенд, из которого shell строится автоматически');
   await click('#diagram [data-node="SATURN-1"]','Выбираем физический Saturn PLC');
-  await page.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('AUTO SHELL'));
+  await page.locator('#plc-front .runtime-hmi [data-hmi-page="overview"]').waitFor();
   await page.evaluate(()=>document.body.classList.add('tour-plc-focus'));
   await page.waitForTimeout(600);
-  await caption('Shell сгенерирован из topology + devices + signal bindings. Никаких вручную сверстанных страниц.',1800);
+  await caption('React renderer строит HMI из topology + devices + live signal bindings.',1800);
 
   await click('#plc-front [data-plc-button="right"]','RIGHT → процессный экран из того же .fbdbin');
-  await page.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('PUMP-1'));
-  await caption('Цветной TFT: нативные линии, окружности, состояния и живые PLC значения',1600);
+  await page.locator('#plc-front .runtime-hmi [data-hmi-page="process"]').waitFor();
+  await caption('Цветной TFT: бак, поток, насос, реле и лампа. Поток и механика анимированы.',1800);
 
   await click('#plc-front [data-plc-button="right"]','RIGHT → PUMP-1. Управляемое оборудование приоритетно в навигации');
-  await page.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('PUMP'));
-  await caption('Это экран, отрисованный командами физического fbd-runtime, а не отдельный HTML/SVG макет',1400);
+  await page.locator('#plc-front .runtime-hmi [data-hmi-page="device.PUMP-1"]').waitFor();
+  await caption('Насос — React/SVG-компонент. Скорость ротора привязана к live RPM.',1600);
 
   await click('#plc-front [data-plc-button="down"]','DOWN → STOP через setpoint физического PLC');
   await page.waitForFunction(()=>Number(document.querySelector('#inspector [data-signal="SATURN-1.DO1"] b')?.textContent)===0,null,{timeout:12000});
@@ -82,17 +82,17 @@ try {
   await caption('DO1=1. Экран и логика управления живут в одном .fbdbin.',1800);
 
   await click('#plc-front [data-plc-button="right"]','RIGHT → резервуар');
-  await page.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('TANK-1'));
+  await page.locator('#plc-front .runtime-hmi [data-hmi-page="device.TANK-1"]').waitFor();
   await click('#plc-front [data-plc-button="down"]','DOWN на резервуаре не должен останавливать насос');
   await page.waitForTimeout(350);
   if(Number(await page.locator('#inspector [data-signal="SATURN-1.DO1"] b').innerText())!==1)throw new Error('Non-contextual tank key changed pump output');
-  await caption('Контекстное управление: экран TANK-1 не может случайно изменить MANUAL насоса.',1700);
+  await caption('Контекстное управление: TANK-1 не может случайно изменить MANUAL насоса.',1700);
 
   await click('#plc-front [data-plc-button="left"]','LEFT → обратно на процесс');
-  await page.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('ТЕХПРОЦЕСС'));
+  await page.locator('#plc-front .runtime-hmi [data-hmi-page="process"]').waitFor();
   await click('#plc-front [data-plc-button="left"]','LEFT → обзор');
-  await page.waitForFunction(()=>document.querySelector('#plc-front .runtime-hmi')?.textContent?.includes('AUTO SHELL'));
-  await caption('Обзор, процесс, I/O, сеть и detail-экраны собраны из topology + PLC bindings.',1800);
+  await page.locator('#plc-front .runtime-hmi [data-hmi-page="overview"]').waitFor();
+  await caption('Один component model: overview, process, equipment, I/O и network.',1800);
 
   await page.evaluate(()=>document.body.classList.remove('tour-plc-focus'));
   await page.waitForTimeout(550);
