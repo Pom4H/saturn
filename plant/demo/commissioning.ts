@@ -49,8 +49,8 @@ export const controller=plc('SATURN-1',{
   },
  }
 });
-export const processPump=simulation('PUMP-1','pump',{system:'commissioning',at:{x:1320,y:3440},inputs:{voltage:controller.DO1,resistance:1},parameters:{inertia:1.2,nominalFlow:1}});
-export const processTank=simulation('TANK-1','reservoir',{system:'commissioning',at:{x:1000,y:3440},inputs:{inflow:.55,demand:processPump.flow},parameters:{capacity:20,initialLevel:.72}});
+export const processPump=simulation('PUMP-1','pump',{system:'commissioning',at:{x:1760,y:3800},inputs:{voltage:controller.DO1,resistance:1},parameters:{inertia:1.2,nominalFlow:1}});
+export const processTank=simulation('TANK-1','reservoir',{system:'commissioning',at:{x:1450,y:3800},inputs:{inflow:.55,demand:processPump.flow},parameters:{capacity:20,initialLevel:.72}});
 export const relay=simulation('RELAY-1','contactor',{system:'commissioning',at:{x:1370,y:3100}});
 export const lamp=simulation('LAMP-1','indicator',{system:'commissioning',at:{x:1780,y:3100}});
 export const module=simulation('EXP-AI4','io-module',{system:'commissioning',at:{x:1150,y:3480}});
