@@ -2,7 +2,7 @@
 
 The project is a map of UTF-8 source files with `plant.ts` as its entry. It is a bounded declarative TypeScript subset, interpreted through the TypeScript AST. No project code is evaluated as JavaScript. Named imports, const declarations, explicit values, ordinary scalar arithmetic, arrays/spreads and installed DSL functions are supported. Relative imports resolve only inside the immutable supplied project. Functions, loops, getters, arbitrary calls and imports from the network/filesystem are rejected.
 
-For a normal TypeScript-aware IDE, the same functions are available through the public `./plant` package export. The workbench's metadata validator remains authoritative at runtime.
+For TypeScript-aware tooling, authored projects use the canonical `@saturn/core` module. The bounded Saturn compiler remains authoritative at runtime; the historical `@scada/plant` name is accepted only as a migration alias.
 
 ## Decomposition
 
