@@ -5,32 +5,32 @@ const os = require('node:os');
 const path = require('node:path');
 const {
   buildCatalog,
-  normalizeExtensionList,
   quoteArg,
   readTargets,
   targetCommand,
 } = require('../lib/model.cjs');
 
-test('plugin elements appear as separate equipment catalogs', () => {
-  const extensions = normalizeExtensionList([
-    {
-      name: '@factory/motors',
-      version: '1.2.3',
-      capabilities: ['elements'],
-      elements: [
-        { type: 'factory.motor.ie4', title: 'IE4 Motor', tag: 'factory-motor' },
-      ],
-    },
-  ]);
-  const catalog = buildCatalog(extensions);
-  assert.equal(catalog[0].id, 'core');
-  assert.equal(catalog[1].id, '@factory/motors');
-  assert.deepEqual(catalog[1].items[0], {
-    type: 'factory.motor.ie4',
-    title: 'IE4 Motor',
-    tag: 'factory-motor',
-    source: '@factory/motors',
+test('canonical CLI catalog keeps core and plugin groups without host-owned model names', () => {
+  const catalog = buildCatalog({
+    schema: 1,
+    catalogs: [
+      {
+        id: 'core',
+        title: 'Saturn Core',
+        source: '@saturn/core',
+        items: [{ type: 'heat-exchanger', title: 'Конденсатор', source: '@saturn/core' }],
+      },
+      {
+        id: '@factory/motors',
+        title: '@factory/motors',
+        source: '@factory/motors@1.2.3',
+        items: [{ type: 'factory.motor.ie4', title: 'IE4 Motor', tag: 'factory-motor', source: '@factory/motors' }],
+      },
+    ],
   });
+  assert.equal(catalog[0].items[0].type, 'heat-exchanger');
+  assert.equal(catalog[1].id, '@factory/motors');
+  assert.equal(catalog[1].items[0].tag, 'factory-motor');
 });
 
 test('targets file is declarative and keeps provider/action identity', () => {
