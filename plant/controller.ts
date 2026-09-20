@@ -5,17 +5,55 @@ import { FbdRuntime, type HmiDrawCommand } from './vendor/saturn/src/runtime';
 import { buildSchema, type ElementSpec } from './vendor/saturn/src/builder';
 import { ELEM } from './vendor/saturn/src/format';
 import { compileHmiScreens } from './vendor/saturn/src/hmi-compile';
+import type { HmiScreenModel } from './vendor/saturn/src/types';
 import { runtimeHash as wasmSha256, STATE_ABI, type RuntimeSnapshot } from './vendor/firmverse/index';
 export const CONTROLLER_ABI=STATE_ABI;
+export type ControllerKey = 'up'|'down'|'left'|'right';
+export interface ControllerHmi {
+    title: string;
+    rows: { label: string; pin: string }[];
+    view?: Presentation;
+    /** Native 320x240 controller screens compiled into the .fbdbin. */
+    screens?: HmiScreenModel[];
+    initial?: string;
+    /** Physical front-panel key navigation. Omitted keys fall back to cyclic navigation. */
+    keys?: Record<string, Partial<Record<ControllerKey,string>>>;
+}
 export interface Controller {
     id: string; profile: 'saturn-fbd'; system: string; layout: Layout;
     blocks?: Record<string, PlcBlock>;
-    outputs: Record<string, Expr>; hmi: { title: string; rows: { label: string; pin: string }[]; view?: Presentation };
+    outputs: Record<string, Expr>; hmi: ControllerHmi;
 }
 export interface PlcBlock { type: 'TON'|'TP'|'RSTRG'|'DTRG'|'COUNTER'|'PID'|'SUM'|'SUMM'|'LIM'|'EQ'|'OR'|'XOR'; inputs: Expr[]; params?: number[] }
-export interface ControllerState { inputs: Record<string, number>; outputs: Record<string, number>; healthy: boolean; powered: boolean; display?: HmiDrawCommand[]; snapshot?: RuntimeSnapshot }
+export interface ControllerState { inputs: Record<string, number>; outputs: Record<string, number>; healthy: boolean; powered: boolean; screen: number; display?: HmiDrawCommand[]; snapshot?: RuntimeSnapshot }
 export const inputPins: Record<string, number> = Object.fromEntries([...Array.from({length:10},(_,i)=>[`DI${i+1}`,i+1]), ['AI1',11], ['AI2',12]]);
 export const outputPins: Record<string, number> = Object.fromEntries([...Array.from({length:11},(_,i)=>[`DO${i+1}`,i+1]), ['AO1',12], ['AO2',13]]);
+
+export function controllerScreenIds(c:Controller): string[] {
+    if(c.hmi.screens?.length) return c.hmi.screens.map(screen=>screen.id);
+    if(c.hmi.view) return [c.hmi.view.id];
+    return ['main'];
+}
+export function initialControllerScreen(c:Controller): number {
+    const ids=controllerScreenIds(c), initial=c.hmi.initial ?? ids[0], index=ids.indexOf(initial);
+    if(index<0) throw new AppError('Unknown initial controller HMI screen');
+    return index;
+}
+export function controllerScreenAfterKey(c:Controller,current:number,key:ControllerKey):number {
+    const ids=controllerScreenIds(c);
+    if(!ids.length) return 0;
+    const safe=((current%ids.length)+ids.length)%ids.length, currentId=ids[safe];
+    const explicit=c.hmi.keys?.[currentId]?.[key];
+    if(explicit!==undefined) {
+        const target=ids.indexOf(explicit);
+        if(target<0) throw new AppError('Unknown controller HMI navigation target');
+        return target;
+    }
+    if(ids.length===1) return 0;
+    const delta=key==='right'||key==='down'?1:-1;
+    return (safe+delta+ids.length)%ids.length;
+}
+
 /** Named blocks compile once; stateful execution is checkpointed by Firmverse. */
 export function compileController(c: Controller) {
     if(c.profile !== 'saturn-fbd' || !c.outputs || Object.keys(c.outputs).length<1 || Object.keys(c.outputs).length>13) throw new AppError('Invalid Saturn profile');
@@ -53,8 +91,31 @@ export function compileController(c: Controller) {
     for(const row of c.hmi.rows){ if(typeof row.label!=='string'||row.label.length>24)throw new AppError('HMI label too long');
         if(!bindings[row.pin]) { if(!Object.hasOwn(inputPins,row.pin))throw new AppError('HMI pin not in compiled program');bindings[row.pin]=expr({ref:row.pin}); }
     }
-    let screenModels: import('./vendor/saturn/src/types').HmiScreenModel[];
-    if(c.hmi.view) {
+    const resolveHmiRef=(ref:string):string=>{
+        if(bindings[ref]) return bindings[ref];
+        if(Object.hasOwn(inputPins,ref)) return bindings[ref]=expr({ref});
+        if(Object.hasOwn(c.blocks??{},ref)) return expr({ref});
+        return ref;
+    };
+    let screenModels: HmiScreenModel[];
+    if(c.hmi.screens?.length) {
+        if(c.hmi.screens.length>16) throw new AppError('At most 16 controller HMI screens');
+        const ids=new Set<string>();
+        screenModels=c.hmi.screens.map(screen=>{
+            if(!/^[A-Za-z][A-Za-z0-9_.-]{0,95}$/.test(screen.id)||ids.has(screen.id))throw new AppError('Invalid or duplicate controller HMI screen');
+            ids.add(screen.id);
+            return {...screen,elements:screen.elements.map(element=>({
+                ...element,
+                ...(element.binding?{binding:{...element.binding,ref:resolveHmiRef(element.binding.ref)}}:{}),
+                ...(element.visible?{visible:{...element.visible,ref:resolveHmiRef(element.visible.ref)}}:{}),
+            }))};
+        });
+        const initial=c.hmi.initial??screenModels[0].id;if(!ids.has(initial))throw new AppError('Unknown initial controller HMI screen');
+        for(const [from,map] of Object.entries(c.hmi.keys??{})){
+            if(!ids.has(from))throw new AppError('Unknown controller HMI navigation source');
+            for(const to of Object.values(map))if(to!==undefined&&!ids.has(to))throw new AppError('Unknown controller HMI navigation target');
+        }
+    } else if(c.hmi.view) {
         const viewBindings=Object.fromEntries(Object.entries(c.hmi.view.bindings).map(([key,value])=>[key,expr(value)]));
         screenModels=[presentationHmi(c.hmi.view,viewBindings)];
     } else screenModels=[{id:'main',title:c.hmi.title,screenType:'main',period:0,elements:[
@@ -71,9 +132,9 @@ export class ControllerVM {
     snapshot():RuntimeSnapshot {return this.runtime.snapshot();}
     restore(snapshot:RuntimeSnapshot):void {this.runtime.restore(snapshot);}
     reset():void {this.runtime.reset();}
-    scan(inputs:Record<string,number>, dt:number):{outputs:Record<string,number>;hmi:HmiDrawCommand[]} {
+    scan(inputs:Record<string,number>, dt:number, screen=0):{outputs:Record<string,number>;hmi:HmiDrawCommand[]} {
         for(const [pin,index] of Object.entries(inputPins)) { const value=inputs[pin]??0;if(!Number.isSafeInteger(value)||value< -2147483648||value>2147483647)throw new AppError('PLC input outside int32: '+pin);this.runtime.setInput(index,value); }
-        const hmi=this.runtime.stepAndRenderScreen(dt);
+        const hmi=this.runtime.stepAndRenderScreen(dt,screen);
         return {outputs:Object.fromEntries(Object.keys(this.controller.outputs).map(pin=>[pin,Number(this.runtime.getOutput(outputPins[pin]))])),hmi};
     }
 }
