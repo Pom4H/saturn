@@ -1,15 +1,18 @@
 import { benchPanel } from './views';
-import { system, simulation, control, plc, pin, gt, port, cable, expansion, alarm, view } from '@scada/plant';
+import { system, simulation, control, plc, pin, gt, block, setpoint, functionBlock, port, cable, expansion, alarm, view } from '@scada/plant';
 // Generic isolated low-voltage commissioning bench; never connected to reactor controls.
 export const benchSystem=system('commissioning','PLC · стенд подключения клемм','site');
 export const level=control('BENCH-LEVEL',{title:'Датчик уровня · тестовый сигнал',system:'commissioning',min:0,max:10,initial:3,rate:1,unit:'V'});
 export const psu=simulation('PSU-24','dc-supply',{system:'commissioning',at:{x:80,y:3100}});
 export const sensor=simulation('LEVEL-TX','transmitter',{system:'commissioning',at:{x:480,y:3480},inputs:{value:level.value}});
 export const controller=plc('SATURN-1',{
- system:'commissioning',at:{x:760,y:3100},outputs:{DO1:gt(pin('AI1'),500)},
+ system:'commissioning',at:{x:760,y:3100},
+ setpoints:{MANUAL:{caption:'Ручной выход',min:0,max:1,initial:0,step:1}},
+ blocks:{drive:functionBlock('OR',[gt(pin('AI1'),500),setpoint('MANUAL')])},
+ outputs:{DO1:block('drive')},
  hmi:{
   title:'Commissioning bench',rows:[{label:'AI1 x100',pin:'AI1'},{label:'Relay DO1',pin:'DO1'}],
-  view:view('plc-screen',{title:'PLC',body:benchPanel,bindings:{input:pin('AI1'),output:gt(pin('AI1'),500)}}),
+  view:view('plc-screen',{title:'PLC',body:benchPanel,bindings:{input:pin('AI1'),output:block('drive')}}),
   initial:'main',
   screens:[
    {id:'main',title:'SATURN-1',screenType:'main',period:100,elements:[
@@ -18,6 +21,7 @@ export const controller=plc('SATURN-1',{
     {id:'subtitle',primitive:'text',label:'Стенд управления',position:{x:10,y:48}},
     {id:'ai1',primitive:'value',label:'AI1 x100: ',position:{x:10,y:82},binding:{source:'input',ref:'AI1',format:'int'}},
     {id:'do1',primitive:'status',label:'Реле DO1: ',position:{x:10,y:118},binding:{source:'output',ref:'DO1',format:'bool'}},
+    {id:'manual',primitive:'status',label:'Ручной: ',position:{x:10,y:154},binding:{source:'sp',ref:'MANUAL',format:'bool'}},
     {id:'hint',primitive:'text',label:'RIGHT I/O   DOWN LOAD',position:{x:10,y:205},color:33808},
    ]},
    {id:'io',title:'I/O',screenType:'diagnostics',period:100,elements:[
@@ -33,14 +37,14 @@ export const controller=plc('SATURN-1',{
     {id:'title',primitive:'text',label:'Управляемая нагрузка',position:{x:10,y:8},font:1,color:65535},
     {id:'relay',primitive:'status',label:'RELAY-1: ',position:{x:10,y:64},binding:{source:'output',ref:'DO1',format:'bool'}},
     {id:'lamp',primitive:'status',label:'LAMP-1: ',position:{x:10,y:106},binding:{source:'output',ref:'DO1',format:'bool'}},
-    {id:'logic',primitive:'text',label:'Источник: SATURN-1.DO1',position:{x:10,y:154}},
-    {id:'hint',primitive:'text',label:'LEFT I/O   RIGHT MAIN',position:{x:10,y:205},color:33808},
+    {id:'manual',primitive:'status',label:'Ручной режим: ',position:{x:10,y:148},binding:{source:'sp',ref:'MANUAL',format:'bool'}},
+    {id:'hint',primitive:'text',label:'UP ON  DOWN OFF  LEFT I/O',position:{x:10,y:205},color:33808},
    ]},
   ],
   keys:{
    main:{right:'io',down:'load',left:'load',up:'io'},
    io:{left:'main',right:'load',up:'main',down:'load'},
-   load:{left:'io',right:'main',up:'io',down:'main'},
+   load:{left:'io',right:'main',up:{setpoint:'MANUAL',value:1},down:{setpoint:'MANUAL',value:0}},
   },
  }
 });
