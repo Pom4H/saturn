@@ -77,6 +77,8 @@
   "exports": {
     "./core": "./src/core.ts",
     "./sdk": "./src/sdk.ts",
-    "./plant": "./plant/dsl.ts"
+    "./plant": "./plant/dsl.ts",
+    "./hmi": "./src/hmi.ts",
+    "./hmi/react": "./src/hmi-react.ts"
   }
 }
