@@ -92,9 +92,10 @@ if (-not $proc) { throw 'VS Code did not create a visible window.' }
 [SaturnVideoWindow]::ShowWindow($proc.MainWindowHandle, 3) | Out-Null
 [SaturnVideoWindow]::SetForegroundWindow($proc.MainWindowHandle) | Out-Null
 
-$ffmpeg = (Get-Command ffmpeg.exe -ErrorAction SilentlyContinue)?.Source
-if (-not $ffmpeg) { $ffmpeg = (Get-Command ffmpeg -ErrorAction SilentlyContinue)?.Source }
-if (-not $ffmpeg) { throw 'ffmpeg is required on the Windows runner.' }
+$ffmpegCommand = Get-Command ffmpeg.exe -ErrorAction SilentlyContinue
+if (-not $ffmpegCommand) { $ffmpegCommand = Get-Command ffmpeg -ErrorAction SilentlyContinue }
+if (-not $ffmpegCommand) { throw 'ffmpeg is required on the Windows runner.' }
+$ffmpeg = $ffmpegCommand.Source
 
 New-Item -ItemType Directory -Force -Path 'vscode-video' | Out-Null
 $out = (Resolve-Path 'vscode-video').Path + '\saturn-vscode-tour.mp4'
