@@ -30,7 +30,7 @@ type VisualOf<M> = M extends { visual: infer V extends PhysicalType } ? V : neve
 type PortsOf<M,ID extends string> = [VisualOf<M>] extends [never] ? {} : PortRefs<VisualOf<M>,ID>;
 
 export type SimRef<
-    M = { outputs: Record<string, string> },
+    M = { outputs: {} },
     ID extends string = string,
     Kind extends string = string,
 > = {
@@ -125,7 +125,7 @@ export const pin=(name:string):Expr=>({ref:id(name)});
 export function port<M,ID extends string,Kind extends string,P extends keyof PortsOf<M,ID>&string>(device:SimRef<M,ID,Kind>,name:P):PortsOf<M,ID>[P];
 export function port<ID extends string,O extends Record<string,Expr>,P extends keyof PortRefs<'saturn',ID>&string>(device:ControllerRef<ID,O>,name:P):PortRefs<'saturn',ID>[P];
 export function port(device:string|Device,name:string):DynamicEndpoint;
-export function port(device:string|SimRef|ControllerRef|Device,name:string):Endpoint {
+export function port(device:string|SimRef|ControllerRef|Device,name:string):any {
  const deviceId=typeof device==='string'?id(device):device.id;
  if(typeof device!=='string'&&'ports' in device&&device.ports&&Object.hasOwn(device.ports,name))return (device.ports as Record<string,Endpoint>)[name];
  return {device:deviceId,port:name};
