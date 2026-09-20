@@ -277,7 +277,7 @@ function attachModule(controllerId:string){
  // Deliberately explicit module authoring. The base program never guesses physical expansion addresses.
  const fileName='expansion-'+slot+'.ts';if(files[fileName])throw new Error('Файл модуля уже существует');
  const moduleId=controllerId+'-AI4-'+slot;
- const source=`import { simulation } from '@scada/plant';
+ const source=`import { simulation } from '@saturn/core';
 export const module = simulation(${JSON.stringify(moduleId)}, 'io-module', {system:${JSON.stringify(controller.system)},at:{x:${controller.layout.x+400+(slot-1)*190},y:${controller.layout.y+650}}});
 `;
  // Insert into the explicit project arrays via the existing bounded AST helper.
