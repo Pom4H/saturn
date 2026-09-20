@@ -30,6 +30,7 @@ jobs:
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run site:test:browser
       - run: npm run test:e2e
+      - run: npm run plant:test:browser
       - run: npm run challenge:browser
       - run: npm audit --audit-level=high
       - uses: actions/upload-artifact@v7.0.1
@@ -41,6 +42,7 @@ jobs:
             test-results/
             runtime-playwright-report/
             runtime-test-results/
+            plant-test-results/
             challenge-results/
           retention-days: 7
       - uses: actions/upload-pages-artifact@v5.0.0
