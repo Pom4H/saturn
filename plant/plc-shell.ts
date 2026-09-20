@@ -97,7 +97,7 @@ export function generatePlcShell(project:Project, controllerId:string):PlcShellM
     {id:'process',kind:'process',title:'Процесс',devices:uniq([...detail.map(device=>device.id),...ordered.map(device=>device.id)]).slice(0,6)},
     ...detail.map(device=>{
       const driver=deviceDriver(project,controllerId,device.id,outputs);
-      return {id:'device:'+device.id,kind:'device' as const,title:device.id,deviceId:device.id,visual:device.type,driver,controlSetpoint:setpointForOutput(controller,driver)};
+      return {id:'device.'+device.id,kind:'device' as const,title:device.id,deviceId:device.id,visual:device.type,driver,controlSetpoint:setpointForOutput(controller,driver)};
     }),
     {id:'io',kind:'io',title:'I/O',signals:ioSignals},
     {id:'network',kind:'network',title:'Сеть',peers},
