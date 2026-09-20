@@ -32,6 +32,8 @@ if (!has('--skip-web-build')) {
 }
 
 const packageJson = JSON.parse(await readFile('package.json', 'utf8'));
+const demoNames = ['views.ts','commissioning.ts','wiring.ts','plant.ts','core.ts','cooling.ts','steam.ts','safety.ts','reports.ts','auxiliary.ts','services.ts','training.ts'];
+const demoFiles = Object.fromEntries(await Promise.all(demoNames.map(async name => [name, await readFile(resolve('plant/demo', name), 'utf8')] as const)));
 const defaultName = target.includes('windows') ? 'saturn.exe' : 'saturn';
 const outfile = resolve(value('--outfile') ?? resolve('dist/standalone', defaultName));
 await mkdir(resolve(outfile, '..'), { recursive: true });
@@ -43,6 +45,7 @@ const build = await Bun.build({
     sourcemap: 'none',
     define: {
         SATURN_VERSION: JSON.stringify(packageJson.version),
+        SATURN_DEMO_FILES: JSON.stringify(demoFiles),
     },
     compile: {
         target,
