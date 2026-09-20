@@ -1,5 +1,5 @@
 import './pwa.css';
-import { readAppLanguage, setAppLanguage, t } from './i18n';
+import { readAppLanguage, setAppLanguage, t, tr } from './i18n';
 
 type InstallPrompt = Event & {
   prompt(): Promise<void>;
@@ -233,7 +233,7 @@ async function runUpdate(): Promise<void> {
 function observeWorker(worker: ServiceWorker | null): void {
   if (!worker) return;
   worker.addEventListener('statechange', () => {
-    if (worker.state === 'redundant' && !registration?.active) workerError = 'Не удалось сохранить приложение';
+    if (worker.state === 'redundant' && !registration?.active) workerError = tr('Не удалось сохранить приложение', 'Could not save the application');
     networkState();
   });
 }
@@ -246,7 +246,7 @@ async function registerWorker(): Promise<void> {
     networkState();
     await navigator.serviceWorker.ready;
     networkState();
-  } catch { workerError = 'Не удалось подготовить приложение'; networkState(); }
+  } catch { workerError = tr('Не удалось подготовить приложение', 'Could not prepare the application'); networkState(); }
 }
 window.addEventListener('saturn-project-change', networkState);
 window.addEventListener('saturn-telemetry-change', networkState);
