@@ -24,7 +24,8 @@ function applicationDataRoot(): string {
 }
 
 let args = process.argv.slice(1);
-if (args[0]?.replaceAll('\\', '/').endsWith('/standalone/entry.ts'))
+const entryArg = args[0]?.replaceAll('\\', '/') ?? '';
+if (entryArg.endsWith('/standalone/entry.ts') || entryArg.includes('/~BUN/'))
     args = args.slice(1);
 
 const command = args[0] === 'run' ? 'run' : args[0] === 'open' ? 'open' : 'open';
