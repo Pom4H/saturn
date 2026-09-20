@@ -1,6 +1,14 @@
 name: Isomorphic SCADA and PWA
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'plant/**'
+      - 'src/hmi*.ts'
+      - 'scripts/plant-*.mjs'
+      - 'tsconfig.plant.json'
+      - 'package.json'
+      - '.github/workflows/plant.yml'
 permissions:
   contents: read
 concurrency:
