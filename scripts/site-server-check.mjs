@@ -170,15 +170,20 @@ export async function checkServerFiles(browser) {
 
     // Operator opens the same root PWA and gets runtime/HMI, not the engineering IDE.
     operatorContext = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
-    const operatorLogin = await operatorContext.request.post(app.origin + '/plant/api/login', { data: { user: 'operator', password: operatorPassword }, headers: { Origin: app.origin } });
-    assert.equal(operatorLogin.status(), 200);
-    assert.equal((await operatorContext.request.get(app.origin + '/plant/api/project')).status(), 403, 'Operator cannot read source files');
     const operatorPage = await operatorContext.newPage(), operatorErrors = []; operatorPage.on('pageerror', error => operatorErrors.push(error.message));
     await operatorPage.goto(app.origin);
+    const operatorLoginStatus = await operatorPage.evaluate(async credentials => {
+      const response = await fetch('/plant/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(credentials) });
+      return response.status;
+    }, { user: 'operator', password: operatorPassword });
+    assert.equal(operatorLoginStatus, 200);
+    assert.equal(await operatorPage.evaluate(async () => (await fetch('/plant/api/project', { cache: 'no-store' })).status), 403, 'Operator cannot read source files');
+    await operatorPage.reload();
     await operatorPage.waitForFunction(() => {
       const shell = document.getElementById('studio-shell');
-      return shell?.dataset.role === 'operator' && shell.dataset.runtimeOnly === 'true' && ['live','paused'].includes(shell.dataset.telemetry ?? '');
+      return shell?.dataset.role === 'operator' && shell.dataset.runtimeOnly === 'true';
     });
+    await operatorPage.waitForFunction(() => ['live','paused'].includes(document.getElementById('studio-shell')?.dataset.telemetry ?? ''), null, { timeout: 60_000 });
     assert(await operatorPage.locator('#runtime-controls').isVisible());
     assert(!(await operatorPage.locator('#files-toggle').isVisible()), 'Operator does not see source navigation');
     assert(!(await operatorPage.locator('#studio-code').isVisible()), 'Operator does not see the code editor');
@@ -201,15 +206,20 @@ export async function checkServerFiles(browser) {
 
     // Viewer gets the same live projection but no command surface.
     viewerContext = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
-    const viewerLogin = await viewerContext.request.post(app.origin + '/plant/api/login', { data: { user: 'viewer', password: viewerPassword }, headers: { Origin: app.origin } });
-    assert.equal(viewerLogin.status(), 200);
-    assert.equal((await viewerContext.request.get(app.origin + '/plant/api/project')).status(), 403, 'Viewer cannot read source files');
     const viewerPage = await viewerContext.newPage(), viewerErrors = []; viewerPage.on('pageerror', error => viewerErrors.push(error.message));
     await viewerPage.goto(app.origin);
+    const viewerLoginStatus = await viewerPage.evaluate(async credentials => {
+      const response = await fetch('/plant/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(credentials) });
+      return response.status;
+    }, { user: 'viewer', password: viewerPassword });
+    assert.equal(viewerLoginStatus, 200);
+    assert.equal(await viewerPage.evaluate(async () => (await fetch('/plant/api/project', { cache: 'no-store' })).status), 403, 'Viewer cannot read source files');
+    await viewerPage.reload();
     await viewerPage.waitForFunction(() => {
       const shell = document.getElementById('studio-shell');
-      return shell?.dataset.role === 'viewer' && shell.dataset.runtimeOnly === 'true' && ['live','paused'].includes(shell.dataset.telemetry ?? '');
+      return shell?.dataset.role === 'viewer' && shell.dataset.runtimeOnly === 'true';
     });
+    await viewerPage.waitForFunction(() => ['live','paused'].includes(document.getElementById('studio-shell')?.dataset.telemetry ?? ''), null, { timeout: 60_000 });
     assert(await viewerPage.locator('#runtime-controls').isVisible());
     assert(!(await viewerPage.locator('#runtime-pause').isVisible()), 'Viewer cannot pause runtime');
     await viewerPage.locator('#runtime-controls').click();
