@@ -46,7 +46,7 @@ function permission(): NotificationPermission | 'unsupported' {
 }
 function installationHint(): string {
   if (isInstalled()) return 'Saturn открыт как приложение.';
-  if (installPrompt) return 'Отдельное окно и быстрый доступ к проектам.';
+  if (installPrompt) return 'Отдельное окно IDE и быстрый доступ к инженерным проектам.';
   const ua = navigator.userAgent;
   const ios = /iPad|iPhone|iPod/.test(ua) || navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
   if (ios) return 'В Safari: Поделиться → На экран «Домой».';
@@ -134,7 +134,7 @@ function createSettings(): HTMLDialogElement {
         <div class="app-settings-row"><h3 id="app-notifications-title">Уведомления</h3><span id="app-notifications-state" class="app-settings-value"></span></div>
         <p id="app-notifications-description"></p>
         <div class="app-settings-actions"><button type="button" id="app-notifications-allow">Разрешить уведомления</button><button type="button" id="app-notifications-test" hidden>Отправить проверку</button></div>
-        <p class="app-settings-footnote">Тревоги и управление доступны в рабочей среде после подключения к установке.</p>
+        <p class="app-settings-footnote">Runtime, диагностика и управление доступны в инженерном проекте после подключения к установке.</p>
       </section>
     </div>
     <div id="app-settings-message" class="app-settings-message" role="status" aria-live="polite"></div>`;
@@ -195,7 +195,7 @@ async function requestNotifications(): Promise<void> {
 async function testNotification(): Promise<void> {
   if (permission() !== 'granted' || !registration?.active) return;
   await runAction(async () => {
-    await registration!.showNotification('Saturn', { body: 'Проверочное уведомление. Уведомления на этом устройстве работают.', icon: '/site/assets/icon-192.png', tag: 'saturn-notification-test' });
+    await registration!.showNotification('Saturn', { body: 'Проверка Saturn IDE. Системные уведомления на этом устройстве работают.', icon: '/site/assets/icon-192.png', tag: 'saturn-notification-test' });
     settingsMessage('Проверочное уведомление передано системе. Его показ зависит от настроек устройства.');
   }, 'Система не приняла уведомление. Проверьте разрешения браузера и устройства.');
 }
