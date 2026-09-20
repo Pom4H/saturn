@@ -9,6 +9,7 @@ export const controller=plc('SATURN-1',{
  system:'commissioning',at:{x:760,y:3100},outputs:{DO1:gt(pin('AI1'),500)},
  hmi:{
   title:'Commissioning bench',rows:[{label:'AI1 x100',pin:'AI1'},{label:'Relay DO1',pin:'DO1'}],
+  view:view('plc-screen',{title:'PLC',body:benchPanel,bindings:{input:pin('AI1'),output:gt(pin('AI1'),500)}}),
   initial:'main',
   screens:[
    {id:'main',title:'SATURN-1',screenType:'main',period:100,elements:[
