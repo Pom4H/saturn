@@ -56,20 +56,18 @@ Existing SQLite archives add/backfill `sim_time_ms` once and create the
 has no multiyear retention policy. Windowed reads fix browser behavior; they do
 not turn this demo recorder into a production historian.
 
-## SDK and completion
+## Project API and language tooling
 
-The separate `examples/consumer` package imports `@saturn/scada/core` and
-`@saturn/scada/sdk` without internal relative paths. `defineComponent()` infers
-field values, choices, ports, signal types and command arguments from literal
-metadata. The consumer test has expected compiler errors for misspelled fields,
-wrong values, invalid ports/directions and incorrect command parameters, plus an
-executed bundled smoke test. These are source entrypoints for TS-aware bundlers;
-the repository is still private-to-npm and no package was published.
+The external consumer smoke test imports the canonical `@saturn/core` package.
+The application package `@saturn/scada` no longer exports a second DSL or a
+parallel `defineComponent()` SDK. Public simulation/controller references hide
+their Project IR payload and expose stable domain identity instead.
 
-The browser's recovery-parser completion reads the same metadata for fields,
-units/ranges, enum choices and named ports. Extensions such as the filter get
-`resistance` completion without another central list. The editor remains a
-bounded declarative language, not a general TS language server.
+The remaining recovery-parser completion in the legacy single-file editor is a
+transitional dependency, not the Saturn language architecture. New plant
+features must extend TypeScript types/shared metadata and the language-service
+boundary described in [the developer guide](developer/language-tooling.md).
+Structured Saturn diagnostics use stable codes/data with localized presentation.
 
 ## Development rebuilds
 
