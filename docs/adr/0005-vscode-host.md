@@ -48,11 +48,11 @@ The mnemonic is therefore a separate editor tab created with `WebviewPanel`. It 
 The first bridge reuses the accepted extension manifest from ADR-0002.
 
 ```text
-saturn extension list --json
+saturn ide catalog --json
              |
-             +-- core catalog
+             +-- plant/models.ts
              |
-             +-- extension.elements
+             +-- installed extension.elements
                         |
                         v
               VS Code Equipment Catalog
@@ -126,7 +126,7 @@ The repository now contains a loadable CommonJS VS Code extension under `vscode/
 - HMI open command;
 - status-bar runtime state;
 - insertion of a selected catalog element into the active TypeScript document;
-- extension catalog discovery through `saturn extension list --json`;
+- canonical core + extension catalog discovery through `saturn ide catalog --json`;
 - safe target descriptor parsing;
 - Deploy and Flash commands that only become actionable for targets advertising those capabilities;
 - tests ensuring target files cannot inject arbitrary actions.
