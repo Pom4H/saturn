@@ -7,7 +7,7 @@ For a normal TypeScript-aware IDE, the same functions are available through the 
 ## Decomposition
 
 ```ts
-import { system, simulation, bank, aggregate, derived, signal } from '@scada/plant';
+import { system, simulation, bank, aggregate, derived, signal } from '@saturn/core';
 
 export const cooling = system('cooling', 'Circulation', 'unit');
 export const supply = simulation('GRID', 'supply', {
@@ -34,7 +34,7 @@ Model output keys, input names and parameter names are inferred from literal met
 `equipment()` binds arbitrary signal expressions to an installed visual type. When omitted from the project, devices are derived from simulation metadata. A visual consumes observations and never advances a model. A device may use a derived value or the output of a model in another subsystem. The current live source is simulation; real PLC/network adapters are **not implemented by this change**.
 
 ```ts
-import { equipment, signal } from '@scada/plant';
+import { equipment, signal } from '@saturn/core';
 export const gauge = equipment('FLOW-GAUGE', 'sensor', {
   system: 'cooling', at: { x: 50, y: 250 },
   signals: { value: signal('loop.flow') },
@@ -58,7 +58,7 @@ The same policy can be set for a model output using `history: { flow: { ... } }`
 ## Alarms
 
 ```ts
-import { alarm, signal } from '@scada/plant';
+import { alarm, signal } from '@saturn/core';
 const highTemperature = alarm('temperature-high', {
   title: 'High temperature', signal: signal('loop.temperature'),
   above: 1.6, clearBelow: 1.5, delay: 1000,
@@ -71,7 +71,7 @@ Alarm activation, acknowledgement, return to normal and measurement quality are 
 ## Reports
 
 ```ts
-import { report } from '@scada/plant';
+import { report } from '@saturn/core';
 export const flow = report('flow-hour', {
   title: 'Flow history',
   on: {
