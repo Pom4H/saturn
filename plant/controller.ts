@@ -9,6 +9,8 @@ import type { HmiScreenModel } from './vendor/saturn/src/types';
 import { runtimeHash as wasmSha256, STATE_ABI, type RuntimeSnapshot } from './vendor/firmverse/index';
 export const CONTROLLER_ABI=STATE_ABI;
 export type ControllerKey = 'up'|'down'|'left'|'right';
+export interface PlcSetpoint { caption:string; min:number; max:number; initial:number; divider?:number; step?:number }
+export type ControllerKeyAction = string | { screen?:string; setpoint:string; value?:number; delta?:number };
 export interface ControllerHmi {
     title: string;
     rows: { label: string; pin: string }[];
@@ -17,11 +19,12 @@ export interface ControllerHmi {
     screens?: HmiScreenModel[];
     initial?: string;
     /** Physical front-panel key navigation. Omitted keys fall back to cyclic navigation. */
-    keys?: Record<string, Partial<Record<ControllerKey,string>>>;
+    keys?: Record<string, Partial<Record<ControllerKey,ControllerKeyAction>>>;
 }
 export interface Controller {
     id: string; profile: 'saturn-fbd'; system: string; layout: Layout;
     blocks?: Record<string, PlcBlock>;
+    setpoints?: Record<string, PlcSetpoint>;
     outputs: Record<string, Expr>; hmi: ControllerHmi;
 }
 export interface PlcBlock { type: 'TON'|'TP'|'RSTRG'|'DTRG'|'COUNTER'|'PID'|'SUM'|'SUMM'|'LIM'|'EQ'|'OR'|'XOR'; inputs: Expr[]; params?: number[] }
@@ -39,26 +42,36 @@ export function initialControllerScreen(c:Controller): number {
     if(index<0) throw new AppError('Unknown initial controller HMI screen');
     return index;
 }
-export function controllerScreenAfterKey(c:Controller,current:number,key:ControllerKey):number {
+export function controllerKeyAction(c:Controller,current:number,key:ControllerKey):{screen:number;setpoint?:string;value?:number;delta?:number} {
     const ids=controllerScreenIds(c);
-    if(!ids.length) return 0;
+    if(!ids.length) return {screen:0};
     const safe=((current%ids.length)+ids.length)%ids.length, currentId=ids[safe];
     const explicit=c.hmi.keys?.[currentId]?.[key];
-    if(explicit!==undefined) {
-        const target=ids.indexOf(explicit);
-        if(target<0) throw new AppError('Unknown controller HMI navigation target');
-        return target;
+    if(typeof explicit==='string') {
+        const target=ids.indexOf(explicit);if(target<0)throw new AppError('Unknown controller HMI navigation target');
+        return {screen:target};
     }
-    if(ids.length===1) return 0;
+    if(explicit&&typeof explicit==='object') {
+        const target=explicit.screen===undefined?safe:ids.indexOf(explicit.screen);
+        if(target<0)throw new AppError('Unknown controller HMI navigation target');
+        if(!Object.hasOwn(c.setpoints??{},explicit.setpoint))throw new AppError('Unknown controller HMI setpoint');
+        if((explicit.value===undefined)===(explicit.delta===undefined))throw new AppError('Controller HMI setpoint action requires value or delta');
+        return {screen:target,setpoint:explicit.setpoint,...(explicit.value===undefined?{delta:explicit.delta}:{value:explicit.value})};
+    }
+    if(ids.length===1) return {screen:0};
     const delta=key==='right'||key==='down'?1:-1;
-    return (safe+delta+ids.length)%ids.length;
+    return {screen:(safe+delta+ids.length)%ids.length};
 }
 
 /** Named blocks compile once; stateful execution is checkpointed by Firmverse. */
 export function compileController(c: Controller) {
     if(c.profile !== 'saturn-fbd' || !c.outputs || Object.keys(c.outputs).length<1 || Object.keys(c.outputs).length>13) throw new AppError('Invalid Saturn profile');
-    const elements: ElementSpec[] = []; const used = new Set<string>(); const built=new Map<string,string>(),active=new Set<string>();let serial=0;
-    for(const name of Object.keys(c.blocks??{})){if(!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(name)||Object.hasOwn(inputPins,name))throw new AppError('Invalid or ambiguous PLC block ID');}
+    const elements: ElementSpec[] = []; const used = new Set<string>(); const built=new Map<string,string>(),spBuilt=new Map<string,string>(),active=new Set<string>();const setpointOrder:string[]=[];let serial=0;
+    for(const name of Object.keys(c.blocks??{})){if(!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(name)||Object.hasOwn(inputPins,name)||Object.hasOwn(c.setpoints??{},name))throw new AppError('Invalid or ambiguous PLC block ID');}
+    for(const [name,sp] of Object.entries(c.setpoints??{})){
+        if(!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(name)||Object.hasOwn(inputPins,name)||Object.hasOwn(c.blocks??{},name))throw new AppError('Invalid or ambiguous PLC setpoint ID');
+        if(!sp||typeof sp.caption!=='string'||sp.caption.length>24||![sp.min,sp.max,sp.initial,sp.divider??0,sp.step??1].every(Number.isSafeInteger)||sp.min>sp.max||sp.initial<sp.min||sp.initial>sp.max||(sp.step??1)<=0)throw new AppError('Invalid PLC setpoint');
+    }
     const blockKinds=new Set(['TON','TP','RSTRG','DTRG','COUNTER','PID','SUM','SUMM','LIM','EQ','OR','XOR']);
     const push = (spec: Omit<ElementSpec,'id'>, name='e'+serial++):string => { elements.push({id:name,...spec}); if(elements.length>256)throw new AppError('PLC program exceeds 256 blocks');return name; };
     const expr = (v: Expr, depth=0):string => {
@@ -66,6 +79,12 @@ export function compileController(c: Controller) {
         if(typeof v==='number'||typeof v==='boolean') { const n=Number(v); if(!Number.isSafeInteger(n)||n< -2147483648||n>2147483647) throw new AppError('PLC constants must be int32');return push({type:ELEM.CONST,params:[n]}); }
         if(!v||typeof v!=='object')throw new AppError('Invalid PLC expression');
         if('ref' in v) {
+            if(Object.hasOwn(c.setpoints??{},v.ref)){
+                if(spBuilt.has(v.ref))return spBuilt.get(v.ref)!;
+                const sp=c.setpoints![v.ref],name='setpoint_'+v.ref;
+                push({type:ELEM.SP,params:[sp.min,sp.max,sp.initial,sp.divider??0,sp.step??1],caption:sp.caption},name);
+                spBuilt.set(v.ref,name);setpointOrder.push(v.ref);return name;
+            }
             if(Object.hasOwn(c.blocks??{},v.ref)){
                 if(built.has(v.ref))return built.get(v.ref)!;
                 if(active.has(v.ref))throw new AppError('PLC graph cycle requires an explicit memory block');
@@ -113,7 +132,8 @@ export function compileController(c: Controller) {
         const initial=c.hmi.initial??screenModels[0].id;if(!ids.has(initial))throw new AppError('Unknown initial controller HMI screen');
         for(const [from,map] of Object.entries(c.hmi.keys??{})){
             if(!ids.has(from))throw new AppError('Unknown controller HMI navigation source');
-            for(const to of Object.values(map))if(to!==undefined&&!ids.has(to))throw new AppError('Unknown controller HMI navigation target');
+            for(const action of Object.values(map))if(typeof action==='string'&&!ids.has(action))throw new AppError('Unknown controller HMI navigation target');
+            else if(action&&typeof action==='object'){if(action.screen!==undefined&&!ids.has(action.screen))throw new AppError('Unknown controller HMI navigation target');if(!Object.hasOwn(c.setpoints??{},action.setpoint))throw new AppError('Unknown controller HMI setpoint');}
         }
     } else if(c.hmi.view) {
         const viewBindings=Object.fromEntries(Object.entries(c.hmi.view.bindings).map(([key,value])=>[key,expr(value)]));
@@ -124,7 +144,7 @@ export function compileController(c: Controller) {
     ]}];
     const screens=compileHmiScreens(screenModels,{elementIndex:new Map(elements.map((e,i)=>[e.id,i]))});
     const compiled=buildSchema(elements,{projectName:c.id,projectVersion:'1.0',buildTime:'reproducible',screens});
-    return {...compiled, inputs:[...used].sort(), runtimeHash:wasmSha256, profile:'saturn-fbd/state-v1', hardwareVerified:false};
+    return {...compiled, inputs:[...used].sort(), setpointOrder, runtimeHash:wasmSha256, profile:'saturn-fbd/state-v1', hardwareVerified:false};
 }
 export class ControllerVM {
     readonly artifact: ReturnType<typeof compileController>; private runtime:FbdRuntime;
@@ -132,6 +152,12 @@ export class ControllerVM {
     snapshot():RuntimeSnapshot {return this.runtime.snapshot();}
     restore(snapshot:RuntimeSnapshot):void {this.runtime.restore(snapshot);}
     reset():void {this.runtime.reset();}
+    setSetpoint(name:string,value?:number,delta?:number):void {
+        const index=this.artifact.setpointOrder.indexOf(name);if(index<0)throw new AppError('Unknown controller setpoint');
+        const point=this.runtime.getSetpoint(index),next=value??Math.max(point.lowLimit,Math.min(point.upperLimit,point.value+(delta??0)*point.step));
+        this.runtime.setSetpoint(index,next);
+    }
+    getSetpoint(name:string){const index=this.artifact.setpointOrder.indexOf(name);if(index<0)throw new AppError('Unknown controller setpoint');return this.runtime.getSetpoint(index);}
     scan(inputs:Record<string,number>, dt:number, screen=0):{outputs:Record<string,number>;hmi:HmiDrawCommand[]} {
         for(const [pin,index] of Object.entries(inputPins)) { const value=inputs[pin]??0;if(!Number.isSafeInteger(value)||value< -2147483648||value>2147483647)throw new AppError('PLC input outside int32: '+pin);this.runtime.setInput(index,value); }
         const hmi=this.runtime.stepAndRenderScreen(dt,screen);
