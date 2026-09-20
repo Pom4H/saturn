@@ -102,13 +102,20 @@ export function generatePlcShell(project:Project, controllerId:string):PlcShellM
     ...[...connected].filter(id=>project.devices.find(device=>device.id===id)?.type==='ioModule'),
   ]);
   const ioSignals=[...inputs].sort().concat(outputs);
-  const pages:PlcShellPage[]=[
-    {id:'overview',kind:'overview',title:system?.title??controllerId},
-    {id:'process',kind:'process',title:'Процесс',devices:uniq([...detail.map(device=>device.id),...ordered.map(device=>device.id)]).slice(0,6)},
-    ...detail.map(device=>{
+  const compact=controller.hmi.shell?.mode==='compact';
+  const detailPages=detail.map(device=>{
       const driver=deviceDriver(project,controllerId,device.id,outputs);
       return {id:'device.'+device.id,kind:'device' as const,title:device.id,deviceId:device.id,visual:device.type,driver,controlSetpoint:setpointForOutput(controller,driver)};
-    }),
+    });
+  const pages:PlcShellPage[]=compact?[
+    {id:'overview',kind:'overview',title:system?.title??controllerId},
+    ...detailPages,
+    {id:'io',kind:'io',title:'I/O',signals:ioSignals},
+    {id:'network',kind:'network',title:'Сеть',peers},
+  ]:[
+    {id:'overview',kind:'overview',title:system?.title??controllerId},
+    {id:'process',kind:'process',title:'Процесс',devices:uniq([...detail.map(device=>device.id),...ordered.map(device=>device.id)]).slice(0,6)},
+    ...detailPages,
     {id:'io',kind:'io',title:'I/O',signals:ioSignals},
     {id:'network',kind:'network',title:'Сеть',peers},
   ];
@@ -124,8 +131,10 @@ const indexOf=(model:PlcShellModel,id:string,fallback:number)=>{const found=mode
 export function shellKey(project:Project,controllerId:string,current:number,key:ControllerKey):{screen:number;setpoint?:string;value?:number} {
   const model=generatePlcShell(project,controllerId), safe=((current%model.pages.length)+model.pages.length)%model.pages.length, page=shellPage(model,safe);
   const process=indexOf(model,'process',safe), io=indexOf(model,'io',safe), network=indexOf(model,'network',safe);
+  const compact=project.controllers?.find(item=>item.id===controllerId)?.hmi.shell?.mode==='compact';
   if(page.kind==='overview'){
-    if(key==='right')return{screen:process};if(key==='down')return{screen:io};if(key==='up')return{screen:network};return{screen:safe};
+    const first=model.pages.findIndex(item=>item.kind==='device');
+    if(key==='right')return{screen:compact&&first>=0?first:process};if(key==='down')return{screen:io};if(key==='up')return{screen:network};return{screen:safe};
   }
   if(page.kind==='process'){
     const first=model.pages.findIndex(item=>item.kind==='device');
@@ -136,18 +145,18 @@ export function shellKey(project:Project,controllerId:string,current:number,key:
       const sp=project.controllers!.find(item=>item.id===controllerId)!.setpoints?.[page.controlSetpoint];
       if(sp)return{screen:safe,setpoint:page.controlSetpoint,value:key==='up'?sp.max:sp.min};
     }
-    if(key==='left')return{screen:process};
+    if(key==='left')return{screen:compact?indexOf(model,'overview',safe):process};
     if(key==='right'){
       const next=model.pages.slice(safe+1).findIndex(item=>item.kind==='device');
-      return{screen:next>=0?safe+1+next:process};
+      return{screen:next>=0?safe+1+next:(compact?indexOf(model,'overview',safe):process)};
     }
     return{screen:safe};
   }
   if(page.kind==='io'){
-    if(key==='left')return{screen:indexOf(model,'overview',safe)};if(key==='right'||key==='down')return{screen:network};if(key==='up')return{screen:process};return{screen:safe};
+    if(key==='left')return{screen:indexOf(model,'overview',safe)};if(key==='right'||key==='down')return{screen:network};if(key==='up')return{screen:compact?indexOf(model,'overview',safe):process};return{screen:safe};
   }
   if(key==='left')return{screen:indexOf(model,'overview',safe)};
-  if(key==='right'||key==='up')return{screen:process};
+  if(key==='right'||key==='up')return{screen:compact?indexOf(model,'overview',safe):process};
   if(key==='down')return{screen:io};
   return{screen:safe};
 }
