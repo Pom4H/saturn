@@ -135,7 +135,12 @@ type FluidTarget<From extends FluidSource> = TypedEndpoint<string,Terminal&{medi
 export function pipe<const ID extends string,From extends FluidSource>(name:ID,from:From,to:FluidTarget<From>,options?:Pick<Connection,'via'>):Connection;
 export function pipe(name:string,from:DynamicEndpoint,to:DynamicEndpoint,options?:Pick<Connection,'via'>):Connection;
 export function pipe(name:string,from:Endpoint,to:Endpoint,options:Pick<Connection,'via'>={}):Connection {return{id:id(name),from,to,medium:'pipe',...options};}
-export const cable=(name:string,from:Endpoint,to:Endpoint,options:Omit<Connection,'id'|'from'|'to'>):Connection=>({id:id(name),from,to,...options});
+type CableSource = TypedEndpoint<string,Terminal&{medium:'power'|'control'|'bus';family:string;role:'source'|'passive'}>;
+type CableTarget<From extends CableSource> = TypedEndpoint<string,Terminal&{medium:TerminalOf<From>['medium'];family:TerminalOf<From>['family'];role:'sink'|'passive'}>;
+type CableOptions<From extends CableSource> = Omit<Connection,'id'|'from'|'to'|'medium'>&{medium:TerminalOf<From>['medium']};
+export function cable<const ID extends string,From extends CableSource>(name:ID,from:From,to:CableTarget<From>,options:CableOptions<From>):Connection;
+export function cable(name:string,from:DynamicEndpoint,to:DynamicEndpoint,options:Omit<Connection,'id'|'from'|'to'>):Connection;
+export function cable(name:string,from:Endpoint,to:Endpoint,options:Omit<Connection,'id'|'from'|'to'>):Connection {return{id:id(name),from,to,...options};}
 export const expansion=(device:SimRef,controller:ControllerRef,slot:number):Attachment=>({device:device.id,controller:controller.id,slot,profile:'virtual-io4'});
 
 /** Controller-local stable block identity; separate from a physical terminal. */
