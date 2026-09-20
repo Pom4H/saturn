@@ -23,6 +23,7 @@ const app = await startPlantHttpServer({
     user: process.env.SCADA_USER,
     password: process.env.SCADA_PASSWORD,
     root: resolve(import.meta.dir, 'dist/plant'),
+    embeddedStatic: true,
     autoTick: true,
     pushSubject: process.env.SCADA_PUSH_SUBJECT,
     database,
