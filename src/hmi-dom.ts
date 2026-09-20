@@ -8,6 +8,7 @@ export interface HmiDomEquipmentInstance {
 export type HmiDomEquipmentRenderer = (node: HmiEquipmentNode, runtime: HmiRuntime) => HmiDomEquipmentInstance | HTMLElement;
 export interface HmiDomOptions {
   equipment?: Readonly<Record<string, HmiDomEquipmentRenderer>>;
+  interactive?: () => boolean;
   onError?: (error: unknown) => void;
 }
 
@@ -58,7 +59,7 @@ export function mountHmiDom(host: HTMLElement, runtime: HmiRuntime, options: Hmi
       element.onclick = () => void runtime.dispatch(node.action).catch(fail);
       const update = () => {
         element.textContent = display(runtime.resolve(node.label));
-        element.disabled = node.disabledWhen ? Boolean(runtime.resolve(node.disabledWhen)) : false;
+        element.disabled = (options.interactive ? !options.interactive() : false) || (node.disabledWhen ? Boolean(runtime.resolve(node.disabledWhen)) : false);
       };
       updates.push(update); update(); return element;
     }
