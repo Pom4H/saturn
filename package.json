@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.lab.json",
     "test": "node scripts/test.mjs",
     "test:e2e": "playwright test",
-    "check": "npm run build && npm run typecheck && npm test && npm run challenge:core && npm run lab:test && npm run lab:build && npm run plant:typecheck && npm run plant:test && npm run test:consumer",
+    "check": "npm run build && npm run typecheck && npm test && npm run challenge:core && npm run lab:test && npm run lab:build && npm run plant:typecheck && npm run plant:test && npm run test:consumer && npm run vscode:check",
     "challenge": "node scripts/challenge.mjs",
     "challenge:core": "node scripts/challenge.mjs core",
     "challenge:browser": "node scripts/challenge.mjs browser",
@@ -31,7 +31,9 @@
     "site:test:browser": "node scripts/site-studio-check.mjs",
     "saturn": "node scripts/saturn.mjs",
     "standalone:pack": "bun run scripts/standalone-pack.ts",
-    "update:manifest": "node scripts/sign-update-manifest.mjs"
+    "update:manifest": "node scripts/sign-update-manifest.mjs",
+    "vscode:test": "node --test vscode/test/*.test.cjs",
+    "vscode:check": "node --check vscode/extension.cjs && node --check vscode/lib/model.cjs && npm run vscode:test"
   },
   "keywords": [],
   "author": "Roman Popov",
@@ -71,4 +73,4 @@
   "bin": {
     "saturn": "scripts/saturn.mjs"
   }
-}
+}\n
