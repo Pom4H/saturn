@@ -158,11 +158,11 @@ export function compileProject(files: Record<string, string>, entry = 'plant.ts'
                     fail(statement, 'Use named imports');
                 const spec = (statement.moduleSpecifier as ts.StringLiteral).text;
                 let source: Record<string, unknown>;
-                if (spec === '@scada/plant')
+                if (spec === '@saturn/core' || spec === '@scada/plant')
                     source = builtins;
                 else {
                     if (!spec.startsWith('./') && !spec.startsWith('../'))
-                        fail(statement, 'Only local modules or @scada/plant are allowed');
+                        fail(statement, 'Only local modules or @saturn/core are allowed');
                     const parts = path.split('/');
                     parts.pop();
                     for (const part of spec.split('/')) {
