@@ -9,7 +9,7 @@ let childArgs;
 if (command === 'pack') {
     childArgs = ['run', 'scripts/standalone-pack.ts', ...args.slice(1)];
 }
-else if (command === 'open' || command === 'run') {
+else if (['open', 'run', 'update', 'extension', 'extensions'].includes(command)) {
     childArgs = ['run', 'standalone/entry.ts', command, ...args.slice(1)];
 }
 else {
@@ -17,6 +17,8 @@ else {
         'Usage:',
         '  saturn open [PROJECT]',
         '  saturn run PROJECT [--kiosk]',
+        '  saturn update [--check] [--channel stable|preview|nightly]',
+        '  saturn extension <list|add|update|remove> [package]',
         '  saturn pack [--target windows-x64|linux-x64|linux-arm64|darwin-arm64] [--outfile PATH]',
     ].join('\n'));
     process.exit(2);

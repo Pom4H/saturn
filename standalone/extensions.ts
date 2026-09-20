@@ -168,6 +168,14 @@ async function writeState(root: string, state: ExtensionState): Promise<void> {
     await rename(temporary, path);
 }
 
+function canonical(value: unknown): string {
+    if (Array.isArray(value))
+        return '[' + value.map(canonical).join(',') + ']';
+    if (value && typeof value === 'object')
+        return '{' + Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => JSON.stringify(key) + ':' + canonical(item)).join(',') + '}';
+    return JSON.stringify(value);
+}
+
 function registryHeaders(token?: string): HeadersInit {
     return token ? { Authorization: `Bearer ${token}`, Accept: 'application/json' } : { Accept: 'application/json' };
 }
@@ -241,7 +249,7 @@ export class ExtensionManager {
             await extractNpmTarball(bytes, temporary);
             const installedPkg = JSON.parse(await readFile(resolve(temporary, 'package.json'), 'utf8')) as RegistryVersion;
             const installedManifest = validateExtensionPackage(installedPkg);
-            if (installedPkg.name !== name || installedPkg.version !== pkg.version || JSON.stringify(installedManifest) !== JSON.stringify(manifest))
+            if (installedPkg.name !== name || installedPkg.version !== pkg.version || canonical(installedManifest) !== canonical(manifest))
                 throw new Error('Installed extension manifest does not match registry metadata');
             await rm(target, { recursive: true, force: true });
             await mkdir(packageRoot, { recursive: true });

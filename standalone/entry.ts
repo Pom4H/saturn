@@ -28,7 +28,9 @@ function applicationDataRoot(): string {
     return resolve(process.env.XDG_STATE_HOME ?? join(homedir(), '.local', 'state'), 'saturn');
 }
 
-async function selfHealthcheck(): Promise<void> {
+async function selfHealthcheck(expectedVersion?: string): Promise<void> {
+    if (expectedVersion && SATURN_VERSION !== expectedVersion)
+        throw new Error(`Saturn binary version ${SATURN_VERSION} does not match expected update version ${expectedVersion}`);
     const directory = await mkdtemp(join(tmpdir(), 'saturn-health-'));
     let app: Awaited<ReturnType<typeof startPlantHttpServer>> | undefined;
     try {
@@ -70,8 +72,13 @@ if (args[0] === '__apply-update') {
     await applyStagedUpdate(args.slice(1));
     process.exit(0);
 }
+if (args[0] === '__version') {
+    console.log(SATURN_VERSION);
+    process.exit(0);
+}
 if (args[0] === '__healthcheck') {
-    await selfHealthcheck();
+    const expectedIndex = args.indexOf('--expect-version');
+    await selfHealthcheck(expectedIndex >= 0 ? args[expectedIndex + 1] : undefined);
     process.exit(0);
 }
 if (args[0] === 'update') {

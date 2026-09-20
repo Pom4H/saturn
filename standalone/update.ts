@@ -149,9 +149,9 @@ function spawnAndWait(file: string, args: string[]): Promise<number> {
 }
 
 export async function applyStagedUpdate(args: string[]): Promise<void> {
-    const [pidText, target, staged, backup] = args;
+    const [pidText, target, staged, backup, expectedVersion] = args;
     const pid = Number(pidText);
-    if (!Number.isSafeInteger(pid) || pid <= 0 || !target || !staged || !backup)
+    if (!Number.isSafeInteger(pid) || pid <= 0 || !target || !staged || !backup || !expectedVersion || !versionPattern.test(expectedVersion))
         throw new Error('Invalid internal update arguments');
     await waitForExit(pid);
     const temporary = target + '.next';
@@ -163,12 +163,14 @@ export async function applyStagedUpdate(args: string[]): Promise<void> {
     await rename(target, backup);
     try {
         await rename(temporary, target);
-        const health = await spawnAndWait(target, ['__healthcheck']);
+        const health = await spawnAndWait(target, ['__healthcheck', '--expect-version', expectedVersion]);
         if (health !== 0)
             throw new Error(`Updated Saturn failed health check with exit code ${health}`);
         await rm(staged, { force: true });
-        const child = spawn(target, [], { detached: true, stdio: 'ignore', windowsHide: true });
-        child.unref();
+        if (process.env.SATURN_UPDATE_NO_RELAUNCH !== '1') {
+            const child = spawn(target, [], { detached: true, stdio: 'ignore', windowsHide: true });
+            child.unref();
+        }
     }
     catch (error) {
         await rm(target, { force: true }).catch(() => {});
@@ -177,7 +179,7 @@ export async function applyStagedUpdate(args: string[]): Promise<void> {
     }
 }
 
-export async function scheduleUpdateApply(context: UpdateContext, staged: string): Promise<void> {
+export async function scheduleUpdateApply(context: UpdateContext, staged: string, expectedVersion: string): Promise<void> {
     if (!context.standaloneExecutable)
         throw new Error('Self-update installation is available only in the packaged Saturn application');
     const helperName = process.platform === 'win32' ? `saturn-updater-${process.pid}.exe` : `saturn-updater-${process.pid}`;
@@ -186,7 +188,7 @@ export async function scheduleUpdateApply(context: UpdateContext, staged: string
     if (process.platform !== 'win32')
         await chmod(helper, 0o755);
     const backup = resolve(dirname(context.executable), process.platform === 'win32' ? 'saturn.previous.exe' : 'saturn.previous');
-    const child = spawn(helper, ['__apply-update', String(process.pid), context.executable, staged, backup], {
+    const child = spawn(helper, ['__apply-update', String(process.pid), context.executable, staged, backup, expectedVersion], {
         detached: true,
         stdio: 'ignore',
         shell: false,
@@ -228,7 +230,7 @@ export async function runUpdateCommand(args: string[], context: UpdateContext): 
     }
     const updateDir = resolve(context.appData, 'updates', manifest.version);
     const staged = await downloadAndVerifyUpdate(manifest, target, artifact, updateDir);
-    await scheduleUpdateApply(context, staged);
+    await scheduleUpdateApply(context, staged, manifest.version);
     console.log(`Verified Saturn ${manifest.version}; update will be applied after this process exits.`);
     return 'scheduled';
 }

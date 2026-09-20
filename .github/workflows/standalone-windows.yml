@@ -49,11 +49,17 @@ jobs:
       - name: Test standalone trust contracts
         run: bun test standalone/update-extension.test.ts
 
+      - name: Generate update smoke key
+        run: node scripts/update-test-key.mjs "${{ runner.temp }}\saturn-update-key"
+
       - name: Pack Windows executable
-        run: npm run saturn -- pack --target windows-x64 --outfile dist/standalone/saturn.exe --skip-web-build
+        run: npm run saturn -- pack --target windows-x64 --outfile dist/standalone/saturn.exe --skip-web-build --update-public-key-file "${{ runner.temp }}\saturn-update-key\public.pem"
+
+      - name: Pack next Windows executable
+        run: npm run saturn -- pack --target windows-x64 --outfile dist/standalone/saturn-next.exe --skip-web-build --version 0.1.1 --update-public-key-file "${{ runner.temp }}\saturn-update-key\public.pem"
 
       - name: Smoke test executable
-        run: node scripts/standalone-smoke.mjs dist/standalone/saturn.exe
+        run: node scripts/standalone-smoke.mjs dist/standalone/saturn.exe dist/standalone/saturn-next.exe "${{ runner.temp }}\saturn-update-key\private.pem"
 
       - uses: actions/upload-artifact@v7.0.1
         if: always()

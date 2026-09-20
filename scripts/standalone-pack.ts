@@ -32,6 +32,9 @@ if (!has('--skip-web-build')) {
 }
 
 const packageJson = JSON.parse(await readFile('package.json', 'utf8'));
+const buildVersion = value('--version') ?? packageJson.version;
+if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(buildVersion))
+    throw new Error('Invalid --version');
 const updatePublicKeyFile = value('--update-public-key-file');
 const updatePublicKey = updatePublicKeyFile ? await readFile(resolve(updatePublicKeyFile), 'utf8') : '';
 const updateManifestUrl = value('--update-manifest-url') ?? '';
@@ -47,7 +50,7 @@ const build = await Bun.build({
     minify: true,
     sourcemap: 'none',
     define: {
-        SATURN_VERSION: JSON.stringify(packageJson.version),
+        SATURN_VERSION: JSON.stringify(buildVersion),
         SATURN_DEMO_FILES: JSON.stringify(demoFiles),
         SATURN_UPDATE_PUBLIC_KEY: JSON.stringify(updatePublicKey),
         SATURN_UPDATE_MANIFEST_URL: JSON.stringify(updateManifestUrl),
@@ -64,7 +67,7 @@ const build = await Bun.build({
             windows: {
                 title: 'Saturn',
                 publisher: 'Saturn',
-                version: packageJson.version,
+                version: buildVersion,
                 description: 'Saturn standalone engineering runtime',
                 copyright: 'MIT © Roman Popov',
                 hideConsole: false,
@@ -78,5 +81,5 @@ if (!build.success) {
     process.exit(1);
 }
 
-console.log(`Packed Saturn application -> ${outfile}`);
+console.log(`Packed Saturn ${buildVersion} application -> ${outfile}`);
 console.log(`Target: ${target}`);
