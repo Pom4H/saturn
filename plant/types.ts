@@ -184,6 +184,7 @@ export interface Checkpoint {
 }
 export interface Frame {
     displays?: Record<string,HmiDrawCommand[]>;
+    controllerScreens?: Record<string,number>;
     runId: string;
     revision: string;
     seq: number;
