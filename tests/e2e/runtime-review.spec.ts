@@ -48,8 +48,10 @@ test.beforeEach(async ({page}) => {
 });
 test.afterEach(async ({page},info) => {
   try {
-    if(!page.isClosed()) await info.attach('project-workspace',{body:await page.screenshot({fullPage:true}),contentType:'image/png'});
     expect(errors.get(page)??[]).toEqual([]);
+    if(!page.isClosed()) {
+      await info.attach('project-workspace',{body:await page.screenshot({animations:'disabled',caret:'hide'}),contentType:'image/png'});
+    }
   } finally {await app?.close();await rm(directory,{recursive:true,force:true});}
 });
 async function run(page:Page) {
