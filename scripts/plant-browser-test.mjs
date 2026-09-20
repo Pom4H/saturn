@@ -133,7 +133,7 @@ try {
         assert.equal(await bench.locator('#diagram .saturn-block-outline').first().evaluate(e=>getComputedStyle(e).fill),'none');
         await bench.screenshot({path:evidence+'/commissioning-2d.png',fullPage:true});
     });
-    await check('Saturn inspector executes the same compiled WASM program, downloads exact CRC-tested bytes and renders its HMI',async()=>{
+    await check('Saturn inspector executes the compiled WASM program, downloads exact CRC-tested bytes and mounts the React HMI',async()=>{
         await bench.locator('#diagram [data-node="SATURN-1"]').click();
         await bench.waitForFunction(()=>Number(document.querySelector('#inspector [data-signal="SATURN-1.AI1"] b')?.textContent)===300);
         assert.equal(await bench.locator('#plc-front .runtime-hmi').getAttribute('data-renderer'),'react');
@@ -149,7 +149,7 @@ try {
         await bench.locator('#plc-front .runtime-hmi [data-react-plc-hmi]').waitFor();
         await bench.screenshot({path:evidence+'/saturn-inspector.png',fullPage:true});
     });
-    await check('Saturn front-panel keys navigate the exact firmware HMI and only operate contextual equipment',async()=>{
+    await check('Saturn front-panel keys navigate the animated React shell and only operate contextual equipment',async()=>{
         await bench.locator('[data-tab="controls"]').click();
         await bench.locator('[data-control-input="BENCH-LEVEL"]').fill('3');
         await bench.locator('[data-operate="BENCH-LEVEL"]').click();
@@ -164,8 +164,8 @@ try {
         await bench.locator('#plc-front .runtime-hmi [data-hmi-page="process"]').waitFor();
         assert.match(await lcd.textContent(),/PUMP-1/);assert.match(await lcd.textContent(),/TANK-1/);
         assert.ok(await lcd.locator('[data-flow]').evaluate(element=>element.getAnimations().length>0));
-        assert.ok(await lcd.locator('line').count()>0,'native process HMI must contain firmware lines');
-        assert.ok(await lcd.locator('ellipse').count()>0,'native process HMI must contain firmware circles');
+        assert.ok(await lcd.locator('line').count()>0,'React process HMI must contain process lines');
+        assert.ok(await lcd.locator('circle').count()>0,'React process HMI must contain equipment geometry');
         await right.click();
         await bench.locator('#plc-front .runtime-hmi [data-hmi-page="device.PUMP-1"]').waitFor();
         assert.ok(await lcd.locator('[data-rotor]').evaluate(element=>element.getAnimations().length>0));
@@ -232,7 +232,7 @@ try {
         // Do not silently publish a draft or claim the virtual module is hardware qualified.
         await bench.locator('#reload-project').click();await bench.waitForTimeout(200);
     });
-    await check('commissioning bench renders exact 3D terminal routes and Saturn front-panel HMI',async()=>{
+    await check('commissioning bench renders exact 3D terminal routes and the React Saturn front-panel HMI',async()=>{
         await bench.locator('[data-tab="scheme"]').click();await bench.locator('[data-system="commissioning"]').click();
         await bench.locator('#view-3d').click();await bench.locator('#scene3d canvas').waitFor({state:'visible'});
         await bench.locator('[data-node3d="SATURN-1"]').click();await bench.waitForTimeout(800);
