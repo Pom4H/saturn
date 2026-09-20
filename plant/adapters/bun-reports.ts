@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import type { ReportTask, ReportArtifact } from '../types';
 
 interface BunSubprocess {
@@ -32,7 +33,7 @@ export function runReport(task: ReportTask, timeoutMs = 5000): Promise<ReportArt
             error ? reject(error) : resolve(value!);
         };
         child = bunRuntime.spawn({
-            cmd: [process.execPath, new URL('./report-worker.mjs', import.meta.url).pathname],
+            cmd: [process.execPath, fileURLToPath(new URL('./report-worker.mjs', import.meta.url))],
             stdin: 'ignore',
             stdout: 'ignore',
             stderr: 'ignore',
