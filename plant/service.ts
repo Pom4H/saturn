@@ -155,6 +155,10 @@ export class Service {
                     this.kernel.setParameter(payload.target!, payload.parameter!, payload.value!);
                     event = this.event('command.parameter', payload.target!, `${payload.parameter}=${payload.value}`, actor);
                     break;
+                case 'plc-key':
+                    this.kernel.controllerKey(payload.target!, payload.parameter!);
+                    event = this.event('controller.key', payload.target!, payload.parameter!, actor);
+                    break;
                 case 'pause':
                     this.kernel.state.paused = true;
                     event = this.event('command.pause', 'simulation', 'Simulation paused', actor);
