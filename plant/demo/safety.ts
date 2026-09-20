@@ -1,4 +1,4 @@
-import { system, simulation, signal } from '@scada/plant';
+import { system, simulation, signal } from '@saturn/core';
 export const safetySystem = system('safety', 'Измерение и защитное воздействие', 'unit4');
 export const buildingSystem = system('building', 'Конструкции здания', 'unit4');
 export const sensor = simulation('TEMP', 'sensor', {
