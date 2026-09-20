@@ -109,7 +109,24 @@ segments(signal TEXT, start INTEGER, end INTEGER, value REAL, quality TEXT)
 
 For volume from a flow rate in m³/h, integrate good segments with `SUM(value*(end-start)/3600000.0)` and expose coverage. Such units are not implicitly assumed for normalized model signals. Counter resets/rollovers are not automatically corrected by this generic query API.
 
-For a chart, return an x column and a numeric-or-null y column and specify `chart: {x, y, title}`. Null/unknown points split the SVG line. Templates are deliberately limited to an escaped table and optional SVG plot, rather than unrestricted HTML/JS execution. Import of third-party report formats belongs in external migration adapters, not the core. Adding a new report needs no HTTP route or rendering component.
+For a chart, return an x column and a numeric-or-null y column. Reports support `type: 'line' | 'bar'`; null/unknown points split a line and are omitted from bars. `unit` is rendered on the chart rather than inferred from signal names.
+
+Reports may also declare summary metrics over the SQL result rows:
+
+```ts
+summary: [
+  { key: 'volume', label: 'За сутки', aggregate: 'sum', unit: 'м³', digits: 1, emphasis: 'primary' },
+  { key: 'average', label: 'Средний расход', aggregate: 'avg', unit: 'м³/ч', digits: 1 },
+  { key: 'average', label: 'Пиковый час', aggregate: 'max', unit: 'м³/ч', digits: 1 },
+],
+chart: { x: 'hour', y: 'volume', title: 'Расход по часам', type: 'bar', unit: 'м³' },
+```
+
+Available summary aggregations are `sum`, `avg`, `min`, `max` and `last`. They operate only on finite numeric values returned by the report query. The presentation stays deterministic and safe: the artifact is escaped HTML with embedded CSS/SVG, no report JavaScript, external fonts, remote assets or live database reads.
+
+The default Saturn report layout is designed for both screen and A4 print: restrained masthead, large report title, optional description, tabular-numeric KPI row, chart before the detailed table, provenance footer, and repeating table headers when printed. A custom shared `view` still works for frozen HMI snapshots.
+
+Templates are deliberately limited to escaped presentation primitives rather than unrestricted HTML/JS execution. Import of third-party report formats belongs in external migration adapters, not the core. Adding a new report needs no HTTP route or rendering component.
 
 ## Root
 
