@@ -73,10 +73,6 @@ try {
   await page.waitForLoadState('networkidle').catch(()=>{});
   await sleep(2500);
 
-  const diag = execFileSync('cmd.exe', ['/d','/s','/c','query session'], { encoding:'utf8' });
-  writeFileSync(resolve(out, '..', 'windows-session.txt'), diag);
-  console.log(diag);
-
   const ps = [
     'Add-Type -AssemblyName System.Windows.Forms',
     'Add-Type -AssemblyName System.Drawing',
