@@ -11,7 +11,7 @@ const [{startPlantServer},{showcaseFiles}]=await Promise.all([
   import(pathToFileURL(resolve('.plant/showcase-server.mjs'))),
   import(pathToFileURL(resolve('.plant/showcase-files.mjs'))),
 ]);
-const password=process.env.SCADA_PASSWORD??'showcase';
+const password=process.env.SCADA_PASSWORD??'showcase-demo-2026';
 const server=await startPlantServer({port:Number(process.env.PORT??4177),seed:showcaseFiles,user:'engineer',password});
 console.log('Saturn HMI showcase:',server.origin+'/plant/');
 console.log('Login: engineer / '+password);
