@@ -171,6 +171,11 @@ try {
         await bench.locator('#plcBack').click();
         await bench.locator('#hmi-root [data-hmi-screen="overview"]').waitFor();
         assert.match(await bench.locator('#overviewOutputValue').innerText(),/^1$/);
+        // Restore the fixture state expected by the older independent PLC/3D checks.
+        await bench.locator('[data-tab="controls"]').click();
+        await bench.locator('[data-control-input="BENCH-LEVEL"]').fill('8');
+        await bench.locator('[data-operate="BENCH-LEVEL"]').click();
+        await bench.waitForFunction(()=>Number(document.querySelector('[data-control="BENCH-LEVEL"] [data-actual]')?.textContent)>=8,null,{timeout:12000});
         await bench.locator('[data-tab="scheme"]').click();
         await bench.locator('[data-system="commissioning"]').click();
     });
