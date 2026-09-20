@@ -2,6 +2,7 @@ export type AppLanguage = 'system' | 'ru' | 'en';
 export type ResolvedLanguage = 'ru' | 'en';
 
 const LANGUAGE_KEY = 'saturn.ui.language';
+let sessionLanguage: AppLanguage | null = null;
 
 const messages = {
   ru: {
@@ -261,6 +262,7 @@ const messages = {
 export type MessageKey = keyof typeof messages.ru;
 
 export function readAppLanguage(): AppLanguage {
+  if (sessionLanguage) return sessionLanguage;
   try {
     const value = localStorage.getItem(LANGUAGE_KEY);
     if (value === 'ru' || value === 'en') return value;
@@ -280,6 +282,10 @@ export function languageTag(language: ResolvedLanguage = resolveLanguage()): str
 
 export function t(key: MessageKey, language: ResolvedLanguage = resolveLanguage()): string {
   return messages[language][key];
+}
+
+export function tr(ru: string, en: string, language: ResolvedLanguage = resolveLanguage()): string {
+  return language === 'ru' ? ru : en;
 }
 
 const textBindings: [string, MessageKey][] = [
@@ -359,6 +365,7 @@ export function applyStaticLanguage(): void {
 }
 
 export function setAppLanguage(language: AppLanguage): void {
+  sessionLanguage = language;
   try { localStorage.setItem(LANGUAGE_KEY, language); } catch { /* Keep the in-session choice. */ }
   document.documentElement.dataset.languagePreference = language;
   applyStaticLanguage();
