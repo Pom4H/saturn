@@ -4,13 +4,14 @@
 
 ## 1. Локальный запуск
 
-Установите Git и [Node.js 24 LTS](https://nodejs.org/en/download): версия от 24.20.0, ниже 25. Точная версия проекта указана в `.nvmrc`. npm входит в Node.js; отдельный сервер базы данных не нужен — используется встроенный SQLite.
+Установите Git, [Node.js 24 LTS](https://nodejs.org/en/download) для сборки/npm и Bun версии из `.bun-version` для нативного сервера. Точная версия Node указана в `.nvmrc`. Отдельный сервер базы данных не нужен — production runtime использует `bun:sqlite`.
 
 Проверьте в терминале или PowerShell:
 
 ```sh
 node --version
 npm --version
+bun --version
 git --version
 ```
 
@@ -49,9 +50,9 @@ npm run plant
 
 ## 2. Постоянный сервер для команды
 
-Пример ниже рассчитан на Linux с systemd. Нужны Git, Node.js 24.20.0 или новее в ветке 24, npm, права sudo и домен. Здесь `saturn.example.com` — пример: замените его своим доменом во всех файлах.
+Пример ниже рассчитан на Linux с systemd. Нужны Git, Node.js из `.nvmrc`, npm, Bun из `.bun-version`, права sudo и домен. Здесь `saturn.example.com` — пример: замените его своим доменом во всех файлах.
 
-Установите Node.js, npm и Git так, чтобы они были доступны системному пользователю, а не только из личного профиля nvm. Для HTTPS установите [Caddy официальным способом](https://caddyserver.com/docs/install), который добавляет службу `caddy`.
+Установите Node.js, npm, Bun и Git так, чтобы они были доступны системному пользователю, а Bun был виден службе через её `PATH`, а не только из интерактивного shell. Для HTTPS установите [Caddy официальным способом](https://caddyserver.com/docs/install), который добавляет службу `caddy`.
 
 ### Приложение и данные
 
@@ -92,7 +93,7 @@ Group=saturn
 WorkingDirectory=/opt/saturn
 EnvironmentFile=/etc/saturn.env
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
-ExecStart=/usr/bin/env node --experimental-sqlite /opt/saturn/.plant/server.mjs
+ExecStart=/usr/bin/env bun /opt/saturn/.plant/server.mjs
 Restart=on-failure
 RestartSec=5
 UMask=0077
@@ -102,7 +103,7 @@ TimeoutStopSec=30
 WantedBy=multi-user.target
 ```
 
-Если Node установлен вне указанного PATH, укажите абсолютный путь к Node в `ExecStart`. Запустите службу и проверьте её состояние:
+Если Bun установлен вне указанного PATH, укажите абсолютный путь к `bun` в `ExecStart`. Запустите службу и проверьте её состояние:
 
 ```sh
 sudo systemctl daemon-reload
@@ -149,8 +150,8 @@ sudo systemctl reload caddy
 
 ## Если не запускается
 
-- **Не найдены `node`, `npm` или `git`:** установите зависимости и откройте новый терминал. Для службы проверьте её PATH.
-- **Нет `node:sqlite` или несовместимый Node:** используйте версию из `.nvmrc` и заново выполните `npm ci`.
+- **Не найдены `node`, `npm`, `bun` или `git`:** установите зависимости и откройте новый терминал. Для службы отдельно проверьте её PATH.
+- **Сервер сообщает, что нужен Bun:** используйте версию из `.bun-version`; Node из `.nvmrc` остаётся нужен для build/test scripts.
 - **`EADDRINUSE`:** порт занят; остановите свой предыдущий экземпляр либо задайте другой `PORT` и измените порт в прокси.
 - **`Cross-origin write blocked`:** сравните адрес браузера с `SCADA_PUBLIC_URL`, затем перезапустите службу после исправления окружения.
 - **Не открывается с телефона:** проверьте HTTPS-домен и доступность прокси; loopback-адрес работает только на самом сервере.
