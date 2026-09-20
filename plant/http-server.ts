@@ -9,6 +9,7 @@ import { Push } from './adapters/push';
 import { Store } from './store';
 import { Service } from './service';
 import { AppError, requireRole, type Repository, type SqlDatabase, type ReportTask, type ReportArtifact } from './types';
+import { diagnosticLocale, errorPayload } from './diagnostics';
 const prefix = '/plant';
 async function body(req: IncomingMessage): Promise<any> { if (!req.headers['content-type']?.startsWith('application/json'))
     throw new AppError('JSON body required', 415); let size = 0; const chunks: Buffer[] = []; for await (const chunk of req) {
@@ -426,7 +427,8 @@ export async function startPlantHttpServer(options: {
                 return;
             }
             const status = error instanceof AppError ? error.status : 500;
-            json(status, { error: status === 500 ? 'Internal server error' : (error as Error).message });
+            const locale = diagnosticLocale(req.headers['accept-language']);
+            json(status, status === 500 ? { error: 'Internal server error', locale } : errorPayload(error, locale));
             if (status === 500)
                 console.error(error);
         }
