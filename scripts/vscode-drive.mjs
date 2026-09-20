@@ -46,30 +46,43 @@ if (!page) throw new Error('VS Code workbench page not found');
 await page.bringToFront();
 await page.waitForSelector('.monaco-workbench', { timeout: 15000 });
 
-async function clickVisibleByText(text) {
-  const exact = page.getByText(text, { exact: true }).last();
-  try {
-    if (await exact.isVisible({ timeout: 500 })) {
-      await exact.click();
-      await page.waitForTimeout(700);
-      return true;
+async function clickAcrossFrames(label) {
+  for (const frame of page.frames()) {
+    for (const locator of [
+      frame.getByRole('button', { name: label, exact: true }),
+      frame.getByRole('link', { name: label, exact: true }),
+      frame.getByText(label, { exact: true }),
+    ]) {
+      try {
+        const count = await locator.count();
+        for (let i = count - 1; i >= 0; i--) {
+          const item = locator.nth(i);
+          if (await item.isVisible({ timeout: 250 })) {
+            await item.click({ force: true, timeout: 1000 });
+            await page.waitForTimeout(700);
+            return true;
+          }
+        }
+      } catch {}
     }
-  } catch {}
+  }
   return false;
 }
 
-await clickVisibleByText('Continue without Signing In');
-await clickVisibleByText('Cancel');
-for (const label of ['Continue', 'Skip', 'Done', 'Start Using VS Code']) {
-  const bodyText = await page.locator('body').innerText();
-  if (!bodyText.includes('Welcome to VS Code')) break;
-  await clickVisibleByText(label);
-}
-for (let i = 0; i < 3; i++) {
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(150);
+for (let pass = 0; pass < 6; pass++) {
+  const text = await page.locator('body').innerText().catch(() => '');
+  if (!/Welcome to VS Code|Sign in to use GitHub Copilot|Signing in to github.com/i.test(text)) break;
+  let acted = false;
+  for (const label of ['Continue without Signing In', 'Cancel', 'Skip', 'Done', 'Start Using VS Code', 'Continue']) {
+    if (await clickAcrossFrames(label)) { acted = true; break; }
+  }
+  if (!acted) {
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+  }
 }
 
+await page.bringToFront();
 await command(page, 'View: Close All Editors');
 await page.keyboard.press('Control+P');
 await page.waitForTimeout(300);
