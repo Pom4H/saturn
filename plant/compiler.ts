@@ -158,7 +158,7 @@ export function compileProject(files: Record<string, string>, entry = 'plant.ts'
                     fail(statement, 'Use named imports');
                 const spec = (statement.moduleSpecifier as ts.StringLiteral).text;
                 let source: Record<string, unknown>;
-                if (spec === '@saturn/core' || spec === '@scada/plant')
+                if (spec === '@saturn/core')
                     source = builtins;
                 else {
                     if (!spec.startsWith('./') && !spec.startsWith('../'))
