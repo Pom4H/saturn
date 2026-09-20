@@ -7,7 +7,7 @@ export interface Terminal { x:number;y:number;z:number;side:Side;medium:Medium;f
 export interface Endpoint { device:string;port:string }
 export interface Connection { id:string;from:Endpoint;to:Endpoint;medium:Medium;via?:{x:number;y:number}[];signal?:Expr;scale?:number; }
 export interface Attachment { device:string;controller:string;slot:number;profile:'virtual-io4' }
-const t=<M extends Medium,F extends string,R extends Terminal['role']>(x:number,y:number,side:Side,medium:M,family:F,role:R, extra:Partial<Terminal>={}):Terminal&{medium:M;family:F;role:R}=>({x,y,side,medium,family,role,z:.65,max:1,...extra});
+const t=<M extends Medium,F extends string,R extends Terminal['role']>(x:number,y:number,side:Side,medium:M,family:F,role:R,extra:Partial<Omit<Terminal,'x'|'y'|'side'|'medium'|'family'|'role'>>={}):Terminal&{medium:M;family:F;role:R}=>({x,y,side,medium,family,role,z:.65,max:1,...extra});
 const inline = ()=>({ inlet:t(0,48,'left','pipe','water','sink'),outlet:t(150,48,'right','pipe','water','source',{signal:'flow'}) });
 const io = ()=>({ value:t(75,8,'up','control','analog','source',{signal:'value'}), common:t(100,8,'up','power','dc0','sink') });
 const saturnProfile=Object.fromEntries([...SATURN_TERMINAL_ANCHORS.map(a=>[a.id,t(a.x*.5,a.y*.5,a.side==='top'?'up':'down','control',a.signal,a.direction==='input'?'sink':'source',{z:1,max:a.direction==='output'?8:1,signal:a.direction==='output'?a.id:undefined})] as const),
@@ -50,7 +50,7 @@ export type TypedEndpoint<ID extends string = string,T extends Terminal = Termin
 export type DynamicEndpoint = Endpoint & { readonly [endpointTerminal]?: never };
 export type TerminalOf<E> = E extends TypedEndpoint<string,infer T> ? T : never;
 export type PortRefs<T extends PhysicalType,ID extends string> = {
-    readonly [P in keyof (typeof profiles)[T] & string]: TypedEndpoint<ID,(typeof profiles)[T][P]>;
+    readonly [P in keyof (typeof profiles)[T] & string]: TypedEndpoint<ID,(typeof profiles)[T][P]&Terminal>;
 };
 export function portRefs<T extends PhysicalType,ID extends string>(device:ID,type:T):PortRefs<T,ID>{
     return Object.fromEntries(Object.keys(profiles[type]).map(port=>[port,{device,port}])) as PortRefs<T,ID>;
