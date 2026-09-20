@@ -77,11 +77,6 @@
     "esbuild": "0.28.2",
     "typescript": "7.0.2"
   },
-  "exports": {
-    "./core": "./src/core.ts",
-    "./sdk": "./src/sdk.ts",
-    "./plant": "./plant/dsl.ts"
-  },
   "bin": {
     "saturn": "scripts/saturn.mjs"
   }
