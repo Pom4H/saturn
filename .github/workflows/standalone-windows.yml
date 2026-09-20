@@ -61,6 +61,9 @@ jobs:
       - name: Smoke test executable
         run: node scripts/standalone-smoke.mjs dist/standalone/saturn.exe dist/standalone/saturn-next.exe "${{ runner.temp }}\saturn-update-key\private.pem"
 
+      - name: Capture real Windows desktop
+        run: node scripts/windows-desktop-capture.mjs dist/standalone/saturn.exe standalone-test-results/windows-desktop.png
+
       - uses: actions/upload-artifact@v7.0.1
         if: always()
         with:
