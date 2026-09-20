@@ -84,6 +84,7 @@ export interface Report {
     view?: Presentation;
     id: string;
     title: string;
+    description?: string;
     on: {
         workflow_dispatch?: {
             inputs?: Record<string, ReportInput>;
@@ -100,10 +101,20 @@ export interface Report {
         title: string;
         unit?: string;
     }[];
+    summary?: {
+        key: string;
+        label: string;
+        unit?: string;
+        aggregate: 'sum' | 'avg' | 'min' | 'max' | 'last';
+        digits?: number;
+        emphasis?: 'primary' | 'secondary';
+    }[];
     chart?: {
         x: string;
         y: string;
         title: string;
+        type?: 'line' | 'bar';
+        unit?: string;
     };
     notify: boolean;
 }
