@@ -1,8 +1,8 @@
-# Node.js + browser SCADA
+# Bun + browser SCADA
 
 This implementation is a runnable **simulation/engineering workbench**, not an operational nuclear control system. It adds an isomorphic installation runtime to the existing editor. The old editor, its source-preserving edits, and the PR #11 recorder remain available; the new workbench reuses the component registry, SVG host, and CodeMirror rather than replacing those with a second renderer.
 
-The same `Kernel`, `Service`, alarm evaluator, historian queries, report renderer, and project compiler run in Node.js and a browser Worker. Native SQLite and SQLite WASM are adapters. The browser repository emulates the application-level commit/publish/rollback contract, not the Git wire format.
+The same portable `Kernel`, `Service`, alarm evaluator, historian queries, report renderer, and project compiler run behind the Bun server and in a browser Worker. Native `bun:sqlite` and SQLite WASM are adapters. The browser repository emulates the application-level commit/publish/rollback contract, not the Git wire format.
 
 ## Operator controls and equipment views
 
@@ -17,9 +17,9 @@ npm ci
 npm run plant
 ```
 
-Open `http://127.0.0.1:4176/plant/app/` for the authenticated Node installation, or `/plant/demo/` for the browser-only version. A new database generates an initial named `engineer` account and prints its random password **once**. Save that password. There are no fixed production credentials. The CLI applies `umask(077)` before creating its database and project repository.
+Open `http://127.0.0.1:4176/plant/app/` for the authenticated Bun installation, or `/plant/demo/` for the browser-only version. A new database generates an initial named `engineer` account and prints its random password **once**. Save that password. There are no fixed production credentials. The CLI applies `umask(077)` before creating its database and project repository.
 
-The implementation was exercised in the sandbox using **Node 22.16.0**, native SQLite 3.49.1, SQLite WASM 3.53.4, and isolated Playwright Chromium 153.0.8010.12. The repository's existing `.nvmrc` remains the pinned Node 24 toolchain. Use a patched Node release in either supported major for deployment; the old sandbox patch version is a test observation, not a security recommendation.
+The native server runtime is pinned in `.bun-version`; Node 24 from `.nvmrc` remains the build/test toolchain. CI runs the Bun server smoke test alongside the portable Node/browser regression suites.
 
 Optional environment configuration:
 
@@ -53,7 +53,7 @@ Official implementation references:
 
 An alarm has independent active/cleared and acknowledged states, an activation delay, hysteresis, priority, quality, episode and operator identity. Acknowledgement does not remove the cause. Missing quality does not clear an active alarm. Alarm transitions and checkpoint changes are persisted together; the pending notification is created in the same transaction.
 
-For Node, enable `SCADA_PUSH_SUBJECT`, open the authenticated app, and press **Уведомления**. Permission is requested only on user action. The server stores VAPID keys, subscriptions and an outbox in SQLite. Delivery uses the `web-push` library, encrypted messages, bounded retry, and removal of expired subscriptions. Endpoint registration allows only known push-provider HTTPS domains rather than arbitrary user-controlled destinations.
+For the Bun server, enable `SCADA_PUSH_SUBJECT`, open the authenticated app, and press **Уведомления**. Permission is requested only on user action. The server stores VAPID keys, subscriptions and an outbox in SQLite. Delivery uses the `web-push` library, encrypted messages, bounded retry, and removal of expired subscriptions. Endpoint registration allows only known push-provider HTTPS domains rather than arbitrary user-controlled destinations.
 
 A push accepted by a provider is recorded as `accepted`, **not** as proof that a person received or read it. Payloads contain a generic notification and same-origin link, never process values, report data, passwords or project source. Opening the link still requires authentication. A subscription remains usable after cookie expiration for periodic reports; explicit logout from the registering session revokes it. The authenticated unsubscribe API also revokes a device. There is a five-device limit per user. This is an additional notification channel, not a safety interlock or guaranteed emergency delivery system.
 
@@ -79,7 +79,7 @@ See [the DSL](dsl.md). Both manual and five-field UTC cron triggers create durab
 
 The scheduler checks current UTC minute; **missed minutes are not backfilled**. There is one report worker at a time and an eight-job pending limit. The demo schedules only while executing. Reports are a deliberately small workflow system: there is no shell execution, action marketplace, arbitrary JavaScript step or distributed DAG.
 
-SQL runs in a new in-memory SQLite database containing only the report's declared `samples` and `segments`. It cannot access authentication, notification subscriptions, server files, operational command tables or Git metadata. SELECT-only validation is supplementary: process/worker isolation and the separate database are the actual boundary. A five-second worker timeout, bounded input/result counts and query-only mode limit abusive queries. Native reports run in disposable child processes, so the timeout can kill a native SQLite query. Each report adapter limits SQLite's allocator to 64 MiB; native report JavaScript also has a 96 MiB heap limit. These are not a total OS-enforced RSS quota. Unbounded blob/format allocation functions are rejected. Returned HTML escapes data and uses a restrictive CSP and sandboxed preview. Charts use the same SVG renderer in both environments.
+SQL runs in a new in-memory SQLite database containing only the report's declared `samples` and `segments`. It cannot access authentication, notification subscriptions, server files, operational command tables or Git metadata. SELECT-only validation is supplementary: process/worker isolation and the separate database are the actual boundary. A five-second worker timeout, bounded input/result counts and query-only mode limit abusive queries. Native reports run in disposable child processes, so the timeout can kill a native SQLite query. The native report adapter limits SQLite's allocator to 64 MiB and runs each report in a disposable Bun process with a hard execution timeout. This is not a total OS-enforced RSS quota. Unbounded blob/format allocation functions are rejected. Returned HTML escapes data and uses a restrictive CSP and sandboxed preview. Charts use the same SVG renderer in both environments.
 
 `segments` retain the predecessor at the beginning of an interval. Time-weighted calculations account for unequal sample durations; unknown intervals are not zero. There is no universal database-side time-series abstraction or ORM. Historian retention is per signal for the active run. Old runs, reports and event journals are not automatically subject to a total storage quota: this is not yet a multiyear production historian.
 
@@ -92,7 +92,7 @@ npm run plant:test:browser
 npm run check
 ```
 
-The browser command starts its own isolated Node server on a free port, uses temporary credentials/database/Git, checks both remote and offline modes, and cleans up. `PWA_CHROMIUM` may select a test browser executable. `PWA_EVIDENCE_DIR` selects screenshots and JSON evidence (default `plant-test-results`). `.github/workflows/plant.yml` is **manual**, not a deploy or a billable test loop on every commit.
+The browser command starts its own isolated Bun server on a free port, uses temporary credentials/database/Git, checks both remote and offline modes, and cleans up. `PWA_CHROMIUM` may select a test browser executable. `PWA_EVIDENCE_DIR` selects screenshots and JSON evidence (default `plant-test-results`). `.github/workflows/plant.yml` is **manual**, not a deploy or a billable test loop on every commit.
 
 The Chernobyl-inspired model, assumptions and counterfactual results are documented [separately](model.md). Code under `plant/tests/` includes native/browser equation parity, SQL parity, quality, archive compression, native Git, release CAS, rollback, authentication, CSRF, report isolation and notification lifecycle tests. Type assertions also check the public DSL metadata inference. The existing legacy test suite remains separate; do not present its browser test counts as new PWA coverage.
 
