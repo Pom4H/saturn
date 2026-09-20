@@ -7,10 +7,12 @@ export interface Terminal { x:number;y:number;z:number;side:Side;medium:Medium;f
 export interface Endpoint { device:string;port:string }
 export interface Connection { id:string;from:Endpoint;to:Endpoint;medium:Medium;via?:{x:number;y:number}[];signal?:Expr;scale?:number; }
 export interface Attachment { device:string;controller:string;slot:number;profile:'virtual-io4' }
-const t=(x:number,y:number,side:Side,medium:Medium,family:string,role:Terminal['role'], extra:Partial<Terminal>={}):Terminal=>({x,y,side,medium,family,role,z:.65,max:1,...extra});
+const t=<M extends Medium,F extends string,R extends Terminal['role']>(x:number,y:number,side:Side,medium:M,family:F,role:R, extra:Partial<Terminal>={}):Terminal&{medium:M;family:F;role:R}=>({x,y,side,medium,family,role,z:.65,max:1,...extra});
 const inline = ()=>({ inlet:t(0,48,'left','pipe','water','sink'),outlet:t(150,48,'right','pipe','water','source',{signal:'flow'}) });
 const io = ()=>({ value:t(75,8,'up','control','analog','source',{signal:'value'}), common:t(100,8,'up','power','dc0','sink') });
-const profiles:Record<string,Record<string,Terminal>>={
+const saturnProfile=Object.fromEntries([...SATURN_TERMINAL_ANCHORS.map(a=>[a.id,t(a.x*.5,a.y*.5,a.side==='top'?'up':'down','control',a.signal,a.direction==='input'?'sink':'source',{z:1,max:a.direction==='output'?8:1,signal:a.direction==='output'?a.id:undefined})] as const),
+ ...SATURN_SERVICE_ANCHORS.map(a=>[a.id,t(a.x*.5,a.y*.5,a.side==='top'?'up':'down',a.id.startsWith('RS')?'bus':'power',a.family,a.id.startsWith('RS')?'passive':'sink',{z:1})] as const)]) as Record<string,Terminal>;
+export const profiles={
     pump:{...inline(),drive:t(75,9,'up','power','drive','sink',{input:'voltage'})},
     turbine:{...inline()},separator:{inlet:t(0,48,'left','pipe','water','sink'),outlet:t(150,48,'right','pipe','steam','source')},
     exchanger:{...inline(),coldIn:t(40,85,'down','pipe','water','sink'),coldOut:t(110,85,'down','pipe','water','source')},
@@ -36,10 +38,26 @@ const profiles:Record<string,Record<string,Terminal>>={
     ioModule:{busA:t(0,25,'left','bus','rs485-A','passive',{max:2}),busB:t(0,65,'left','bus','rs485-B','passive',{max:2}),plus:t(30,8,'up','power','dc24','sink'),minus:t(55,8,'up','power','dc0','sink'),
       ...Object.fromEntries(Array.from({length:4},(_,i)=>['AI'+(i+1),t(140,20+i*20,'right','control','analog','sink',{input:'channel'+(i+1)})]))},
     junction:{inlet:t(0,48,'left','pipe','water','sink'),outlet:t(150,48,'right','pipe','water','source'),branch:t(75,85,'down','pipe','water','source')},
+    saturn:saturnProfile,
+} satisfies Record<string,Record<string,Terminal>>;
+
+export type PhysicalType = keyof typeof profiles;
+declare const endpointTerminal: unique symbol;
+export type TypedEndpoint<ID extends string = string,T extends Terminal = Terminal> = Endpoint & {
+    readonly device: ID;
+    readonly [endpointTerminal]: T;
 };
-profiles.saturn=Object.fromEntries([...SATURN_TERMINAL_ANCHORS.map(a=>[a.id,t(a.x*.5,a.y*.5,a.side==='top'?'up':'down','control',a.signal,a.direction==='input'?'sink':'source',{z:1,max:a.direction==='output'?8:1,signal:a.direction==='output'?a.id:undefined})] as const),
- ...SATURN_SERVICE_ANCHORS.map(a=>[a.id,t(a.x*.5,a.y*.5,a.side==='top'?'up':'down',a.id.startsWith('RS')?'bus':'power',a.family,a.id.startsWith('RS')?'passive':'sink',{z:1})] as const)]);
-export function terminals(type:string):Record<string,Terminal>{const p=Object.hasOwn(profiles,type)?profiles[type]:undefined;if(!p)failDiagnostic('SATURN_PORT_PROFILE_MISSING','ports.profileMissing',{type},{type});return p;}
+export type DynamicEndpoint = Endpoint & { readonly [endpointTerminal]?: never };
+export type TerminalOf<E> = E extends TypedEndpoint<string,infer T> ? T : never;
+export type PortRefs<T extends PhysicalType,ID extends string> = {
+    readonly [P in keyof (typeof profiles)[T] & string]: TypedEndpoint<ID,(typeof profiles)[T][P]>;
+};
+export function portRefs<T extends PhysicalType,ID extends string>(device:ID,type:T):PortRefs<T,ID>{
+    return Object.fromEntries(Object.keys(profiles[type]).map(port=>[port,{device,port}])) as PortRefs<T,ID>;
+}
+export function terminals<T extends PhysicalType>(type:T):(typeof profiles)[T];
+export function terminals(type:string):Record<string,Terminal>;
+export function terminals(type:string):Record<string,Terminal>{const p=Object.hasOwn(profiles,type)?profiles[type as PhysicalType]:undefined;if(!p)failDiagnostic('SATURN_PORT_PROFILE_MISSING','ports.profileMissing',{type},{type});return p;}
 export function footprint(type:string){return type==='saturn'?{width:310,height:190}:{width:150,height:118};}
 export const physicalTypes=()=>Object.keys(profiles);
 export function resolvePort(p:Project,e:Endpoint):{device:Device;terminal:Terminal}{const device=p.devices.find(d=>d.id===e.device);const ports=device&&terminals(device.type);const terminal=ports&&Object.hasOwn(ports,e.port)?ports[e.port]:undefined;if(!device||!terminal)failDiagnostic('SATURN_PORT_UNKNOWN','ports.unknownTerminal',{device:e.device,port:e.port},{endpoint:e});return{device,terminal};}
