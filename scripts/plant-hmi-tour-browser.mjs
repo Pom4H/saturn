@@ -121,8 +121,9 @@ try {
   await rename(raw, webm);
   const mp4 = output + '/hmi-saturn-plc-tour.mp4';
   const ffmpeg = spawnSync('ffmpeg', ['-y','-i',webm,'-c:v','libx264','-preset','fast','-crf','22','-pix_fmt','yuv420p','-movflags','+faststart',mp4], { stdio: 'inherit' });
-  if (ffmpeg.status !== 0) throw new Error('ffmpeg conversion failed');
-  console.log(mp4);
+  if (ffmpeg.error?.code === 'ENOENT') console.log('System ffmpeg unavailable; keeping Playwright WebM:', webm);
+  else if (ffmpeg.status !== 0) console.warn('MP4 conversion failed; keeping Playwright WebM:', webm);
+  else console.log(mp4);
 } catch (error) {
   await context.close().catch(() => {});
   await browser.close().catch(() => {});
