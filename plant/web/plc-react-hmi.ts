@@ -165,7 +165,8 @@ function signalsFor(frame:Frame):DisplaySignals{
   return Object.fromEntries(Object.entries(frame.samples).map(([id,sample])=>[id,sample.quality==='good'&&typeof sample.value==='number'?sample.value:null]));
 }
 function renderCommand(command:DisplayDrawCommand,index:number):React.ReactNode{
-  const common={key:index,'data-firmverse-command':command.type,'data-source':command.source??''};
+  const flow=command.source?.includes('flow'),rotor=command.source==='pump'&&command.type==='polygon';
+  const common={key:index,'data-firmverse-command':command.type,'data-source':command.source??'',...(flow?{'data-flow':true}:{}),...(rotor?{'data-rotor':true}:{}),...(flow||rotor?{style:{animation:flow?'firmverseFlowPresence 1.1s ease-in-out infinite':'firmverseRotorPresence .9s ease-in-out infinite'}}:{})};
   if(command.type==='rect')return h('rect',{...common,x:command.x,y:command.y,width:command.width,height:command.height,rx:command.radius??0,fill:css565(command.fill),stroke:command.stroke===undefined?'none':css565(command.stroke),strokeWidth:command.strokeWidth??0,opacity:command.opacity??1});
   if(command.type==='circle')return h('circle',{...common,cx:command.cx,cy:command.cy,r:command.r,fill:css565(command.fill),stroke:command.stroke===undefined?'none':css565(command.stroke),strokeWidth:command.strokeWidth??0,opacity:command.opacity??1});
   if(command.type==='line')return h('line',{...common,x1:command.x1,y1:command.y1,x2:command.x2,y2:command.y2,stroke:css565(command.color),strokeWidth:command.width,strokeLinecap:'round',opacity:command.opacity??1});
@@ -182,5 +183,8 @@ export function SaturnPlcHmi({project,frame,controllerId}:SaturnPlcHmiProps){
   // intentionally free of Frame so all motion remains inside Firmverse.
   if(page.kind==='overview')scene=overview(project,frame,controllerId,page,index,model.pages.length);
   const display=emulatorRef.current.render(scene,signalsFor(frame),frame.time);
-  return h('g',{'data-react-plc-hmi':true,'data-firmverse-display':true,'data-controller-id':controllerId,'data-hmi-page':page.id,'data-display-time':String(display.timeMs)},...display.commands.map(renderCommand));
+  return h(React.Fragment,null,
+    h('style',null,'@keyframes firmverseFlowPresence{0%,100%{opacity:.92}50%{opacity:1}}@keyframes firmverseRotorPresence{0%,100%{filter:brightness(.98)}50%{filter:brightness(1.03)}}'),
+    h('g',{'data-react-plc-hmi':true,'data-firmverse-display':true,'data-controller-id':controllerId,'data-hmi-page':page.id,'data-display-time':String(display.timeMs)},...display.commands.map(renderCommand))
+  );
 }
