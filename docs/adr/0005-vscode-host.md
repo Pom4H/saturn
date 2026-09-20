@@ -41,7 +41,7 @@ It does not get another project model and does not serialize a second representa
 
 A VS Code custom editor registered for `*.ts` would compete with the normal TypeScript editor and damage the source-first workflow.
 
-The mnemonic is therefore a separate editor tab created with `WebviewPanel`. It can sit beside `plant.ts`, follow source selection and send source edits through the same Saturn source-edit contract. The TypeScript file remains a normal text document.
+The mnemonic is therefore a separate editor tab created with `WebviewPanel`. `saturn ide diagram --project <path> --json` compiles the canonical project and returns Scene IR; the VS Code host renders only that IR, never the complete Saturn web shell. It can sit beside `plant.ts`; clicking equipment reveals its source declaration. The TypeScript file remains a normal text document.
 
 ### Equipment catalog
 
