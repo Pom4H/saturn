@@ -100,7 +100,7 @@ export async function mountStudio() {
     }
   }
   function syncTelemetry() {
-    if ((serverRevision || runtimeOnly) && plant) stream.start();
+    if ((serverRevision || runtimeOnly) && plant) stream.start(telemetry.frame);
     else { stream.stop(); telemetry = { state: 'connecting', frame: null, message: '', lastSeenAt: null, retryInMs: 0 }; }
     applyTelemetry();
   }
