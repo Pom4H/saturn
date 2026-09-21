@@ -36,7 +36,8 @@
     "vscode:check": "npm run vscode:build && node scripts/vscode-check.mjs && npm run vscode:test",
     "vscode:build": "node scripts/vscode-build.mjs",
     "authoring:typecheck": "tsc --noEmit -p tsconfig.authoring.json",
-    "authoring:test": "node scripts/authoring-check.mjs"
+    "authoring:test": "node scripts/authoring-check.mjs && npm run architecture:check",
+    "architecture:check": "node scripts/architecture-invariants.mjs"
   },
   "keywords": [],
   "author": "Roman Popov",
