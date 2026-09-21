@@ -13,6 +13,7 @@ import { addRegistryItem, runRegistryCommand } from './registry';
 import { runIdeCommand } from './ide';
 import { buildArtifact } from '../plant/artifact';
 import { WorkspaceHost } from './workspace-host';
+import { createSaturnProject } from './scaffold';
 
 declare const SATURN_VERSION: string;
 declare const SATURN_DEMO_FILES: Record<string, string>;
@@ -109,6 +110,23 @@ if (args[0] === 'update') {
         standaloneExecutable,
         restartArgs: [],
     });
+    process.exit(0);
+}
+if (args[0] === 'new') {
+    const directory = args[1];
+    if (!directory) throw new Error('Usage: saturn new <directory>');
+    const created = await createSaturnProject(directory);
+    const host = new WorkspaceHost(created);
+    const artifact = await host.build();
+    console.log(`Created Saturn project: ${created}`);
+    console.log(`Build: ${artifact.hash}`);
+    process.exit(0);
+}
+if (args[0] === 'check') {
+    const directory = args[1] ?? process.cwd();
+    const host = new WorkspaceHost(directory);
+    const artifact = await host.build();
+    console.log(`OK ${artifact.project.title} · ${artifact.hash}`);
     process.exit(0);
 }
 if (args[0] === 'registry') {
