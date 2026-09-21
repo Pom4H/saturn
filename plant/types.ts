@@ -2,6 +2,7 @@ import type { Presentation } from './presentation';
 import type { Controller, ControllerState } from './controller';
 import type { Connection, Attachment } from './ports';
 import type { HmiDrawCommand } from './vendor/saturn/src/runtime';
+import type { TextKey } from './i18n';
 import { failCode } from './diagnostics';
 export { AppError } from './diagnostics';
 /** Portable contracts. No DOM, Node, filesystem, SQL driver or network imports. */
@@ -224,7 +225,7 @@ export interface Project {
 export interface ModelSpec {
     kind: string;
     version: string;
-    titleKey: string;
+    titleKey: TextKey;
     visual: string;
     inputs: Record<string, number>;
     parameters: Record<string, {

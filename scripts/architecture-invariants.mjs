@@ -46,7 +46,12 @@ async function inspect(file) {
     if (!allowedDiagnosticFiles.has(rel) && ts.isNewExpression(node)
       && ts.isIdentifier(node.expression) && node.expression.text === 'AppError'
       && node.arguments?.length && (ts.isStringLiteralLike(node.arguments[0]) || ts.isTemplateExpression(node.arguments[0]) || ts.isNoSubstitutionTemplateLiteral(node.arguments[0]))) {
-      report(source,file,node,'structured-diagnostics','Use failDiagnostic()/SaturnDiagnosticError with stable code, messageKey and data.');
+      report(source,file,node,'structured-diagnostics','Use failCode()/SaturnDiagnosticError with stable code and data.');
+    }
+
+    if (rel !== 'plant/i18n.ts' && ts.isPropertyAssignment(node)
+      && ts.isIdentifier(node.name) && (node.name.text === 'en' || node.name.text === 'ru')) {
+      report(source,file,node,'single-i18n-source','Human translations belong only in plant/i18n.ts; reference a typed TextKey elsewhere.');
     }
 
     ts.forEachChild(node,visit);
