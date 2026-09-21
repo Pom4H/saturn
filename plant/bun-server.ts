@@ -8,7 +8,8 @@ import { Push } from './adapters/push';
 import { runReport } from './adapters/bun-reports';
 import { Store } from './store';
 import { Service } from './service';
-import { AppError, requireRole } from './types';
+import { requireRole } from './types';
+import { AppError, failCode } from './diagnostics';
 import { demoFiles } from './demo/files';
 
 const prefix = '/plant';
@@ -62,20 +63,85 @@ const json = (status: number, value: unknown, headers: HeadersInit = {}) =>
 const html = (status: number, value: string) =>
     response(value, status, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
 
-async function body(request: Request): Promise<any> {
+type JsonObject = Record<string, unknown>;
+
+function objectValue(value: unknown, field = 'body'): JsonObject {
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+        failCode('SATURN_HTTP_INVALID', { reason:'malformed' }, { field });
+    return value as JsonObject;
+}
+function stringValue(input: JsonObject, field: string): string {
+    const value = input[field];
+    if (typeof value !== 'string')
+        failCode('SATURN_VALUE_INVALID', { field, reason:'invalid' }, { value });
+    return value;
+}
+function optionalStringValue(input: JsonObject, field: string): string | undefined {
+    const value = input[field];
+    if (value === undefined) return undefined;
+    if (typeof value !== 'string')
+        failCode('SATURN_VALUE_INVALID', { field, reason:'invalid' }, { value });
+    return value;
+}
+function nullableStringValue(input: JsonObject, field: string): string | null {
+    const value = input[field];
+    if (value === null || value === undefined) return null;
+    if (typeof value !== 'string')
+        failCode('SATURN_VALUE_INVALID', { field, reason:'invalid' }, { value });
+    return value;
+}
+function finiteNumberValue(input: JsonObject, field: string): number | undefined {
+    const value = input[field];
+    if (value === undefined) return undefined;
+    if (typeof value !== 'number' || !Number.isFinite(value))
+        failCode('SATURN_VALUE_INVALID', { field, reason:'invalid' }, { value });
+    return value;
+}
+function stringMapValue(value: unknown, field: string): Record<string,string> {
+    const object = objectValue(value, field);
+    for (const [key, item] of Object.entries(object))
+        if (typeof item !== 'string')
+            failCode('SATURN_VALUE_INVALID', { field: `${field}.${key}`, reason:'invalid' }, { value:item });
+    return object as Record<string,string>;
+}
+function numberMapValue(value: unknown, field: string): Record<string,number> {
+    if (value === undefined) return {};
+    const object = objectValue(value, field);
+    for (const [key, item] of Object.entries(object))
+        if (typeof item !== 'number' || !Number.isFinite(item))
+            failCode('SATURN_VALUE_INVALID', { field: `${field}.${key}`, reason:'invalid' }, { value:item });
+    return object as Record<string,number>;
+}
+function commandValue(input: JsonObject) {
+    return {
+        id: stringValue(input,'id'),
+        revision: stringValue(input,'revision'),
+        action: stringValue(input,'action'),
+        ...(optionalStringValue(input,'runId') !== undefined ? { runId: optionalStringValue(input,'runId') } : {}),
+        ...(optionalStringValue(input,'target') !== undefined ? { target: optionalStringValue(input,'target') } : {}),
+        ...(optionalStringValue(input,'parameter') !== undefined ? { parameter: optionalStringValue(input,'parameter') } : {}),
+        ...(finiteNumberValue(input,'value') !== undefined ? { value: finiteNumberValue(input,'value') } : {}),
+    };
+}
+async function body(request: Request): Promise<JsonObject> {
     if (!request.headers.get('content-type')?.toLowerCase().startsWith('application/json'))
-        throw new AppError('JSON body required', 415);
+        failCode('SATURN_HTTP_INVALID', { reason:'missing' }, { field:'content-type' }, { status:415 });
     const length = Number(request.headers.get('content-length') ?? 0);
-    if (Number.isFinite(length) && length > maxBodySize) throw new AppError('Request too large', 413);
-    const text = await request.text();
-    if (encoder.encode(text).byteLength > maxBodySize) throw new AppError('Request too large', 413);
-    try { return JSON.parse(text); }
-    catch { throw new AppError('Invalid JSON'); }
+    if (Number.isFinite(length) && length > maxBodySize)
+        failCode('SATURN_LIMIT', { resource:'http.body', reason:'tooLarge' }, { bytes:length, max:maxBodySize }, { status:413 });
+    const source = await request.text();
+    if (encoder.encode(source).byteLength > maxBodySize)
+        failCode('SATURN_LIMIT', { resource:'http.body', reason:'tooLarge' }, { max:maxBodySize }, { status:413 });
+    let parsed: unknown;
+    try { parsed = JSON.parse(source); }
+    catch { failCode('SATURN_HTTP_INVALID', { reason:'malformed' }, { field:'json' }); }
+    return objectValue(parsed);
 }
 
 async function safeFile(root: string, relative: string): Promise<string> {
     const file = await realpath(resolve(root, relative));
-    if (file !== root && !file.startsWith(root + sep)) throw new AppError('Path rejected', 403);
+    if (file !== root && !file.startsWith(root + sep))
+        failCode('SATURN_PERMISSION', { role:'engineer' }, { reason:'pathRejected', relative }, { status:403 });
     return file;
 }
 function fileResponse(path: string, type: string, head = false, extra: HeadersInit = {}): Response {
@@ -100,9 +166,22 @@ export async function startPlantServer(options: {
     unix?: string;
     tls?: { cert: string; key: string; ca?: string[] };
     http2?: boolean;
+    gitRemote?: string;
+    gitSourceBranch?: string;
+    gitReleaseBranch?: string;
+    sourceRef?: string;
+    releaseRef?: string;
 } = {}) {
     const store = new Store(new BunSql(options.data ?? resolve('data-plant/plant.sqlite3')));
-    const repository = await new GitRepository(options.repository ?? resolve('data-plant/project.git')).initialize();
+    const sourceBranch = options.gitSourceBranch ?? 'main';
+    const releaseBranch = options.gitReleaseBranch ?? 'production';
+    const sourceRef = options.sourceRef ?? (options.gitRemote ? `refs/remotes/${options.gitRemote}/${sourceBranch}` : 'refs/heads/main');
+    const releaseRef = options.releaseRef ?? (options.gitRemote ? `refs/remotes/${options.gitRemote}/${releaseBranch}` : 'refs/scada/plant/published');
+    const repository = await new GitRepository(options.repository ?? resolve('data-plant/project.git'), sourceRef, releaseRef).initialize();
+    if (options.gitRemote) {
+        repository.track(options.gitRemote, sourceBranch, releaseBranch);
+        await repository.refresh();
+    }
     const service = new Service(store, repository, { reportRunner: runReport });
     await service.start(demoFiles);
 
@@ -143,13 +222,13 @@ export async function startPlantServer(options: {
                 const url = new URL(request.url);
                 let path: string;
                 try { path = decodeURIComponent(url.pathname); }
-                catch { throw new AppError('Malformed URL'); }
+                catch { failCode('SATURN_HTTP_INVALID',{reason:'malformed'},{field:'url'}); }
 
                 if (request.method === 'POST' && request.headers.get('origin') !== origin)
-                    throw new AppError('Cross-origin write blocked', 403);
+                    failCode('SATURN_PERMISSION',{role:'operator'},{reason:'crossOriginWrite'},{status:403});
 
                 if (path === '/') {
-                    if (!['GET', 'HEAD'].includes(request.method)) throw new AppError('Method not allowed', 405);
+                    if (!['GET', 'HEAD'].includes(request.method)) failCode('SATURN_HTTP_INVALID',{reason:'disabled'},{method:request.method},{status:405});
                     const text = (await readFile(resolve(root, 'site/index.html'), 'utf8')).replaceAll('/plant/', `${prefix}/`);
                     return html(200, request.method === 'HEAD' ? '' : text);
                 }
@@ -159,7 +238,7 @@ export async function startPlantServer(options: {
 
                 if (path === `${prefix}/api/login` && request.method === 'POST') {
                     const input = await body(request);
-                    const session = await auth.login(input.user, input.password, server.requestIP(request)?.address ?? 'unknown');
+                    const session = await auth.login(stringValue(input,'user'), stringValue(input,'password'), server.requestIP(request)?.address ?? 'unknown');
                     const secure = origin.startsWith('https:') ? '; Secure' : '';
                     return json(200, { actor: session.actor, csrf: session.csrf }, {
                         'Set-Cookie': `scada_session=${session.token}; HttpOnly; SameSite=Strict; Path=${prefix}/; Max-Age=28800${secure}`,
@@ -171,7 +250,7 @@ export async function startPlantServer(options: {
                 }
 
                 if (path === `${prefix}/app/`) {
-                    if (request.method !== 'GET') throw new AppError('Method not allowed', 405);
+                    if (request.method !== 'GET') failCode('SATURN_HTTP_INVALID',{reason:'disabled'},{method:request.method},{status:405});
                     try { auth.session(request.headers.get('cookie') ?? undefined); }
                     catch { return response(null, 302, { Location: `${prefix}/login`, 'Cache-Control': 'no-store' }); }
                     return html(200, await readFile(resolve(root, 'index.html'), 'utf8'));
@@ -182,13 +261,13 @@ export async function startPlantServer(options: {
                     const session = auth.session(cookie);
                     const actor = session.actor;
                     if (request.method === 'POST' && request.headers.get('x-csrf-token') !== session.csrf)
-                        throw new AppError('Invalid CSRF token', 403);
+                        failCode('SATURN_PERMISSION',{role:'operator'},{reason:'csrf'},{status:403});
                     const action = path.slice(`${prefix}/api/`.length);
 
                     if (request.method === 'GET') {
                         if (action === 'ws') {
-                            if (request.headers.get('origin') !== origin) throw new AppError('Cross-origin WebSocket blocked', 403);
-                            if (server.subscriberCount(liveTopic) >= 32) throw new AppError('Too many live sockets', 429);
+                            if (request.headers.get('origin') !== origin) failCode('SATURN_PERMISSION',{role:'viewer'},{reason:'crossOriginWebSocket'},{status:403});
+                            if (server.subscriberCount(liveTopic) >= 32) failCode('SATURN_LIMIT',{resource:'websocket.connections',reason:'tooMany'},{max:32},{status:429});
                             return server.upgrade(request, { data: { cookie: cookie ?? '' } })
                                 ? undefined
                                 : json(426, { error: 'WebSocket upgrade required' }, { Upgrade: 'websocket' });
@@ -213,7 +292,7 @@ export async function startPlantServer(options: {
                             });
                         }
                         if (action === 'stream') {
-                            if (streamCount >= 32) throw new AppError('Too many streams', 429);
+                            if (streamCount >= 32) failCode('SATURN_LIMIT',{resource:'sse.connections',reason:'tooMany'},{max:32},{status:429});
                             server.timeout(request, 0);
                             streamCount++;
                             let closed = false;
@@ -268,26 +347,26 @@ export async function startPlantServer(options: {
                             auth.logout(session.sessionId);
                             return json(200, { ok: true }, { 'Set-Cookie': `scada_session=; Path=${prefix}/; HttpOnly; SameSite=Strict; Max-Age=0` });
                         }
-                        if (action === 'firmware') return json(200, service.firmware(input.controllerId, input.revision, actor));
-                        if (action === 'command') return json(200, service.command(input, actor));
+                        if (action === 'firmware') return json(200, service.firmware(stringValue(input,'controllerId'), stringValue(input,'revision'), actor));
+                        if (action === 'command') return json(200, service.command(commandValue(input), actor));
                         if (action === 'restart') return json(200, await service.restart(actor));
-                        if (action === 'save') return json(200, await service.save(input.files, input.expected, input.message, actor));
-                        if (action === 'publish') return json(200, await service.publish(input.revision, input.expected, actor));
-                        if (action === 'rollback') return json(200, await service.rollback(input.revision, input.expected, actor));
-                        if (action === 'report') return json(202, service.dispatch(input.reportId, input.inputs ?? {}, actor));
+                        if (action === 'save') return json(200, await service.save(stringMapValue(input.files,'files'), nullableStringValue(input,'expected'), stringValue(input,'message'), actor));
+                        if (action === 'publish') return json(200, await service.publish(stringValue(input,'revision'), nullableStringValue(input,'expected'), actor));
+                        if (action === 'rollback') return json(200, await service.rollback(stringValue(input,'revision'), nullableStringValue(input,'expected'), actor));
+                        if (action === 'report') return json(202, service.dispatch(stringValue(input,'reportId'), numberMapValue(input.inputs,'inputs'), actor));
                         if (action === 'subscribe') {
-                            if (!push) throw new AppError('Configure SCADA_PUSH_SUBJECT to enable Web Push', 503);
+                            if (!push) failCode('SATURN_RUNTIME_INVALID',{reason:'missing'},{resource:'push.subject'},{status:503});
                             return json(200, push.subscribe(input, actor, session.sessionId));
                         }
                         if (action === 'unsubscribe') {
-                            push?.unsubscribe(input.endpoint, actor);
+                            push?.unsubscribe(stringValue(input,'endpoint'), actor);
                             return json(200, { ok: true });
                         }
                     }
-                    throw new AppError('Endpoint not found', 404);
+                    failCode('SATURN_NOT_FOUND',{resource:'http.endpoint',id:action},{path},{status:404});
                 }
 
-                if (!['GET', 'HEAD'].includes(request.method)) throw new AppError('Method not allowed', 405);
+                if (!['GET', 'HEAD'].includes(request.method)) failCode('SATURN_HTTP_INVALID',{reason:'disabled'},{method:request.method},{status:405});
                 const head = request.method === 'HEAD';
                 if (path === '/saturn-sw.js') {
                     const file = await safeFile(root, 'site/saturn-sw.js');
@@ -313,7 +392,7 @@ export async function startPlantServer(options: {
                     return response(head ? null : JSON.stringify(manifest), 200, { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'no-cache' });
                 }
                 if (!path.startsWith(`${prefix}/assets/`) && path !== `${prefix}/sw.js`)
-                    throw new AppError('File not found', 404);
+                    failCode('SATURN_NOT_FOUND',{resource:'file',id:path},{path},{status:404});
                 const file = await safeFile(root, '.' + path.slice(prefix.length));
                 const mime: Record<string, string> = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.wasm': 'application/wasm', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.txt': 'text/plain' };
                 return fileResponse(file, mime[extname(file)] ?? 'application/octet-stream', head);
