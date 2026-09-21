@@ -9,7 +9,7 @@ import { registerSvgRenderer, register3dRenderer, el, type SvgRendererContext } 
 import type { RuntimeFrame } from '../src/runtime/protocol';
 import { models, outputType, outputUnit } from './models';
 import { evaluate } from './kernel';
-import type { Project, Frame, Expr } from './types';
+import type { Project, Frame, Expr, ModelOutput } from './types';
 const metalStroke = '#526f7a', water = '#10a6b5', fuel = '#d39b51';
 type Draw = (c: SvgRendererContext) => void;
 const body = (c: SvgRendererContext, x = 15, y = 10, w = 120, h = 66) => el(c.root, 'rect', { x, y, width: w, height: h, rx: 8, fill: c.paint('metal'), stroke: metalStroke, 'stroke-width': 2 });
@@ -99,7 +99,14 @@ Object.assign(shapes, {
 });
 const installed = new Set<string>();
 export function installEquipment() {
-    for (const spec of [...models(),{visual:'saturn',title:'Saturn PLC · FBD',outputs:{healthy:'лог.',powered:'лог.'}}]) {
+    const specs: {visual:string;title:string;outputs:Record<string,ModelOutput>}[] = [
+        ...models(),
+        {visual:'saturn',title:'Saturn PLC · FBD',outputs:{
+            healthy:{type:'boolean',unit:'лог.'},
+            powered:{type:'boolean',unit:'лог.'},
+        }},
+    ];
+    for (const spec of specs) {
         if (!shapes[spec.visual]) throw new Error(`Missing SVG anatomy: ${spec.visual}`);
         const kind = `plant_${spec.visual}`;
         if (installed.has(kind))
