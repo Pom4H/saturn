@@ -20,6 +20,8 @@ else {
         '  saturn update [--check] [--channel stable|preview|nightly]',
         '  saturn extension <list|add|update|remove> [package]',
         '  saturn ide catalog --json',
+        '  saturn ide docs --locale en|ru --json',
+        '  saturn ide check --project PROJECT --locale en|ru --json',
         '  saturn ide diagram --project PROJECT --json',
         '  saturn ide reports --project PROJECT --json',
         '  saturn ide report --project PROJECT --id REPORT --json',
