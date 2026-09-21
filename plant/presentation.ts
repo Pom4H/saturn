@@ -1,4 +1,5 @@
-import { AppError, type Expr, type Sample } from './types';
+import type { Expr, Sample } from './types';
+import { failCode } from './diagnostics';
 import { evaluate } from './expressions';
 import { chartSVG, escape } from './graphics';
 
@@ -15,25 +16,25 @@ export interface PresentationContext { values: Record<string, Sample>; rows?: Re
 const key = (s:unknown):s is string => typeof s==='string'&&/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/.test(s);
 const text = (s:unknown, limit=200):s is string => typeof s==='string'&&s.length<=limit;
 export function validatePresentation(view:Presentation, target:'web'|'report'|'plc'='web'):void {
-    if(!view||!key(view.id)||!text(view.title)||!view.bindings||Array.isArray(view.bindings)||Object.keys(view.bindings).length>64)throw new AppError('Invalid presentation');
-    for(const k of Object.keys(view.bindings))if(!key(k))throw new AppError('Invalid presentation binding');
+    if(!view||!key(view.id)||!text(view.title)||!view.bindings||Array.isArray(view.bindings)||Object.keys(view.bindings).length>64)failCode('SATURN_PRESENTATION_INVALID',{reason:'malformed'},{field:'root'});
+    for(const k of Object.keys(view.bindings))if(!key(k))failCode('SATURN_PRESENTATION_INVALID',{reason:'invalid'},{field:'binding'});
     let count=0;
     const visit=(node:ViewNode,depth:number):void=>{
-        if(!node||typeof node!=='object'||++count>128||depth>8)throw new AppError('Presentation exceeds structure budget');
+        if(!node||typeof node!=='object'||++count>128||depth>8)failCode('SATURN_LIMIT',{resource:'presentation',reason:'tooMany'},{maxNodes:128,maxDepth:8});
         switch(node.kind){
             case 'group':
-                if(!['row','column'].includes(node.direction)||!Array.isArray(node.children)||node.children.length>64||(node.title!==undefined&&!text(node.title)))throw new AppError('Invalid presentation group');
+                if(!['row','column'].includes(node.direction)||!Array.isArray(node.children)||node.children.length>64||(node.title!==undefined&&!text(node.title)))failCode('SATURN_PRESENTATION_INVALID',{reason:'invalid'},{field:'group'});
                 node.children.forEach(n=>visit(n,depth+1));break;
-            case 'text':if(!text(node.text,2000))throw new AppError('Invalid presentation text');break;
+            case 'text':if(!text(node.text,2000))failCode('SATURN_PRESENTATION_INVALID',{reason:'invalid'},{field:'text'});break;
             case 'value':
-                if(!text(node.label)||!key(node.binding)||!Object.hasOwn(view.bindings,node.binding)||!text(node.unit,30)||!Number.isInteger(node.digits)||node.digits<0||node.digits>6)throw new AppError('Invalid presentation readout');break;
+                if(!text(node.label)||!key(node.binding)||!Object.hasOwn(view.bindings,node.binding)||!text(node.unit,30)||!Number.isInteger(node.digits)||node.digits<0||node.digits>6)failCode('SATURN_PRESENTATION_INVALID',{reason:'invalid'},{field:'value'});break;
             case 'table':
-                if(!Array.isArray(node.columns)||!node.columns.length||node.columns.length>32||node.columns.some(c=>!c||!key(c.key)||!text(c.title)||(c.unit!==undefined&&!text(c.unit,30))))throw new AppError('Invalid presentation table');break;
-            case 'chart':if(!text(node.title)||!key(node.x)||!key(node.y))throw new AppError('Invalid presentation chart');break;
-            case 'action':if(!text(node.label)||!key(node.target)||!Number.isFinite(node.value))throw new AppError('Invalid presentation action');break;
-            default:throw new AppError('Unknown presentation node');
+                if(!Array.isArray(node.columns)||!node.columns.length||node.columns.length>32||node.columns.some(c=>!c||!key(c.key)||!text(c.title)||(c.unit!==undefined&&!text(c.unit,30))))failCode('SATURN_PRESENTATION_INVALID',{reason:'invalid'},{field:'table'});break;
+            case 'chart':if(!text(node.title)||!key(node.x)||!key(node.y))failCode('SATURN_PRESENTATION_INVALID',{reason:'invalid'},{field:'chart'});break;
+            case 'action':if(!text(node.label)||!key(node.target)||!Number.isFinite(node.value))failCode('SATURN_PRESENTATION_INVALID',{reason:'invalid'},{field:'action'});break;
+            default:failCode('SATURN_PRESENTATION_INVALID',{reason:'unknown'},{field:'node'});
         }
-        if(target==='plc'&&!['group','text','value'].includes(node.kind))throw new AppError(`PLC display does not support ${node.kind}`);
+        if(target==='plc'&&!['group','text','value'].includes(node.kind))failCode('SATURN_PRESENTATION_INVALID',{reason:'invalid'},{target:'plc',nodeKind:node.kind});
     };
     visit(view.body,0);
 }
@@ -46,7 +47,7 @@ export function presentationActions(node:ViewNode):Extract<ViewNode,{kind:'actio
 }
 export function renderPresentation(view:Presentation,context:PresentationContext):string {
     validatePresentation(view);const rows=context.rows??[];
-    if(rows.length>2000)throw new AppError('Presentation row budget');
+    if(rows.length>2000)failCode('SATURN_LIMIT',{resource:'presentation.rows',reason:'rowBudget'},{maxRows:2000});
     const render=(node:ViewNode):string=>{
         switch(node.kind){
             case 'group':return `<section class="pv-group pv-${node.direction}">${node.title?`<h3>${escape(node.title)}</h3>`:''}<div class="pv-children">${node.children.map(render).join('')}</div></section>`;
