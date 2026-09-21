@@ -4,7 +4,8 @@ import { Kernel } from './kernel';
 import { acknowledge, updateAlarms } from './alarms';
 import { Store } from './store';
 import { cronMatches } from './workflows';
-import { AppError, clone, finite, id, requireRole, type Actor, type AlarmState, type Event, type Frame, type Project, type Repository, type ReportTask, type ReportArtifact } from './types';
+import { clone, finite, id, requireRole, type Actor, type AlarmState, type Event, type Frame, type Project, type Repository, type ReportTask, type ReportArtifact } from './types';
+import { failCode, SaturnDiagnosticError } from './diagnostics';
 const engineering: Actor = { id: 'system', role: 'engineer' };
 const configuration = (p: Project) => JSON.stringify({ controllers:(p.controllers??[]).map(({layout,system,...c})=>c),connections:(p.connections??[]).map(({via,...w})=>w),attachments:p.attachments??[], simulations: p.simulations.map(({ layout, system, history, ...n }) => n).sort((a, b) => a.id.localeCompare(b.id)), signals: p.signals.map(({ unit, history, ...s }) => s), stepMs: p.stepMs, controls: p.controls ?? [] });
 export class Service {
@@ -93,7 +94,7 @@ export class Service {
         return this.emit();
     }
     async save(files: Record<string, string>, expected: string | null, message: string, actor: Actor) { requireRole(actor, 'engineer'); validateFiles(files); compileProject(files); if (typeof message !== 'string' || !message.trim() || message.length > 200)
-        throw new AppError('Commit message required (1..200 characters)'); return this.repository.commit(files, expected, message, actor.id); }
+        failCode('SATURN_VALUE_INVALID',{field:'commit.message',reason:'range'},{min:1,max:200,value:message}); return this.repository.commit(files, expected, message, actor.id); }
     async publish(revision: string, expected: string | null, actor: Actor) { requireRole(actor, 'engineer'); const snapshot = await this.repository.read(revision); compileProject(snapshot.files); await this.repository.publish(revision, expected); await this.apply(revision, actor); return this.status(actor); }
     /** Git desired ref is durable first; SQLite applied checkpoint is authoritative for visible state.
      * A crash between them is reconciled by start(), retaining the last good checkpoint on rejection. */
@@ -133,10 +134,10 @@ export class Service {
     }, actor: Actor) {
         requireRole(actor, 'operator');
         if (!this.healthy)
-            throw new AppError('Runtime storage unavailable', 503);
+            failCode('SATURN_RUNTIME_INVALID',{reason:'disabled'},{resource:'storage'},{status:503});
         id(payload.id);
         if (payload.revision !== this.kernel.state.revision)
-            throw new AppError('Project revision changed', 409);
+            failCode('SATURN_CONFLICT',{resource:'revision',reason:'stateChanged'},{expected:payload.revision,actual:this.kernel.state.revision});
         const encoded = JSON.stringify({ actor: actor.id, ...payload });
         const existing = this.store.db.all<{
             payload: string;
@@ -144,7 +145,7 @@ export class Service {
         }>('SELECT payload,receipt FROM commands WHERE id=?', [payload.id])[0];
         if (existing) {
             if (existing.payload !== encoded)
-                throw new AppError('Command ID reused with a different payload', 409);
+                failCode('SATURN_CONFLICT',{resource:'command',reason:'duplicate'},{id:payload.id},{status:409});
             return JSON.parse(existing.receipt);
         }
         const before = clone(this.kernel.state), alarms = clone(this.alarms);
@@ -152,7 +153,7 @@ export class Service {
         try {
             switch (payload.action) {
                 case 'operate':
-                    if (payload.runId !== this.kernel.state.runId) throw new AppError('Simulation run changed', 409);
+                    if (payload.runId !== this.kernel.state.runId) failCode('SATURN_CONFLICT',{resource:'run',reason:'stateChanged'},{expected:payload.runId,actual:this.kernel.state.runId},{status:409});
                     this.kernel.operate(payload.target!, payload.value!);
                     event = this.event('command.control', payload.target!, JSON.stringify({ requested: payload.value, actual: this.kernel.state.controls![payload.target!].value }), actor);
                     break;
@@ -173,7 +174,7 @@ export class Service {
                     acknowledge(this.alarms, payload.target!, actor, this.kernel.state.time);
                     event = this.event('alarm.acknowledged', payload.target!, 'Acknowledged', actor);
                     break;
-                default: throw new AppError('Unknown command');
+                default: failCode('SATURN_DSL_UNKNOWN',{kind:'command',name:payload.action},{action:payload.action});
             }
             const receipt = { id: payload.id, status: payload.action === 'operate' ? 'accepted' : 'applied', seq: this.kernel.state.seq, runId: this.kernel.state.runId };
             // Commands and their effects share one SQLite transaction (save() is kept outside to avoid nested BEGIN).
@@ -184,7 +185,7 @@ export class Service {
         catch (error) {
             this.kernel.state = before;
             this.alarms = alarms;
-            if (payload.action === 'operate' && error instanceof AppError) {
+            if (payload.action === 'operate' && error instanceof SaturnDiagnosticError) {
                 try { this.store.event(this.event('command.rejected', payload.target ?? 'unknown', error.message, actor)); }
                 catch { this.healthy = false; }
             }
@@ -217,8 +218,8 @@ export class Service {
     async status(actor: Actor) { return { actor, mode: 'simulation', project: this.project, frame: this.frame(), head: await this.repository.head(), desired: await this.repository.desired(), healthy: this.healthy, releaseError: this.releaseError, overrides: clone(this.kernel.state.overrides), instance: await this.instance(actor) }; }
     async files(actor: Actor) { requireRole(actor, 'engineer'); const head = await this.repository.head(); return head ? this.repository.read(head) : null; }
     firmware(controllerId:string, revision:string, actor:Actor) {
-        requireRole(actor,'engineer');if(revision!==this.kernel.state.revision)throw new AppError('Project revision changed',409);
-        const c=this.project.controllers?.find(c=>c.id===controllerId);if(!c)throw new AppError('Unknown PLC',404);
+        requireRole(actor,'engineer');if(revision!==this.kernel.state.revision)failCode('SATURN_CONFLICT',{resource:'revision',reason:'stateChanged'},{expected:revision,actual:this.kernel.state.revision},{status:409});
+        const c=this.project.controllers?.find(c=>c.id===controllerId);if(!c)failCode('SATURN_NOT_FOUND',{resource:'plc',id:controllerId},{controllerId},{status:404});
         const artifact=compileController(c);
         return { ...artifact,fbdbin:Array.from(artifact.fbdbin),revision,controllerId,
           connections:(this.project.connections??[]).filter(w=>w.from.device===controllerId||w.to.device===controllerId),
@@ -230,16 +231,16 @@ export class Service {
         artifact: string | null;
         status: string;
     }>('SELECT artifact,status FROM reports WHERE id=?', [name])[0]; if (!row)
-        throw new AppError('Report not found', 404); if (!row.artifact)
-        throw new AppError(`Report is ${row.status}`, 409); return JSON.parse(row.artifact) as ReportArtifact; }
+        failCode('SATURN_NOT_FOUND',{resource:'report',id:name},{id:name},{status:404}); if (!row.artifact)
+        failCode('SATURN_CONFLICT',{resource:'report',reason:'stateChanged'},{id:name,status:row.status},{status:409}); return JSON.parse(row.artifact) as ReportArtifact; }
     private makeTask(reportId: string, trigger: string, actor: Actor, inputs: Record<string, number>, now: number): ReportTask {
         const report = this.project.reports.find(r => r.id === reportId);
         if (!report)
-            throw new AppError('Unknown report');
+            failCode('SATURN_NOT_FOUND',{resource:'report',id:reportId},{reportId},{status:404});
         const definitions = report.on.workflow_dispatch?.inputs ?? {}, resolved: Record<string, number> = {};
         for (const name of Object.keys(inputs))
             if (!(name in definitions))
-                throw new AppError(`Unknown report input: ${name}`);
+                failCode('SATURN_DSL_UNKNOWN',{kind:'reportInput',name},{reportId,input:name});
         for (const [name, d] of Object.entries(definitions))
             resolved[name] = finite(inputs[name] ?? d.default, name, d.min, d.max);
         const to = this.kernel.state.time, from = Math.max(this.kernel.state.epoch, to - report.window);
@@ -247,8 +248,8 @@ export class Service {
     }
     private queue(task: ReportTask) { this.store.db.exec("INSERT INTO reports VALUES(?,?,?,?,?,?,?,'queued',?,NULL,NULL)", [task.id, task.report.id, task.runId, task.revision, task.trigger, task.actor, task.createdAt, JSON.stringify(task)]); }
     dispatch(reportId: string, inputs: Record<string, number>, actor: Actor) { requireRole(actor, 'operator'); const report = this.project.reports.find(r => r.id === reportId); if (!report?.on.workflow_dispatch)
-        throw new AppError('Manual trigger is disabled'); if (this.store.db.all("SELECT id FROM reports WHERE status IN ('queued','running')").length >= 8)
-        throw new AppError('Report queue full', 429); const task = this.makeTask(reportId, 'workflow_dispatch', actor, inputs, this.now()); this.store.db.transaction(() => this.queue(task)); void this.runJobs().catch(() => { this.healthy = false; this.emit(); }); return { id: task.id, status: 'queued' }; }
+        failCode('SATURN_RUNTIME_INVALID',{reason:'disabled'},{resource:'report',reportId}); if (this.store.db.all("SELECT id FROM reports WHERE status IN ('queued','running')").length >= 8)
+        failCode('SATURN_LIMIT',{resource:'report.queue',reason:'queueFull'},{max:8},{status:429}); const task = this.makeTask(reportId, 'workflow_dispatch', actor, inputs, this.now()); this.store.db.transaction(() => this.queue(task)); void this.runJobs().catch(() => { this.healthy = false; this.emit(); }); return { id: task.id, status: 'queued' }; }
     schedule(now = this.now()) {
         const slot = Math.floor(now / 60000) * 60000;
         for (const report of this.project.reports) {
