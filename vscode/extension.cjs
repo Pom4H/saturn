@@ -119,7 +119,7 @@ class CatalogTreeProvider extends RefreshableTree {
     }
     if (!element) {
       return this.catalog.map(group => {
-        const item = new vscode.TreeItem(group.title, vscode.TreeItemCollapsibleState.Collapsed);
+        const item = new vscode.TreeItem(group.title, group.id === 'core' ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed);
         item.contextValue = 'saturnCatalog';
         item.description = group.source;
         item.iconPath = new vscode.ThemeIcon(group.id === 'core' ? 'library' : 'extensions');
