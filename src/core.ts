@@ -74,9 +74,9 @@ type Base = { x: number; y: number; quality?: Quality; alarm?: Alarm };
 type InPort = Endpoint & { readonly role: 'in' };
 type OutPort = Endpoint & { readonly role: 'out' };
 type Inline = Equipment & { inlet: InPort; outlet: OutPort };
-function create(kind: Kind, id: string, props: object): Equipment & Record<string, any> {
+function create(kind: Kind, id: string, props: object): Equipment & Record<string, unknown> {
   if (!Object.prototype.hasOwnProperty.call(catalog, kind)) throw new Error(`Unknown component: ${kind}`);
-  const node: Equipment & Record<string, any> = { kind, id, variable: '', props: { ...defaults(kind), ...props } };
+  const node: Equipment & Record<string, unknown> = { kind, id, variable: '', props: { ...defaults(kind), ...props } };
   for (const [name, port] of Object.entries(catalog[kind].ports)) node[name] = { node: id, port: name, role: port.role };
   return node;
 }
