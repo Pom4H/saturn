@@ -12,12 +12,14 @@ import { installEquipment, sceneFor, visualFrame, references } from '../equipmen
 import { models, model } from '../models';
 import { compileProject, validateFiles } from '../compiler';
 import { chartSVG, escape } from '../workflows';
-import { LocalClient, RemoteClient, LinkedClient, type Connection, type Status, type Revision, type Frame, type ReportArtifact, type ReportData } from './client';
+import { LocalClient, RemoteClient, LinkedClient, type Connection, type Status, type Revision, type Frame, type ReportArtifact, type ReportData, type EnvironmentDescriptor } from './client';
+import type { Event as SaturnEvent } from '../types';
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const base = new URL('../', location.href), demo = location.pathname.endsWith('/demo/');
 let client: Connection, status: Status, frame: Frame, scene: SceneView, system = '', selected: string | null = null, tab = 'scheme', file = 'plant.ts', files: Record<string, string> = {}, head: string | null = null, dirty = false, validDraft = true, editor: EditorView, loadingEditor = false, failed = false;
 let scene3d: SceneView3D | undefined, viewMode: '2d' | '3d' = '2d', changingView = false;
-let registration: ServiceWorkerRegistration | undefined, pendingInstall: any, noticeEnabled = false, closed = false;
+type BeforeInstallPromptEvent = Event & { prompt(): Promise<void> };
+let registration: ServiceWorkerRegistration | undefined, pendingInstall: BeforeInstallPromptEvent | undefined, noticeEnabled = false, closed = false;
 type ApplicationExtension = { id: string; name: string; version: string; entry: string; entryUrl: string; capabilities: string[]; elements: Array<{ type: string; title: string; tag: string }> };
 let applicationInfo: { version: string | null; extensions: ApplicationExtension[] } | null = null;
 type ApplicationUpdateStatus = { configured: boolean; available: boolean; currentVersion: string | null; version?: string; channel?: string; publishedAt?: string; target?: string };
@@ -255,8 +257,8 @@ function renderPlcInspector(){
  const c=status.project.controllers?.find(c=>c.id===selected);if(!c){$('inspector').textContent=selected;return;}
  const modules=(status.project.attachments??[]).filter(m=>m.controller===c.id);
  $('inspector').innerHTML=`<p class="eyebrow">SATURN · FBD / WASM</p><h2>${escape(c.id)}</h2><div id="plc-front">${renderSaturnPlcSvg({defsPrefix:'inspector-'+c.id})}</div><div class="signals">${[...Object.keys(c.outputs),'healthy','powered'].map(k=>`<div class="signal-row" data-signal="${escape(c.id+'.'+k)}"><span>${escape(k)}</span><b>—</b></div>`).join('')}</div><button id="build-plc" ${status.actor.role!=='engineer'?'disabled':''}>Собрать .fbdbin + HMI</button><p class="model-limit">Программа для установленного FBD-runtime. Не прошивка загрузчика/HAL. Виртуальные модули не подтверждают совместимость с аппаратурой.</p><h3>Клеммы входов</h3><div class="signals">${Object.keys(terminals('saturn')).filter(k=>/^DI|^AI/.test(k)).map(k=>`<div class="signal-row" data-signal="${escape(c.id+'.'+k)}"><span>${escape(k)}</span><b>—</b></div>`).join('')}</div><h3>Модули расширения</h3>${modules.map(m=>`<p>Слот ${m.slot} · ${escape(m.device)} · ${escape(m.profile)}</p>`).join('')||'<p>Нет подключённых модулей</p>'}<button id="build-manifest">Скачать манифест сборки</button><button id="attach-module" ${status.actor.role!=='engineer'?'disabled':''}>Добавить виртуальный AI4</button>`;
- $('build-plc').onclick=()=>void guard(async()=>{const artifact=await client.request<any>('firmware',{controllerId:c.id,revision:frame.revision});download(c.id+'.fbdbin',new Uint8Array(artifact.fbdbin),'application/octet-stream');toast('Собраны программа и HMI. Манифест скачивается отдельно. Аппаратная загрузка не выполнялась.');});
- $('build-manifest').onclick=()=>void guard(async()=>{const {fbdbin,...manifest}=await client.request<any>('firmware',{controllerId:c.id,revision:frame.revision});download(c.id+'-build.json',JSON.stringify(manifest,null,2),'application/json');});
+ $('build-plc').onclick=()=>void guard(async()=>{const artifact=await client.request<{fbdbin:number[]}&Record<string,unknown>>('firmware',{controllerId:c.id,revision:frame.revision});download(c.id+'.fbdbin',new Uint8Array(artifact.fbdbin),'application/octet-stream');toast('Собраны программа и HMI. Манифест скачивается отдельно. Аппаратная загрузка не выполнялась.');});
+ $('build-manifest').onclick=()=>void guard(async()=>{const {fbdbin,...manifest}=await client.request<{fbdbin:number[]}&Record<string,unknown>>('firmware',{controllerId:c.id,revision:frame.revision});download(c.id+'-build.json',JSON.stringify(manifest,null,2),'application/json');});
  $('attach-module').onclick=()=>void guard(()=>attachModule(c.id));
  appendTerminalPanel();renderFrame(frame);
 }
@@ -320,11 +322,11 @@ async function refreshPanel() {
         renderAlarms();
     if (tab === 'inventory') renderInventory();
     if (tab === 'reports') {
-        const rows = await client.request<Record<string, any>[]>('reports');
+        const rows = await client.request<Array<{id:string;reportId:string;createdAt:number;trigger:string;revision:string;status:string;error?:string|null}>>('reports');
         $('report-runs').innerHTML = rows.length ? `<div class="table-scroll"><table><thead><tr><th>Отчёт / запуск</th><th>Триггер</th><th>Ревизия</th><th>Статус</th><th></th></tr></thead><tbody>${rows.map(r => `<tr><td>${escape(r.reportId)}<br><small>${time(r.createdAt)}</small></td><td>${escape(r.trigger)}</td><td>${escape(String(r.revision).slice(0, 16))}</td><td><span class="badge ${escape(r.status)}">${escape(r.status)}</span>${r.error ? `<p>${escape(r.error)}</p>` : ''}</td><td><button data-artifact="${escape(r.id)}" ${r.status !== 'success' ? 'disabled' : ''}>Открыть</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Отчётов пока нет. Запустите первый вручную.</div>';
     }
     if (tab === 'events') {
-        const rows = await client.request<Record<string, any>[]>('events');
+        const rows = await client.request<SaturnEvent[]>('events');
         $('event-list').innerHTML = `<div class="table-scroll"><table><thead><tr><th>Время модели</th><th>Событие</th><th>Объект</th><th>Автор</th><th>Детали</th></tr></thead><tbody>${rows.map(e => `<tr><td>${time(e.time)}</td><td>${escape(e.type)}</td><td>${escape(e.subject)}</td><td>${escape(e.actor ?? '—')}</td><td>${escape(e.detail)}</td></tr>`).join('')}</tbody></table></div>`;
     }
     if (tab === 'project') {
@@ -478,7 +480,7 @@ $('environment-form').addEventListener('submit', e => {
         if (demo)
             return;
         const form = new FormData(e.currentTarget as HTMLFormElement);
-        const descriptor = await client.request<any>('environment/connect', {
+        const descriptor = await client.request<EnvironmentDescriptor>('environment/connect', {
             name: form.get('name'),
             url: form.get('url'),
             user: form.get('user'),
@@ -555,7 +557,7 @@ $('memory').onclick = () => void start(true);
 $('notifications').onclick = () => void guard(enableNotifications);
 $('install').onclick = () => void guard(async () => { await pendingInstall?.prompt(); $('install').hidden = true; });
 $('shell-update').onclick = () => void guard(installShellUpdate);
-window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); pendingInstall = e; $('install').hidden = false; });
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); pendingInstall = e as BeforeInstallPromptEvent; $('install').hidden = false; });
 $('logout').onclick = () => void guard(async () => { await client.request('logout', {}); client.close(); sessionStorage.removeItem('scada-draft:server'); location.href = new URL('login', base).href; });
 $('pause').onclick = () => void guard(() => command(frame.paused ? 'resume' : 'pause'));
 $('restart').onclick = () => void guard(async () => { if (!confirm('Начать новый прогон с исходными параметрами? Архив и отчёты сохранятся.'))
