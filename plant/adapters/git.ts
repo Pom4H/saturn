@@ -40,22 +40,22 @@ export class GitRepository implements Repository {
                     accept(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)));
                 }
                 catch {
-                    reject(new SaturnDiagnosticError({code:'SATURN_STORAGE_INVALID',severity:'error',status:400,message:{key:'storage.invalid',args:{reason:'malformed'}},data:{field:'git.object'}}));
+                    reject(new SaturnDiagnosticError({code:'SATURN_STORAGE_INVALID',severity:'error',message:{key:'storage.invalid',args:{reason:'malformed'}},data:{field:'git.object'}},'en',400));
                 }
             } };
-            const timer = setTimeout(() => { child.kill('SIGKILL'); done(new SaturnDiagnosticError({code:'SATURN_STORAGE_INVALID',severity:'error',status:503,message:{key:'storage.invalid',args:{reason:'stateChanged'}},data:{operation:args[0]}})); }, 15000);
+            const timer = setTimeout(() => { child.kill('SIGKILL'); done(new SaturnDiagnosticError({code:'SATURN_STORAGE_INVALID',severity:'error',message:{key:'storage.invalid',args:{reason:'stateChanged'}},data:{operation:args[0]}},'en',503)); }, 15000);
             child.stdout.on('data', b => { size += b.length; if (size > 2500000) {
                 child.kill('SIGKILL');
-                done(new SaturnDiagnosticError({code:'SATURN_LIMIT',severity:'error',status:400,message:{key:'limits.exceeded',args:{resource:'git.result',reason:'tooLarge'}},data:{limit:2500000}}));
+                done(new SaturnDiagnosticError({code:'SATURN_LIMIT',severity:'error',message:{key:'limits.exceeded',args:{resource:'git.result',reason:'tooLarge'}},data:{limit:2500000}},'en',400));
             }
             else
                 chunks.push(b); });
             child.stderr.on('data', b => { stderrSize += b.length; if (stderrSize <= 16384) stderr.push(b); });
             child.stdin.on('error', () => { });
-            child.on('error', error => { console.error('Git spawn failed:', args[0] ?? '(none)', error.message); done(new SaturnDiagnosticError({code:'SATURN_STORAGE_INVALID',severity:'error',status:503,message:{key:'storage.invalid',args:{reason:'disabled'}},data:{operation:args[0]}})); });
+            child.on('error', error => { console.error('Git spawn failed:', args[0] ?? '(none)', error.message); done(new SaturnDiagnosticError({code:'SATURN_STORAGE_INVALID',severity:'error',message:{key:'storage.invalid',args:{reason:'disabled'}},data:{operation:args[0]}},'en',503)); });
             child.on('close', code => {
                 if (code !== 0 && !quietFailure) console.error('Git command failed:', args[0] ?? '(none)', 'exit', code, Buffer.concat(stderr).toString('utf8').trim());
-                done(code === 0 ? undefined : new SaturnDiagnosticError({code:'SATURN_CONFLICT',severity:'error',status:409,message:{key:'resource.conflict',args:{resource:'git',reason:'stateChanged'}},data:{operation:args[0],exitCode:code}}));
+                done(code === 0 ? undefined : new SaturnDiagnosticError({code:'SATURN_CONFLICT',severity:'error',message:{key:'resource.conflict',args:{resource:'git',reason:'stateChanged'}},data:{operation:args[0],exitCode:code}},'en',409));
             });
             child.stdin.end(input);
         });
