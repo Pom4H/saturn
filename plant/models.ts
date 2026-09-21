@@ -1,13 +1,14 @@
-import { AppError, type ModelSpec, type SignalRuntimeType } from './types';
+import type { ModelSpec, SignalRuntimeType } from './types';
+import { failCode } from './diagnostics';
 /** Models are trusted installed modules. All plant-specific wiring lives in DSL files. */
 const registry = new Map<string, ModelSpec>();
 export function registerModel(model: ModelSpec): void {
     if (registry.has(model.kind))
-        throw new AppError(`Duplicate model: ${model.kind}`);
+        failCode('SATURN_MODEL_INVALID',{model:model.kind,reason:'duplicate'},{kind:model.kind});
     registry.set(model.kind, model);
 }
 export function model(kind: string): ModelSpec { const m = registry.get(kind); if (!m)
-    throw new AppError(`Unknown installed model: ${kind}`); return m; }
+    failCode('SATURN_NOT_FOUND',{resource:'model',id:kind},{kind}); return m; }
 export const models = () => [...registry.values()];
 export const outputType = (spec: Pick<ModelSpec,'outputTypes'>, key: string): SignalRuntimeType => spec.outputTypes?.[key] ?? 'number';
 const p = (value: number, min = 0, max = 100) => ({ default: value, min, max });
