@@ -1,5 +1,5 @@
-import { simulation, bank, aggregate, control, gt, signal, report, reportField, numberField, reportSchema, reportColumn, excelColumn, excelSheet, workbook, asc } from '../dsl';
-import type { SignalDimensionOf, SignalId, SignalUnitOf, SignalValueOf } from '../types';
+import { simulation, bank, aggregate, control, gt, signal, add, mul, report, reportField, numberField, reportSchema, reportColumn, excelColumn, excelSheet, workbook, asc } from '../dsl';
+import type { ExpressionDimensionOf, SignalDimensionOf, SignalId, SignalUnitOf, SignalValueOf } from '../types';
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
 type Assert<T extends true> = T;
 const pump = simulation('P', 'pump', { system: 'cooling', at: { x: 0, y: 0 }, inputs: { voltage: 1 }, parameters: { inertia: 2 } });
@@ -111,4 +111,4 @@ simulation('P-WRONG-TYPE', 'pump', {
     inputs: { voltage: valveDemand.blocked },
 });
 const scaledFlow = mul(pump.flow, .5);
-type _ScaledFlowDimension = Assert<Equal<SignalDimensionOf<typeof scaledFlow extends never ? never : typeof pump.flow>, 'flow'>>;
+type _ScaledFlowDimension = Assert<Equal<ExpressionDimensionOf<typeof scaledFlow>, 'flow'>>;
