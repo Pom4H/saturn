@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'vscode/**'
+      - 'plant/**'
+      - 'packages/core/**'
+      - 'examples/consumer/**'
       - 'standalone/ide.ts'
       - 'standalone/entry.ts'
       - 'standalone/extensions.ts'
@@ -35,3 +38,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run vscode:check
+      - run: npm run plant:typecheck
+      - run: npm run plant:test
+      - run: npm run test:consumer
