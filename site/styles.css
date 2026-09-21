@@ -501,7 +501,8 @@ dialog .primary { width: 100%; }
 /* Landing V2 — buyer/engineer narrative. */
 .hero-v2 { padding: 34px 20px 36px; }
 .hero-v2 .hero-eyebrow { display:block; margin-bottom:15px; color:var(--muted); font:600 10px/1 var(--mono); letter-spacing:.14em; }
-.hero-v2 h1 { max-width: 980px; margin:0 auto; font-size:clamp(38px,5.4vw,74px); line-height:.98; letter-spacing:-3.5px; font-weight:510; }
+.hero-v2 h1 { margin:0 auto 18px; font-size:clamp(28px,3vw,42px); line-height:1; letter-spacing:-1.7px; font-weight:600; }
+.hero-v2 h2 { max-width:980px; margin:0 auto; font-size:clamp(38px,5.4vw,74px); line-height:.98; letter-spacing:-3.5px; font-weight:510; }
 .hero-v2 p { max-width:720px; margin:20px auto 0; font-size:16px; line-height:1.6; }
 
 .buyer-section,.site-footer { width:min(1120px,calc(100% - 48px)); margin-inline:auto; }
@@ -604,7 +605,8 @@ dialog .primary { width: 100%; }
   .role-grid>div:nth-child(4) { border-top:1px solid var(--line); }
 }
 @media(max-width:700px) {
-  .hero-v2 h1 { font-size:38px; letter-spacing:-1.8px; }
+  .hero-v2 h1 { font-size:28px; letter-spacing:-1px; }
+  .hero-v2 h2 { font-size:38px; letter-spacing:-1.8px; }
   .buyer-section,.site-footer { width:calc(100% - 32px); }
   .buyer-section { padding-top:78px; }
   .buyer-heading h2,.proof-copy h2 { font-size:34px; letter-spacing:-1.4px; }
