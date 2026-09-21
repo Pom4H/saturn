@@ -16,16 +16,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         tls: cert && key ? { cert, key, ...(ca?.length ? { ca } : {}) } : undefined,
         http2,
         data: process.env.SCADA_DATABASE,
-        repository: process.env.SCADA_PROJECT_REPO,
         publicUrl: process.env.SCADA_PUBLIC_URL,
         user: process.env.SCADA_USER,
         password: process.env.SCADA_PASSWORD,
         pushSubject: process.env.SCADA_PUSH_SUBJECT,
-        gitRemote: process.env.SCADA_PROJECT_REMOTE,
-        gitSourceBranch: process.env.SCADA_PROJECT_BRANCH,
-        gitReleaseBranch: process.env.SCADA_PROJECT_RELEASE_BRANCH,
-        sourceRef: process.env.SCADA_PROJECT_REF,
-        releaseRef: process.env.SCADA_PROJECT_RELEASE_REF,
     });
     console.log(`Saturn: ${app.origin}/plant/app/\nDemo: ${app.origin}/plant/demo/`);
     if (app.initialPassword)
