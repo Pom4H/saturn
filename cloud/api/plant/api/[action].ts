@@ -12,8 +12,8 @@ import {
     siteBySlug,
     siteSlugFromRequest,
     waitForCommand,
-} from '../../../_lib/state.js';
-import { httpError, readJson, requestUrl, sendError, sendJson } from '../../../_lib/http.js';
+} from '../../_lib/state.js';
+import { httpError, readJson, requestUrl, sendError, sendJson } from '../../_lib/http.js';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 

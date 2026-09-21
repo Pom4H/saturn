@@ -95,7 +95,7 @@ export class CloudEdge {
     private unsubscribe: (() => void) | undefined;
     private latestFrame: Frame | null = null;
     private sentSeq = -1;
-    private sentRevision = '';
+    private sentProjectRevision = '';
 
     constructor(private readonly service: Service, private readonly options: CloudEdgeOptions) {}
 
@@ -200,7 +200,7 @@ export class CloudEdge {
             frame,
         })) {
             this.sentSeq = frame.seq;
-            this.sentRevision = frame.revision;
+            this.sentProjectRevision = frame.revision;
         }
     }
 
@@ -209,7 +209,6 @@ export class CloudEdge {
         if (!frame || frame.seq === this.sentSeq) return;
         if (this.send({ type: 'frame', frame })) {
             this.sentSeq = frame.seq;
-            this.sentRevision = frame.revision;
         }
     }
 
@@ -220,9 +219,9 @@ export class CloudEdge {
         this.send({
             type: 'heartbeat',
             instance,
-            ...(revision && revision !== this.sentRevision ? { project: this.service.project } : {}),
+            ...(revision && revision !== this.sentProjectRevision ? { project: this.service.project } : {}),
         });
-        if (revision) this.sentRevision = revision;
+        if (revision) this.sentProjectRevision = revision;
     }
 
     private async execute(command: CloudCommandMessage): Promise<void> {
