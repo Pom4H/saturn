@@ -518,7 +518,7 @@ async function showEntryFile() {
   return vscode.window.showTextDocument(document, { viewColumn: vscode.ViewColumn.One, preserveFocus: false });
 }
 
-async function runRecordedTour(catalog, targets, terminal) {
+async function runRecordedTour(catalog, reports, targets, terminal) {
   await vscode.commands.executeCommand('workbench.action.closeAllEditors');
   await showEntryFile();
   await vscode.commands.executeCommand('workbench.view.extension.saturn');
@@ -528,6 +528,13 @@ async function runRecordedTour(catalog, targets, terminal) {
 
   await vscode.commands.executeCommand('saturn.openDiagram');
   await sleep(6000);
+
+  await reports.reload();
+  const firstReport = reports.reports[0];
+  if (firstReport) {
+    await vscode.commands.executeCommand('saturn.openReport', firstReport);
+    await sleep(5000);
+  }
 
   const root = workspaceRoot();
   if (root) {
@@ -676,7 +683,7 @@ function activate(context) {
   targets.reload();
 
   if (process.env.SATURN_VSCODE_TOUR === '1') {
-    setTimeout(() => { void runRecordedTour(catalog, targets, terminal); }, 10000);
+    setTimeout(() => { void runRecordedTour(catalog, reports, targets, terminal); }, 10000);
   } else if (process.env.SATURN_VSCODE_CAPTURE === '1') {
     setTimeout(() => {
       void (async () => {
