@@ -33,6 +33,14 @@ export type PresentationProjection =
  * The physical Saturn display compiles the same IR to the bounded 320x240
  * screen schema that Firmverse packages into / executes from the controller artifact.
  */
+export function projectPresentation(
+    view: Presentation,
+    request: Extract<PresentationProjectionRequest, { target: 'web' | 'report' }>,
+): Extract<PresentationProjection, { target: 'web' | 'report' }>;
+export function projectPresentation(
+    view: Presentation,
+    request: Extract<PresentationProjectionRequest, { target: 'saturn-plc-320' }>,
+): Extract<PresentationProjection, { target: 'saturn-plc-320' }>;
 export function projectPresentation(view: Presentation, request: PresentationProjectionRequest): PresentationProjection {
     validatePresentation(view, request.target);
     if (request.target === 'saturn-plc-320') {
