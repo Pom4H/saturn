@@ -155,6 +155,16 @@
           "type": "string",
           "default": "plant.ts",
           "description": "Preferred Saturn project entry file."
+        },
+        "saturn.locale": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "en",
+            "ru"
+          ],
+          "default": "auto",
+          "description": "Language for Saturn diagnostics and DSL documentation. Auto follows the VS Code display language."
         }
       }
     }
