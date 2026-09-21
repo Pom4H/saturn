@@ -3,7 +3,7 @@ import { inputPins, type Controller, type PlcBlock } from './controller';
 import { portRefs, physicalTypes, type Endpoint, type Connection, type Attachment, type DynamicEndpoint, type PhysicalType, type PortRefs, type Terminal, type TerminalOf, type TypedEndpoint } from './ports';
 import { expressionInfo, expressionMetadata, id, signalRef as createSignalRef, type Expr, type OperationExpr, type SignalDimension, type SignalDimensionOf, type System, type Simulation, type Project, type Derived, type Device, type AlarmRule, type Report, type Layout, type HistoryPolicy, type Control, type Scalar, type SignalRef } from './types';
 import { failCode } from './diagnostics';
-import { reportSchemaFields, type ReportSchema } from './reporting';
+import { reportSchemaFields, type ReportFieldRef, type ReportSchema } from './reporting';
 export { reportField, numberField, booleanField, textField, dateTimeField, reportSchema, reportColumn, excelColumn, asc, desc, excelSheet, workbook } from './reporting';
 export type { ReportFieldRef, ReportSchema } from './reporting';
 import { model, outputType, type builtInModels } from './models';
