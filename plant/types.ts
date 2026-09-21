@@ -223,7 +223,7 @@ export interface Project {
 export interface ModelSpec {
     kind: string;
     version: string;
-    title: string;
+    titleKey: string;
     visual: string;
     inputs: Record<string, number>;
     parameters: Record<string, {
