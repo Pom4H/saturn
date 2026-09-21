@@ -1,4 +1,26 @@
-import { entities, operators } from '../dsl-reference';
+import { operators } from '../dsl-reference';
+import { localizedDslEntities } from '../dsl-i18n';
+import type { SaturnLocale } from '../diagnostics';
+
+const dslLocale: SaturnLocale = document.documentElement.lang.toLowerCase().startsWith('ru') || navigator.language.toLowerCase().startsWith('ru') ? 'ru' : 'en';
+const entities = localizedDslEntities(dslLocale);
+const ui = dslLocale === 'ru' ? {
+  title: 'Интерактивная документация @saturn/core',
+  heading: 'DSL проекта',
+  intro: 'Один декларативный TypeScript-проект описывает состав установки, сигналы, топологию, управление, PLC, интерфейсы и отчёты. Runtime-состояние и подключение к операторскому Saturn остаются вне исходников.',
+  search: 'Найти pipe, PLC, сигнал, отчёт…',
+  expand: 'Пример и связи',
+  collapse: 'Свернуть',
+  empty: 'Ничего не найдено. Сбросьте категорию или поиск.',
+} : {
+  title: 'Interactive @saturn/core documentation',
+  heading: 'Project DSL',
+  intro: 'One declarative TypeScript project describes installation structure, signals, topology, controls, PLCs, interfaces and reports. Runtime state and operator connectivity stay outside project source.',
+  search: 'Find pipe, PLC, signal, report…',
+  expand: 'Example and relations',
+  collapse: 'Collapse',
+  empty: 'Nothing found. Clear the category or search.',
+};
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]!));
@@ -11,7 +33,7 @@ if (tabs && main && !document.querySelector('[data-tab="dsl"]')) {
   const tab = document.createElement('button');
   tab.dataset.tab = 'dsl';
   tab.textContent = 'DSL';
-  tab.title = 'Интерактивная документация @saturn/core';
+  tab.title = ui.title;
   tabs.insertBefore(tab, tabs.querySelector('[data-tab="extensions"]'));
 
   const panel = document.createElement('section');
@@ -61,8 +83,8 @@ if (tabs && main && !document.querySelector('[data-tab="dsl"]')) {
       <div class="dsl-hero">
         <div>
           <p class="dsl-kicker">SATURN · AUTHORING API</p>
-          <h2>DSL проекта</h2>
-          <p>Один декларативный TypeScript-проект описывает состав установки, сигналы, топологию, управление, PLC, интерфейсы и отчёты. Runtime-состояние и подключение к операторскому Saturn остаются вне исходников.</p>
+          <h2>${escapeHtml(ui.heading)}</h2>
+          <p>${escapeHtml(ui.intro)}</p>
           <pre><code>import { project, system, simulation, port, pipe } from '@saturn/core'</code></pre>
         </div>
         <div class="dsl-package">
@@ -103,7 +125,7 @@ if (tabs && main && !document.querySelector('[data-tab="dsl"]')) {
       </div>
 
       <div class="dsl-toolbar">
-        <input id="dsl-search" type="search" placeholder="Найти pipe, PLC, сигнал, отчёт…" aria-label="Поиск по DSL">
+        <input id="dsl-search" type="search" placeholder="${escapeHtml(ui.search)}" aria-label="Поиск по DSL">
         <div class="dsl-categories" id="dsl-categories"></div>
         <span class="dsl-results" id="dsl-results" aria-live="polite"></span>
       </div>
@@ -149,14 +171,14 @@ if (tabs && main && !document.querySelector('[data-tab="dsl"]')) {
           ${entity.featured ? '<span class="badge active">core abstraction</span>' : ''}
         </div>
         <p>${escapeHtml(entity.summary)}</p>
-        <button type="button" data-dsl-expand="${escapeHtml(entity.name)}" aria-expanded="false">Пример и связи</button>
+        <button type="button" data-dsl-expand="${escapeHtml(entity.name)}" aria-expanded="false">${escapeHtml(ui.expand)}</button>
         <div class="dsl-detail" hidden>
           <pre><code>${escapeHtml(entity.example)}</code></pre>
           <div class="dsl-relations">${entity.relations.map(name => `<button type="button" data-dsl-jump="${escapeHtml(name)}">${escapeHtml(name)}()</button>`).join('')}</div>
           ${entity.note ? `<p class="dsl-note">${escapeHtml(entity.note)}</p>` : ''}
         </div>
       </article>
-    `).join('') : '<div class="dsl-empty">Ничего не найдено. Сбросьте категорию или поиск.</div>';
+    `).join('') : `<div class="dsl-empty">${escapeHtml(ui.empty)}</div>`;
   };
 
   search.addEventListener('input', render);
@@ -177,7 +199,7 @@ if (tabs && main && !document.querySelector('[data-tab="dsl"]')) {
       const open = detail.hidden;
       detail.hidden = !open;
       expand.setAttribute('aria-expanded', String(open));
-      expand.textContent = open ? 'Свернуть' : 'Пример и связи';
+      expand.textContent = open ? ui.collapse : ui.expand;
       return;
     }
     const jump = target.closest<HTMLButtonElement>('[data-dsl-jump]');
