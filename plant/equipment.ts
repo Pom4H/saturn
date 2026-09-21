@@ -7,9 +7,9 @@ import { createPlantModel } from './visual3d';
 import { registerComponent, catalog, type Equipment, type Scene } from '../src/core';
 import { registerSvgRenderer, register3dRenderer, el, type SvgRendererContext } from '../src/view';
 import type { RuntimeFrame } from '../src/runtime/protocol';
-import { models, outputType, outputUnit } from './models';
+import { models, outputType } from './models';
 import { evaluate } from './kernel';
-import type { Project, Frame, Expr, ModelOutput } from './types';
+import type { Project, Frame, Expr, ModelSpec } from './types';
 const metalStroke = '#526f7a', water = '#10a6b5', fuel = '#d39b51';
 type Draw = (c: SvgRendererContext) => void;
 const body = (c: SvgRendererContext, x = 15, y = 10, w = 120, h = 66) => el(c.root, 'rect', { x, y, width: w, height: h, rx: 8, fill: c.paint('metal'), stroke: metalStroke, 'stroke-width': 2 });
@@ -99,12 +99,14 @@ Object.assign(shapes, {
 });
 const installed = new Set<string>();
 export function installEquipment() {
-    const specs: {visual:string;title:string;outputs:Record<string,ModelOutput>}[] = [
+    const specs: Pick<ModelSpec,'visual'|'title'|'outputs'|'outputTypes'>[] = [
         ...models(),
-        {visual:'saturn',title:'Saturn PLC · FBD',outputs:{
-            healthy:{type:'boolean',unit:'лог.'},
-            powered:{type:'boolean',unit:'лог.'},
-        }},
+        {
+            visual:'saturn',
+            title:'Saturn PLC · FBD',
+            outputs:{healthy:'лог.',powered:'лог.'},
+            outputTypes:{healthy:'boolean',powered:'boolean'},
+        },
     ];
     for (const spec of specs) {
         if (!shapes[spec.visual]) throw new Error(`Missing SVG anatomy: ${spec.visual}`);
@@ -113,8 +115,8 @@ export function installEquipment() {
             continue;
         installed.add(kind);
         if (!catalog[kind])
-            registerComponent(kind, { version: '1.0.0', label: spec.title, ...footprint(spec.visual), fields: { x: { label: 'X', scope: 'layout', default: 0 }, y: { label: 'Y', scope: 'layout', default: 0 } }, ports: Object.fromEntries(Object.entries(terminals(spec.visual)).map(([name,t])=>[name,{x:t.x,y:t.y,direction:t.side,role:t.role==='source'?'out':'in'}])), signals: Object.fromEntries(Object.entries(spec.outputs).map(([k, definition]) => [k, { label: k, unit: outputUnit(definition), type: outputType(definition) }])) });
-        registerSvgRenderer(kind, c => { shapes[spec.visual](c); if(spec.visual==='saturn')return; const key = Object.keys(spec.outputs)[0]; const text = el(c.root, 'text', { x: 75, y: 111, 'text-anchor': 'middle', 'font-family': 'ui-monospace,monospace', 'font-size': 15, fill: '#214d5f' }); c.onUpdate(dt => { const value = c.number(key, dt); text.textContent = value === null ? '—' : `${value.toFixed(2)} ${outputUnit(spec.outputs[key])}`; }); });
+            registerComponent(kind, { version: '1.0.0', label: spec.title, ...footprint(spec.visual), fields: { x: { label: 'X', scope: 'layout', default: 0 }, y: { label: 'Y', scope: 'layout', default: 0 } }, ports: Object.fromEntries(Object.entries(terminals(spec.visual)).map(([name,t])=>[name,{x:t.x,y:t.y,direction:t.side,role:t.role==='source'?'out':'in'}])), signals: Object.fromEntries(Object.entries(spec.outputs).map(([k, unit]) => [k, { label: k, unit, type: outputType(spec, k) }])) });
+        registerSvgRenderer(kind, c => { shapes[spec.visual](c); if(spec.visual==='saturn')return; const key = Object.keys(spec.outputs)[0]; const text = el(c.root, 'text', { x: 75, y: 111, 'text-anchor': 'middle', 'font-family': 'ui-monospace,monospace', 'font-size': 15, fill: '#214d5f' }); c.onUpdate(dt => { const value = c.number(key, dt); text.textContent = value === null ? '—' : `${value.toFixed(2)} ${spec.outputs[key]}`; }); });
         register3dRenderer(kind, c => createPlantModel(c, spec.visual, Object.keys(spec.outputs)[0]));
     }
 }
