@@ -99,6 +99,29 @@ export interface ReportInput {
     min: number;
     max: number;
 }
+export type ReportValueType = 'number' | 'boolean' | 'string' | 'datetime';
+export interface ReportField {
+    key: string;
+    type: ReportValueType;
+    unit?: string;
+}
+export interface ExcelColumnSpec {
+    key: string;
+    title: string;
+    unit?: string;
+    format?: string;
+    width?: number;
+}
+export interface ExcelSortSpec { key: string; direction: 'asc' | 'desc' }
+export interface ExcelSheetSpec {
+    name: string;
+    columns: ExcelColumnSpec[];
+    sort?: ExcelSortSpec[];
+    freezeRows?: number;
+    autoFilter?: boolean;
+}
+export interface ExcelWorkbookSpec { sheets: ExcelSheetSpec[] }
+
 export interface Report {
     view?: Presentation;
     id: string;
@@ -119,6 +142,8 @@ export interface Report {
         title: string;
         unit?: string;
     }[];
+    schema?: ReportField[];
+    excel?: ExcelWorkbookSpec;
     chart?: {
         x: string;
         y: string;
