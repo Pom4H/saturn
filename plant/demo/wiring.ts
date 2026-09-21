@@ -12,8 +12,8 @@ export const plantWires=[
  pipe('lab-return',labStore.ports.outlet,labTower.ports.inlet),
  cable('service-power',generator.ports.output,transformer.ports.primary,{medium:'power'}),
  cable('motor-power',transformer.ports.secondary,drive.ports.power,{medium:'power'}),
- cable('ups-feeder',backup.ports.outlet,feeder.ports.inlet,{medium:'power'}),
- cable('feeder-fan',feeder.ports.outlet,ventilation.ports.power,{medium:'power'}),
+ cable('ups-feeder',backup.ports.out,feeder.ports.in,{medium:'power'}),
+ cable('feeder-fan',feeder.ports.out,ventilation.ports.power,{medium:'power'}),
 ];
 
 // Visual connection edits append dynamic declarations here; normal authored code uses typed refs above.
