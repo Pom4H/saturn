@@ -38,6 +38,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run vscode:check
-      - run: npm run plant:typecheck
-      - run: npm run plant:test
+      - run: npm run authoring:typecheck
+      - run: npm run authoring:test
       - run: npm run test:consumer
