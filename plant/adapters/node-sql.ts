@@ -2,6 +2,13 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { SqlDatabase } from '../types';
+import { failCode } from '../diagnostics';
+type SqlValue = null | number | bigint | string | Uint8Array;
+const sqlValue = (value: unknown): SqlValue => {
+    if (value === null || typeof value === 'number' || typeof value === 'bigint' || typeof value === 'string' || value instanceof Uint8Array) return value;
+    failCode('SATURN_STORAGE_INVALID',{reason:'invalid'},{field:'sql.bind',valueType:typeof value});
+};
+const sqlObject = (value: Record<string, unknown>): Record<string, SqlValue> => Object.fromEntries(Object.entries(value).map(([key,item])=>[key,sqlValue(item)]));
 export class NodeSql implements SqlDatabase {
     readonly db: DatabaseSync;
     private statements = new Map<string, ReturnType<DatabaseSync['prepare']>>();
@@ -16,15 +23,15 @@ export class NodeSql implements SqlDatabase {
         this.db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;'); }
     exec(sql: string, bind?: unknown[] | Record<string, unknown>): void { if (bind) {
         const q = this.query(sql);
-        Array.isArray(bind) ? q.run(...bind as any[]) : q.run(bind as any);
+        Array.isArray(bind) ? q.run(...bind.map(sqlValue)) : q.run(sqlObject(bind));
     }
     else
         this.db.exec(sql); }
-    all<T = Record<string, unknown>>(sql: string, bind: unknown[] | Record<string, unknown> = []): T[] { const q = this.query(sql); return (Array.isArray(bind) ? q.all(...bind as any[]) : q.all(bind as any)) as T[]; }
+    all<T = Record<string, unknown>>(sql: string, bind: unknown[] | Record<string, unknown> = []): T[] { const q = this.query(sql); return (Array.isArray(bind) ? q.all(...bind.map(sqlValue)) : q.all(sqlObject(bind))) as T[]; }
     transaction<T>(fn: () => T): T { this.db.exec('BEGIN IMMEDIATE'); try {
         const result = fn();
         if (result instanceof Promise)
-            throw new Error('SQL transaction callback must be synchronous');
+            failCode('SATURN_STORAGE_INVALID',{reason:'invalid'},{field:'transaction.async'});
         this.db.exec('COMMIT');
         return result;
     }
