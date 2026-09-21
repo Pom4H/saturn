@@ -37,7 +37,7 @@ type LocalSessionPayload = { environment: EnvironmentDescriptor; frame: { paused
 const engineer: Actor = { id: 'engineer', role: 'engineer' }, viewer: Actor = { id: 'reader', role: 'viewer' };
 const project = () => compileProject(demoFiles);
 const makeService = async (files = demoFiles) => { const store = new Store(new NodeSql()); let serial = 0; const repo = new LocalRepository(store, () => `local:${++serial}`); const service = new Service(store, repo, { now: () => 1000000, uuid: () => `id-${++serial}`, reportRunner: async (task) => executeReport(task, new NodeSql()) }); await service.start(files); return service; };
-test('multi-file DSL compiles hierarchy and typed signal sources', () => { const p = project(); assert.equal(p.simulations.length, 46); assert.equal(p.systems.length, 18); assert.equal(p.reports.length, 4); assert.deepEqual(p.simulations.find(n => n.id === 'PUMP-A')!.inputs.voltage, { ref: 'GRID.voltage' }); });
+test('multi-file DSL compiles hierarchy and typed signal sources', () => { const p = project(); assert.equal(p.simulations.length, 46); assert.equal(p.systems.length, 18); assert.equal(p.reports.length, 5); assert.deepEqual(p.simulations.find(n => n.id === 'PUMP-A')!.inputs.voltage, { ref: 'GRID.voltage' }); });
 test('canonical @saturn/core import compiles and legacy DSL namespaces are rejected', () => {
     const source = `import { project, system, simulation } from '@saturn/core';
 export default project('minimal', {

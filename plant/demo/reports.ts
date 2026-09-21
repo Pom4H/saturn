@@ -32,6 +32,7 @@ const transientRows = reportSchema({
 });
 export const transientReport = report('transient', {
     title: 'Переходный процесс · температура каналов',
+    description: 'Изменение температуры за выбранный интервал с явными разрывами недостоверных данных.',
     on: { workflow_dispatch: {} },
     signals: [temperature.value], window: 600000,
     sql: `SELECT time, CASE WHEN quality='good' THEN value ELSE NULL END AS temperature
@@ -41,7 +42,12 @@ export const transientReport = report('transient', {
         reportColumn('Модельное время, UTC ms', transientRows.time),
         reportColumn('Температура', transientRows.temperature),
     ],
-    chart: { x: 'time', y: 'temperature', title: 'Температура и разрывы качества' },
+    summary: [
+        { key: 'temperature', label: 'Максимум', aggregate: 'max', unit: 'отн.', digits: 2, emphasis: 'primary' },
+        { key: 'temperature', label: 'Среднее по точкам', aggregate: 'avg', unit: 'отн.', digits: 2 },
+        { key: 'temperature', label: 'Последнее значение', aggregate: 'last', unit: 'отн.', digits: 2 },
+    ],
+    chart: { x: 'time', y: 'temperature', title: 'Температура и разрывы качества', type: 'line', unit: 'отн.' },
     excel: workbook([
         excelSheet('Температура', transientRows, {
             columns: [
@@ -54,6 +60,32 @@ export const transientReport = report('transient', {
         }),
     ]),
 });
+export const hourlyFlowReport = report('pump-a-hourly-flow', {
+    title: 'Суточный профиль расхода · PUMP-A',
+    description: 'Интеграл расхода и среднее значение по каждому часу. Недостоверные интервалы исключаются из расчёта, а не подменяются нулём.',
+    on: { workflow_dispatch: {}, schedule: [{ cron: '5 0 * * *' }] },
+    signals: [pumpA.flow],
+    window: 24 * 3600000,
+    sql: `SELECT CAST((start-:from)/3600000 AS INTEGER) AS hour,
+      SUM(CASE WHEN quality='good' THEN value*(end-start)/3600000.0 END) AS volume,
+      SUM(CASE WHEN quality='good' THEN value*(end-start) END)
+        / NULLIF(SUM(CASE WHEN quality='good' THEN end-start END),0) AS average,
+      100.0 * SUM(CASE WHEN quality='good' THEN end-start ELSE 0 END) / 3600000.0 AS coverage
+      FROM segments WHERE signal='PUMP-A.flow' GROUP BY hour ORDER BY hour`,
+    columns: [
+        { key: 'hour', title: 'Час UTC' },
+        { key: 'volume', title: 'Интеграл', unit: 'отн.·ч' },
+        { key: 'average', title: 'Среднее', unit: 'отн.' },
+        { key: 'coverage', title: 'Полнота', unit: '%' },
+    ],
+    summary: [
+        { key: 'volume', label: 'За сутки', aggregate: 'sum', unit: 'отн.·ч', digits: 1, emphasis: 'primary' },
+        { key: 'average', label: 'Средний расход', aggregate: 'avg', unit: 'отн.', digits: 2 },
+        { key: 'average', label: 'Пиковый час', aggregate: 'max', unit: 'отн.', digits: 2 },
+    ],
+    chart: { x: 'hour', y: 'volume', title: 'Расход по часам', type: 'bar', unit: 'отн.·ч' },
+});
+
 export const benchReport = report('bench-state', {
     title: 'Снимок PLC · общая панель HMI', on: {workflow_dispatch:{}},
     signals: [controller.inputs.AI1, controller.DO1], window:60000,
@@ -61,4 +93,4 @@ export const benchReport = report('bench-state', {
     columns: [{key:'signal',title:'Сигнал'},{key:'value',title:'Значение'}],
     view: benchView,
 });
-export const reports = [thermalReport, transientReport, benchReport];
+export const reports = [thermalReport, transientReport, hourlyFlowReport, benchReport];

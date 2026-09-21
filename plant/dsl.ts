@@ -285,5 +285,5 @@ export const panel=(children:ViewNode[],direction:'row'|'column'='column',title?
 export const label=(text:string):ViewNode=>({kind:'text',text});
 export const readout=(label:string,binding:string,unit='',digits=2):ViewNode=>({kind:'value',label,binding,unit,digits});
 export const dataTable=(columns:Extract<ViewNode,{kind:'table'}>['columns']):ViewNode=>({kind:'table',columns});
-export const trend=(title:string,x:string,y:string):ViewNode=>({kind:'chart',title,x,y});
+export const trend=(title:string,x:string,y:string,options:Pick<Extract<ViewNode,{kind:'chart'}>,'type'|'unit'>={}):ViewNode=>({kind:'chart',title,x,y,...options});
 export const commandButton=(label:string,target:string,value:number):ViewNode=>({kind:'action',label,target,value});

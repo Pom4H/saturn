@@ -109,7 +109,7 @@ segments(signal TEXT, start INTEGER, end INTEGER, value REAL, quality TEXT)
 
 For volume from a flow rate in m³/h, integrate good segments with `SUM(value*(end-start)/3600000.0)` and expose coverage. Such units are not implicitly assumed for normalized model signals. Counter resets/rollovers are not automatically corrected by this generic query API.
 
-For a chart, return an x column and a numeric-or-null y column and specify `chart: {x, y, title}`. Null/unknown points split the SVG line. Templates are deliberately limited to an escaped table and optional SVG plot, rather than unrestricted HTML/JS execution. Import of third-party report formats belongs in external migration adapters, not the core. Adding a new report needs no HTTP route or rendering component.
+For a chart, return an x column and a numeric-or-null y column. Reports support `type: 'line' | 'bar'`; null/unknown points split a line and are omitted from bars. `unit` is rendered explicitly rather than inferred.\n\nReports may declare summary metrics with `sum`, `avg`, `min`, `max` or `last`. The default Saturn report layout is designed for screen and A4 print: masthead, report title/description, tabular-numeric KPI row, chart before the detailed table, provenance footer and repeating table headers. Rendering stays deterministic: escaped HTML/CSS/SVG only, with no report JavaScript, remote assets or live reads after the report capsule is frozen.\n\nTemplates are deliberately limited to presentation primitives rather than unrestricted HTML/JS execution. Import of third-party report formats belongs in external migration adapters, not the core. Adding a new report needs no HTTP route or rendering component.
 
 ## Root
 

@@ -41,6 +41,22 @@ test('report presentation binds only the frozen data capsule, excluding samples 
  ]}};
  const result=executeReport(task,new NodeSql());assert.match(result.html,/>321</);assert.ok(!result.html.includes('>999<'));
 });
+test('modern report renders summary metrics, bar chart and printable Saturn typography',()=>{
+ const report=project().reports.find(r=>r.id==='pump-a-hourly-flow')!;
+ const task:ReportTask={id:'hourly-flow',createdAt:7200000,report,revision:'abc123',runId:'run-1',from:0,to:7200000,actor:'engineer',trigger:'manual',inputs:{},data:{samples:[],segments:[
+  {signal:'PUMP-A.flow',start:0,end:3600000,value:40,quality:'good'},
+  {signal:'PUMP-A.flow',start:3600000,end:7200000,value:50,quality:'good'},
+ ]}};
+ const result=executeReport(task,new NodeSql());
+ assert.equal(result.rows.length,2);
+ assert.match(result.html,/class="report-sheet"/);
+ assert.match(result.html,/data-report-metric="volume"/);
+ assert.match(result.html,/90,0/);
+ assert.match(result.html,/data-chart-type="bar"/);
+ assert.match(result.html,/Engineering report/);
+ assert.match(result.html,/@page\{size:A4/);
+});
+
 test('target-specific unsupported widgets and display overflow fail explicitly',()=>{
  const v=view('small',{title:'Small',bindings:{},body:dataTable([{key:'x',title:'X'}])});assert.throws(()=>projectPresentation(v,{target:'saturn-plc-320',bindings:{}}),diagnostic('SATURN_PRESENTATION_INVALID',{target:'plc',nodeKind:'table'}));
  v.body=panel(Array.from({length:12},()=>label('A')));assert.throws(()=>projectPresentation(v,{target:'saturn-plc-320',bindings:{}}),diagnostic('SATURN_LIMIT'));

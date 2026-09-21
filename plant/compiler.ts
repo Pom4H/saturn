@@ -413,10 +413,32 @@ export function validateProject(value: unknown): asserts value is Project {
             failCode('SATURN_REPORT_INVALID',{report:r.id,reason:'malformed'},{field:'sql/columns'});
         if (typeof r.title !== 'string' || r.title.length > 150 || r.columns.length > 32 || (r.on.schedule?.length ?? 0) > 8 || Object.keys(r.on.workflow_dispatch?.inputs ?? {}).length > 16)
             failCode('SATURN_LIMIT',{resource:'report',reason:'tooMany'},{report:r.id});
+        if (r.description !== undefined && (typeof r.description !== 'string' || r.description.length > 500))
+            failCode('SATURN_REPORT_INVALID',{report:r.id,reason:'invalid'},{field:'description'});
         for (const column of r.columns) {
             id(column.key);
-            if (typeof column.title !== 'string' || column.title.length > 150)
+            if (typeof column.title !== 'string' || column.title.length > 150 || (column.unit !== undefined && (typeof column.unit !== 'string' || column.unit.length > 30)))
                 failCode('SATURN_REPORT_INVALID',{report:r.id,reason:'invalid'},{field:'column'});
+        }
+        if (r.summary !== undefined) {
+            if (!Array.isArray(r.summary) || r.summary.length > 8)
+                failCode('SATURN_LIMIT',{resource:'report.summary',reason:'tooMany'},{report:r.id,max:8});
+            for (const metric of r.summary) {
+                id(metric.key);
+                if (typeof metric.label !== 'string' || !metric.label.trim() || metric.label.length > 100 || !['sum','avg','min','max','last'].includes(metric.aggregate))
+                    failCode('SATURN_REPORT_INVALID',{report:r.id,reason:'invalid'},{field:'summary'});
+                if (metric.unit !== undefined && (typeof metric.unit !== 'string' || metric.unit.length > 30))
+                    failCode('SATURN_REPORT_INVALID',{report:r.id,reason:'invalid'},{field:'summary.unit'});
+                if (metric.digits !== undefined && (!Number.isInteger(metric.digits) || metric.digits < 0 || metric.digits > 6))
+                    failCode('SATURN_REPORT_INVALID',{report:r.id,reason:'range'},{field:'summary.digits'});
+                if (metric.emphasis !== undefined && !['primary','secondary'].includes(metric.emphasis))
+                    failCode('SATURN_REPORT_INVALID',{report:r.id,reason:'invalid'},{field:'summary.emphasis'});
+            }
+        }
+        if (r.chart) {
+            id(r.chart.x); id(r.chart.y);
+            if (typeof r.chart.title !== 'string' || !r.chart.title.trim() || r.chart.title.length > 150 || (r.chart.type !== undefined && !['line','bar'].includes(r.chart.type)) || (r.chart.unit !== undefined && (typeof r.chart.unit !== 'string' || r.chart.unit.length > 30)))
+                failCode('SATURN_REPORT_INVALID',{report:r.id,reason:'invalid'},{field:'chart'});
         }
         if (r.schema) {
             if (!Array.isArray(r.schema) || !r.schema.length || r.schema.length > 64)
