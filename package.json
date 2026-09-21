@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.lab.json",
     "test": "node scripts/test.mjs",
     "test:e2e": "playwright test",
-    "check": "npm run build && npm run typecheck && npm test && npm run challenge:core && npm run lab:test && npm run lab:build && npm run plant:typecheck && npm run plant:test && npm run test:consumer && npm run vscode:check",
+    "check": "npm run build && npm run typecheck && npm test && npm run challenge:core && npm run lab:test && npm run lab:build && npm run plant:typecheck && npm run plant:test && bun run plant/tests/bun-smoke.ts && npm run test:consumer && npm run vscode:check",
     "challenge": "node scripts/challenge.mjs",
     "challenge:core": "node scripts/challenge.mjs core",
     "challenge:browser": "node scripts/challenge.mjs browser",
@@ -23,11 +23,11 @@
     "lab:capture": "node scripts/lab-capture.mjs",
     "test:consumer": "node scripts/consumer-test.mjs",
     "plant:build": "node scripts/plant-build.mjs",
-    "plant": "npm run plant:build && node --experimental-sqlite .plant/server.mjs",
+    "plant": "npm run plant:build && bun .plant/server.mjs",
     "plant:typecheck": "tsc --noEmit -p tsconfig.plant.json",
     "plant:test": "node scripts/plant-test.mjs",
-    "plant:test:browser": "node scripts/plant-e2e.mjs",
-    "plant:check": "npm run plant:build && npm run plant:typecheck && npm run plant:test",
+    "plant:test:browser": "bun scripts/plant-e2e.mjs",
+    "plant:check": "npm run plant:build && npm run plant:typecheck && npm run plant:test && bun run plant/tests/bun-smoke.ts",
     "site:test:browser": "node scripts/site-studio-check.mjs",
     "saturn": "node scripts/saturn.mjs",
     "standalone:pack": "bun run scripts/standalone-pack.ts",
@@ -37,7 +37,8 @@
     "vscode:build": "node scripts/vscode-build.mjs",
     "authoring:typecheck": "tsc --noEmit -p tsconfig.authoring.json",
     "authoring:test": "node scripts/authoring-check.mjs && npm run architecture:check",
-    "architecture:check": "node scripts/architecture-invariants.mjs"
+    "architecture:check": "node scripts/architecture-invariants.mjs",
+    "plant:bun:smoke": "npm run plant:build && bun run plant/tests/bun-smoke.ts"
   },
   "keywords": [],
   "author": "Roman Popov",
@@ -64,7 +65,8 @@
     "url": "https://github.com/Pom4H/saturn.git"
   },
   "engines": {
-    "node": ">=22.16.0 <23 || >=24.20.0 <25"
+    "node": ">=22.16.0 <23 || >=24.20.0 <25",
+    "bun": ">=1.4.2 <2"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
