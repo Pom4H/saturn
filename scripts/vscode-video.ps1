@@ -55,6 +55,7 @@ $saturnExe = (Join-Path $env:RUNNER_TEMP 'saturn.exe').Replace('\','\\')
   "workbench.startupEditor": "none",
   "chat.disableAIFeatures": true,
   "workbench.colorTheme": "Default Dark Modern",
+  "workbench.secondarySideBar.defaultVisibility": "hidden",
   "window.restoreWindows": "none",
   "window.commandCenter": false,
   "editor.fontSize": 15,
