@@ -27,7 +27,9 @@ export class OpfsProjectFs implements ProjectFs {
     const parent = await directory(this.root, dirnameProjectPath(path), true);
     const handle = await parent.getFileHandle(path.split('/').at(-1)!, { create: true });
     const writable = await handle.createWritable();
-    try { await writable.write(data); } finally { await writable.close(); }
+    const copy = new Uint8Array(data.byteLength);
+    copy.set(data);
+    try { await writable.write(copy.buffer); } finally { await writable.close(); }
   }
 
   async readDir(path = ''): Promise<readonly ProjectEntry[]> {
