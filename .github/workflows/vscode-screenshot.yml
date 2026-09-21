@@ -37,6 +37,9 @@ jobs:
       - name: Build Saturn web assets
         run: npm run plant:build
 
+      - name: Build Saturn VS Code assets
+        run: npm run vscode:build
+
       - name: Generate capture update key
         run: node scripts\update-test-key.mjs "%RUNNER_TEMP%\saturn-vscode-key"
 
