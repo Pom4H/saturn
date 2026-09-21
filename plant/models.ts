@@ -19,7 +19,8 @@ export const outputType = (value: ModelOutput): SignalRuntimeType => typeof valu
 const p = (value: number, min = 0, max = 100) => ({ default: value, min, max });
 const clamp = (x: number, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const approach = (x: number, to: number, dt: number, tau: number) => x + (to - x) * (1 - Math.exp(-dt / Math.max(.02, tau)));
-const installed = <const M>(m: M & Omit<ModelSpec, 'version'>): M & { version: string } => {
+type ValidInstalledModel<M> = M extends Omit<ModelSpec, 'version'> ? unknown : never;
+const installed = <const M>(m: M & ValidInstalledModel<M>): M & { version: string } => {
     const definition = { ...m, version: '1.0.0' } as M & { version: string };
     registerModel(definition as unknown as ModelSpec);
     return definition;
