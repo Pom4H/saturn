@@ -64,8 +64,71 @@ $saturnExe = (Join-Path $env:RUNNER_TEMP 'saturn.exe').Replace('\','\\')
 }
 "@ | Set-Content -Encoding UTF8 (Join-Path $settingsDir 'settings.json')
 
-$workspace = (Resolve-Path 'plant\demo').Path
-$file = (Resolve-Path 'plant\demo\plant.ts').Path
+$workspace = Join-Path $root 'workspace'
+Remove-Item -Recurse -Force $workspace -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path $workspace | Out-Null
+@'
+import { project, system, simulation, derived, alarm } from '@saturn/core';
+
+const main = system('main', 'Cooling loop');
+
+const grid = simulation('GRID', 'supply', {
+  system: 'main',
+  at: { x: 80, y: 100 },
+  parameters: { voltage: 1 },
+});
+
+const pump = simulation('P-101', 'pump', {
+  system: 'main',
+  at: { x: 300, y: 100 },
+  inputs: { voltage: grid.voltage },
+  parameters: { inertia: 4, nominalFlow: 1.2 },
+});
+
+const tank = simulation('T-101', 'reservoir', {
+  system: 'main',
+  at: { x: 520, y: 100 },
+  inputs: { inflow: pump.flow, demand: 0.45 },
+  parameters: { capacity: 12, initialLevel: 0.7 },
+});
+
+const valve = simulation('V-101', 'motor-valve', {
+  system: 'main',
+  at: { x: 740, y: 100 },
+  inputs: { demand: 0.65, pressure: 1 },
+});
+
+const exchanger = simulation('HX-101', 'heat-exchanger', {
+  system: 'main',
+  at: { x: 960, y: 100 },
+  inputs: { heat: pump.power, cooling: 1 },
+});
+
+const flow = derived('loop.flow', pump.flow, 'm3/h');
+const flowHigh = alarm('flow-high', {
+  title: 'High flow',
+  signal: pump.flow,
+  above: 1.15,
+  clearBelow: 1.05,
+  priority: 'warning',
+});
+
+export default project('vscode-demo', {
+  title: 'Saturn VS Code · Cooling loop',
+  description: 'Small valid project used to demonstrate the native Saturn VS Code host.',
+  systems: [main],
+  simulations: [grid, pump, tank, valve, exchanger],
+  signals: [flow],
+  alarms: [flowHigh],
+  reports: [],
+  overview: [
+    { signal: 'P-101.rpm', label: 'Pump speed', unit: 'rpm' },
+    { signal: 'T-101.level', label: 'Tank level', unit: '%' },
+    { signal: 'V-101.opening', label: 'Valve', unit: '%' },
+  ],
+});
+'@ | Set-Content -Encoding UTF8 (Join-Path $workspace 'plant.ts')
+$file = Join-Path $workspace 'plant.ts'
 $args = @(
   '--user-data-dir', $userData,
   '--extensions-dir', $extensions,
