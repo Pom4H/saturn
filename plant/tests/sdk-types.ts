@@ -1,4 +1,4 @@
-import { simulation, bank, aggregate, control, gt, signal } from '../dsl';
+import { simulation, bank, aggregate, control, gt, signal, report, reportField, numberField, reportSchema, reportColumn, excelColumn, excelSheet, workbook, asc } from '../dsl';
 import type { SignalId, SignalUnitOf, SignalValueOf } from '../types';
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
 type Assert<T extends true> = T;
@@ -40,3 +40,40 @@ simulation('DRIVE', 'electric-motor', {system:'lab', at:{x:0,y:0}, inputs:{frequ
 type _BlockedId = Assert<Equal<SignalId<typeof valveDemand.blocked>, 'DEMAND.blocked'>>;
 type _BlockedValue = Assert<Equal<SignalValueOf<typeof valveDemand.blocked>, boolean>>;
 type _BlockedUnit = Assert<Equal<SignalUnitOf<typeof valveDemand.blocked>, 'лог.'>>;
+
+
+const typedRows = reportSchema({
+    time: numberField('ms'),
+    flow: reportField(pump.flow),
+    blocked: reportField(valveDemand.blocked),
+});
+const typedReport = report('typed-report', {
+    title: 'Typed report',
+    on: { workflow_dispatch: {} },
+    signals: [pump.flow, valveDemand.blocked],
+    window: 60_000,
+    sql: 'SELECT 0 AS time, 1 AS flow, 0 AS blocked',
+    schema: typedRows,
+    columns: [
+        reportColumn('Time', typedRows.time),
+        reportColumn('Flow', typedRows.flow),
+        reportColumn('Blocked', typedRows.blocked),
+    ],
+    excel: workbook([
+        excelSheet('Signals', typedRows, {
+            columns: [
+                excelColumn('Time', typedRows.time, { format: '0' }),
+                excelColumn('Flow', typedRows.flow, { format: '0.00' }),
+                excelColumn('Blocked', typedRows.blocked),
+            ],
+            sort: [asc(typedRows.time)],
+            freezeRows: 1,
+            autoFilter: true,
+        }),
+    ]),
+});
+void typedReport;
+// @ts-expect-error Reports consume typed signal refs, not unchecked string IDs.
+report('bad-signals', { title:'Bad', on:{workflow_dispatch:{}}, signals:['P.flow'], window:1000, sql:'SELECT 1 AS x', columns:[{key:'x',title:'x'}] });
+// @ts-expect-error Boolean fields do not accept numeric Excel formats.
+excelColumn('Blocked', typedRows.blocked, { format: '0.00' });
