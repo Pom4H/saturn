@@ -59,6 +59,7 @@ export class Documents {
 }
 
 export interface ServerWorkspaceSnapshot {
+  /** Content-addressed build identity for these files. */
   id: string;
   sourceRevision: string | null;
   time: number;
