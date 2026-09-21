@@ -11,18 +11,18 @@ const controllerValue = Symbol('saturn.controller');
 
 export interface ControlRef<ID extends string = string, Unit extends string = string> {
     control: Control;
-    value: SignalRef<`${ID}.value`, number, Unit>;
-    requested: SignalRef<`${ID}.requested`, number, Unit>;
-    blocked: SignalRef<`${ID}.blocked`, boolean, 'лог.'>;
+    value: SignalRef<`${ID}.value`, number, Unit, 'unknown'>;
+    requested: SignalRef<`${ID}.requested`, number, Unit, 'unknown'>;
+    blocked: SignalRef<`${ID}.blocked`, boolean, 'лог.', 'boolean'>;
 }
 type ControlOptions = Omit<Control, 'id' | 'unit' | 'step'> & Partial<Pick<Control, 'unit' | 'step'>>;
 export function control<const ID extends string, const Options extends ControlOptions>(name: ID, options: Options): ControlRef<ID, Options extends { unit: infer Unit extends string } ? Unit : 'отн.'> {
     const unit = (options.unit ?? 'отн.') as Options extends { unit: infer Unit extends string } ? Unit : 'отн.';
     return {
         control: { id: id(name), unit, step: .01, ...options },
-        value: createSignalRef(`${name}.value`, 'number', unit),
-        requested: createSignalRef(`${name}.requested`, 'number', unit),
-        blocked: createSignalRef(`${name}.blocked`, 'boolean', 'лог.'),
+        value: createSignalRef(`${name}.value`, 'number', unit, 'unknown'),
+        requested: createSignalRef(`${name}.requested`, 'number', unit, 'unknown'),
+        blocked: createSignalRef(`${name}.blocked`, 'boolean', 'лог.', 'boolean'),
     };
 }
 type NumericSignal<Dimension extends SignalDimension = SignalDimension> = SignalRef<string, number, string, Dimension>;
@@ -38,9 +38,11 @@ const operation = <Value extends Scalar, Dimension extends SignalDimension>(op: 
     ({ op, args }) as unknown as OperationExpr<Value, Dimension>;
 
 export function gt<A extends NumericTyped>(a: A, b: CompatibleNumeric<DimensionOf<A>>): OperationExpr<boolean, 'boolean'>;
+export function gt<B extends NumericTyped>(a: number, b: B): OperationExpr<boolean, 'boolean'>;
 export function gt(a: number, b: number): OperationExpr<boolean, 'boolean'>;
 export function gt(a: Expr, b: Expr): OperationExpr<boolean, 'boolean'> { return operation('gt', [a, b]); }
 export function lt<A extends NumericTyped>(a: A, b: CompatibleNumeric<DimensionOf<A>>): OperationExpr<boolean, 'boolean'>;
+export function lt<B extends NumericTyped>(a: number, b: B): OperationExpr<boolean, 'boolean'>;
 export function lt(a: number, b: number): OperationExpr<boolean, 'boolean'>;
 export function lt(a: Expr, b: Expr): OperationExpr<boolean, 'boolean'> { return operation('lt', [a, b]); }
 export const and = (...args: BooleanExpr[]): OperationExpr<boolean, 'boolean'> => operation('and', args as Expr[]);
@@ -214,8 +216,8 @@ export type ControllerRef<ID extends string = string, O extends Record<string, E
     readonly profile: 'saturn-fbd';
     readonly ports: PortRefs<'saturn',ID>;
     readonly inputs: { readonly [K in keyof typeof inputPins & string]: SignalRef<`${ID}.${K}`, number, ''> };
-    readonly healthy: SignalRef<`${ID}.healthy`, boolean, 'лог.'>;
-    readonly powered: SignalRef<`${ID}.powered`, boolean, 'лог.'>;
+    readonly healthy: SignalRef<`${ID}.healthy`, boolean, 'лог.', 'boolean'>;
+    readonly powered: SignalRef<`${ID}.powered`, boolean, 'лог.', 'boolean'>;
     readonly [controllerValue]: Controller;
 } & { readonly [K in keyof O]: SignalRef<`${ID}.${K & string}`, number, ''> };
 
@@ -227,8 +229,8 @@ export function plc<const ID extends string, const O extends Record<string,Expr>
    profile:controller.profile,
    ports:portRefs(controller.id as ID,'saturn'),
    inputs:Object.fromEntries(Object.keys(inputPins).map(k=>[k,createSignalRef(`${name}.${k}`,'number','')])),
-   healthy:createSignalRef(`${name}.healthy`,'boolean','лог.'),
-   powered:createSignalRef(`${name}.powered`,'boolean','лог.'),
+   healthy:createSignalRef(`${name}.healthy`,'boolean','лог.','boolean'),
+   powered:createSignalRef(`${name}.powered`,'boolean','лог.','boolean'),
    [controllerValue]:controller,
  },Object.fromEntries(Object.keys(options.outputs).map(k=>[k,createSignalRef(`${name}.${k}`,'number','')]))) as ControllerRef<ID,O>;
 }
