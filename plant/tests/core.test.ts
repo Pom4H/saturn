@@ -31,7 +31,7 @@ import type { EnvironmentDescriptor } from '../environment';
 type PushSender = NonNullable<ConstructorParameters<typeof Push>[2]>;
 type LoginPayload = { csrf: string };
 type FirmwarePayload = { hardwareVerified: boolean; fbdbin: number[] };
-type RemoteSessionPayload = { project: { id: string }; instance: { instanceId: string }; csrf: string };
+type RemoteSessionPayload = { project: { id: string }; instance: { instanceId: string }; frame: { revision: string; runId: string; paused: boolean }; csrf: string };
 type LocalSessionPayload = { environment: EnvironmentDescriptor; frame: { paused: boolean } };
 const engineer: Actor = { id: 'engineer', role: 'engineer' }, viewer: Actor = { id: 'reader', role: 'viewer' };
 const project = () => compileProject(demoFiles);
