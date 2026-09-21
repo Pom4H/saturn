@@ -1,4 +1,4 @@
-import ts from 'typescript';
+import ts from '@typescript/typescript6';
 import { compileProject } from './compiler';
 import { failCode } from './diagnostics';
 import type { Connection } from './ports';
