@@ -18,6 +18,11 @@ export interface SaturnDiagnostic {
 
 type Catalog = Record<string, Record<SaturnLocale, string>>;
 
+export type LocalizedText = string | { en: string; ru?: string };
+export function localizeText(value: LocalizedText, locale: SaturnLocale = 'en'): string {
+  return typeof value === 'string' ? value : value[locale] ?? value.en;
+}
+
 const messages: Catalog = {
   'ports.profileMissing': { en: 'No physical port profile: {type}', ru: 'Нет профиля физических портов: {type}' },
   'ports.unknownTerminal': { en: 'Unknown terminal {device}.{port}', ru: 'Неизвестная клемма {device}.{port}' },
@@ -33,6 +38,22 @@ const messages: Catalog = {
   'ports.invalidRoute': { en: 'Invalid route points', ru: 'Некорректные точки маршрута' },
   'ports.multipleBusOwners': { en: 'Multiple PLC bus owners are not supported', ru: 'Несколько владельцев одной шины PLC не поддерживаются' },
   'ports.invalidExpansion': { en: 'Invalid expansion slot', ru: 'Некорректный слот модуля расширения' },
+  'typing.valueTypeMismatch': {
+    en: 'Input {model}.{input} expects {expected}; received {actual}',
+    ru: 'Вход {model}.{input} ожидает тип {expected}; получен {actual}',
+  },
+  'typing.dimensionMismatch': {
+    en: 'Input {model}.{input} expects dimension {expected}; received {actual}',
+    ru: 'Вход {model}.{input} ожидает размерность {expected}; получена {actual}',
+  },
+  'typing.numericRequired': {
+    en: '{context} requires a numeric signal',
+    ru: 'Для {context} требуется числовой сигнал',
+  },
+  'typing.booleanRequired': {
+    en: '{context} requires a boolean signal',
+    ru: 'Для {context} требуется логический сигнал',
+  },
 };
 
 function interpolate(template: string, args: Record<string, DiagnosticValue> = {}): string {
