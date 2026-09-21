@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { advancePhase, readSignal, rotate, type Asset, type Signals } from '../src/elements/model';
 import { registry } from '../src/elements/core-elements';
-import { materialPresets, type MaterialPresetId } from '../src/elements/materials';
+import { materialPresets, type MaterialPreset, type MaterialPresetId } from '../src/elements/materials';
 
 function presetMaterial(id: MaterialPresetId): THREE.Material {
-  const p=materialPresets[id], transparent=(p.opacity??1)<1 || (p.transmission??0)>0;
+  const p:MaterialPreset=materialPresets[id], transparent=(p.opacity??1)<1 || (p.transmission??0)>0;
   if ((p.transmission??0)>0 || (p.clearcoat??0)>0) return new THREE.MeshPhysicalMaterial({
     color:p.color,metalness:p.metalness,roughness:p.roughness,transparent,opacity:p.opacity??1,
     transmission:p.transmission??0,thickness:p.thickness??0,ior:p.ior??1.5,

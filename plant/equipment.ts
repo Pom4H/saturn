@@ -12,6 +12,7 @@ import { evaluate } from './kernel';
 import type { Project, Frame, Expr, ModelSpec } from './types';
 import { modelTitle } from './i18n';
 import type { SaturnLocale } from './diagnostics';
+import type { ElementCategory } from '../src/elements/model';
 const metalStroke = '#526f7a', water = '#10a6b5', fuel = '#d39b51';
 type Draw = (c: SvgRendererContext) => void;
 const body = (c: SvgRendererContext, x = 15, y = 10, w = 120, h = 66) => el(c.root, 'rect', { x, y, width: w, height: h, rx: 8, fill: c.paint('metal'), stroke: metalStroke, 'stroke-width': 2 });
@@ -107,7 +108,7 @@ const glyphByVisual:Record<string,string>={
  alternator:'electrical.generator',calorimeter:'instrumentation.sensor',dcSupply:'electrical.battery',transmitter:'instrumentation.sensor',contactor:'control.panel',
  indicator:'instrumentation.sensor',ioModule:'control.panel',junction:'generic.element',saturn:'control.panel'
 };
-const categoryByVisual=(visual:string)=>visual==='motor'||visual==='generator'||visual==='alternator'||visual==='transformer'||visual==='battery'||visual==='dcSupply'?'electrical'
+const categoryByVisual=(visual:string):ElementCategory=>visual==='motor'||visual==='generator'||visual==='alternator'||visual==='transformer'||visual==='battery'||visual==='dcSupply'?'electrical'
   :visual==='sensor'||visual==='transmitter'||visual==='calorimeter'||visual==='indicator'?'instrumentation'
   :visual==='control'||visual==='switchgear'||visual==='contactor'||visual==='ioModule'||visual==='saturn'?'control'
   :visual==='turbine'||visual==='fan'?'mechanical':'process';
@@ -131,7 +132,7 @@ export function installEquipment(locale: SaturnLocale = 'en') {
             continue;
         installed.add(kind);
         if (!catalog[kind])
-            registerComponent(kind, { version: '1.0.0', label: modelTitle(spec.kind, locale), ...footprint(spec.visual), visual:{glyph:glyphByVisual[spec.visual]??'generic.element',category:categoryByVisual(spec.visual) as any,geometry:`plant.${spec.visual}`,envelope:{min:[-.8,-.6,.02],max:[.8,.6,1.9]}}, fields: { x: { label: 'X', scope: 'layout', default: 0 }, y: { label: 'Y', scope: 'layout', default: 0 } }, ports: Object.fromEntries(Object.entries(terminals(spec.visual)).map(([name,t])=>[name,{x:t.x,y:t.y,direction:t.side,role:t.role==='source'?'out':'in'}])), signals: Object.fromEntries(Object.entries(spec.outputs).map(([k, unit]) => [k, { label: k, unit, type: outputType(spec, k) }])) });
+            registerComponent(kind, { version: '1.0.0', label: modelTitle(spec.kind, locale), ...footprint(spec.visual), visual:{glyph:glyphByVisual[spec.visual]??'generic.element',category:categoryByVisual(spec.visual),geometry:`plant.${spec.visual}`,envelope:{min:[-.8,-.6,.02],max:[.8,.6,1.9]}}, fields: { x: { label: 'X', scope: 'layout', default: 0 }, y: { label: 'Y', scope: 'layout', default: 0 } }, ports: Object.fromEntries(Object.entries(terminals(spec.visual)).map(([name,t])=>[name,{x:t.x,y:t.y,direction:t.side,role:t.role==='source'?'out':'in'}])), signals: Object.fromEntries(Object.entries(spec.outputs).map(([k, unit]) => [k, { label: k, unit, type: outputType(spec, k) }])) });
         registerSvgRenderer(kind, c => { shapes[spec.visual](c); if(spec.visual==='saturn')return; const key = Object.keys(spec.outputs)[0]; const text = el(c.root, 'text', { x: 75, y: 111, 'text-anchor': 'middle', 'font-family': 'ui-monospace,monospace', 'font-size': 15, fill: '#214d5f' }); c.onUpdate(dt => { const value = c.number(key, dt); text.textContent = value === null ? '—' : `${value.toFixed(2)} ${spec.outputs[key]}`; }); });
         register3dRenderer(kind, c => createPlantModel(c, spec.visual, Object.keys(spec.outputs)[0]));
     }

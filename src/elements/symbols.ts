@@ -31,7 +31,7 @@ export function createGlyphSvg(document: Document, id: string, className = 'satu
       if (key==='kind'||key==='fill') continue;
       el.setAttribute(key,String(value));
     }
-    el.setAttribute('fill', primitive.fill ? 'currentColor' : 'none');
+    el.setAttribute('fill', 'fill' in primitive && primitive.fill ? 'currentColor' : 'none');
     el.setAttribute('stroke','currentColor'); el.setAttribute('stroke-width','1.6'); el.setAttribute('stroke-linecap','round'); el.setAttribute('stroke-linejoin','round');
     svg.append(el);
   }

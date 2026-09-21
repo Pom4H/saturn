@@ -10,7 +10,7 @@ registerComponent('filter', {
     quality: { label: 'Качество', default: 'good', choices: ['good', 'stale', 'bad'] },
     alarm: { label: 'Состояние', default: 'none', choices: ['none', 'warning', 'trip'] },
   },
-  ports: projection.ports as any,
+  ports: Object.fromEntries(Object.entries(projection.ports).map(([id,p])=>[id,{x:p.x,y:p.y,direction:p.direction,role:p.role==='bidirectional'?'in':p.role}])),
   signals: { flow: { label: 'Расход', type: 'number', unit: 'm3/h' }, differentialPressure: { label: 'Перепад давления', type: 'number', unit: 'bar' } },
   commands: { clean: { label: 'Очистить фильтр' } },
   visual: elementRegistry.get('process.filter.inline').visual,
