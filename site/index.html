@@ -127,6 +127,18 @@
       <div><code>target provider</code><h3>PLC compiler / deploy / flash</h3></div>
       <p>Контроллер-специфичная часть живёт за provider boundary: компиляция проекта в target artifact, прошивка, мониторинг и deployment не требуют отдельного Saturn IDE.</p>
     </div>
+    <div class="extension-ecosystem" aria-label="Направления экосистемы расширений">
+      <div><span>Дальше через extensions</span><a href="https://github.com/Pom4H/saturn/blob/main/docs/adr/0002-extension-packages.md" target="_blank" rel="noopener">Extension API ↗</a></div>
+      <div class="ecosystem-tags">
+        <span>импорт TIA / CODESYS / WinCC</span>
+        <span>historian / Timescale / Influx</span>
+        <span>MQTT / webhook / notifications</span>
+        <span>commissioning & test packs</span>
+        <span>simulation / domain packs</span>
+        <span>OIDC / LDAP providers</span>
+      </div>
+      <p>Это направления для следующих capability API, а не обещание v0.1: доступ к сети, процессам и файловой системе потребует отдельных явных permissions.</p>
+    </div>
   </section>
 
   <footer class="site-footer">
