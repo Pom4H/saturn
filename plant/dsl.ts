@@ -1,7 +1,7 @@
 import type { Presentation, ViewNode } from './presentation';
 import { inputPins, type Controller, type PlcBlock } from './controller';
 import { portRefs, physicalTypes, type Endpoint, type Connection, type Attachment, type DynamicEndpoint, type PhysicalType, type PortRefs, type Terminal, type TerminalOf, type TypedEndpoint } from './ports';
-import { AppError, id, signalRef as createSignalRef, type Expr, type System, type Simulation, type Project, type Derived, type Device, type AlarmRule, type Report, type Layout, type HistoryPolicy, type Control, type Scalar, type SignalRef } from './types';
+import { AppError, id, signalRef as createSignalRef, type Expr, type OperationExpr, type SignalDimension, type SignalDimensionOf, type System, type Simulation, type Project, type Derived, type Device, type AlarmRule, type Report, type Layout, type HistoryPolicy, type Control, type Scalar, type SignalRef } from './types';
 import { reportSchemaFields, type ReportSchema } from './reporting';
 export { reportField, numberField, booleanField, textField, dateTimeField, reportSchema, reportColumn, excelColumn, asc, desc, excelSheet, workbook } from './reporting';
 export type { ReportFieldRef, ReportSchema } from './reporting';
@@ -25,16 +25,46 @@ export function control<const ID extends string, const Options extends ControlOp
         blocked: createSignalRef(`${name}.blocked`, 'boolean', 'лог.'),
     };
 }
-export const gt = (a: Expr, b: Expr): Expr => ({ op: 'gt', args: [a, b] });
-export const lt = (a: Expr, b: Expr): Expr => ({ op: 'lt', args: [a, b] });
-export const and = (...args: Expr[]): Expr => ({ op: 'and', args });
-export const signal = <const ID extends string>(path: ID): SignalRef<ID, number, ''> => createSignalRef(id(path) as ID, 'number', '');
-export const add = (...args: Expr[]): Expr => ({ op: 'add', args });
-export const mul = (...args: Expr[]): Expr => ({ op: 'mul', args });
-export const sub = (a: Expr, b: Expr): Expr => ({ op: 'sub', args: [a, b] });
-export const div = (a: Expr, b: Expr): Expr => ({ op: 'div', args: [a, b] });
-export const max = (...args: Expr[]): Expr => ({ op: 'max', args });
-export const min = (...args: Expr[]): Expr => ({ op: 'min', args });
+type NumericSignal<Dimension extends SignalDimension = SignalDimension> = SignalRef<string, number, string, Dimension>;
+type NumericOperation<Dimension extends SignalDimension = SignalDimension> = OperationExpr<number, Dimension>;
+type NumericTyped = NumericSignal | NumericOperation;
+export type NumericExpr<Dimension extends SignalDimension = 'unknown'> = number | NumericSignal<Dimension> | NumericOperation<Dimension>;
+export type BooleanExpr = boolean | SignalRef<string, boolean, string, SignalDimension> | OperationExpr<boolean, 'boolean'>;
+type DimensionOf<E> = E extends SignalRef<string, number, string, infer Dimension> ? Dimension : E extends OperationExpr<number, infer Dimension> ? Dimension : 'unknown';
+type CompatibleNumeric<Dimension extends SignalDimension> = Dimension extends 'unknown'
+    ? number | NumericTyped
+    : number | NumericSignal<Dimension> | NumericOperation<Dimension> | NumericSignal<'unknown'> | NumericOperation<'unknown'>;
+const operation = <Value extends Scalar, Dimension extends SignalDimension>(op: OperationExpr<Value, Dimension>['op'], args: Expr[]): OperationExpr<Value, Dimension> =>
+    ({ op, args }) as unknown as OperationExpr<Value, Dimension>;
+
+export function gt<A extends NumericTyped>(a: A, b: CompatibleNumeric<DimensionOf<A>>): OperationExpr<boolean, 'boolean'>;
+export function gt(a: number, b: number): OperationExpr<boolean, 'boolean'>;
+export function gt(a: Expr, b: Expr): OperationExpr<boolean, 'boolean'> { return operation('gt', [a, b]); }
+export function lt<A extends NumericTyped>(a: A, b: CompatibleNumeric<DimensionOf<A>>): OperationExpr<boolean, 'boolean'>;
+export function lt(a: number, b: number): OperationExpr<boolean, 'boolean'>;
+export function lt(a: Expr, b: Expr): OperationExpr<boolean, 'boolean'> { return operation('lt', [a, b]); }
+export const and = (...args: BooleanExpr[]): OperationExpr<boolean, 'boolean'> => operation('and', args as Expr[]);
+export const signal = <const ID extends string>(path: ID): SignalRef<ID, number, '', 'unknown'> => createSignalRef(id(path) as ID, 'number', '', 'unknown');
+
+export function add<A extends NumericTyped>(a: A, ...args: CompatibleNumeric<DimensionOf<A>>[]): OperationExpr<number, DimensionOf<A>>;
+export function add(a: number, ...args: number[]): OperationExpr<number, 'scalar'>;
+export function add(...args: Expr[]): OperationExpr<number, SignalDimension> { return operation('add', args); }
+export function mul<A extends NumericTyped>(a: A, ...factors: number[]): OperationExpr<number, DimensionOf<A>>;
+export function mul(...args: number[]): OperationExpr<number, 'scalar'>;
+export function mul(...args: Expr[]): OperationExpr<number, SignalDimension> { return operation('mul', args); }
+export function sub<A extends NumericTyped>(a: A, b: CompatibleNumeric<DimensionOf<A>>): OperationExpr<number, DimensionOf<A>>;
+export function sub(a: number, b: number): OperationExpr<number, 'scalar'>;
+export function sub(a: Expr, b: Expr): OperationExpr<number, SignalDimension> { return operation('sub', [a, b]); }
+export function div<A extends NumericTyped>(a: A, b: number): OperationExpr<number, DimensionOf<A>>;
+export function div<A extends NumericTyped>(a: A, b: CompatibleNumeric<DimensionOf<A>>): OperationExpr<number, 'scalar'>;
+export function div(a: number, b: number): OperationExpr<number, 'scalar'>;
+export function div(a: Expr, b: Expr): OperationExpr<number, SignalDimension> { return operation('div', [a, b]); }
+export function max<A extends NumericTyped>(a: A, ...args: CompatibleNumeric<DimensionOf<A>>[]): OperationExpr<number, DimensionOf<A>>;
+export function max(a: number, ...args: number[]): OperationExpr<number, 'scalar'>;
+export function max(...args: Expr[]): OperationExpr<number, SignalDimension> { return operation('max', args); }
+export function min<A extends NumericTyped>(a: A, ...args: CompatibleNumeric<DimensionOf<A>>[]): OperationExpr<number, DimensionOf<A>>;
+export function min(a: number, ...args: number[]): OperationExpr<number, 'scalar'>;
+export function min(...args: Expr[]): OperationExpr<number, SignalDimension> { return operation('min', args); }
 export const system = (name: string, title: string, parent?: string): System => ({ id: id(name), title, ...(parent ? { parent } : {}) });
 type BuiltInModels = typeof builtInModels;
 /** Module augmentation can add metadata for independently installed equipment. */
@@ -50,9 +80,24 @@ type OutputUnit<M, K extends PropertyKey> = M extends { outputs: infer Outputs }
 type OutputDeclaredType<M, K extends PropertyKey> = M extends { outputTypes: infer Types }
     ? K extends keyof Types ? Types[K] : 'number'
     : 'number';
+type OutputDimension<M, K extends PropertyKey> = M extends { outputDimensions: infer Dimensions }
+    ? K extends keyof Dimensions ? Dimensions[K] extends SignalDimension ? Dimensions[K] : 'unknown' : 'unknown'
+    : 'unknown';
 type OutputValue<M, K extends PropertyKey> = OutputDeclaredType<M, K> extends 'boolean'
     ? boolean
     : OutputDeclaredType<M, K> extends 'string' ? string : number;
+type InputDeclaredType<M, K extends PropertyKey> = M extends { inputTypes: infer Types }
+    ? K extends keyof Types ? Types[K] : 'number'
+    : 'number';
+type InputDimension<M, K extends PropertyKey> = M extends { inputDimensions: infer Dimensions }
+    ? K extends keyof Dimensions ? Dimensions[K] extends SignalDimension ? Dimensions[K] : 'unknown' : 'unknown'
+    : 'unknown';
+type NumericInput<Dimension extends SignalDimension> = Dimension extends 'unknown'
+    ? number | NumericTyped
+    : CompatibleNumeric<Dimension>;
+type InputExpression<M, K extends PropertyKey> = InputDeclaredType<M, K> extends 'boolean'
+    ? BooleanExpr
+    : NumericInput<InputDimension<M, K>>;
 
 export type SimRef<
     M = { outputs: {} },
@@ -65,7 +110,7 @@ export type SimRef<
     readonly [simulationValue]: Simulation;
 } & {
     readonly [K in M extends { outputs: infer O } ? keyof O : never]:
-        SignalRef<`${ID}.${K & string}`, OutputValue<M, K>, OutputUnit<M, K>>;
+        SignalRef<`${ID}.${K & string}`, OutputValue<M, K>, OutputUnit<M, K>, OutputDimension<M, K>>;
 };
 type Options<M extends {
     inputs: object;
@@ -73,7 +118,7 @@ type Options<M extends {
 }> = {
     system: string;
     at: Layout;
-    inputs?: Partial<Record<keyof M['inputs'], Expr>>;
+    inputs?: Partial<{ [K in keyof M['inputs']]: InputExpression<M, K> }>;
     parameters?: Partial<Record<keyof M['parameters'], number>>;
     history?: Record<string, HistoryPolicy>;
 };
@@ -83,17 +128,23 @@ export function simulation<const ID extends string, K extends keyof ModelCatalog
     const ports = physicalTypes().includes(spec.visual) ? portRefs(node.id as ID, spec.visual as VisualOf<ModelCatalog[K]>) : {} as PortsOf<ModelCatalog[K],ID>;
     return Object.assign(
         { id: node.id as ID, kind: String(kind), ports, [simulationValue]: node },
-        Object.fromEntries(Object.entries(spec.outputs).map(([k, unit]) => [k, createSignalRef(`${name}.${k}`, outputType(spec, k), unit)])),
+        Object.fromEntries(Object.entries(spec.outputs).map(([k, unit]) => [k, createSignalRef(`${name}.${k}`, outputType(spec, k), unit, spec.outputDimensions?.[k] ?? 'unknown')])),
     ) as SimRef<ModelCatalog[K], ID, K & string>;
 }
-export type DerivedRef<ID extends string = string, Unit extends string = string> = Derived & {
-    readonly value: SignalRef<ID, number, Unit>;
+export type DerivedRef<ID extends string = string, Unit extends string = string, Dimension extends SignalDimension = 'unknown'> = Derived & {
+    readonly value: SignalRef<ID, number, Unit, Dimension>;
 };
-export function derived<const ID extends string, const Unit extends string = 'отн.'>(name: ID, expression: Expr, unit?: Unit, history?: HistoryPolicy): DerivedRef<ID, Unit> {
+export function derived<const ID extends string, const Unit extends string = 'отн.', const E extends NumericTyped | number = NumericTyped | number>(
+    name: ID,
+    expression: E,
+    unit?: Unit,
+    history?: HistoryPolicy,
+): DerivedRef<ID, Unit, E extends NumericTyped ? DimensionOf<E> : 'scalar'> {
     const resolvedUnit = (unit ?? 'отн.') as Unit;
-    const result: Derived = { id: id(name), expression, unit: resolvedUnit, ...(history ? { history } : {}) };
-    Object.defineProperty(result, 'value', { value: createSignalRef(name, 'number', resolvedUnit), enumerable: false });
-    return result as DerivedRef<ID, Unit>;
+    const dimension = (typeof expression === 'number' ? 'scalar' : 'unknown') as E extends NumericTyped ? DimensionOf<E> : 'scalar';
+    const result: Derived = { id: id(name), expression: expression as Expr, unit: resolvedUnit, ...(history ? { history } : {}) };
+    Object.defineProperty(result, 'value', { value: createSignalRef(name, 'number', resolvedUnit, dimension), enumerable: false });
+    return result as DerivedRef<ID, Unit, E extends NumericTyped ? DimensionOf<E> : 'scalar'>;
 }
 export const equipment = (name: string, type: string, options: {
     system: string;
@@ -142,21 +193,21 @@ export function bank<K extends keyof ModelCatalog>(prefix: string, kind: K, opti
         throw new AppError('Invalid bank dimensions');
     return Array.from({ length: options.count }, (_, i) => simulation(`${prefix}${i + 1}`, kind, { ...options, at: { x: options.at.x + (i % options.columns) * options.pitch.x, y: options.at.y + Math.floor(i / options.columns) * options.pitch.y } }));
 }
-export function aggregate<T extends SimRef>(items: T[], output: Exclude<keyof T, 'id' | 'kind' | typeof simulationValue> & string, operation: 'mean' | 'sum' | 'min' | 'max' = 'mean'): Expr {
+type NumericSignalKey<T> = {
+    [K in keyof T]: T[K] extends SignalRef<string, number, string, SignalDimension> ? K : never
+}[keyof T] & string;
+export function aggregate<T extends SimRef, K extends NumericSignalKey<T>>(
+    items: T[],
+    output: K,
+    operation: 'mean' | 'sum' | 'min' | 'max' = 'mean',
+): OperationExpr<number, SignalDimensionOf<T[K]>> {
     if (!Array.isArray(items) || !items.length || items.length > 256)
         throw new AppError('Aggregate needs a bounded non-empty equipment list');
     const args = items.map(item => { const node = item[simulationValue]; if (!model(node.model).outputs[output])
         throw new AppError(`Unknown aggregate output: ${output}`); return signal(`${node.id}.${output}`); });
-    if (operation === 'mean')
-        return div(add(...args), args.length);
-    if (operation === 'sum')
-        return add(...args);
-    if (operation === 'min')
-        return min(...args);
-    if (operation === 'max')
-        return max(...args);
-    throw new AppError('Unknown aggregate operation');
+    return operation(operation === 'mean' ? 'div' : operation === 'sum' ? 'add' : operation, operation === 'mean' ? [operationNode('add', args), args.length] : args) as OperationExpr<number, SignalDimensionOf<T[K]>>;
 }
+const operationNode = (op: OperationExpr<number, SignalDimension>['op'], args: Expr[]): OperationExpr<number, SignalDimension> => operation(op, args);
 
 export type ControllerRef<ID extends string = string, O extends Record<string, Expr> = {}> = {
     readonly id: ID;
@@ -181,7 +232,7 @@ export function plc<const ID extends string, const O extends Record<string,Expr>
    [controllerValue]:controller,
  },Object.fromEntries(Object.keys(options.outputs).map(k=>[k,createSignalRef(`${name}.${k}`,'number','')]))) as ControllerRef<ID,O>;
 }
-export const pin=(name:string):Expr=>({ref:id(name)});
+export const pin=<const ID extends string>(name:ID):SignalRef<ID,number,'','unknown'>=>createSignalRef(id(name) as ID,'number','','unknown');
 export function port<M,ID extends string,Kind extends string,P extends keyof PortsOf<M,ID>&string>(device:SimRef<M,ID,Kind>,name:P):PortsOf<M,ID>[P];
 export function port<ID extends string,O extends Record<string,Expr>,P extends keyof PortRefs<'saturn',ID>&string>(device:ControllerRef<ID,O>,name:P):PortRefs<'saturn',ID>[P];
 export function port(device:string|Device,name:string):DynamicEndpoint;
@@ -204,7 +255,7 @@ export function cable(name:string,from:Endpoint,to:Endpoint,options:Omit<Connect
 export const expansion=(device:SimRef,controller:ControllerRef,slot:number):Attachment=>({device:device.id,controller:controller.id,slot,profile:'virtual-io4'});
 
 /** Controller-local stable block identity; separate from a physical terminal. */
-export const block=(name:string):Expr=>({ref:id(name)});
+export const block=<const ID extends string>(name:ID):SignalRef<ID,number,'','unknown'>=>createSignalRef(id(name) as ID,'number','','unknown');
 export const functionBlock=(type:PlcBlock['type'],inputs:Expr[],params:number[]=[]):PlcBlock=>({type,inputs,params});
 
 /** Shared report/live-HMI blueprint; binding environments are explicit at each use. */
