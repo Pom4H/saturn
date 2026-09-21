@@ -54,7 +54,8 @@ async function selfHealthcheck(expectedVersion?: string): Promise<void> {
             seed: SATURN_DEMO_FILES,
         });
         const response = await fetch(`${app.origin}/plant/api/health`, { cache: 'no-store', signal: AbortSignal.timeout(5000) });
-        if (!response.ok || (await response.json() as any).status !== 'ok')
+        const health: unknown = await response.json();
+        if (!response.ok || !health || typeof health !== 'object' || !('status' in health) || (health as {status?:unknown}).status !== 'ok')
             throw new Error('Saturn internal health check failed');
     }
     finally {
