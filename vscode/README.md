@@ -8,6 +8,7 @@ It deliberately does **not** embed a second IDE inside VS Code.
 
 - **Project** — native `TreeView` for the project entry, diagram, local runtime and HMI.
 - **Equipment Catalog** — native `TreeView` built from Saturn Core equipment plus `elements` contributed by installed Saturn extensions.
+- **Reports** — native `TreeView`; selecting a report reveals its TypeScript and opens the exact server report renderer in a preview tab using deterministic preview timeseries.
 - **Targets** — native `TreeView` for local runtime, servers, controllers, HMIs and devices.
 - **Diagram** — editor-area `WebviewPanel` rendered from `saturn ide diagram --json`, opened beside TypeScript source. It contains only the mnemonic, not the Saturn web IDE; clicking equipment reveals its TypeScript declaration.
 - **Status bar** — local runtime state.
@@ -61,3 +62,12 @@ This file never contains executable shell commands. VS Code only exposes a bound
 `saturn extension list --json` is the bridge used by the VS Code host. Existing Saturn extension `elements` become catalog entries automatically, grouped by extension package.
 
 This keeps custom equipment packs installable once through Saturn instead of requiring a separate VS Code extension for every vendor catalog.
+
+
+## Report editor
+
+`saturn ide reports --project <path> --json` exposes report definitions to the host.
+
+`saturn ide report --project <path> --id <report> --json` runs the authored report SQL against deterministic preview timeseries in an isolated in-memory database, then renders it through the same `executeReport()` / `renderPresentation()` path used by the server.
+
+There is no second report document format in VS Code. The TypeScript `report()` declaration remains authoritative; save the source and the preview is rebuilt.
