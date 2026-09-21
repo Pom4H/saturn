@@ -5,9 +5,28 @@ import type { HmiDrawCommand } from './vendor/saturn/src/runtime';
 /** Portable contracts. No DOM, Node, filesystem, SQL driver or network imports. */
 export type Scalar = number | boolean | string;
 export type Quality = 'good' | 'bad' | 'stale' | 'offline';
-export type Expr = number | boolean | {
-    ref: string;
-} | {
+
+declare const signalValueType: unique symbol;
+export type SignalRuntimeType = 'number' | 'boolean' | 'string';
+export interface SignalRef<ID extends string = string, Value extends Scalar = number, Unit extends string = string> {
+    readonly ref: ID;
+    readonly [signalValueType]?: { value: Value; unit: Unit };
+}
+export type SignalId<S> = S extends SignalRef<infer ID, Scalar, string> ? ID : never;
+export type SignalValueOf<S> = S extends SignalRef<string, infer Value, string> ? Value : never;
+export type SignalUnitOf<S> = S extends SignalRef<string, Scalar, infer Unit> ? Unit : never;
+export interface SignalMetadata { type: SignalRuntimeType; unit: string }
+export const signalMetadata = Symbol('saturn.signal.metadata');
+export function signalRef<const ID extends string, Value extends Scalar, const Unit extends string>(ref: ID, type: SignalRuntimeType, unit: Unit): SignalRef<ID, Value, Unit> {
+    const value = { ref };
+    Object.defineProperty(value, signalMetadata, { value: { type, unit }, enumerable: false, configurable: false, writable: false });
+    return value as SignalRef<ID, Value, Unit>;
+}
+export function signalInfo(ref: SignalRef<string, Scalar, string>): SignalMetadata {
+    return (ref as SignalRef<string, Scalar, string> & { [signalMetadata]?: SignalMetadata })[signalMetadata] ?? { type: 'number', unit: '' };
+}
+
+export type Expr = number | boolean | SignalRef<string, Scalar, string> | {
     op: 'add' | 'mul' | 'sub' | 'div' | 'min' | 'max' | 'gt' | 'lt' | 'not' | 'and';
     args: Expr[];
 };
