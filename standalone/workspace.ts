@@ -22,8 +22,8 @@ export class WorkspaceRegistry {
             if (value?.version !== 1 || !Array.isArray(value.recent))
                 throw new Error('Invalid workspace registry');
             return { version: 1, recent: value.recent.slice(0, 20) };
-        } catch (error: any) {
-            if (error?.code === 'ENOENT')
+        } catch (error: unknown) {
+            if (error instanceof Error && 'code' in error && (error as Error & {code?:unknown}).code === 'ENOENT')
                 return { version: 1, recent: [] };
             throw error;
         }
