@@ -42,6 +42,81 @@ async function runCliJson(args) {
   return JSON.parse(stdout);
 }
 
+function saturnLocale() {
+  const configured = config().get('locale', 'auto');
+  if (configured === 'ru' || configured === 'en') return configured;
+  return String(vscode.env.language ?? '').toLowerCase().startsWith('ru') ? 'ru' : 'en';
+}
+
+let dslDocsCache = null;
+async function dslDocs() {
+  const locale = saturnLocale();
+  if (dslDocsCache?.locale === locale) return dslDocsCache;
+  dslDocsCache = await runCliJson(['ide', 'docs', '--locale', locale, '--json']);
+  return dslDocsCache;
+}
+
+async function refreshSaturnDiagnostics(collection) {
+  const root = workspaceRoot();
+  collection.clear();
+  if (!root) return;
+  try {
+    const result = await runCliJson(['ide', 'check', '--project', root, '--locale', saturnLocale(), '--json']);
+    const byUri = new Map();
+    for (const item of result?.diagnostics ?? []) {
+      const source = item.source ?? item.data?.source;
+      if (!source?.path) continue;
+      const uri = vscode.Uri.file(path.join(root, source.path));
+      let document;
+      try { document = await vscode.workspace.openTextDocument(uri); } catch { continue; }
+      const from = Math.max(0, Math.min(document.getText().length, Number(source.from) || 0));
+      const to = Math.max(from, Math.min(document.getText().length, Number(source.to) || from + 1));
+      const severity = item.severity === 'warning'
+        ? vscode.DiagnosticSeverity.Warning
+        : item.severity === 'info'
+          ? vscode.DiagnosticSeverity.Information
+          : vscode.DiagnosticSeverity.Error;
+      const diagnostic = new vscode.Diagnostic(
+        new vscode.Range(document.positionAt(from), document.positionAt(to)),
+        item.message,
+        severity
+      );
+      diagnostic.source = 'Saturn';
+      diagnostic.code = item.code;
+      const key = uri.toString();
+      const list = byUri.get(key) ?? { uri, diagnostics: [] };
+      list.diagnostics.push(diagnostic);
+      byUri.set(key, list);
+    }
+    for (const { uri, diagnostics } of byUri.values()) collection.set(uri, diagnostics);
+  } catch {
+    // Built-in TypeScript diagnostics remain available if the Saturn bridge is unavailable.
+  }
+}
+
+class SaturnHoverProvider {
+  async provideHover(document, position) {
+    const range = document.getWordRangeAtPosition(position, /[A-Za-z_$][A-Za-z0-9_$]*/);
+    if (!range) return null;
+    const name = document.getText(range);
+    let docs;
+    try { docs = await dslDocs(); } catch { return null; }
+    const entity = docs?.entities?.find(item => item.name === name);
+    if (!entity) return null;
+    const markdown = new vscode.MarkdownString();
+    markdown.isTrusted = false;
+    markdown.appendCodeblock(entity.signature, 'typescript');
+    markdown.appendMarkdown(entity.summary);
+    if (entity.note) markdown.appendMarkdown('\n\n> ' + entity.note);
+    if (entity.example) {
+      const label = docs.locale === 'ru' ? 'Пример' : 'Example';
+      markdown.appendMarkdown('\n\n**' + label + '**\n');
+      markdown.appendCodeblock(entity.example, 'typescript');
+    }
+    return new vscode.Hover(markdown, range);
+  }
+}
+
 class RefreshableTree {
   constructor() {
     this._emitter = new vscode.EventEmitter();
@@ -578,6 +653,7 @@ async function runRecordedTour(catalog, reports, targets, terminal) {
 }
 
 function activate(context) {
+  const saturnDiagnostics = vscode.languages.createDiagnosticCollection('saturn');
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 20);
   statusBar.command = 'saturn.openDiagram';
   statusBar.text = '$(circle-slash) Saturn: stopped';
@@ -591,6 +667,11 @@ function activate(context) {
   const targets = new TargetsTreeProvider();
 
   context.subscriptions.push(
+    saturnDiagnostics,
+    vscode.languages.registerHoverProvider(
+      [{ language: 'typescript', scheme: 'file' }, { language: 'typescriptreact', scheme: 'file' }],
+      new SaturnHoverProvider()
+    ),
     statusBar,
     terminal,
     project,
@@ -607,6 +688,13 @@ function activate(context) {
       void catalog.reload();
       void reports.reload();
       targets.reload();
+      void refreshSaturnDiagnostics(saturnDiagnostics);
+    }),
+    vscode.workspace.onDidChangeConfiguration(event => {
+      if (event.affectsConfiguration('saturn.locale')) {
+        dslDocsCache = null;
+        void refreshSaturnDiagnostics(saturnDiagnostics);
+      }
     }),
     vscode.workspace.onDidSaveTextDocument(document => {
       if (document.fileName.endsWith('.ts')) {
@@ -614,6 +702,7 @@ function activate(context) {
         for (const panel of diagramPanels) void refreshDiagram(panel, context);
         void reports.reload();
         for (const entry of reportPanels) void refreshReportPreview(entry);
+        void refreshSaturnDiagnostics(saturnDiagnostics);
       }
       if (document.fileName.endsWith(path.join('.saturn', 'targets.json'))) targets.reload();
     }),
@@ -681,6 +770,7 @@ function activate(context) {
   void catalog.reload();
   void reports.reload();
   targets.reload();
+  void refreshSaturnDiagnostics(saturnDiagnostics);
 
   if (process.env.SATURN_VSCODE_TOUR === '1') {
     setTimeout(() => { void runRecordedTour(catalog, reports, targets, terminal); }, 10000);
