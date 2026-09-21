@@ -4,15 +4,15 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { startPlantHttpServer } from '../plant/http-server';
-import { LocalRepository, Store } from '../plant/store';
 import { BunSql } from './bun-sql';
 import { runStandaloneReport } from './reports';
 import { loadProjectDirectory } from './project-loader';
 import { WorkspaceRegistry } from './workspace';
-import { WorkspaceRepository } from './workspace-repository';
 import { applyStagedUpdate, checkApplicationUpdate, installApplicationUpdate, runUpdateCommand, type UpdateChannel } from './update';
 import { addRegistryItem, runRegistryCommand } from './registry';
 import { runIdeCommand } from './ide';
+import { buildArtifact } from '../plant/artifact';
+import { WorkspaceHost } from './workspace-host';
 
 declare const SATURN_VERSION: string;
 declare const SATURN_DEMO_FILES: Record<string, string>;
@@ -37,8 +37,7 @@ async function selfHealthcheck(expectedVersion?: string): Promise<void> {
     let app: Awaited<ReturnType<typeof startPlantHttpServer>> | undefined;
     try {
         const database = new BunSql(resolve(directory, 'health.sqlite3'));
-        const store = new Store(database);
-        const repository = new LocalRepository(store, () => `health:${crypto.randomUUID()}`);
+        const seed = await buildArtifact(SATURN_DEMO_FILES, { packageName: '@saturn/demo' });
         app = await startPlantHttpServer({
             port: 0,
             host: '127.0.0.1',
@@ -49,9 +48,8 @@ async function selfHealthcheck(expectedVersion?: string): Promise<void> {
             autoTick: false,
             uiMode: 'runtime',
             database,
-            projectRepository: repository,
             reportRunner: runStandaloneReport,
-            seed: SATURN_DEMO_FILES,
+            seed,
         });
         const response = await fetch(`${app.origin}/plant/api/health`, { cache: 'no-store', signal: AbortSignal.timeout(5000) });
         const health: unknown = await response.json();
@@ -159,10 +157,10 @@ const dataDirectory = resolve(process.env.SATURN_DATA_DIR ?? resolve(appData, 'p
 mkdirSync(dataDirectory, { recursive: true });
 
 const database = new BunSql(resolve(dataDirectory, 'saturn.sqlite3'));
-const repositoryStore = new Store(database);
-const projectRepository = projectDirectory
-    ? await new WorkspaceRepository(repositoryStore, projectDirectory).initialize(files)
-    : new LocalRepository(repositoryStore, () => `standalone:${crypto.randomUUID()}`);
+const workspaceHost = projectDirectory ? new WorkspaceHost(projectDirectory) : null;
+const seedArtifact = workspaceHost
+    ? await workspaceHost.build()
+    : await buildArtifact(files, { packageName: '@saturn/demo' });
 
 const updateChannel = ((process.env.SATURN_UPDATE_CHANNEL ?? 'stable') as UpdateChannel);
 const updateContext = {
@@ -199,9 +197,9 @@ app = await startPlantHttpServer({
         },
     },
     database,
-    projectRepository,
+    ...(workspaceHost ? { workspace: workspaceHost } : {}),
     reportRunner: runStandaloneReport,
-    seed: files,
+    seed: seedArtifact,
 });
 
 console.log(`Saturn ${SATURN_VERSION} · ${kiosk ? 'kiosk' : command}`);
