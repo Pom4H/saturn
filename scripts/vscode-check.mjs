@@ -24,6 +24,11 @@ if (!source.includes("import { SceneView } from '../src/view'") || !source.inclu
     throw new Error('VS Code mnemonic must reuse Saturn SceneView and installed equipment renderers');
 if (host.includes('<iframe') || host.includes('const make=(name,attrs'))
     throw new Error('VS Code mnemonic must not embed Saturn IDE or keep a parallel generic SVG renderer');
+if (!host.includes("createDiagnosticCollection('saturn')") || !host.includes('registerHoverProvider') || !host.includes("'ide', 'docs'") || !host.includes("'ide', 'check'"))
+    throw new Error('VS Code host must expose localized Saturn diagnostics and DSL hover through the canonical IDE bridge');
+const manifest = await readFile('vscode/package.json', 'utf8');
+if (!manifest.includes('"saturn.locale"'))
+    throw new Error('VS Code manifest must expose saturn.locale');
 
 const bundle = await stat('vscode/dist/diagram-webview.js');
 if (!bundle.isFile() || bundle.size < 10_000)
