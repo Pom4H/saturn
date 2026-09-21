@@ -4,7 +4,7 @@ import { compile, patchFields, applyChanges, editable, removeObject, appendEquip
 import { catalog, simulate, worldPort, pump, valve, connect } from '../src/core';
 import { layout, segmentClear, bounds } from '../src/geometry';
 import { booster, twin, empty } from '../src/examples';
-const patch = (s: string, id: string, props: any) => applyChanges(s, patchFields(s,id,props));
+const patch = (s: string, id: string, props: Record<string, string | number | boolean>) => applyChanges(s, patchFields(s,id,props));
 test('initial scene: eight nodes, five connections, two taps', () => {
  const s = compile(booster).scene; assert.equal(s.nodes.length,8); assert.equal(s.links.length,5); assert.equal(s.nodes.filter(n=>n.tap).length,2);
  assert.equal(simulate(s).flows.get('P-101'),9.120000000000001);
