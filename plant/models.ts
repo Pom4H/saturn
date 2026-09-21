@@ -18,9 +18,9 @@ const installed = <const M extends Omit<ModelSpec, 'version'>>(m: M): M & { vers
     registerModel(definition);
     return definition;
 };
-const supply = installed({ kind: 'supply', title: 'Электропитание', visual: 'generator', inputs: {}, parameters: { voltage: p(1, 0, 1.5) }, outputs: { voltage: 'отн.' },
+const supply = installed({ kind: 'supply', title: 'Электропитание', visual: 'generator', inputs: {}, parameters: { voltage: p(1, 0, 1.5) }, outputs: { voltage: 'отн.' }, outputDimensions: { voltage: 'voltage' } as const,
     initialize: q => ({ voltage: q.voltage }), advance: (_s, _i, q) => ({ voltage: q.voltage }), observe: s => ({ ...s }) });
-const pump = installed({ kind: 'pump', title: 'Циркуляционный насос', visual: 'pump', inputs: { voltage: 1, resistance: 1 }, parameters: { inertia: p(6, .1, 120), nominalFlow: p(1, .01, 100) }, outputs: { flow: 'отн.', rpm: 'об/мин', power: 'отн.' },
+const pump = installed({ kind: 'pump', title: 'Циркуляционный насос', visual: 'pump', inputs: { voltage: 1, resistance: 1 }, inputDimensions: { voltage: 'voltage', resistance: 'resistance' } as const, parameters: { inertia: p(6, .1, 120), nominalFlow: p(1, .01, 100) }, outputs: { flow: 'отн.', rpm: 'об/мин', power: 'отн.' }, outputDimensions: { flow: 'flow', rpm: 'rotational-speed', power: 'power' } as const,
     initialize: () => ({ speed: 1, flow: 1 }), advance: (s, i, q, dt) => { const speed = approach(s.speed, clamp(i.voltage, 0, 1.5), dt, q.inertia); return { speed, flow: q.nominalFlow * speed / Math.max(.2, i.resistance) }; },
     observe: s => ({ flow: s.flow, rpm: s.speed * 1500, power: s.speed ** 3 }) });
 /** Dimensionless feedback heat source, NOT neutron kinetics or a reactor operating model. */
@@ -36,7 +36,7 @@ const separator = installed({ kind: 'separator', title: 'Барабан-сепа
     initialize: () => ({ pressure: 1, steam: 1, level: 70 }), advance: (s, i, q, dt) => { const steam = Math.min(Math.max(0, s.pressure), Math.max(0, i.demand)); return { pressure: Math.max(0, s.pressure + dt * (Math.max(0, i.heat) - steam) / q.capacity), steam, level: clamp(1 - .3 * s.pressure, .05, 1) * 100 }; }, observe: s => ({ ...s }) });
 const turbine = installed({ kind: 'turbine', title: 'Турбина', visual: 'turbine', inputs: { steam: 1, load: 1 }, parameters: { inertia: p(12, .5, 120), efficiency: p(.9, 0, 1) }, outputs: { rpm: 'об/мин', electricity: 'отн.', exhaust: 'отн.' },
     initialize: () => ({ speed: 1, electricity: .9, exhaust: 1 }), advance: (s, i, q, dt) => { const speed = clamp(s.speed + dt * (Math.max(0, i.steam) - Math.max(.05, i.load) * s.speed) / q.inertia, 0, 3); return { speed, electricity: speed * Math.max(0, i.load) * q.efficiency, exhaust: Math.max(0, i.steam) * (1 - q.efficiency) }; }, observe: s => ({ rpm: s.speed * 1500, electricity: s.electricity, exhaust: s.exhaust }) });
-const exchanger = installed({ kind: 'heat-exchanger', title: 'Конденсатор', visual: 'exchanger', inputs: { heat: .1, cooling: 1 }, parameters: { capacity: p(12, .1, 100), ambient: p(.2, 0, 1) }, outputs: { temperature: 'отн.', rejected: 'отн.' },
+const exchanger = installed({ kind: 'heat-exchanger', title: 'Конденсатор', visual: 'exchanger', inputs: { heat: .1, cooling: 1 }, inputDimensions: { heat: 'power', cooling: 'flow' } as const, parameters: { capacity: p(12, .1, 100), ambient: p(.2, 0, 1) }, outputs: { temperature: 'отн.', rejected: 'отн.' }, outputDimensions: { temperature: 'temperature', rejected: 'power' } as const,
     initialize: q => ({ temperature: q.ambient, rejected: 0 }), advance: (s, i, q, dt) => { const rejected = Math.max(0, i.cooling) * (s.temperature - q.ambient); return { temperature: Math.max(q.ambient, s.temperature + dt * (i.heat - rejected) / q.capacity), rejected }; }, observe: s => ({ ...s }) });
 const sensor = installed({ kind: 'sensor', title: 'Измерительный канал', visual: 'sensor', inputs: { value: 0 }, parameters: { lag: p(.2, .02, 30), bias: p(0, -100, 100) }, outputs: { value: 'отн.' }, initialize: () => ({ value: 0 }), advance: (s, i, q, dt) => ({ value: approach(s.value, i.value + q.bias, dt, q.lag) }), observe: s => ({ ...s }) });
 const protection = installed({ kind: 'protection', title: 'Защита и поглотитель', visual: 'control', inputs: { temperature: 1, power: 1, demand: 0 }, parameters: { temperatureLimit: p(1.7, 1, 5), powerLimit: p(2, 1, 10), actuation: p(1, .05, 60) }, outputs: { insertion: 'доля', trip: 'лог.' }, outputTypes: { trip: 'boolean' } as const,
@@ -45,9 +45,9 @@ const structure = installed({ kind: 'structure', title: 'Реакторное з
     initialize: () => ({ pressure: 0, damage: 0 }), advance: (s, i, q, dt) => { const pressure = Math.max(0, s.pressure + dt * (Math.max(0, i.release) - q.vent * s.pressure) / q.capacity); return { pressure, damage: clamp(s.damage + dt * .08 * Math.max(0, pressure - q.strength) ** 2) }; }, observe: s => ({ ...s }) });
 /** Generic balance-of-plant teaching components. Coefficients are dimensionless,
  * not equipment datasheets, nuclear operating limits, or a site reconstruction. */
-const reservoir = installed({ kind: 'reservoir', title: 'Буферная ёмкость', visual: 'reservoir', inputs: { inflow: .1, demand: .1 },
+const reservoir = installed({ kind: 'reservoir', title: 'Буферная ёмкость', visual: 'reservoir', inputs: { inflow: .1, demand: .1 }, inputDimensions: { inflow: 'flow', demand: 'flow' } as const,
     parameters: { capacity: p(10, 1, 1000), initialLevel: p(.7, 0, 1) },
-    outputs: { level: '%', inventory: 'отн.', flow: 'отн.', spill: 'отн.', balance: 'отн.' },
+    outputs: { level: '%', inventory: 'отн.', flow: 'отн.', spill: 'отн.', balance: 'отн.' }, outputDimensions: { level: 'ratio', inventory: 'volume', flow: 'flow', spill: 'flow', balance: 'volume' } as const,
     initialize: q => ({ inventory: q.capacity * q.initialLevel, flow: 0, spill: 0, balance: 0 }),
     advance: (s, i, q, dt) => {
         const incoming = Math.max(0, i.inflow), available = s.inventory + incoming * dt;
@@ -56,8 +56,8 @@ const reservoir = installed({ kind: 'reservoir', title: 'Буферная ёмк
         const inventory = clamp(available - (flow + spill) * dt, 0, q.capacity);
         return { inventory, flow, spill, balance: inventory - s.inventory - dt * (incoming - flow - spill) };
     }, observe: (s, q) => ({ ...s, level: 100 * s.inventory / q.capacity }) });
-const valve = installed({ kind: 'motor-valve', title: 'Регулирующий клапан', visual: 'valve', inputs: { demand: .5, pressure: 1 },
-    parameters: { travel: p(2, .1, 60), capacity: p(.3, .01, 10) }, outputs: { opening: '%', flow: 'отн.' },
+const valve = installed({ kind: 'motor-valve', title: 'Регулирующий клапан', visual: 'valve', inputs: { demand: .5, pressure: 1 }, inputDimensions: { demand: 'ratio', pressure: 'pressure' } as const,
+    parameters: { travel: p(2, .1, 60), capacity: p(.3, .01, 10) }, outputs: { opening: '%', flow: 'отн.' }, outputDimensions: { opening: 'ratio', flow: 'flow' } as const,
     initialize: () => ({ opening: .5, flow: .15 }),
     advance: (s, i, q, dt) => { const opening = approach(s.opening, clamp(i.demand), dt, q.travel); return { opening, flow: q.capacity * opening * Math.sqrt(Math.max(0, i.pressure)) }; },
     observe: s => ({ opening: s.opening * 100, flow: s.flow }) });
@@ -70,16 +70,16 @@ const switchgear = installed({ kind: 'switchgear', title: 'Щит питания
     parameters: { limit: p(1.5, .1, 10) }, outputs: { voltage: 'отн.', closed: 'лог.', trip: 'лог.' }, outputTypes: { closed: 'boolean', trip: 'boolean' } as const,
     initialize: () => ({ voltage: 1, closed: 1, trip: 0 }),
     advance: (s, i, q) => { const trip = s.trip || i.load > q.limit ? 1 : 0, closed = i.demand > .5 && !trip ? 1 : 0; return { voltage: Math.max(0, i.voltage) * closed, closed, trip }; }, observe: s => ({ ...s }) });
-const fan = installed({ kind: 'fan', title: 'Вентиляция и теплоотвод', visual: 'fan', inputs: { voltage: 1, demand: .8 },
-    parameters: { inertia: p(3, .1, 120) }, outputs: { airflow: 'отн.', rpm: 'об/мин', load: 'отн.' },
+const fan = installed({ kind: 'fan', title: 'Вентиляция и теплоотвод', visual: 'fan', inputs: { voltage: 1, demand: .8 }, inputDimensions: { voltage: 'voltage', demand: 'ratio' } as const,
+    parameters: { inertia: p(3, .1, 120) }, outputs: { airflow: 'отн.', rpm: 'об/мин', load: 'отн.' }, outputDimensions: { airflow: 'flow', rpm: 'rotational-speed', load: 'power' } as const,
     initialize: () => ({ speed: .8 }), advance: (s, i, q, dt) => ({ speed: approach(s.speed, clamp(i.voltage) * clamp(i.demand), dt, q.inertia) }),
     observe: s => ({ airflow: s.speed, rpm: 1200 * s.speed, load: .3 * s.speed ** 3 }) });
 
 
 /** Balance-of-plant primitives in normalized teaching units. Never site operating data. */
 const motor = installed({ kind: 'electric-motor', title: 'Электропривод', visual: 'motor',
-    inputs: { voltage: 1, demand: .85 }, parameters: { inertia: p(5, .1, 60) },
-    outputs: { speed: 'отн.', rpm: 'об/мин', load: 'отн.' },
+    inputs: { voltage: 1, demand: .85 }, inputDimensions: { voltage: 'voltage', demand: 'ratio' } as const, parameters: { inertia: p(5, .1, 60) },
+    outputs: { speed: 'отн.', rpm: 'об/мин', load: 'отн.' }, outputDimensions: { speed: 'ratio', rpm: 'rotational-speed', load: 'power' } as const,
     initialize: () => ({ speed: .85 }),
     advance: (s, i, q, dt) => ({ speed: approach(s.speed, clamp(i.voltage) * clamp(i.demand, 0, 1.2), dt, q.inertia) }),
     observe: s => ({ speed: s.speed, rpm: s.speed * 1500, load: .25 * s.speed ** 3 }) });
@@ -118,8 +118,8 @@ const relief = installed({ kind: 'relief-valve', title: 'Предохранит�
         return { opening, flow: opening * q.capacity * Math.sqrt(Math.max(0, i.pressure - i.downstream)) }; },
     observe: s => ({ flow: s.flow, opening: s.opening * 100 }) });
 const transformer = installed({ kind: 'transformer', title: 'Трансформатор', visual: 'transformer',
-    inputs: { voltage: 1, load: .2 }, parameters: { efficiency: p(.96, .5, 1), thermalTime: p(20, 1, 100) },
-    outputs: { voltage: 'отн.', temperature: 'отн.', loss: 'отн.' },
+    inputs: { voltage: 1, load: .2 }, inputDimensions: { voltage: 'voltage', load: 'power' } as const, parameters: { efficiency: p(.96, .5, 1), thermalTime: p(20, 1, 100) },
+    outputs: { voltage: 'отн.', temperature: 'отн.', loss: 'отн.' }, outputDimensions: { voltage: 'voltage', temperature: 'temperature', loss: 'power' } as const,
     initialize: () => ({ voltage: 1, temperature: .2, loss: 0 }),
     advance: (s, i, q, dt) => { const loss = Math.max(0, i.load) * (1 - q.efficiency);
         return { voltage: clamp(i.voltage, 0, 1.5), loss, temperature: approach(s.temperature, .2 + loss * 2, dt, q.thermalTime) }; }, observe: s => ({ ...s }) });
@@ -145,7 +145,7 @@ const thermalStore = installed({ kind: 'thermal-store', title: 'Тепловой
 
 
 // Low-energy fictional commissioning bench. It has no connection to nuclear controls.
-const dcSupply=installed({kind:'dc-supply',visual:'dcSupply',title:'Источник 24 V DC · стенд',inputs:{enable:1},parameters:{voltage:p(24,12,24)},outputs:{voltage:'V',return:'V'},initialize:()=>({voltage:0,return:0}),advance:(_s,i,q)=>({voltage:i.enable>0?q.voltage:0,return:0}),observe:s=>({...s})});
+const dcSupply=installed({kind:'dc-supply',visual:'dcSupply',title:'Источник 24 V DC · стенд',inputs:{enable:1},inputDimensions:{enable:'ratio'} as const,parameters:{voltage:p(24,12,24)},outputs:{voltage:'V',return:'V'},outputDimensions:{voltage:'voltage',return:'voltage'} as const,initialize:()=>({voltage:0,return:0}),advance:(_s,i,q)=>({voltage:i.enable>0?q.voltage:0,return:0}),observe:s=>({...s})});
 const transmitter=installed({kind:'transmitter',visual:'transmitter',title:'Измерительный преобразователь',inputs:{value:0},parameters:{gain:p(1,0,1000)},outputs:{value:'отн.'},initialize:()=>({value:0}),advance:(_s,i,q)=>({value:i.value*q.gain}),observe:s=>({...s})});
 const contactor=installed({kind:'contactor',visual:'contactor',title:'Промежуточное реле · стенд',inputs:{coil:0,supply:0},parameters:{travel:p(.1,.02,1)},outputs:{voltage:'V',closed:'доля'},initialize:()=>({voltage:0,closed:0}),advance:(s,i,q,dt)=>{const closed=approach(s.closed,i.coil>0?1:0,dt,q.travel);return{closed,voltage:closed>.8?i.supply:0};},observe:s=>({...s})});
 const indicator=installed({kind:'indicator',visual:'indicator',title:'Сигнальная лампа · стенд',inputs:{voltage:0},parameters:{nominal:p(24,12,24)},outputs:{brightness:'доля'},initialize:()=>({brightness:0}),advance:(_s,i,q)=>({brightness:clamp(i.voltage/q.nominal)}),observe:s=>({...s})});
