@@ -3,6 +3,8 @@ import { failCode } from './diagnostics';
 import { evaluate } from './expressions';
 import { chartSVG, escape } from './graphics';
 
+export type PresentationTarget = 'web' | 'report' | 'saturn-plc-320';
+
 /** One serializable presentation tree. Bindings belong to each usage, not the widget. */
 export type ViewNode =
     | { kind: 'group'; title?: string; direction: 'row'|'column'; children: ViewNode[] }
@@ -15,7 +17,7 @@ export interface Presentation { id: string; title: string; body: ViewNode; bindi
 export interface PresentationContext { values: Record<string, Sample>; rows?: Record<string,unknown>[]; interactive?: boolean }
 const key = (s:unknown):s is string => typeof s==='string'&&/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/.test(s);
 const text = (s:unknown, limit=200):s is string => typeof s==='string'&&s.length<=limit;
-export function validatePresentation(view:Presentation, target:'web'|'report'|'plc'='web'):void {
+export function validatePresentation(view:Presentation, target:PresentationTarget='web'):void {
     if(!view||!key(view.id)||!text(view.title)||!view.bindings||Array.isArray(view.bindings)||Object.keys(view.bindings).length>64)failCode('SATURN_PRESENTATION_INVALID',{reason:'malformed'},{field:'root'});
     for(const k of Object.keys(view.bindings))if(!key(k))failCode('SATURN_PRESENTATION_INVALID',{reason:'invalid'},{field:'binding'});
     let count=0;
@@ -34,7 +36,7 @@ export function validatePresentation(view:Presentation, target:'web'|'report'|'p
             case 'action':if(!text(node.label)||!key(node.target)||!Number.isFinite(node.value))failCode('SATURN_PRESENTATION_INVALID',{reason:'invalid'},{field:'action'});break;
             default:failCode('SATURN_PRESENTATION_INVALID',{reason:'unknown'},{field:'node'});
         }
-        if(target==='plc'&&!['group','text','value'].includes(node.kind))failCode('SATURN_PRESENTATION_INVALID',{reason:'invalid'},{target:'plc',nodeKind:node.kind});
+        if(target==='saturn-plc-320'&&!['group','text','value'].includes(node.kind))failCode('SATURN_PRESENTATION_INVALID',{reason:'invalid'},{target:'plc',nodeKind:node.kind});
     };
     visit(view.body,0);
 }
