@@ -2,6 +2,9 @@ name: Standalone Windows
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - feat/standalone-pack
@@ -15,6 +18,7 @@ concurrency:
 
 jobs:
   windows:
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'release/')
     runs-on: [self-hosted, windows]
     timeout-minutes: 20
     defaults:
