@@ -1,0 +1,36 @@
+name: Saturn core authoring
+
+on:
+  pull_request:
+    paths:
+      - 'plant/**'
+      - 'packages/core/**'
+      - 'examples/consumer/**'
+      - 'tsconfig.plant.json'
+      - 'scripts/consumer-test.mjs'
+      - '.github/workflows/core-authoring.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-authoring-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run plant:typecheck
+      - run: npm run plant:test
+      - run: npm run test:consumer
