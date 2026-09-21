@@ -15,6 +15,7 @@ function buildCatalog(document) {
           type: item.type,
           title: item.title,
           source: typeof item.source === 'string' ? item.source : group.id,
+          visual: typeof item.visual === 'string' ? item.visual : '',
           tag: typeof item.tag === 'string' ? item.tag : '',
         })),
     }))
