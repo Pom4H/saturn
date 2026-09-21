@@ -100,6 +100,32 @@ An engineering Saturn can connect to an operator Saturn while keeping local sour
 
 See [Standalone Saturn](docs/standalone.md) and [ADR-0001](docs/adr/0001-saturn-system-architecture.md).
 
+## Optional managed Environment: Saturn Cloud
+
+Saturn Core does not require a vendor server. A local runtime can remain completely
+self-hosted and offline.
+
+For installations that do not want to operate an Internet-facing server, the
+repository also contains the commercial-source **Saturn Cloud** composition:
+
+```text
+Saturn Cloud
+     ^
+     | outbound WebSocket
+     |
+local Saturn runtime
+     |
+ PLC / I/O / HMI
+```
+
+Cloud mirrors project/revision state and sampled telemetry, provides remote history
+and exposes the normal Saturn Environment API. The local runtime remains the
+authority for physical state and command acceptance. If Cloud or the WAN disappears,
+the installation keeps running locally.
+
+See [Saturn Cloud](cloud/README.md) and
+[ADR-0007](docs/adr/0007-saturn-cloud.md).
+
 ## Use Saturn where you engineer
 
 Saturn is one application; projects stay ordinary directories.
@@ -200,4 +226,7 @@ Useful documentation:
 
 ## License
 
-MIT © Roman Popov.
+Saturn Core is MIT © Roman Popov.
+
+The commercial-source `cloud/` directory is explicitly excluded from the root MIT
+grant and is governed by [cloud/LICENSE](cloud/LICENSE).

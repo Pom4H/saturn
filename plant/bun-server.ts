@@ -5,6 +5,7 @@ import { BunSql } from './adapters/bun-sql';
 import { GitRepository } from './adapters/git';
 import { BunAuth } from './adapters/bun-auth';
 import { Push } from './adapters/push';
+import { CloudEdge, type CloudEdgeOptions } from './cloud-edge';
 import { runReport } from './adapters/bun-reports';
 import { Store } from './store';
 import { Service } from './service';
@@ -104,6 +105,7 @@ export async function startPlantServer(options: {
     root?: string;
     autoTick?: boolean;
     pushSubject?: string;
+    cloud?: CloudEdgeOptions;
     unix?: string;
     tls?: { cert: string; key: string; ca?: string[] };
     http2?: boolean;
@@ -125,6 +127,7 @@ export async function startPlantServer(options: {
     }
     const service = new Service(store, repository, { reportRunner: runReport });
     await service.start(demoFiles);
+    const cloud = options.cloud ? new CloudEdge(service, options.cloud) : null;
 
     const auth = new BunAuth(store);
     const password = options.password ?? randomBytes(18).toString('base64url');
@@ -382,6 +385,7 @@ export async function startPlantServer(options: {
         origin = `${scheme}://${urlHost}:${server.port ?? options.port ?? 4176}`;
     }
 
+    cloud?.start();
     const unsubscribeWebSockets = service.subscribe(frame => {
         server.publish(liveTopic, JSON.stringify({ type: 'frame', frame }));
     });
@@ -417,10 +421,11 @@ export async function startPlantServer(options: {
     }, 60_000);
 
     return {
-        server, service, auth, push, origin, initialPassword: created ? password : null,
+        server, service, auth, push, cloud, origin, initialPassword: created ? password : null,
         async close() {
             if (stopping) return;
             stopping = true;
+            cloud?.stop();
             if (timer) clearTimeout(timer);
             if (control) clearInterval(control);
             schedule?.stop();

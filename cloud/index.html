@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Saturn Cloud</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand"><span class="mark">S</span><strong>Saturn</strong><span>Cloud</span></div>
+      <div id="connection" class="connection"><i></i><span>connecting</span></div>
+    </header>
+
+    <section id="login-view" class="login-card">
+      <div>
+        <p class="eyebrow">MANAGED ENVIRONMENT</p>
+        <h1>Открыть объект</h1>
+        <p class="muted">Saturn Cloud показывает состояние удалённого runtime. Управление объектом остаётся на локальном Saturn.</p>
+      </div>
+      <form id="login">
+        <label>Пользователь<input name="user" autocomplete="username" value="operator" required></label>
+        <label>Пароль<input name="password" type="password" autocomplete="current-password" required></label>
+        <button>Войти</button>
+        <p id="login-error" class="error"></p>
+      </form>
+    </section>
+
+    <section id="runtime-view" class="runtime" hidden>
+      <div class="context">
+        <div><small>PROJECT</small><strong id="project-title">—</strong></div>
+        <div><small>ENVIRONMENT</small><strong id="environment">—</strong></div>
+        <button id="logout" class="quiet">Выйти</button>
+      </div>
+
+      <div class="revision-chain">
+        <article><small>SOURCE</small><strong id="head">—</strong></article>
+        <span>→</span>
+        <article><small>PUBLISHED</small><strong id="published">—</strong></article>
+        <span>→</span>
+        <article><small>APPLIED</small><strong id="applied">—</strong></article>
+      </div>
+
+      <div class="grid">
+        <section class="panel signals">
+          <div class="panel-head"><h2>Signals</h2><span id="signal-count">0</span></div>
+          <div class="table-head"><span>Signal</span><span>Value</span><span>Quality</span></div>
+          <div id="signals"></div>
+        </section>
+        <aside>
+          <section class="panel">
+            <div class="panel-head"><h2>Runtime</h2></div>
+            <dl>
+              <div><dt>Instance</dt><dd id="instance">—</dd></div>
+              <div><dt>Run</dt><dd id="run">—</dd></div>
+              <div><dt>Last seen</dt><dd id="last-seen">—</dd></div>
+            </dl>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><h2>Alarms</h2><span id="alarm-count">0</span></div>
+            <div id="alarms" class="alarms"><p class="muted">Нет активных аварий</p></div>
+          </section>
+        </aside>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

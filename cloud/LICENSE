@@ -1,0 +1,14 @@
+Saturn Cloud Commercial Source License Notice
+
+Copyright (c) 2026 Roman Popov. All rights reserved.
+
+The software contained in this cloud/ directory is not licensed under the MIT
+license that applies to Saturn Core. Source is provided for inspection and
+development of Saturn Cloud.
+
+Production use, redistribution, resale, operating Saturn Cloud as a hosted
+service for third parties, sublicensing, or other commercial use requires a
+separate written commercial license from the copyright holder.
+
+Saturn Core outside this directory remains governed by the license stated at
+the repository root.

@@ -130,6 +130,12 @@ const kiosk = args.includes('--kiosk');
 const projectArgument = args.find(arg => !arg.startsWith('--')) ?? process.env.SATURN_PROJECT;
 const registry = new WorkspaceRegistry(resolve(appData, 'workspace.json'));
 const extensionManager = new ExtensionManager(resolve(appData, 'extensions'));
+const cloudUrl = process.env.SATURN_CLOUD_URL;
+const cloudSite = process.env.SATURN_CLOUD_SITE;
+const cloudToken = process.env.SATURN_CLOUD_TOKEN;
+const cloudValues = [cloudUrl, cloudSite, cloudToken];
+if (cloudValues.some(Boolean) && !cloudValues.every(Boolean))
+    throw new Error('SATURN_CLOUD_URL, SATURN_CLOUD_SITE and SATURN_CLOUD_TOKEN must be configured together');
 
 let files = SATURN_DEMO_FILES;
 let projectDirectory: string | null = null;
@@ -179,6 +185,7 @@ app = await startPlantHttpServer({
     staticReader: standaloneExecutable ? readEmbeddedPlantAsset : undefined,
     autoTick: true,
     pushSubject: process.env.SCADA_PUSH_SUBJECT,
+    cloud: cloudUrl && cloudSite && cloudToken ? { url: cloudUrl, site: cloudSite, token: cloudToken } : undefined,
     uiMode: kiosk ? 'kiosk' : command === 'run' ? 'runtime' : 'ide',
     application: {
         version: SATURN_VERSION,
@@ -208,6 +215,8 @@ console.log(`Project: ${projectTitle}${projectDirectory ? ` · ${projectDirector
 console.log(`SCADA: ${app.origin}/plant/app/`);
 console.log(`Demo:  ${app.origin}/plant/demo/`);
 console.log(`Data:  ${dataDirectory}`);
+if (cloudUrl && cloudSite)
+    console.log(`Cloud: ${cloudSite} @ ${cloudUrl}`);
 if (!projectDirectory) {
     const recent = (await registry.read()).recent.slice(0, 5);
     if (recent.length) {

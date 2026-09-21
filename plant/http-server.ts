@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { Auth } from './adapters/auth';
 import { EnvironmentBroker } from './environment';
+import { CloudEdge, type CloudEdgeOptions } from './cloud-edge';
 import { Push } from './adapters/push';
 import { Store } from './store';
 import { Service } from './service';
@@ -34,6 +35,7 @@ export async function startPlantHttpServer(options: {
     root?: string;
     autoTick?: boolean;
     pushSubject?: string;
+    cloud?: CloudEdgeOptions;
     uiMode?: 'ide' | 'runtime' | 'kiosk';
     application?: {
         version: string;
@@ -60,6 +62,7 @@ export async function startPlantHttpServer(options: {
     const repository = options.projectRepository;
     const service = new Service(store, repository, { reportRunner: options.reportRunner });
     await service.start(options.seed);
+    const cloud = options.cloud ? new CloudEdge(service, options.cloud) : null;
     const auth = new Auth(store), environments = new EnvironmentBroker(), password = options.password ?? randomBytes(18).toString('base64url'), username = options.user ?? 'engineer';
     const created = auth.seed(username, password);
     const push = options.pushSubject ? new Push(store, options.pushSubject) : null;
@@ -447,6 +450,7 @@ export async function startPlantHttpServer(options: {
         origin = `http://127.0.0.1:${(server.address() as {
             port: number;
         }).port}`;
+    cloud?.start();
     let timer: ReturnType<typeof setTimeout> | undefined, stopping = false;
     const step = () => { if (stopping)
         return; const started = performance.now(); try {
@@ -467,6 +471,6 @@ export async function startPlantHttpServer(options: {
     catch (error) {
         console.error(error);
     } }, 1000);
-    return { server, service, auth, push, origin, initialPassword: created ? password : null, async close() { stopping = true; clearTimeout(timer); clearInterval(control); for (const stream of streams)
+    return { server, service, auth, push, cloud, origin, initialPassword: created ? password : null, async close() { stopping = true; cloud?.stop(); clearTimeout(timer); clearInterval(control); for (const stream of streams)
             stream.destroy(); await new Promise<void>(resolve => server.close(() => resolve())); await service.idle(); store.db.close(); } };
 }
