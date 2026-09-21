@@ -17,8 +17,8 @@ export async function openBrowserSql(options: {
     if (options.memory)
         handle = new sqlite.oo1.DB(':memory:', 'ct') as unknown as BrowserSqlHandle;
     else {
-        const pool = await sqlite.installOpfsSAHPoolVfs({ name: 'scada-plant', directory: '/scada-plant-v1', initialCapacity: 6 });
-        handle = new pool.OpfsSAHPoolDb('/plant.sqlite3') as unknown as BrowserSqlHandle;
+        const pool = await sqlite.installOpfsSAHPoolVfs({ name: 'saturn-runtime-v2', directory: '/saturn-runtime-v2', initialCapacity: 6 });
+        handle = new pool.OpfsSAHPoolDb('/runtime.sqlite3') as unknown as BrowserSqlHandle;
     }
     handle.exec('PRAGMA foreign_keys=ON; PRAGMA trusted_schema=OFF;');
     const db: SqlDatabase = {
