@@ -48,9 +48,9 @@ export function compileProject(files: Record<string, string>, entry = files['src
     const dirname = (path: string) => path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
     const resolveLocal = (from: string, specifier: string): string => {
         const base = normalize([dirname(from), specifier].filter(Boolean).join('/'));
-        const candidates = /\.(?:ts|tsx)$/.test(base)
+        const candidates = /\.ts$/.test(base)
             ? [base]
-            : [base + '.ts', base + '.tsx', base + '/index.ts', base + '/index.tsx'];
+            : [base + '.ts', base + '/index.ts'];
         const found = candidates.find(path => Object.prototype.hasOwnProperty.call(files, path));
         if (!found) failCode('SATURN_NOT_FOUND',{resource:'module',id:specifier},{from,specifier,candidates});
         return found;
@@ -73,7 +73,7 @@ export function compileProject(files: Record<string, string>, entry = files['src
         if (existing) return existing;
         if (loading.has(path)) failCode('SATURN_DSL_INVALID',{reason:'cycle'},{path});
         const source = files[path];
-        if (typeof source !== 'string' || !/\.(?:ts|tsx)$/.test(path))
+        if (typeof source !== 'string' || !/\.ts$/.test(path))
             failCode('SATURN_NOT_FOUND',{resource:'module',id:path},{path});
 
         const transpiled = ts.transpileModule(source, {
@@ -82,8 +82,6 @@ export function compileProject(files: Record<string, string>, entry = files['src
             compilerOptions: {
                 target: ts.ScriptTarget.ES2022,
                 module: ts.ModuleKind.CommonJS,
-                moduleResolution: ts.ModuleResolutionKind.Bundler,
-                jsx: ts.JsxEmit.ReactJSX,
                 esModuleInterop: true,
                 isolatedModules: true,
                 sourceMap: false,
