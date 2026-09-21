@@ -71,7 +71,7 @@ export async function startPlantHttpServer(options: {
             return candidate;
         const file = await realpath(candidate);
         if (file !== root && !file.startsWith(root + sep))
-            throw new AppError('Path rejected', 403);
+            failCode('SATURN_PERMISSION',{role:'static-path'},{path:relativePath},{status:403});
         return file;
     };
     const readStatic = async (relativePath: string): Promise<Buffer> => {
@@ -98,12 +98,12 @@ export async function startPlantHttpServer(options: {
                 path = decodeURIComponent(url.pathname);
             }
             catch {
-                throw new AppError('Malformed URL');
+                failCode('SATURN_HTTP_INVALID',{reason:'malformed'},{field:'url'});
             }
             if (req.method === 'POST' && req.headers.origin && req.headers.origin !== origin)
-                throw new AppError('Cross-origin write blocked', 403);
+                failCode('SATURN_PERMISSION',{role:'same-origin'},{origin:req.headers.origin},{status:403});
             if (path === '/') {
-                if (!['GET', 'HEAD'].includes(req.method ?? '')) throw new AppError('Method not allowed', 405);
+                if (!['GET', 'HEAD'].includes(req.method ?? '')) failCode('SATURN_HTTP_INVALID',{reason:'disabled'},{method:req.method,path},{status:405});
                 html(200, req.method === 'HEAD' ? '' : (await readStatic('site/index.html')).toString('utf8').replaceAll('/plant/', `${prefix}/`));
                 return;
             }
@@ -117,7 +117,7 @@ export async function startPlantHttpServer(options: {
                     const remote = req.socket.remoteAddress ?? '';
                     const loopback = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1';
                     if (!origin.startsWith('https:') && !loopback)
-                        throw new AppError('Bearer login requires HTTPS outside loopback', 400);
+                        failCode('SATURN_HTTP_INVALID',{reason:'invalid'},{field:'bearer.transport'},{status:400});
                     json(200, { actor: session.actor, token: session.token, expiresIn: 28800 });
                 }
                 else {
@@ -338,7 +338,7 @@ export async function startPlantHttpServer(options: {
                     if (action === 'extensions/remove') {
                         requireRole(actor, 'engineer');
                         if (!options.application?.extensions)
-                            throw new AppError('Extension installation is not available in this Saturn composition', 503);
+                            failCode('SATURN_EXTENSION_INVALID',{reason:'disabled'},{resource:'extension-host'},{status:503});
                         if (typeof input.name !== 'string')
                             failCode('SATURN_EXTENSION_INVALID',{reason:'missing'},{field:'name'});
                         await options.application.extensions.remove(input.name);
