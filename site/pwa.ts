@@ -195,7 +195,7 @@ async function requestNotifications(): Promise<void> {
 async function testNotification(): Promise<void> {
   if (permission() !== 'granted' || !registration?.active) return;
   await runAction(async () => {
-    await registration!.showNotification('Saturn', { body: 'Проверочное уведомление. Уведомления на этом устройстве работают.', icon: '/site/assets/icon-192.png', tag: 'saturn-notification-test' });
+    await registration!.showNotification('Saturn', { body: 'Проверочное уведомление. Уведомления на этом устройстве работают.', icon: new URL('site/assets/icon-192.png', document.baseURI).href, tag: 'saturn-notification-test' });
     settingsMessage('Проверочное уведомление передано системе. Его показ зависит от настроек устройства.');
   }, 'Система не приняла уведомление. Проверьте разрешения браузера и устройства.');
 }
@@ -220,7 +220,8 @@ function observeWorker(worker: ServiceWorker | null): void {
 async function registerWorker(): Promise<void> {
   if (!('serviceWorker' in navigator) || !window.isSecureContext) { networkState(); return; }
   try {
-    registration = await navigator.serviceWorker.register('/saturn-sw.js', { scope: '/' });
+    const root = new URL('./', document.baseURI);
+    registration = await navigator.serviceWorker.register(new URL('saturn-sw.js', root).href, { scope: root.pathname });
     observeWorker(registration.installing);
     registration.addEventListener('updatefound', () => { observeWorker(registration!.installing); renderSettings(); });
     networkState();

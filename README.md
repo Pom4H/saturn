@@ -6,7 +6,7 @@ Saturn is an open-source engineering IDE and runtime for physical systems. Descr
 
 ![Saturn turns one typed engineering model into HMI, signals, history, reports, PLC bindings and deployment](docs/assets/saturn-domain-model.svg)
 
-[Open browser editor](https://pom4h.github.io/scada/) · [DSL reference](docs/plant/dsl.md) · [Architecture](docs/adr/0001-saturn-system-architecture.md) · [Developer guide](docs/developer/language-tooling.md)
+[Open browser editor](https://pom4h.github.io/saturn/) · [DSL reference](docs/plant/dsl.md) · [Architecture](docs/adr/0001-saturn-system-architecture.md) · [Developer guide](docs/developer/language-tooling.md)
 
 ## The project is the model
 
@@ -155,7 +155,7 @@ See [report DSL](docs/plant/dsl.md#reports).
 
 ## What is implemented
 
-The current codebase includes the typed `@saturn/core` DSL, AST validation, source-preserving visual edits, CodeMirror engineering shell, 2D/3D views, equipment catalog metadata, alarms, controls, historian, replay/comparison, project-defined reports, Git-backed project/release workflow, standalone packaging, extensions, signed application updates and a native VS Code host.
+The current codebase includes the typed `@saturn/core` DSL, AST validation, source-preserving visual edits, CodeMirror engineering shell, 2D/3D views, equipment catalog metadata, alarms, controls, historian, replay/comparison, project-defined reports, Git-backed project/release workflow, standalone packaging, extensions, a signed update protocol and a native VS Code host.
 
 The repository also contains simulation models used for development and demonstrations. They are intentionally bounded engineering models, not validated process solvers.
 

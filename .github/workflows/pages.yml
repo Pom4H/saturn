@@ -43,12 +43,13 @@ jobs:
             runtime-test-results/
             challenge-results/
           retention-days: 7
+      - run: npm run pages:build
       - uses: actions/upload-pages-artifact@v5.0.0
-        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         with:
-          path: dist
+          path: dist/pages
   deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs: check
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -83,7 +84,7 @@ jobs:
       - name: Verify the published Pages URL in a real browser
         run: node scripts/verify-live.mjs
         env:
-          PLAYGROUND_URL: ${{ needs.deploy.outputs.page_url }}
+          SATURN_URL: ${{ needs.deploy.outputs.page_url }}
       - uses: actions/upload-artifact@v7.0.1
         if: always()
         with:

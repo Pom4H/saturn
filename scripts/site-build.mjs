@@ -22,7 +22,8 @@ export async function buildSite(outdir = 'dist/site') {
   const bundle = await build({ entryPoints: { site: 'site/main.ts' }, metafile: true, entryNames: '[name]-[hash]', bundle: true, splitting: true, format: 'esm', platform: 'browser', target: 'es2022', minify: true,
     outdir: `${outdir}/assets`, chunkNames: '[name]-[hash]', legalComments: 'linked', define: { __VSCODE_EXTENSION__: JSON.stringify(extensionId) } });
   const [entry, metadata] = Object.entries(bundle.metafile.outputs).find(([, metadata]) => metadata.entryPoint === 'site/main.ts');
-  const html = (await readFile('site/index.html', 'utf8')).replace('/site/assets/site.js', '/site/assets/' + basename(entry)).replace('/site/assets/site.css', '/site/assets/' + basename(metadata.cssBundle));
+  const revision = process.env.GITHUB_SHA || `local-${Date.now()}`;
+  const html = (await readFile('site/index.html', 'utf8')).replace('./site/assets/site.js', './site/assets/' + basename(entry)).replace('./site/assets/site.css', './site/assets/' + basename(metadata.cssBundle)).replace('</head>', `<meta name="saturn-revision" content="${revision}"></head>`);
   await writeFile(`${outdir}/index.html`, html);
   await cp('site/mark.svg', `${outdir}/assets/mark.svg`);
   await cp('site/saturn-icon.png', `${outdir}/assets/saturn-icon.png`);
@@ -38,7 +39,7 @@ export async function buildSite(outdir = 'dist/site') {
   hash.update(await readFile(`${outdir}/index.html`));
   hash.update(await readFile('site/sw.js'));
   for (const name of files) hash.update(await readFile(`${outdir}/assets/${name}`));
-  const assets = ['/', ...files.filter(name => /\.(js|css|png|svg|json|md)$/.test(name)).map(name => `/site/assets/${name}`)];
+  const assets = ['', ...files.filter(name => /\.(js|css|png|svg|json|md)$/.test(name)).map(name => `site/assets/${name}`)];
   const worker = (await readFile('site/sw.js', 'utf8')).replace('__SATURN_CACHE__', 'saturn-landing-' + hash.digest('hex').slice(0, 16)).replace('__SATURN_ASSETS__', JSON.stringify(assets));
   await writeFile(`${outdir}/saturn-sw.js`, worker);
   console.log(`Saturn landing built → ${outdir}`);

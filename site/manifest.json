@@ -1,17 +1,32 @@
 {
-  "id": "/?app=saturn-studio",
-  "name": "Saturn SCADA",
+  "id": "../../?app=saturn-studio",
+  "name": "Saturn",
   "short_name": "Saturn",
-  "description": "От модели к рабочей схеме. Одна среда для установки, схемы и исходника.",
+  "description": "Инженерная IDE и runtime для физических систем.",
   "lang": "ru",
-  "start_url": "/?app=saturn-studio#workspace",
-  "scope": "/",
+  "start_url": "../../?app=saturn-studio#workspace",
+  "scope": "../../",
   "display": "standalone",
   "background_color": "#09090b",
   "theme_color": "#09090b",
   "icons": [
-    { "src": "/site/assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/site/assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
   ],
-  "shortcuts": [{ "name": "Открыть рабочую среду", "url": "/?app=saturn-studio#workspace" }]
+  "shortcuts": [
+    {
+      "name": "Открыть рабочую среду",
+      "url": "../../?app=saturn-studio#workspace"
+    }
+  ]
 }

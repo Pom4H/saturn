@@ -38,7 +38,8 @@
     "authoring:typecheck": "tsc --noEmit -p tsconfig.authoring.json",
     "authoring:test": "node scripts/authoring-check.mjs && npm run architecture:check",
     "architecture:check": "node scripts/architecture-invariants.mjs",
-    "plant:bun:smoke": "npm run plant:build && bun run plant/tests/bun-smoke.ts"
+    "plant:bun:smoke": "npm run plant:build && bun run plant/tests/bun-smoke.ts",
+    "pages:build": "node scripts/pages-build.mjs"
   },
   "keywords": [],
   "author": "Roman Popov",
