@@ -34,7 +34,7 @@ The existing `@scada/core` factories remain valid. `runtime({server, project, ru
 
 - Root: protocol, core/component metadata, compiler/AST edits, main UI orchestration, connection/history client, HTML, build/package/CI, documentation and integration.
 - Server engineer: `server/**`, `src/components/filter/behavior.ts`, `tests/server-model.test.ts`; server installed behavior composition.
-- Designer: `src/view.ts`, `src/view3d.ts`, `src/style.css`, `src/visual-components.ts`, `src/components/filter/visual.ts`, `lab3d/models.ts`; representation hooks and visual review.
+- Designer: `src/view.ts`, `src/view3d.ts`, `src/style.css`, `src/visual-components.ts`, `src/components/filter/visual.ts`, `src/elements/models3d.ts`, `lab3d/**`; representation hooks and visual review.
 - Independent QA: `tests/runtime-contract.test.ts`, `tests/e2e/runtime*.spec.ts`, `scripts/runtime-qa*.mjs`, `playwright.runtime.config.ts`; independent acceptance and evidence. Production defects return to their owners.
 
 Agents do not commit or modify another owner's files. Root integrates all changes in one feature branch and PR.

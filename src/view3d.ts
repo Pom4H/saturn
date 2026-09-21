@@ -6,7 +6,7 @@ import { catalog, type Equipment, type Scene, type SceneGroup } from './core';
 import { layout, tapPoint } from './geometry';
 import { numeric, type RuntimeFrame } from './runtime/protocol';
 import { get3dRenderer, observation, observationAlarm, observationQuality, observedFlows, type EquipmentModel3D, type Renderer3D, type Renderer3DContext } from './view';
-import { createModel, materials, tubeBetween } from '../lab3d/models';
+import { createModel, materials, tubeBetween } from './elements/models3d';
 import { registry } from './elements/core-elements';
 import type { Signals } from './next/model';
 
