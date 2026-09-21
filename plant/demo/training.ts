@@ -15,5 +15,5 @@ export const trainingAlarms = [
     alarm('lab-damage', { title: 'Учебный стенд: накопленное повреждение', signal: store.damage, above: .01, clearBelow: .001, priority: 'critical', delay: 0 }),
 ];
 export const trainingReport = report('lab-recovery', { title: 'Учебный стенд · тепловой баланс', on: { workflow_dispatch: {} },
-    window: 900000, signals: ['LAB-THERMAL.temperature', 'LAB-THERMAL.generated', 'LAB-THERMAL.removed', 'LAB-THERMAL.damage'],
+    window: 900000, signals: [store.temperature, store.generated, store.removed, store.damage],
     sql: "SELECT signal, MAX(value) AS maximum FROM samples WHERE quality='good' GROUP BY signal", columns: [{key:'signal',title:'Сигнал'},{key:'maximum',title:'Максимум'}] });
