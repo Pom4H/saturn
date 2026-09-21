@@ -2,6 +2,7 @@ import type { Presentation } from './presentation';
 import type { Controller, ControllerState } from './controller';
 import type { Connection, Attachment } from './ports';
 import type { HmiDrawCommand } from './vendor/saturn/src/runtime';
+import { failCode } from './diagnostics';
 /** Portable contracts. No DOM, Node, filesystem, SQL driver or network imports. */
 export type Scalar = number | boolean | string;
 export type Quality = 'good' | 'bad' | 'stale' | 'offline';
@@ -340,16 +341,16 @@ export class AppError extends Error {
 export const clone = <T>(v: T): T => structuredClone(v);
 export function finite(v: unknown, name: string, min = -1e12, max = 1e12): number {
     if (typeof v !== 'number' || !Number.isFinite(v) || v < min || v > max)
-        throw new AppError(`${name}: expected ${min}..${max}`);
+        failCode('SATURN_VALUE_INVALID', { field: name, reason: 'range' }, { min, max, value: v });
     return v;
 }
 export const id = (v: unknown): string => {
     if (typeof v !== 'string' || !/^[A-Za-z][A-Za-z0-9_.-]{0,95}$/.test(v) || /(?:__proto__|constructor|prototype)/.test(v))
-        throw new AppError('Invalid identifier');
+        failCode('SATURN_VALUE_INVALID', { field: 'identifier', reason: 'invalid' }, { value: v });
     return v;
 };
 export function requireRole(actor: Actor, role: Actor['role']): void {
     const ranks = { viewer: 0, operator: 1, engineer: 2 };
     if (!(actor.role in ranks) || ranks[actor.role] < ranks[role])
-        throw new AppError('Insufficient permission', 403);
+        failCode('SATURN_PERMISSION', { role }, { actor: actor.id, actualRole: actor.role, requiredRole: role });
 }
