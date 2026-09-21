@@ -1,5 +1,5 @@
 import { simulation, bank, aggregate, control, gt, signal, report, reportField, numberField, reportSchema, reportColumn, excelColumn, excelSheet, workbook, asc } from '../dsl';
-import type { SignalId, SignalUnitOf, SignalValueOf } from '../types';
+import type { SignalDimensionOf, SignalId, SignalUnitOf, SignalValueOf } from '../types';
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
 type Assert<T extends true> = T;
 const pump = simulation('P', 'pump', { system: 'cooling', at: { x: 0, y: 0 }, inputs: { voltage: 1 }, parameters: { inertia: 2 } });
@@ -7,6 +7,7 @@ const flow = pump.flow;
 type _FlowId = Assert<Equal<SignalId<typeof flow>, 'P.flow'>>;
 type _FlowValue = Assert<Equal<SignalValueOf<typeof flow>, number>>;
 type _FlowUnit = Assert<Equal<SignalUnitOf<typeof flow>, 'отн.'>>;
+type _FlowDimension = Assert<Equal<SignalDimensionOf<typeof flow>, 'flow'>>;
 // @ts-expect-error Signals are inferred from installed model metadata.
 pump.pressure;
 // @ts-expect-error Unknown model parameter.
@@ -86,3 +87,28 @@ const guard = simulation('GUARD', 'protection', {
 type _TripId = Assert<Equal<SignalId<typeof guard.trip>, 'GUARD.trip'>>;
 type _TripValue = Assert<Equal<SignalValueOf<typeof guard.trip>, boolean>>;
 type _TripUnit = Assert<Equal<SignalUnitOf<typeof guard.trip>, 'лог.'>>;
+
+// Dimensions participate in authoring types, while runtime IR remains plain refs/ops.
+const gridTyped = simulation('GRID-T', 'supply', { system: 'cooling', at: { x: 0, y: 0 } });
+simulation('P-TYPED', 'pump', {
+    system: 'cooling',
+    at: { x: 0, y: 0 },
+    inputs: { voltage: gridTyped.voltage },
+});
+// @ts-expect-error Flow cannot feed a voltage input.
+simulation('P-WRONG-DIM', 'pump', {
+    system: 'cooling',
+    at: { x: 0, y: 0 },
+    inputs: { voltage: pump.flow },
+});
+// @ts-expect-error add() requires compatible dimensions.
+const impossibleSum = add(pump.flow, pump.rpm);
+void impossibleSum;
+// @ts-expect-error Boolean signals cannot feed numeric model inputs.
+simulation('P-WRONG-TYPE', 'pump', {
+    system: 'cooling',
+    at: { x: 0, y: 0 },
+    inputs: { voltage: valveDemand.blocked },
+});
+const scaledFlow = mul(pump.flow, .5);
+type _ScaledFlowDimension = Assert<Equal<SignalDimensionOf<typeof scaledFlow extends never ? never : typeof pump.flow>, 'flow'>>;
