@@ -46,7 +46,7 @@ Suggested next families, using source categories rather than inventing a new clo
 
 ## Why Z is only part of the change
 
-`src/next/model.ts` contains no Three.js dependency. The physical convention is **metres, right-handed, Z-up**, with unit quaternions and local port normals. The 2D drawing has independent coordinates. Old editor pixel coordinates are not silently reinterpreted as metres.
+`src/elements/model.ts` contains no Three.js dependency. The physical convention is **metres, right-handed, Z-up**, with unit quaternions and local port normals. The 2D drawing has independent coordinates. Old editor pixel coordinates are not silently reinterpreted as metres.
 
 The intended separation is:
 

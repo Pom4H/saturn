@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { advancePhase, ComponentRegistry, readSignal, worldPort } from '../src/next/model';
-import { registry, pump } from '../src/next/components';
+import { advancePhase, ComponentRegistry, readSignal, worldPort } from '../src/elements/model';
+import { registry, pump } from '../src/elements/core-elements';
 import { createModel } from '../lab3d/models';
 import { assets, fixture } from '../lab3d/fixtures';
 
