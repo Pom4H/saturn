@@ -2,7 +2,7 @@
 .project-trigger-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #project-trigger>svg { width: 12px; height: 12px; opacity: .5; margin-left: auto; }
 #project-trigger[aria-expanded=true] { background: var(--shell-hover); color: var(--text); }
-#project-picker { position: fixed; inset: auto; margin: 0; padding: 6px; border: 1px solid color-mix(in srgb, var(--line) 80%, transparent); border-radius: 12px; background: var(--shell-raised); color: var(--text); box-shadow: 0 14px 44px #0002, 0 2px 8px #0000000a; overflow: hidden; }
+#project-picker { position: fixed; inset: auto; margin: 0; padding: 6px; border: 1px solid color-mix(in srgb, var(--line) 80%, transparent); border-radius: 12px; background: var(--shell-raised); color: var(--text); box-shadow: var(--shadow-popover); overflow: hidden; }
 #project-picker:popover-open { display: flex; flex-direction: column; }
 .project-picker-search { display: flex; align-items: center; gap: 9px; padding: 5px 9px 9px; margin-bottom: 2px; border-bottom: 1px solid var(--line); }
 .project-picker-search svg { width: 15px; height: 15px; color: var(--muted); }

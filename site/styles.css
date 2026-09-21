@@ -24,6 +24,13 @@
   --status-warning: #cb9b6f;
   --status-danger: #d07b70;
   --danger-bg: #8b3f3b;
+  --focus-ring: var(--accent);
+  --syntax-ts: #6499c7;
+  --syntax-data: #ac9360;
+  --status-dirty: #b69a64;
+  --status-error: #d78068;
+  --shadow-popover: 0 14px 44px #0002, 0 2px 8px #0000000a;
+  --shadow-modal: 0 24px 90px #0006;
   --radius-control: 6px;
   --radius-panel: 10px;
   --radius-window: 12px;

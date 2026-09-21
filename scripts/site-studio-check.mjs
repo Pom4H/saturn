@@ -25,6 +25,12 @@ try {
   await page.waitForSelector('#studio-spatial canvas', { state: 'attached' });
   assert.equal(await page.locator('h1').innerText(), 'Saturn');
   assert.equal(await page.locator('.project-section,.operator,.delivery').count(), 0, 'Old landing sections must be replaced');
+  assert.equal(await page.locator('.surface-nav .surface-tab').count(), 3, 'Project shell has stable engineering surfaces');
+  assert(await page.locator('#environment-trigger').isVisible(), 'Environment is persistent application context');
+  assert.equal(await page.locator('#revision-source').textContent(), 'demo');
+  assert.equal(await page.locator('#revision-published').textContent(), '—');
+  assert.equal(await page.locator('#revision-applied').textContent(), '—');
+  assert(await page.locator('#studio-editor-pane').isVisible(), 'Desktop landing starts with source + diagram together');
   await mkdir('test-results/site-studio', { recursive: true });
   await page.screenshot({ path: 'test-results/site-studio/landing.png' });
   await page.evaluate(() => { document.documentElement.style.scrollBehavior = 'auto'; window.scrollTo(0, document.getElementById('studio').offsetTop); });
