@@ -88,6 +88,15 @@ class ProjectTreeProvider extends RefreshableTree {
   }
 }
 
+function equipmentThemeIcon(visual) {
+  if (['pump', 'fan', 'turbine', 'motor', 'alternator'].includes(visual)) return 'gear';
+  if (['reservoir', 'separator', 'accumulator', 'calorimeter'].includes(visual)) return 'database';
+  if (['sensor', 'transmitter'].includes(visual)) return 'pulse';
+  if (['saturn', 'ioModule', 'contactor', 'control', 'switchgear'].includes(visual)) return 'circuit-board';
+  if (['generator', 'battery', 'transformer', 'dcSupply'].includes(visual)) return 'plug';
+  return 'symbol-structure';
+}
+
 class CatalogTreeProvider extends RefreshableTree {
   constructor() {
     super();
@@ -133,7 +142,7 @@ class CatalogTreeProvider extends RefreshableTree {
         item.contextValue = 'saturnEquipment';
         item.description = equipment.type;
         item.tooltip = `${equipment.title}\n${equipment.type}\n${equipment.source}`;
-        item.iconPath = new vscode.ThemeIcon('symbol-structure');
+        item.iconPath = new vscode.ThemeIcon(equipmentThemeIcon(equipment.visual));
         item.command = {
           command: 'saturn.insertEquipment',
           title: 'Insert equipment',
