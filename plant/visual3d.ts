@@ -1,4 +1,4 @@
-import { terminals, footprint } from './ports';
+import { terminals, footprint, type Side, type Terminal } from './ports';
 import { drawHmiCanvas, getDisplay } from './hmi-view';
 import { renderSaturnPlcSvg } from './saturn-view';
 import type * as THREE from 'three';
@@ -195,9 +195,10 @@ export function createPlantModel(c: Renderer3DContext, visual: string, readout: 
         default: throw new Error(`No installed 3D anatomy for ${visual}`);
     }
     const size=footprint(visual);
-    for(const [name,p] of Object.entries(terminals(visual))){
+    const directions:Record<Side,THREE.Vector3>={left:new T.Vector3(-1,0,0),right:new T.Vector3(1,0,0),up:new T.Vector3(0,1,0),down:new T.Vector3(0,-1,0)};
+    for(const [name,p] of Object.entries(terminals(visual)) as [string,Terminal][]){
         const point=new T.Vector3((p.x-size.width/2)/100,-(p.y-size.height/2)/100,p.z);
-        const normal=({left:new T.Vector3(-1,0,0),right:new T.Vector3(1,0,0),up:new T.Vector3(0,1,0),down:new T.Vector3(0,-1,0)})[p.side];
+        const normal=directions[p.side];
         ports.set(name,point);portNormals.set(name,normal);
         const socket=mesh(new T.SphereGeometry(visual==='saturn'?.027:.047,8,6),p.medium==='pipe'?steel:p.medium==='power'?copper:teal,point.x,point.y,point.z);
         socket.userData.terminal=name;socket.userData.endpoint=point.toArray();
