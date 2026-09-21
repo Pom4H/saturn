@@ -1,5 +1,8 @@
 import { benchView } from './views';
-import { report } from '@saturn/core';
+import { controller } from './commissioning';
+import { reactor, temperature, voidFraction, damage } from './core';
+import { pumpA, pumpB } from './cooling';
+import { report, reportField, numberField, reportSchema, reportColumn, excelColumn, excelSheet, workbook, asc } from '@saturn/core';
 /** UTC cron and typed manual inputs. SQL sees only the declared signal data capsule. */
 export const thermalReport = report('thermal-balance', {
     title: 'Тепловое состояние и полнота данных',
@@ -7,7 +10,7 @@ export const thermalReport = report('thermal-balance', {
         workflow_dispatch: { inputs: { scale: { type: 'number', default: 1, min: 0.1, max: 10 } } },
         schedule: [{ cron: '0 * * * *' }],
     },
-    signals: ['CORE.power', 'core.temperature', 'core.void', 'core.damage', 'PUMP-A.flow', 'PUMP-B.flow'],
+    signals: [reactor.power, temperature.value, voidFraction.value, damage.value, pumpA.flow, pumpB.flow],
     window: 3600000,
     sql: `SELECT signal,
     SUM(CASE WHEN quality = 'good' THEN value * (end-start) END)
@@ -23,18 +26,37 @@ export const thermalReport = report('thermal-balance', {
         { key: 'coverage', title: 'Полнота', unit: '%' },
     ],
 });
+const transientRows = reportSchema({
+    time: numberField('ms'),
+    temperature: reportField(temperature.value),
+});
 export const transientReport = report('transient', {
     title: 'Переходный процесс · температура каналов',
     on: { workflow_dispatch: {} },
-    signals: ['core.temperature'], window: 600000,
+    signals: [temperature.value], window: 600000,
     sql: `SELECT time, CASE WHEN quality='good' THEN value ELSE NULL END AS temperature
     FROM samples WHERE signal='core.temperature' ORDER BY time`,
-    columns: [{ key: 'time', title: 'Модельное время, UTC ms' }, { key: 'temperature', title: 'Температура', unit: 'отн.' }],
+    schema: transientRows,
+    columns: [
+        reportColumn('Модельное время, UTC ms', transientRows.time),
+        reportColumn('Температура', transientRows.temperature),
+    ],
     chart: { x: 'time', y: 'temperature', title: 'Температура и разрывы качества' },
+    excel: workbook([
+        excelSheet('Температура', transientRows, {
+            columns: [
+                excelColumn('Время', transientRows.time, { format: '0' }),
+                excelColumn('Температура', transientRows.temperature, { format: '0.000' }),
+            ],
+            sort: [asc(transientRows.time)],
+            freezeRows: 1,
+            autoFilter: true,
+        }),
+    ]),
 });
 export const benchReport = report('bench-state', {
     title: 'Снимок PLC · общая панель HMI', on: {workflow_dispatch:{}},
-    signals: ['SATURN-1.AI1','SATURN-1.DO1'], window:60000,
+    signals: [controller.inputs.AI1, controller.DO1], window:60000,
     sql: 'SELECT signal,time,value,quality FROM samples ORDER BY time',
     columns: [{key:'signal',title:'Сигнал'},{key:'value',title:'Значение'}],
     view: benchView,
