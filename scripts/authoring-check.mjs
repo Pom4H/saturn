@@ -20,6 +20,32 @@ assert.equal(transient.excel?.sheets[0]?.sort?.[0]?.key, 'time');
 assert.equal(transient.excel?.sheets[0]?.autoFilter, true);
 const bench = project.reports.find(report => report.id === 'bench-state');
 assert.deepEqual(bench?.signals, ['SATURN-1.AI1', 'SATURN-1.DO1']);
+import { SaturnDiagnosticError, formatDiagnostic } from '../plant/diagnostics';
+import { localizedDslEntity } from '../plant/dsl-i18n';
+
+const invalidDimension = {
+  'plant.ts': `import { project, system, simulation } from '@saturn/core';
+const root = system('root','Root');
+const tank = simulation('TANK','reservoir',{system:'root',at:{x:0,y:0}});
+const pump = simulation('PUMP','pump',{system:'root',at:{x:100,y:0},inputs:{voltage:tank.flow}});
+export default project('bad',{title:'Bad',description:'',systems:[root],simulations:[tank,pump],signals:[],alarms:[],reports:[]});`,
+};
+let mismatch;
+try { compileProject(invalidDimension); } catch (error) { mismatch = error; }
+assert.ok(mismatch instanceof SaturnDiagnosticError);
+assert.equal(mismatch.diagnostic.code, 'SATURN_TYPE_DIMENSION');
+assert.match(formatDiagnostic(mismatch.diagnostic, 'ru'), /ожидает размерность voltage/);
+assert.match(formatDiagnostic(mismatch.diagnostic, 'en'), /expects dimension voltage/);
+assert.equal(mismatch.diagnostic.data?.expectedDimension, 'voltage');
+assert.equal(mismatch.diagnostic.data?.actualDimension, 'flow');
+assert.equal(mismatch.diagnostic.data?.source?.path, 'plant.ts');
+
+const ruSimulation = localizedDslEntity('simulation', 'ru');
+const enSimulation = localizedDslEntity('simulation', 'en');
+assert.ok(ruSimulation && enSimulation);
+assert.notEqual(ruSimulation.summary, enSimulation.summary);
+assert.match(enSimulation.summary, /physical dimension/i);
+
 console.log('Saturn typed authoring smoke passed');
 `;
 await writeFile('.authoring/check.ts', source);
