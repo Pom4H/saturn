@@ -259,83 +259,46 @@ class SaturnTerminal {
   dispose() { this.stop(); }
 }
 
-function diagramHtml(document) {
+function nonce() {
+  return [...Array(24)].map(() => Math.random().toString(36)[2]).join('');
+}
+
+function diagramHtml(document, scriptUri, token) {
   const payload = JSON.stringify(document).replace(/</g, '\\u003c');
+  const title = String(document?.project?.title ?? 'Saturn Diagram').replace(/[&<>]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char]));
   return `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'nonce-${token}';">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 html,body{height:100%;margin:0;background:var(--vscode-editor-background);color:var(--vscode-editor-foreground);font:12px var(--vscode-font-family)}
 main{height:100%;display:grid;grid-template-rows:36px 1fr;overflow:hidden}
-header{display:flex;align-items:center;gap:10px;padding:0 12px;border-bottom:1px solid var(--vscode-panel-border)}
+header{display:flex;align-items:center;gap:10px;padding:0 12px;border-bottom:1px solid var(--vscode-panel-border);background:var(--vscode-sideBar-background)}
 header strong{font-weight:600} header span{opacity:.65;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#viewport{overflow:auto}
-svg{display:block;min-width:100%;min-height:100%}
-.group{fill:var(--vscode-sideBar-background);stroke:var(--vscode-panel-border);stroke-width:1}
-.group-title{fill:var(--vscode-descriptionForeground);font-size:12px;font-weight:600}
-.connection{fill:none;stroke:var(--vscode-descriptionForeground);stroke-width:6;stroke-linecap:round;stroke-linejoin:round;opacity:.55}
+#viewport{position:relative;overflow:hidden;background:var(--vscode-editor-background)}
+#scene{display:block;width:100%;height:100%;touch-action:none;outline:none}
 .node{cursor:pointer}
-.node:hover .body{stroke:var(--vscode-focusBorder);stroke-width:2}
-.body{fill:var(--vscode-editorWidget-background);stroke:var(--vscode-widget-border);stroke-width:1.2}
-.kind{fill:var(--vscode-descriptionForeground);font-size:10px}
-.name{fill:var(--vscode-editor-foreground);font-size:12px;font-weight:600}
-.icon{fill:none;stroke:var(--vscode-symbolIcon-classForeground,var(--vscode-editor-foreground));stroke-width:2}
-.empty{padding:24px;color:var(--vscode-descriptionForeground)}
+.node .selection{opacity:0}
+.node.selected .selection,.node:focus-visible .selection{opacity:1}
+.node:focus-visible{outline:none}
+.node[data-quality=offline] [data-part=body],.node[data-quality=bad] [data-part=body]{opacity:.55}
+.node[data-alarm=warning] .object-label text:first-child{fill:#956018}
+.node[data-alarm=trip] .object-label text:first-child{fill:#bd5145}
+.ports{opacity:.08;transition:opacity .12s}
+.node:hover .ports,.node:focus-within .ports{opacity:1}
+[data-connection]{cursor:default}
+[data-connection][data-valid=false]{opacity:.85}
 </style>
 </head>
 <body>
 <main>
-<header><strong>Saturn Diagram</strong><span id="title"></span></header>
-<div id="viewport"><svg id="scene" xmlns="http://www.w3.org/2000/svg" role="img"></svg></div>
+<header><strong>Saturn Diagram</strong><span>${title}</span></header>
+<div id="viewport"><svg id="scene" xmlns="http://www.w3.org/2000/svg"></svg></div>
 </main>
 <script id="data" type="application/json">${payload}</script>
-<script>
-const vscode = acquireVsCodeApi();
-const data = JSON.parse(document.getElementById('data').textContent);
-document.getElementById('title').textContent = data.project.title;
-const svg = document.getElementById('scene');
-const ns = 'http://www.w3.org/2000/svg';
-const make=(name,attrs={},text='')=>{const e=document.createElementNS(ns,name);for(const[k,v]of Object.entries(attrs))e.setAttribute(k,String(v));if(text)e.textContent=text;return e};
-const nodes=data.scene.nodes||[], groups=data.scene.groups||[], connections=data.scene.connections||[], defs=data.definitions||{};
-if(!nodes.length){document.getElementById('viewport').innerHTML='<div class="empty">No equipment in this project.</div>';}
-else {
-  const boxes=nodes.map(n=>{const d=defs[n.kind]||{width:150,height:100,label:n.kind};return{x:Number(n.props.x)||0,y:Number(n.props.y)||0,w:d.width,h:d.height,n,d}});
-  const xs=boxes.flatMap(b=>[b.x,b.x+b.w]).concat(groups.flatMap(g=>[g.x,g.x+g.width]));
-  const ys=boxes.flatMap(b=>[b.y,b.y+b.h]).concat(groups.flatMap(g=>[g.y,g.y+g.height]));
-  const minX=Math.min(...xs)-80,minY=Math.min(...ys)-80,maxX=Math.max(...xs)+80,maxY=Math.max(...ys)+80;
-  svg.setAttribute('viewBox', [minX,minY,Math.max(320,maxX-minX),Math.max(240,maxY-minY)].join(' '));
-  for(const group of groups){
-    svg.appendChild(make('rect',{class:'group',x:group.x,y:group.y,width:group.width,height:group.height,rx:10}));
-    svg.appendChild(make('text',{class:'group-title',x:group.x+12,y:group.y+20},group.title||group.id));
-  }
-  for(const connection of connections){
-    const points=(connection.points||[]).map(p=>p.x+','+p.y).join(' ');
-    if(points) svg.appendChild(make('polyline',{class:'connection',points,'data-medium':connection.medium||''}));
-  }
-  for(const b of boxes){
-    const g=make('g',{class:'node',transform:'translate('+b.x+' '+b.y+')','data-id':b.n.id,tabindex:'0'});
-    g.appendChild(make('rect',{class:'body',x:0,y:0,width:b.w,height:b.h,rx:8}));
-    const cx=b.w/2,cy=Math.min(42,b.h*.42),r=Math.max(10,Math.min(22,b.w*.15,b.h*.22));
-    if(/pump|fan|turbine|motor|alternator/.test(b.n.kind)){
-      g.appendChild(make('circle',{class:'icon',cx,cy,r}));
-      g.appendChild(make('path',{class:'icon',d:'M'+(cx-r*.65)+' '+cy+'H'+(cx+r*.65)+' M'+cx+' '+(cy-r*.65)+'V'+(cy+r*.65)}));
-    } else if(/valve/.test(b.n.kind)){
-      g.appendChild(make('path',{class:'icon',d:'M'+(cx-r)+' '+(cy-r*.6)+'L'+cx+' '+cy+'L'+(cx-r)+' '+(cy+r*.6)+'Z M'+(cx+r)+' '+(cy-r*.6)+'L'+cx+' '+cy+'L'+(cx+r)+' '+(cy+r*.6)+'Z'}));
-    } else {
-      g.appendChild(make('rect',{class:'icon',x:cx-r,y:cy-r,width:r*2,height:r*2,rx:Math.min(6,r*.3)}));
-    }
-    g.appendChild(make('text',{class:'name',x:10,y:b.h-25},b.n.id));
-    g.appendChild(make('text',{class:'kind',x:10,y:b.h-10},b.d.label||b.n.kind.replace(/^plant_/,'')));
-    const reveal=()=>vscode.postMessage({type:'reveal',id:b.n.id});
-    g.addEventListener('click',reveal);
-    g.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();reveal();}});
-    svg.appendChild(g);
-  }
-}
-</script>
+<script nonce="${token}" src="${scriptUri}"></script>
 </body>
 </html>`;
 }
@@ -344,7 +307,7 @@ function diagramErrorHtml(message) {
   return `<!doctype html><meta charset="utf-8"><style>body{font:13px var(--vscode-font-family);color:var(--vscode-editor-foreground);background:var(--vscode-editor-background);padding:24px}code{color:var(--vscode-errorForeground)}</style><h3>Saturn Diagram</h3><p>Unable to build the mnemonic.</p><code>${String(message).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</code>`;
 }
 
-async function refreshDiagram(panel) {
+async function refreshDiagram(panel, context) {
   const root = workspaceRoot();
   if (!root) {
     panel.webview.html = diagramErrorHtml('Open a Saturn project folder first.');
@@ -353,7 +316,8 @@ async function refreshDiagram(panel) {
   panel.webview.html = '<!doctype html><meta charset="utf-8"><style>body{font:13px var(--vscode-font-family);color:var(--vscode-descriptionForeground);background:var(--vscode-editor-background);padding:24px}</style>Building Saturn diagram…';
   try {
     const document = await runCliJson(['ide', 'diagram', '--project', root, '--json']);
-    panel.webview.html = diagramHtml(document);
+    const scriptUri = panel.webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'dist', 'diagram-webview.js'));
+    panel.webview.html = diagramHtml(document, scriptUri, nonce());
   } catch (error) {
     panel.webview.html = diagramErrorHtml(error instanceof Error ? error.message : String(error));
   }
@@ -513,7 +477,7 @@ function activate(context) {
     vscode.workspace.onDidSaveTextDocument(document => {
       if (document.fileName.endsWith('.ts')) {
         project.refresh();
-        for (const panel of diagramPanels) void refreshDiagram(panel);
+        for (const panel of diagramPanels) void refreshDiagram(panel, context);
       }
       if (document.fileName.endsWith(path.join('.saturn', 'targets.json'))) targets.reload();
     }),
@@ -529,14 +493,19 @@ function activate(context) {
         'saturn.diagram',
         'Saturn Diagram',
         vscode.ViewColumn.Beside,
-        { enableScripts: true, retainContextWhenHidden: true, enableForms: false }
+        {
+          enableScripts: true,
+          retainContextWhenHidden: true,
+          enableForms: false,
+          localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'dist')],
+        }
       );
       diagramPanels.add(panel);
       panel.onDidDispose(() => diagramPanels.delete(panel));
       panel.webview.onDidReceiveMessage(message => {
         if (message?.type === 'reveal' && typeof message.id === 'string') void revealEquipment(message.id);
       });
-      await refreshDiagram(panel);
+      await refreshDiagram(panel, context);
     }),
     vscode.commands.registerCommand('saturn.openHmi', async () => {
       const uri = vscode.Uri.parse(`${serverOrigin()}/plant/app/`);
