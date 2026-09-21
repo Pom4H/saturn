@@ -156,8 +156,8 @@ async function readState(root: string): Promise<ExtensionState> {
             throw new Error('Invalid extension state');
         return parsed;
     }
-    catch (error: any) {
-        if (error?.code === 'ENOENT')
+    catch (error: unknown) {
+        if (error instanceof Error && 'code' in error && (error as Error & {code?:unknown}).code === 'ENOENT')
             return { schema: 1, active: {} };
         throw error;
     }
