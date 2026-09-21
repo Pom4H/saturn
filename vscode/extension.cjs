@@ -182,7 +182,7 @@ class CatalogTreeProvider extends RefreshableTree {
 
   async reload() {
     try {
-      const document = await runCliJson(['ide', 'catalog', '--json']);
+      const document = await runCliJson(['ide', 'catalog', '--locale', saturnLocale(), '--json']);
       this.catalog = buildCatalog(document);
       this.error = null;
     } catch (error) {
