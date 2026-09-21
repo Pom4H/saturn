@@ -12,7 +12,7 @@ export type SignalRuntimeType = 'number' | 'boolean' | 'string';
 export type SignalDimension = 'unknown' | 'scalar' | 'boolean' | 'voltage' | 'current' | 'power' | 'energy' | 'flow' | 'volume' | 'pressure' | 'temperature' | 'resistance' | 'rotational-speed' | 'ratio' | 'frequency' | 'time' | (string & {});
 export type SignalValueForRuntime<Type extends SignalRuntimeType> = Type extends 'boolean' ? boolean : Type extends 'string' ? string : number;
 export interface RefExpr { readonly ref: string }
-export interface SignalRef<ID extends string = string, Value extends Scalar = number, Unit extends string = string, Dimension extends SignalDimension = 'unknown'> extends RefExpr {
+export interface SignalRef<ID extends string = string, Value extends Scalar = number, Unit extends string = string, Dimension extends SignalDimension = SignalDimension> extends RefExpr {
     readonly ref: ID;
     readonly [signalValueType]: { value: Value; unit: Unit; dimension: Dimension };
 }
@@ -20,7 +20,7 @@ export interface RuntimeOperationExpr {
     readonly op: 'add' | 'mul' | 'sub' | 'div' | 'min' | 'max' | 'gt' | 'lt' | 'not' | 'and';
     readonly args: Expr[];
 }
-export interface OperationExpr<Value extends Scalar = number, Dimension extends SignalDimension = 'unknown'> extends RuntimeOperationExpr {
+export interface OperationExpr<Value extends Scalar = number, Dimension extends SignalDimension = SignalDimension> extends RuntimeOperationExpr {
     readonly [expressionValueType]: { value: Value; dimension: Dimension };
 }
 export type SignalId<S> = S extends SignalRef<infer ID, Scalar, string, SignalDimension> ? ID : never;
@@ -40,7 +40,7 @@ export function signalInfo(ref: SignalRef<string, Scalar, string, SignalDimensio
     return (ref as SignalRef<string, Scalar, string, SignalDimension> & { [signalMetadata]?: SignalMetadata })[signalMetadata] ?? { type: 'number', unit: '', dimension: 'unknown' };
 }
 
-export type Expr<Value extends Scalar = Scalar, Dimension extends SignalDimension = 'unknown'> =
+export type Expr<Value extends Scalar = Scalar, Dimension extends SignalDimension = SignalDimension> =
     | number
     | boolean
     | RefExpr
