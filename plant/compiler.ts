@@ -144,6 +144,14 @@ export function compileProject(files: Record<string, string>, entry = 'plant.ts'
                     return fail(n, `Unknown field: ${k}`);
                 return o[k];
             }
+            if (ts.isElementAccessExpression(n)) {
+                if (!n.argumentExpression || !ts.isStringLiteral(n.argumentExpression))
+                    return fail(n, 'Element access requires a string literal key');
+                const o = ev(n.expression), k = n.argumentExpression.text;
+                if (!o || typeof o !== 'object' || reserved.has(k) || !own(o, k))
+                    return fail(n, `Unknown field: ${k}`);
+                return o[k];
+            }
             if (ts.isCallExpression(n) && ts.isIdentifier(n.expression)) {
                 const fn = scope[n.expression.text];
                 if (typeof fn !== 'function' || !Object.values(builtins).includes(fn))
