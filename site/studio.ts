@@ -829,7 +829,7 @@ export async function mountStudio() {
   try {
     const { SceneView3D } = await import('../src/view3d'); spatial = new SceneView3D(spatialHost, { landing: true }); spatial.onSelect = select;
     spatial.canMove = canMoveNode;
-    spatial.onMove = (id, x, y, commit) => commit ? commitPosition(id, x, y) : (x === 0 && y === 0 ? restorePositionPreview() : previewPosition(id, x, y));
+    spatial.onMove = (id, x, y, commit) => commit ? commitPosition(id, x, y) : previewPosition(id, x, y);
     spatial.render(compiled.scene); spatial.setRuntime(observedRuntime ?? plant?.runtime ?? null); spatial.select(selected); setMode(explicit);
   } catch { $('studio-3d').setAttribute('disabled', ''); present(1); toast('WebGL недоступен. Работайте с 2D-схемой.'); }
   const requestedServer = !shared && new URLSearchParams(location.search).get('project') === 'server';
