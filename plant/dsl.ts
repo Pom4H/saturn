@@ -1,7 +1,8 @@
 import type { Presentation, ViewNode } from './presentation';
 import { inputPins, type Controller, type PlcBlock } from './controller';
 import { portRefs, physicalTypes, type Endpoint, type Connection, type Attachment, type DynamicEndpoint, type PhysicalType, type PortRefs, type Terminal, type TerminalOf, type TypedEndpoint } from './ports';
-import { AppError, id, signalRef as createSignalRef, type Expr, type OperationExpr, type SignalDimension, type SignalDimensionOf, type System, type Simulation, type Project, type Derived, type Device, type AlarmRule, type Report, type Layout, type HistoryPolicy, type Control, type Scalar, type SignalRef } from './types';
+import { AppError, expressionInfo, expressionMetadata, id, signalRef as createSignalRef, type Expr, type OperationExpr, type SignalDimension, type SignalDimensionOf, type System, type Simulation, type Project, type Derived, type Device, type AlarmRule, type Report, type Layout, type HistoryPolicy, type Control, type Scalar, type SignalRef } from './types';
+import { failDiagnostic } from './diagnostics';
 import { reportSchemaFields, type ReportSchema } from './reporting';
 export { reportField, numberField, booleanField, textField, dateTimeField, reportSchema, reportColumn, excelColumn, asc, desc, excelSheet, workbook } from './reporting';
 export type { ReportFieldRef, ReportSchema } from './reporting';
@@ -34,39 +35,46 @@ type DimensionOf<E> = E extends SignalRef<string, number, string, infer Dimensio
 type CompatibleNumeric<Dimension extends SignalDimension> = Dimension extends 'unknown'
     ? number | NumericTyped
     : number | NumericSignal<Dimension> | NumericOperation<Dimension> | NumericSignal<'unknown'> | NumericOperation<'unknown'>;
-const operation = <Value extends Scalar, Dimension extends SignalDimension>(op: OperationExpr<Value, Dimension>['op'], args: Expr[]): OperationExpr<Value, Dimension> =>
-    ({ op, args }) as unknown as OperationExpr<Value, Dimension>;
+const operation = <Value extends Scalar, Dimension extends SignalDimension>(
+    op: OperationExpr<Value, Dimension>['op'],
+    args: Expr[],
+    metadata?: { type: 'number'|'boolean'|'string'; dimension: SignalDimension },
+): OperationExpr<Value, Dimension> => {
+    const value = { op, args };
+    if (metadata) Object.defineProperty(value, expressionMetadata, { value: metadata, enumerable: false });
+    return value as unknown as OperationExpr<Value, Dimension>;
+};
 
 export function gt<A extends NumericTyped>(a: A, b: CompatibleNumeric<DimensionOf<A>>): OperationExpr<boolean, 'boolean'>;
 export function gt<B extends NumericTyped>(a: number, b: B): OperationExpr<boolean, 'boolean'>;
 export function gt(a: number, b: number): OperationExpr<boolean, 'boolean'>;
-export function gt(a: Expr, b: Expr): OperationExpr<boolean, 'boolean'> { return operation('gt', [a, b]); }
+export function gt(a: Expr, b: Expr): OperationExpr<boolean, 'boolean'> { return operation('gt', [a, b], { type:'boolean', dimension:'boolean' }); }
 export function lt<A extends NumericTyped>(a: A, b: CompatibleNumeric<DimensionOf<A>>): OperationExpr<boolean, 'boolean'>;
 export function lt<B extends NumericTyped>(a: number, b: B): OperationExpr<boolean, 'boolean'>;
 export function lt(a: number, b: number): OperationExpr<boolean, 'boolean'>;
-export function lt(a: Expr, b: Expr): OperationExpr<boolean, 'boolean'> { return operation('lt', [a, b]); }
-export const and = (...args: BooleanExpr[]): OperationExpr<boolean, 'boolean'> => operation('and', args as Expr[]);
+export function lt(a: Expr, b: Expr): OperationExpr<boolean, 'boolean'> { return operation('lt', [a, b], { type:'boolean', dimension:'boolean' }); }
+export const and = (...args: BooleanExpr[]): OperationExpr<boolean, 'boolean'> => operation('and', args as Expr[], { type:'boolean', dimension:'boolean' });
 export const signal = <const ID extends string>(path: ID): SignalRef<ID, number, '', 'unknown'> => createSignalRef(id(path) as ID, 'number', '', 'unknown');
 
 export function add<A extends NumericTyped>(a: A, ...args: CompatibleNumeric<DimensionOf<A>>[]): OperationExpr<number, DimensionOf<A>>;
 export function add(a: number, ...args: number[]): OperationExpr<number, 'scalar'>;
-export function add(...args: Expr[]): OperationExpr<number, SignalDimension> { return operation('add', args); }
+export function add(...args: Expr[]): OperationExpr<number, SignalDimension> { return operation('add', args, { type:'number', dimension: expressionInfo(args[0])?.dimension ?? 'unknown' }); }
 export function mul<A extends NumericTyped>(a: A, ...factors: number[]): OperationExpr<number, DimensionOf<A>>;
 export function mul(...args: number[]): OperationExpr<number, 'scalar'>;
-export function mul(...args: Expr[]): OperationExpr<number, SignalDimension> { return operation('mul', args); }
+export function mul(...args: Expr[]): OperationExpr<number, SignalDimension> { return operation('mul', args, { type:'number', dimension: expressionInfo(args.find(value => typeof value !== 'number'))?.dimension ?? 'scalar' }); }
 export function sub<A extends NumericTyped>(a: A, b: CompatibleNumeric<DimensionOf<A>>): OperationExpr<number, DimensionOf<A>>;
 export function sub(a: number, b: number): OperationExpr<number, 'scalar'>;
-export function sub(a: Expr, b: Expr): OperationExpr<number, SignalDimension> { return operation('sub', [a, b]); }
+export function sub(a: Expr, b: Expr): OperationExpr<number, SignalDimension> { return operation('sub', [a, b], { type:'number', dimension: expressionInfo(a)?.dimension ?? 'unknown' }); }
 export function div<A extends NumericTyped>(a: A, b: number): OperationExpr<number, DimensionOf<A>>;
 export function div<A extends NumericTyped>(a: A, b: CompatibleNumeric<DimensionOf<A>>): OperationExpr<number, 'scalar'>;
 export function div(a: number, b: number): OperationExpr<number, 'scalar'>;
-export function div(a: Expr, b: Expr): OperationExpr<number, SignalDimension> { return operation('div', [a, b]); }
+export function div(a: Expr, b: Expr): OperationExpr<number, SignalDimension> { return operation('div', [a, b], { type:'number', dimension: typeof b === 'number' ? (expressionInfo(a)?.dimension ?? 'unknown') : 'scalar' }); }
 export function max<A extends NumericTyped>(a: A, ...args: CompatibleNumeric<DimensionOf<A>>[]): OperationExpr<number, DimensionOf<A>>;
 export function max(a: number, ...args: number[]): OperationExpr<number, 'scalar'>;
-export function max(...args: Expr[]): OperationExpr<number, SignalDimension> { return operation('max', args); }
+export function max(...args: Expr[]): OperationExpr<number, SignalDimension> { return operation('max', args, { type:'number', dimension: expressionInfo(args[0])?.dimension ?? 'unknown' }); }
 export function min<A extends NumericTyped>(a: A, ...args: CompatibleNumeric<DimensionOf<A>>[]): OperationExpr<number, DimensionOf<A>>;
 export function min(a: number, ...args: number[]): OperationExpr<number, 'scalar'>;
-export function min(...args: Expr[]): OperationExpr<number, SignalDimension> { return operation('min', args); }
+export function min(...args: Expr[]): OperationExpr<number, SignalDimension> { return operation('min', args, { type:'number', dimension: expressionInfo(args[0])?.dimension ?? 'unknown' }); }
 export const system = (name: string, title: string, parent?: string): System => ({ id: id(name), title, ...(parent ? { parent } : {}) });
 type BuiltInModels = typeof builtInModels;
 /** Module augmentation can add metadata for independently installed equipment. */
@@ -126,7 +134,18 @@ type Options<M extends {
 };
 /** Runtime metadata supplies validation and editor completion, including external installed models. */
 export function simulation<const ID extends string, K extends keyof ModelCatalog>(name: ID, kind: K, options: Options<ModelCatalog[K]>): SimRef<ModelCatalog[K], ID, K & string> {
-    const spec = model(kind), node: Simulation = { id: id(name), model: kind, system: options.system, parameters: { ...Object.fromEntries(Object.entries(spec.parameters).map(([k, v]) => [k, v.default])), ...options.parameters }, inputs: { ...spec.inputs, ...options.inputs }, layout: options.at, ...(options.history ? { history: options.history } : {}) };
+    const spec = model(kind);
+    for (const [input, value] of Object.entries(options.inputs ?? {})) {
+        const actual = expressionInfo(value);
+        if (!actual) continue;
+        const expectedType = spec.inputTypes?.[input] ?? 'number';
+        const expectedDimension = spec.inputDimensions?.[input] ?? 'unknown';
+        if (actual.type !== expectedType)
+            failDiagnostic('SATURN_TYPE_VALUE', 'typing.valueTypeMismatch', { model: String(kind), input, expected: expectedType, actual: actual.type }, { model: String(kind), input, expectedType, actualType: actual.type });
+        if (expectedDimension !== 'unknown' && actual.dimension !== 'unknown' && actual.dimension !== expectedDimension)
+            failDiagnostic('SATURN_TYPE_DIMENSION', 'typing.dimensionMismatch', { model: String(kind), input, expected: expectedDimension, actual: actual.dimension }, { model: String(kind), input, expectedDimension, actualDimension: actual.dimension });
+    }
+    const node: Simulation = { id: id(name), model: kind, system: options.system, parameters: { ...Object.fromEntries(Object.entries(spec.parameters).map(([k, v]) => [k, v.default])), ...options.parameters }, inputs: { ...spec.inputs, ...options.inputs }, layout: options.at, ...(options.history ? { history: options.history } : {}) };
     const ports = physicalTypes().includes(spec.visual) ? portRefs(node.id as ID, spec.visual as VisualOf<ModelCatalog[K]>) : {} as PortsOf<ModelCatalog[K],ID>;
     return Object.assign(
         { id: node.id as ID, kind: String(kind), ports, [simulationValue]: node },
