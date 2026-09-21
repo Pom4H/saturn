@@ -1,4 +1,4 @@
-import ts from 'typescript';
+import ts from '@typescript/typescript6';
 import { compileProject, validateFiles } from '../plant/compiler';
 import { installEquipment, sceneFor, visualFrame } from '../plant/equipment';
 import type { Frame, Project } from '../plant/types';
