@@ -201,7 +201,7 @@ export async function startPlantServer(options: {
                                 : json(426, { error: 'WebSocket upgrade required' }, { Upgrade: 'websocket' });
                         }
                         if (action === 'session')
-                            return json(200, { ...await service.status(actor), csrf: session.csrf, transport: { sse: true, websocket: true }, push: push ? { publicKey: push.keys.publicKey } : null });
+                            return json(200, { ...await service.status(actor), csrf: session.csrf, uiMode: 'runtime', transport: { sse: true, websocket: true }, push: push ? { publicKey: push.keys.publicKey } : null });
                         if (action === 'artifact') return json(200, service.artifactInfo(actor));
                         if (action === 'events') return json(200, store.events(service.kernel.state.runId));
                         if (action === 'reports') return json(200, service.reports());
