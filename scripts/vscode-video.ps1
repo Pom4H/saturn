@@ -129,6 +129,15 @@ export default project('vscode-demo', {
 });
 '@ | Set-Content -Encoding UTF8 (Join-Path $workspace 'plant.ts')
 $file = Join-Path $workspace 'plant.ts'
+
+$diagramJson = & (Join-Path $env:RUNNER_TEMP 'saturn.exe') ide diagram --project $workspace --json
+if ($LASTEXITCODE -ne 0) { throw "Saturn demo workspace did not compile for Diagram" }
+$diagram = $diagramJson | ConvertFrom-Json
+if ($diagram.schema -ne 1 -or $diagram.scene.nodes.Count -lt 5) {
+  throw "Saturn Diagram smoke test returned an incomplete scene"
+}
+Write-Host "Validated Saturn Diagram scene with $($diagram.scene.nodes.Count) equipment nodes."
+
 $args = @(
   '--user-data-dir', $userData,
   '--extensions-dir', $extensions,
