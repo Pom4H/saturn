@@ -16,9 +16,11 @@ export interface SignalRef<ID extends string = string, Value extends Scalar = nu
     readonly ref: ID;
     readonly [signalValueType]: { value: Value; unit: Unit; dimension: Dimension };
 }
-export interface OperationExpr<Value extends Scalar = number, Dimension extends SignalDimension = 'unknown'> {
+export interface RuntimeOperationExpr {
     readonly op: 'add' | 'mul' | 'sub' | 'div' | 'min' | 'max' | 'gt' | 'lt' | 'not' | 'and';
     readonly args: Expr[];
+}
+export interface OperationExpr<Value extends Scalar = number, Dimension extends SignalDimension = 'unknown'> extends RuntimeOperationExpr {
     readonly [expressionValueType]: { value: Value; dimension: Dimension };
 }
 export type SignalId<S> = S extends SignalRef<infer ID, Scalar, string, SignalDimension> ? ID : never;
@@ -42,6 +44,7 @@ export type Expr<Value extends Scalar = Scalar, Dimension extends SignalDimensio
     | number
     | boolean
     | RefExpr
+    | RuntimeOperationExpr
     | OperationExpr<Value, Dimension>;
 export interface Sample {
     value: number | null;
