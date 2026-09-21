@@ -9,7 +9,7 @@ import { EditorView, basicSetup } from 'codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { SceneView, el } from '../../src/view';
 import { installEquipment, sceneFor, visualFrame, references } from '../equipment';
-import { models, model } from '../models';
+import { models, model, outputUnit } from '../models';
 import { compileProject, validateFiles } from '../compiler';
 import { chartSVG, escape } from '../workflows';
 import { LocalClient, RemoteClient, LinkedClient, type Connection, type Status, type Revision, type Frame, type ReportArtifact, type ReportData } from './client';
@@ -295,7 +295,7 @@ function renderInspector() {
     const n = status.project.simulations.find(n => n.id === selected);
     if (!n) { renderPlcInspector(); return; }
     const spec = model(n.model);
-    $('inspector').innerHTML = `<p class="eyebrow">${escape(n.model)} / ${escape(spec.version)}</p><h2>${escape(n.id)}</h2><p>${escape(spec.title)}</p><div class="signals">${Object.entries(spec.outputs).map(([key, unit]) => `<div class="signal-row" data-signal="${escape(n.id + '.' + key)}"><span title="${escape(unit)}">${escape(key)}</span><b>—</b></div>`).join('')}</div><svg id="small-trend" class="trend" viewBox="0 0 400 130"></svg><div class="parameters"><h3>Параметры модели</h3><p>Изменения — команды текущего прогона; исходник проекта не меняется.</p>${Object.entries(spec.parameters).map(([key, d]) => `<label class="parameter"><span>${escape(key)}</span><input type="number" data-param="${escape(key)}" value="${status.overrides[`${n.id}.${key}`] ?? n.parameters[key]}" min="${d.min}" max="${d.max}" step="any"><button data-set="${escape(key)}" ${status.actor.role !== 'engineer' ? 'disabled' : ''} title="Применить">↵</button></label>`).join('')}</div><p class="model-limit">Условная модель. Числа не являются настройками реального оборудования.</p>`;
+    $('inspector').innerHTML = `<p class="eyebrow">${escape(n.model)} / ${escape(spec.version)}</p><h2>${escape(n.id)}</h2><p>${escape(spec.title)}</p><div class="signals">${Object.entries(spec.outputs).map(([key, definition]) => `<div class="signal-row" data-signal="${escape(n.id + '.' + key)}"><span title="${escape(outputUnit(definition))}">${escape(key)}</span><b>—</b></div>`).join('')}</div><svg id="small-trend" class="trend" viewBox="0 0 400 130"></svg><div class="parameters"><h3>Параметры модели</h3><p>Изменения — команды текущего прогона; исходник проекта не меняется.</p>${Object.entries(spec.parameters).map(([key, d]) => `<label class="parameter"><span>${escape(key)}</span><input type="number" data-param="${escape(key)}" value="${status.overrides[`${n.id}.${key}`] ?? n.parameters[key]}" min="${d.min}" max="${d.max}" step="any"><button data-set="${escape(key)}" ${status.actor.role !== 'engineer' ? 'disabled' : ''} title="Применить">↵</button></label>`).join('')}</div><p class="model-limit">Условная модель. Числа не являются настройками реального оборудования.</p>`;
     appendTerminalPanel();
     renderFrame(frame);
     void updateTrend();
