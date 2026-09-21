@@ -1,7 +1,10 @@
 import type { Presentation, ViewNode } from './presentation';
 import { inputPins, type Controller, type PlcBlock } from './controller';
 import { portRefs, physicalTypes, type Endpoint, type Connection, type Attachment, type DynamicEndpoint, type PhysicalType, type PortRefs, type Terminal, type TerminalOf, type TypedEndpoint } from './ports';
-import { AppError, id, signalRef as createSignalRef, type Expr, type System, type Simulation, type Project, type Derived, type Device, type AlarmRule, type Report, type Layout, type HistoryPolicy, type Control, type SignalRef } from './types';
+import { AppError, id, signalRef as createSignalRef, type Expr, type System, type Simulation, type Project, type Derived, type Device, type AlarmRule, type Report, type Layout, type HistoryPolicy, type Control, type Scalar, type SignalRef } from './types';
+import { reportSchemaFields, type ReportSchema } from './reporting';
+export { reportField, numberField, booleanField, textField, dateTimeField, reportSchema, reportColumn, excelColumn, asc, desc, excelSheet, workbook } from './reporting';
+export type { ReportFieldRef, ReportSchema } from './reporting';
 import { model, type builtInModels } from './models';
 const simulationValue = Symbol('saturn.simulation');
 const controllerValue = Symbol('saturn.controller');
@@ -93,9 +96,21 @@ export const equipment = (name: string, type: string, options: {
     signals: Record<string, Expr>;
 }): Device => ({ id: id(name), type, system: options.system, layout: options.at, signals: options.signals });
 export const alarm = (name: string, options: Omit<AlarmRule, 'id' | 'notify' | 'delay' | 'priority'> & Partial<Pick<AlarmRule, 'notify' | 'delay' | 'priority'>>): AlarmRule => ({ id: id(name), notify: true, delay: 1000, priority: 'warning', ...options });
-export const report = (name: string, options: Omit<Report, 'id' | 'notify'> & {
+type AuthoredReport = Omit<Report, 'id' | 'notify' | 'signals' | 'schema'> & {
+    signals: readonly SignalRef<string, Scalar, string>[];
+    schema?: ReportSchema<any>;
     notify?: boolean;
-}): Report => ({ id: id(name), notify: true, ...options });
+};
+export function report(name: string, options: AuthoredReport): Report {
+    const { signals, schema, ...rest } = options;
+    return {
+        id: id(name),
+        notify: true,
+        ...rest,
+        signals: signals.map(signal => signal.ref),
+        ...(schema ? { schema: reportSchemaFields(schema) } : {}),
+    };
+}
 export function project(name: string, options: Omit<Project, 'id' | 'version' | 'simulations' | 'devices' | 'stepMs' | 'seed' | 'history' | 'controls' | 'controllers'> & {
     simulations: SimRef[];
     devices?: Device[];
