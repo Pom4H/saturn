@@ -23,7 +23,7 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(origin);
   await page.waitForSelector('#studio-spatial canvas', { state: 'attached' });
-  assert.equal(await page.locator('h1').innerText(), 'Saturn SCADA');
+  assert.equal(await page.locator('h1').innerText(), 'Saturn');
   assert.equal(await page.locator('.project-section,.operator,.delivery').count(), 0, 'Old landing sections must be replaced');
   await mkdir('test-results/site-studio', { recursive: true });
   await page.screenshot({ path: 'test-results/site-studio/landing.png' });
