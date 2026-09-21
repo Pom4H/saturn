@@ -144,3 +144,19 @@ export function simulate(scene: Scene): { flows: Map<string, number | null>; not
   }
   return { flows, notes: [...new Set(notes)] };
 }
+
+
+/** Trusted extension-authoring API. The bounded project compiler intentionally
+ * does not expose these functions to declarative project source. */
+export {
+  ComponentRegistry as ElementRegistry,
+  defineElementPack,
+  deriveSchematicProjection,
+  type ComponentDefinition as ElementDefinition,
+  type ElementPack,
+  type ElementVisualIdentity,
+  type FluidZoneDefinition,
+  type SemanticPart,
+} from './elements/model';
+export { registerGlyph, getGlyph, listGlyphs, type GlyphDefinition } from './elements/symbols';
+export { materialPresets, mediumPresets, materialCssColor, mediumCssColor, type MaterialPreset, type MediumPreset } from './elements/materials';

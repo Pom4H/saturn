@@ -37,3 +37,10 @@ export type MaterialPresetId = keyof typeof materialPresets;
 export const mediumPresets = {
   water: { id:'water',label:'Water',material:'water',ior:1.333,tint:0x4ebed8,clarity:.88 },
 } as const satisfies Record<string, MediumPreset>;
+
+export function materialCssColor(id: MaterialPresetId): string {
+  return '#' + materialPresets[id].color.toString(16).padStart(6, '0');
+}
+export function mediumCssColor(id: keyof typeof mediumPresets): string {
+  return '#' + mediumPresets[id].tint.toString(16).padStart(6, '0');
+}

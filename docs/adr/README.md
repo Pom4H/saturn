@@ -8,3 +8,5 @@ ADRs record decisions that define Saturn's long-lived architecture. They describ
 - [ADR-0004: Saturn package names and project DSL](0004-package-and-dsl-names.md) — **Accepted**, 2026-09-20
 - [ADR-0005: VS Code is a Saturn host, not another Saturn IDE](0005-vscode-host.md) — **Accepted**, 2026-09-20
 - [ADR-0006: Presentation is the canonical HMI IR](0006-canonical-presentation-ir.md) — **Accepted**, 2026-09-21
+
+- [ADR-0007: Canonical element geometry and semantic projections](0007-element-visual-system.md) — **Accepted**, 2026-09-21

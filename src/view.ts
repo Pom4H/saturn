@@ -4,6 +4,7 @@ import { catalog, simulate, type Equipment, type Scene, type Point } from './cor
 import { layout, tapPoint, type Route } from './geometry';
 import { numeric, type RuntimeFrame, type Signal, type Quality, type Alarm } from './runtime/protocol';
 import type * as Three from 'three';
+import { materialCssColor, mediumCssColor } from './elements/materials';
 
 /** Installed renderers consume observations; they never execute behavior or mutate source. */
 export interface VisualState {
@@ -94,6 +95,13 @@ const label = (g: SVGElement, x: number, y: number, text: string, size = 12, anc
 const part = (g: SVGElement, name: string, attrs: Record<string, string | number> = {}) => el(g, 'g', { 'data-part': name, ...attrs });
 const bolt = (g: SVGElement, x: number, y: number, r = 2) => { el(g, 'circle', { cx: x, cy: y, r, fill: '#78949f', stroke: '#eff6f7', 'stroke-width': .8 }); };
 const pipeAttrs = { fill: 'none', 'stroke-linecap': 'butt', 'stroke-linejoin': 'round' };
+const medium2d = {
+  water: mediumCssColor('water'),
+  surface: materialCssColor('waterSurface'),
+  highlight: materialCssColor('waterHighlight'),
+  stale: materialCssColor('staleFluid'),
+  shell: materialCssColor('pipeShell'),
+};
 let serial = 0;
 export class SceneView {
   scene: Scene = { nodes: [], links: [] };
@@ -246,16 +254,16 @@ export class SceneView {
     for (const edge of scene.links) {
       const route = this.routes.get(edge.id)!;
       const g = el(pipes, 'g', { 'data-edge': edge.id, class: `edge${route.valid ? '' : ' invalid'}`, tabindex: 0, role: 'button', 'aria-label': `Труба ${edge.from.node} → ${edge.to.node}` });
-      el(g, 'path', { d: route.path, ...pipeAttrs, stroke: '#7d9aa6', 'stroke-width': 26 });
-      el(g, 'path', { d: route.path, ...pipeAttrs, stroke: '#d5e4e9', 'stroke-width': 22 });
-      const water = el(g, 'path', { d: route.path, ...pipeAttrs, stroke: route.valid ? '#08a7c5' : '#ca6661', 'stroke-width': 18, 'data-water': edge.id });
-      const flow = el(g, 'path', { d: route.path, ...pipeAttrs, stroke: '#a0eef4', 'stroke-width': 12, 'stroke-dasharray': '36 30', 'data-flow': edge.id });
+      el(g, 'path', { d: route.path, ...pipeAttrs, stroke: '#718995', 'stroke-width': 26 });
+      el(g, 'path', { d: route.path, ...pipeAttrs, stroke: medium2d.shell, 'stroke-opacity': .72, 'stroke-width': 22 });
+      const water = el(g, 'path', { d: route.path, ...pipeAttrs, stroke: route.valid ? medium2d.water : '#ca6661', 'stroke-opacity': .88, 'stroke-width': 17, 'data-water': edge.id, 'data-medium': 'water' });
+      const flow = el(g, 'path', { d: route.path, ...pipeAttrs, stroke: medium2d.highlight, 'stroke-width': 6, 'stroke-linecap': 'round', 'stroke-dasharray': '18 30', 'data-flow': edge.id });
       const hit = el(g, 'g', { class: 'edge-hit' });
       for (let i = 1; i < route.points.length; i++) {
         const a = route.points[i - 1], b = route.points[i];
         el(hit, 'rect', { x: Math.min(a.x, b.x) - 10, y: Math.min(a.y, b.y) - 10, width: Math.abs(a.x - b.x) + 20, height: Math.abs(a.y - b.y) + 20, fill: 'transparent' });
       }
-      this.updates.push(dt => { const q = route.valid ? this.flows.get(edge.id) : 0; const phase = this.phase(edge.id, q == null ? 0 : q * 4.5, dt); flow.setAttribute('stroke-dashoffset', String(-phase % 66)); flow.setAttribute('opacity', q == null ? '0' : '.8'); water.setAttribute('stroke', !route.valid ? '#ca6661' : q == null ? '#b5c8d1' : '#08a7c5'); });
+      this.updates.push(dt => { const q = route.valid ? this.flows.get(edge.id) : 0; const phase = this.phase(edge.id, q == null ? 0 : q * 4.5, dt); flow.setAttribute('stroke-dashoffset', String(-phase % 66)); flow.setAttribute('opacity', q == null || q === 0 ? '0' : '.86'); water.setAttribute('stroke', !route.valid ? '#ca6661' : q == null ? medium2d.stale : medium2d.water); });
     }
     for (const n of [...this.renderedNodes.values()].filter(n => !catalog[n.kind].instrument)) this.equipment(devices, n);
     for (const n of [...this.renderedNodes.values()].filter(n => catalog[n.kind].instrument)) this.instrument(instruments, n);
@@ -300,8 +308,8 @@ export class SceneView {
       const clipId = this.id(`tank-${n.id}`), defs = el(body, 'defs'), clip = el(defs, 'clipPath', { id: clipId });
       el(clip, 'path', { d: 'M23 45C23 24 135 24 135 45V192C135 211 23 211 23 192Z' });
       const water = el(body, 'g', { 'clip-path': `url(#${clipId})` });
-      const fluid = el(water, 'rect', { x: 20, y: 90, width: 120, height: 125, fill: '#11b1ca' });
-      const surface = el(water, 'ellipse', { cx: 79, cy: 90, rx: 60, ry: 9, fill: '#89e5ef', stroke: '#ddffff', 'stroke-width': 1 });
+      const fluid = el(water, 'rect', { x: 20, y: 90, width: 120, height: 125, fill: medium2d.water, opacity: .82, 'data-medium': 'water' });
+      const surface = el(water, 'ellipse', { cx: 79, cy: 90, rx: 60, ry: 9, fill: medium2d.surface, stroke: medium2d.highlight, 'stroke-width': 1.2, 'data-medium-surface': 'water' });
       el(body, 'path', { d: 'M29 52V187M34 58V183', stroke: '#fff', 'stroke-width': 2.5, opacity: .5 });
       el(body, 'ellipse', { cx: 79, cy: 41, rx: 61, ry: 15, fill: metal, stroke: '#86a2ae', 'stroke-width': 1.5 });
       rect(68, 3, 23, 25, 1);

@@ -6,7 +6,7 @@ Saturn is an open-source engineering IDE and runtime for physical systems. Descr
 
 ![Saturn turns one typed engineering model into HMI, signals, history, reports, PLC bindings and deployment](docs/assets/saturn-domain-model.svg)
 
-[Open browser editor](https://pom4h.github.io/saturn/) · [DSL reference](docs/plant/dsl.md) · [Architecture](docs/adr/0001-saturn-system-architecture.md) · [Product & interface system](docs/design-system.md) · [Developer guide](docs/developer/language-tooling.md) · [Changelog](CHANGELOG.md)
+[Open browser editor](https://pom4h.github.io/saturn/) · [DSL reference](docs/plant/dsl.md) · [Architecture](docs/adr/0001-saturn-system-architecture.md) · [Product & interface system](docs/design-system.md) · [Element packs](docs/developer/element-packs.md) · [Developer guide](docs/developer/language-tooling.md) · [Changelog](CHANGELOG.md)
 
 ## The project is the model
 

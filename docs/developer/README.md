@@ -3,6 +3,7 @@
 Start here when changing the project language, editor, extensions or agent-facing tooling.
 
 - [TypeScript DSL, language tooling and coding agents](language-tooling.md) — canonical developer guide for `@saturn/core`, CodeMirror/LSP, diagnostics, i18n, extensions and agent workflows.
+- [Element and device packs](element-packs.md) — canonical geometry, glyphs, materials, fluids and projection rules.
 - [System architecture](../adr/0001-saturn-system-architecture.md)
 - [Extension packages and trust](../adr/0002-extension-packages.md)
 - [Package names and project DSL](../adr/0004-package-and-dsl-names.md)
