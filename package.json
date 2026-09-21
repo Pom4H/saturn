@@ -79,5 +79,8 @@
   },
   "bin": {
     "saturn": "scripts/saturn.mjs"
-  }
+  },
+  "workspaces": [
+    "packages/*"
+  ]
 }
