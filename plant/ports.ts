@@ -10,8 +10,26 @@ export interface Attachment { device:string;controller:string;slot:number;profil
 const t=<M extends Medium,F extends string,R extends Terminal['role']>(x:number,y:number,side:Side,medium:M,family:F,role:R,extra:Partial<Omit<Terminal,'x'|'y'|'side'|'medium'|'family'|'role'>>={}):Terminal&{medium:M;family:F;role:R}=>({x,y,side,medium,family,role,z:.65,max:1,...extra});
 const inline = ()=>({ inlet:t(0,48,'left','pipe','water','sink'),outlet:t(150,48,'right','pipe','water','source',{signal:'flow'}) });
 const io = ()=>({ value:t(75,8,'up','control','analog','source',{signal:'value'}), common:t(100,8,'up','power','dc0','sink') });
+type SaturnDO = `DO${1|2|3|4|5|6|7|8|9|10|11}`;
+type SaturnDI = `DI${1|2|3|4|5|6|7|8|9|10}`;
+type SaturnAI = `AI${1|2}`;
+type SaturnTemperature = `T${1|2|3|4|5}`;
+type SaturnAO = `AO${1|2}`;
+type SaturnProfile =
+    { [K in SaturnDO]: Terminal & {medium:'control';family:'digital';role:'source'} } &
+    { [K in SaturnDI]: Terminal & {medium:'control';family:'digital';role:'sink'} } &
+    { [K in SaturnAI]: Terminal & {medium:'control';family:'analog';role:'sink'} } &
+    { [K in SaturnTemperature]: Terminal & {medium:'control';family:'temperature';role:'sink'} } &
+    { [K in SaturnAO]: Terminal & {medium:'control';family:'analog';role:'source'} } & {
+        'DC+': Terminal & {medium:'power';family:'dc24';role:'sink'};
+        'DC-': Terminal & {medium:'power';family:'dc0';role:'sink'};
+        COM1: Terminal & {medium:'power';family:'dc0';role:'sink'};
+        COM2: Terminal & {medium:'power';family:'dc0';role:'sink'};
+        'RS-A': Terminal & {medium:'bus';family:'rs485-A';role:'passive'};
+        'RS-B': Terminal & {medium:'bus';family:'rs485-B';role:'passive'};
+    };
 const saturnProfile=Object.fromEntries([...SATURN_TERMINAL_ANCHORS.map(a=>[a.id,t(a.x*.5,a.y*.5,a.side==='top'?'up':'down','control',a.signal,a.direction==='input'?'sink':'source',{z:1,max:a.direction==='output'?8:1,signal:a.direction==='output'?a.id:undefined})] as const),
- ...SATURN_SERVICE_ANCHORS.map(a=>[a.id,t(a.x*.5,a.y*.5,a.side==='top'?'up':'down',a.id.startsWith('RS')?'bus':'power',a.family,a.id.startsWith('RS')?'passive':'sink',{z:1})] as const)]) as Record<string,Terminal>;
+ ...SATURN_SERVICE_ANCHORS.map(a=>[a.id,t(a.x*.5,a.y*.5,a.side==='top'?'up':'down',a.id.startsWith('RS')?'bus':'power',a.family,a.id.startsWith('RS')?'passive':'sink',{z:1})] as const)]) as SaturnProfile;
 export const profiles={
     pump:{...inline(),drive:t(75,9,'up','power','drive','sink',{input:'voltage'})},
     turbine:{...inline()},separator:{inlet:t(0,48,'left','pipe','water','sink'),outlet:t(150,48,'right','pipe','steam','source')},
