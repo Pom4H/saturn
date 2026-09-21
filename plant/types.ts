@@ -8,6 +8,7 @@ export type Quality = 'good' | 'bad' | 'stale' | 'offline';
 
 declare const signalValueType: unique symbol;
 export type SignalRuntimeType = 'number' | 'boolean' | 'string';
+export type SignalValueForRuntime<Type extends SignalRuntimeType> = Type extends 'boolean' ? boolean : Type extends 'string' ? string : number;
 export interface SignalRef<ID extends string = string, Value extends Scalar = number, Unit extends string = string> {
     readonly ref: ID;
     readonly [signalValueType]?: { value: Value; unit: Unit };
@@ -17,10 +18,10 @@ export type SignalValueOf<S> = S extends SignalRef<string, infer Value, string> 
 export type SignalUnitOf<S> = S extends SignalRef<string, Scalar, infer Unit> ? Unit : never;
 export interface SignalMetadata { type: SignalRuntimeType; unit: string }
 export const signalMetadata = Symbol('saturn.signal.metadata');
-export function signalRef<const ID extends string, Value extends Scalar, const Unit extends string>(ref: ID, type: SignalRuntimeType, unit: Unit): SignalRef<ID, Value, Unit> {
+export function signalRef<const ID extends string, const Type extends SignalRuntimeType, const Unit extends string>(ref: ID, type: Type, unit: Unit): SignalRef<ID, SignalValueForRuntime<Type>, Unit> {
     const value = { ref };
     Object.defineProperty(value, signalMetadata, { value: { type, unit }, enumerable: false, configurable: false, writable: false });
-    return value as SignalRef<ID, Value, Unit>;
+    return value as SignalRef<ID, SignalValueForRuntime<Type>, Unit>;
 }
 export function signalInfo(ref: SignalRef<string, Scalar, string>): SignalMetadata {
     return (ref as SignalRef<string, Scalar, string> & { [signalMetadata]?: SignalMetadata })[signalMetadata] ?? { type: 'number', unit: '' };
