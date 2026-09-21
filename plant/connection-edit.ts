@@ -9,7 +9,8 @@ export function appendConnection(files:Record<string,string>,wire:Connection):Re
  for(const stmt of file.statements)if(ts.isVariableStatement(stmt))for(const d of stmt.declarationList.declarations)if(ts.isIdentifier(d.name)&&d.name.text==='userWires'&&d.initializer&&ts.isArrayLiteralExpression(d.initializer))array=d.initializer;
  if(!array)failCode('SATURN_PROJECT_INVALID',{reason:'declarativeOnly'},{field:'wiring.userWires'});
  const q=(s:string)=>JSON.stringify(s),options={...(wire.medium!=='pipe'?{medium:wire.medium}:{}),...(wire.via?{via:wire.via}:{}),...(wire.scale!==undefined?{scale:wire.scale}:{}),...(wire.signal!==undefined?{signal:wire.signal}:{})};
- const call=`${wire.medium==='pipe'?'pipe':'cable'}(${q(wire.id)}, port(${q(wire.from.device)}, ${q(wire.from.port)}), port(${q(wire.to.device)}, ${q(wire.to.port)}), ${JSON.stringify(options)})`;
+ const endpoint=(value:{device:string;port:string})=>`{device:${q(value.device)},port:${q(value.port)}}`;
+ const call=`${wire.medium==='pipe'?'pipe':'cable'}(${q(wire.id)}, ${endpoint(wire.from)}, ${endpoint(wire.to)}, ${JSON.stringify(options)})`;
  const at=array.getEnd()-1,prefix=array.elements.length&&!array.elements.hasTrailingComma?',':'';
  const result={...files,'wiring.ts':source.slice(0,at)+prefix+'\n    '+call+',\n'+source.slice(at)};
  const project=compileProject(result);if(!project.connections?.some(c=>c.id===wire.id))failCode('SATURN_PROJECT_INVALID',{reason:'missing'},{field:'project.connections.userWires'});return result;

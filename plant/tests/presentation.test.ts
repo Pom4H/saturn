@@ -10,6 +10,7 @@ import { demoFiles } from '../demo/files';
 import { executeReport } from '../workflows';
 import { NodeSql } from '../adapters/node-sql';
 import type { ReportTask } from '../types';
+import { diagnostic } from './diagnostic';
 const project=()=>compileProject(demoFiles);
 test('one DSL tree is shared by live HMI, report and the compiled controller screen',()=>{
  const p=project(),v=p.views![0];assert.deepEqual(v.body,p.reports.find(r=>r.id==='bench-state')!.view!.body);
@@ -41,17 +42,17 @@ test('report presentation binds only the frozen data capsule, excluding samples 
  const result=executeReport(task,new NodeSql());assert.match(result.html,/>321</);assert.ok(!result.html.includes('>999<'));
 });
 test('target-specific unsupported widgets and display overflow fail explicitly',()=>{
- const v=view('small',{title:'Small',bindings:{},body:dataTable([{key:'x',title:'X'}])});assert.throws(()=>projectPresentation(v,{target:'saturn-plc-320',bindings:{}}),/does not support/);
- v.body=panel(Array.from({length:12},()=>label('A')));assert.throws(()=>projectPresentation(v,{target:'saturn-plc-320',bindings:{}}),/320x240/);
+ const v=view('small',{title:'Small',bindings:{},body:dataTable([{key:'x',title:'X'}])});assert.throws(()=>projectPresentation(v,{target:'saturn-plc-320',bindings:{}}),diagnostic('SATURN_PRESENTATION_INVALID',{target:'plc',nodeKind:'table'}));
+ v.body=panel(Array.from({length:12},()=>label('A')));assert.throws(()=>projectPresentation(v,{target:'saturn-plc-320',bindings:{}}),diagnostic('SATURN_LIMIT'));
 });
 test('view reference errors and unauthorized command ranges are compile-time errors',()=>{
- const p=project();p.views![0].bindings.input=pin('missing.signal');assert.throws(()=>validateProject(p),/Unknown signal/);
- const q=project();q.views![0].body=commandButton('Go','BENCH-LEVEL',100);assert.throws(()=>validateProject(q),/outside declared/);
- const r=project();r.reports.find(r=>r.id==='bench-state')!.view!.bindings.input=pin('CORE.power');assert.throws(()=>validateProject(r),/undeclared signal/);
+ const p=project();p.views![0].bindings.input=pin('missing.signal');assert.throws(()=>validateProject(p),diagnostic('SATURN_DSL_UNKNOWN',{signal:'missing.signal'}));
+ const q=project();q.views![0].body=commandButton('Go','BENCH-LEVEL',100);assert.throws(()=>validateProject(q),diagnostic('SATURN_PRESENTATION_INVALID',{field:'action.target'}));
+ const r=project();r.reports.find(r=>r.id==='bench-state')!.view!.bindings.input=pin('CORE.power');assert.throws(()=>validateProject(r),diagnostic('SATURN_REPORT_INVALID',{signal:'CORE.power'}));
 });
 test('presentation tree rejects excessive recursion and unknown binding slots',()=>{
  const v=view('bounded',{title:'Bounded',bindings:{},body:readout('Unknown','x')});assert.throws(()=>validatePresentation(v));
- v.body=label('x');for(let i=0;i<12;i++)v.body=panel([v.body]);assert.throws(()=>validatePresentation(v),/budget/);
+ v.body=label('x');for(let i=0;i<12;i++)v.body=panel([v.body]);assert.throws(()=>validatePresentation(v),diagnostic('SATURN_LIMIT'));
 });
 test('named timer is compiled once and checkpoint restoration survives repeated frame reads',()=>{
  const p=project(),c=p.controllers![0];c.blocks={start:functionBlock('TON',[{op:'gt',args:[pin('AI1'),500]},500])};

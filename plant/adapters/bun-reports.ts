@@ -39,8 +39,8 @@ export function runReport(task: ReportTask, timeoutMs = 5000): Promise<ReportArt
             try { child?.kill('SIGKILL'); } catch { /* already exited */ }
             error ? reject(error) : resolve(value!);
         };
-        const siblingWorker = fileURLToPath(new URL('./report-worker.mjs', import.meta.url));
-        const worker = existsSync(siblingWorker) ? siblingWorker : resolvePath('.plant/report-worker.mjs');
+        const siblingWorker = fileURLToPath(new URL('./bun-report-worker.mjs', import.meta.url));
+        const worker = existsSync(siblingWorker) ? siblingWorker : resolvePath('.plant/bun-report-worker.mjs');
         child = bunRuntime.spawn({
             cmd: [process.execPath, worker],
             stdin: 'ignore',

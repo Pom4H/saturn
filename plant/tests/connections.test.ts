@@ -11,6 +11,7 @@ import { fbdCrc32 } from '../vendor/saturn/src/format';
 import { appendConnection, addExpansionSource, removeConnection } from '../connection-edit';
 import { createPlantModel } from '../visual3d';
 import * as THREE from 'three';
+import { diagnostic } from './diagnostic';
 const project=()=>compileProject(demoFiles);
 test('physical connections use exact installed anchors and all demo routes avoid equipment',()=>{
  const p=project(),routes=routeConnections(p);assert.equal(routes.length,p.connections!.length);console.log('routes',routes.length,routes.filter(r=>!r.valid));
@@ -54,11 +55,11 @@ test('checkpoint restore and device order preserve integer PLC/HMI trajectory',(
 test('visual connection edit only patches the wiring array, stays a draft and rejects ignored arrays',()=>{
  const wire={id:'module-signal',from:{device:'LEVEL-TX',port:'value'},to:{device:'EXP-AI4',port:'AI1'},medium:'control' as const};
  // The existing sensor output uses a single conductor; a second is not silently fanned out.
- assert.throws(()=>appendConnection(demoFiles,wire),/Occupied/);
+ assert.throws(()=>appendConnection(demoFiles,wire),diagnostic('SATURN_PORT_OCCUPIED'));
  const p={...demoFiles,'wiring.ts':demoFiles['wiring.ts'].replace('export const userWires=[]','export const userWires=[] // preserved')};
  const next=appendConnection(p,{id:'power-com2',from:{device:'PSU-24',port:'minus'},to:{device:'SATURN-1',port:'COM2'},medium:'power'});
  assert.equal(next['plant.ts'],demoFiles['plant.ts']);assert.ok(next['wiring.ts'].includes('// preserved'));assert.ok(compileProject(next).connections!.some(w=>w.id==='power-com2'));
- assert.throws(()=>appendConnection({...demoFiles,'plant.ts':demoFiles['plant.ts'].replace(', ...userWires','')},{id:'ignored',from:{device:'PSU-24',port:'minus'},to:{device:'SATURN-1',port:'COM2'},medium:'power'}),/not included/);
+ assert.throws(()=>appendConnection({...demoFiles,'plant.ts':demoFiles['plant.ts'].replace(', ...userWires','')},{id:'ignored',from:{device:'PSU-24',port:'minus'},to:{device:'SATURN-1',port:'COM2'},medium:'power'}),diagnostic('SATURN_PROJECT_INVALID'));
 });
 test('expansion adds a typed slot and real module declaration without overwriting other files',()=>{
  const next=addExpansionSource(demoFiles,'SATURN-1','EXP-SECOND','expansion-2.ts',"import {simulation} from '@saturn/core'; export const module=simulation('EXP-SECOND','io-module',{system:'commissioning',at:{x:1700,y:3850}});",2),p=compileProject(next);
@@ -81,7 +82,7 @@ test('disconnect patches the explicit source, preserving unrelated declarations 
  const removed=removeConnection(demoFiles,'level-input');assert.equal(removed['plant.ts'],demoFiles['plant.ts']);assert.equal(compileProject(removed).connections!.length,22);assert.ok(removed['commissioning.ts'].includes('// Generic isolated'));assert.throws(()=>removeConnection(removed,'level-input'),/literal/);
 });
 
-test('controller checkpoint rejects a changed runtime ABI rather than claiming deterministic restoration',()=>{const p=project(),k=new Kernel(p,'v','r',0);k.state.controllerAbi='unknown-runtime';assert.throws(()=>new Kernel(p,'v','r',0,k.state),/ABI mismatch/);});
+test('controller checkpoint rejects a changed runtime ABI rather than claiming deterministic restoration',()=>{const p=project(),k=new Kernel(p,'v','r',0);k.state.controllerAbi='unknown-runtime';assert.throws(()=>new Kernel(p,'v','r',0,k.state),diagnostic('SATURN_RUNTIME_INVALID',{field:'controllerAbi'}));});
 
 test('prototype members cannot masquerade as physical connectors',()=>{for(const port of ['__proto__','constructor','toString']){const p=project();p.connections![0].to.port=port;assert.throws(()=>validateProject(p),/Unknown terminal/);}assert.throws(()=>terminals('__proto__'),/No physical/);});
 

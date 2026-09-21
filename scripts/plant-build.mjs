@@ -8,7 +8,8 @@ const raw = { name: 'project-source', setup(b) { b.onResolve({ filter: /\?raw$/ 
 export const options = { bundle: true, format: 'esm', target: 'es2022', sourcemap: true, plugins: [raw] };
 await mkdir('.plant', { recursive: true });
 await build({ ...options, entryPoints: ['plant/cli.ts'], outfile: '.plant/server.mjs', platform: 'node', packages: 'external' });
-await build({ ...options, entryPoints: ['plant/adapters/bun-report-worker.ts'], outfile: '.plant/report-worker.mjs', platform: 'node', packages: 'external' });
+await build({ ...options, entryPoints: ['plant/adapters/node-report-worker.ts'], outfile: '.plant/node-report-worker.mjs', platform: 'node', packages: 'external' });
+await build({ ...options, entryPoints: ['plant/adapters/bun-report-worker.ts'], outfile: '.plant/bun-report-worker.mjs', platform: 'node', packages: 'external' });
 if (process.argv.includes('--server'))
     process.exit(0);
 await rm('dist/plant/assets', { recursive: true, force: true });
