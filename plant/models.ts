@@ -56,7 +56,7 @@ const reservoir = installed({ kind: 'reservoir', title: 'Буферная ёмк
         const inventory = clamp(available - (flow + spill) * dt, 0, q.capacity);
         return { inventory, flow, spill, balance: inventory - s.inventory - dt * (incoming - flow - spill) };
     }, observe: (s, q) => ({ ...s, level: 100 * s.inventory / q.capacity }) });
-const valve = installed({ kind: 'motor-valve', title: 'Регулирующий клапан', visual: 'valve', inputs: { demand: .5, pressure: 1 }, inputDimensions: { demand: 'ratio', pressure: 'pressure' } as const,
+const valve = installed({ kind: 'motor-valve', title: 'Регулирующий клапан', visual: 'valve', inputs: { demand: .5, pressure: 1 }, inputDimensions: { demand: 'ratio', pressure: 'ratio' } as const,
     parameters: { travel: p(2, .1, 60), capacity: p(.3, .01, 10) }, outputs: { opening: '%', flow: 'отн.' }, outputDimensions: { opening: 'ratio', flow: 'flow' } as const,
     initialize: () => ({ opening: .5, flow: .15 }),
     advance: (s, i, q, dt) => { const opening = approach(s.opening, clamp(i.demand), dt, q.travel); return { opening, flow: q.capacity * opening * Math.sqrt(Math.max(0, i.pressure)) }; },
