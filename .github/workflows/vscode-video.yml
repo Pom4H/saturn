@@ -1,6 +1,16 @@
 name: VS Code full tour video
 
 on:
+  push:
+    branches:
+      - feat/vscode-host
+    paths:
+      - 'vscode/**'
+      - 'standalone/**'
+      - 'plant/**'
+      - 'scripts/vscode-video.ps1'
+      - 'scripts/vscode-capture-screencast.mjs'
+      - '.github/workflows/vscode-video.yml'
   pull_request:
     paths:
       - 'vscode/**'
