@@ -27,6 +27,12 @@ import { Push, allowedPushEndpoint } from '../adapters/push';
 import { startPlantServer } from '../server';
 import { runReport } from '../adapters/node-reports';
 import type { Actor, AlarmState, ReportTask, Project, Frame } from '../types';
+import type { EnvironmentDescriptor } from '../environment';
+type PushSender = ConstructorParameters<typeof Push>[2];
+type LoginPayload = { csrf: string };
+type FirmwarePayload = { hardwareVerified: boolean; fbdbin: number[] };
+type RemoteSessionPayload = { project: { id: string }; instance: { instanceId: string } };
+type LocalSessionPayload = { environment: EnvironmentDescriptor; frame: { paused: boolean } };
 const engineer: Actor = { id: 'engineer', role: 'engineer' }, viewer: Actor = { id: 'reader', role: 'viewer' };
 const project = () => compileProject(demoFiles);
 const makeService = async (files = demoFiles) => { const store = new Store(new NodeSql()); let serial = 0; const repo = new LocalRepository(store, () => `local:${++serial}`); const service = new Service(store, repo, { now: () => 1000000, uuid: () => `id-${++serial}`, reportRunner: async (task) => executeReport(task, new NodeSql()) }); await service.start(files); return service; };
@@ -140,10 +146,11 @@ test('report capsule cannot access operational tables or execute SQL writes', ()
     assert.throws(() => executeReport(t, new NodeSql()));
 } });
 test('manual and scheduled reports retain revision, deduplicate UTC minute and record completion', async () => { const s = await makeService(); for (let i = 0; i < 20; i++)
-    s.tick(); const job = s.dispatch('thermal-balance', { scale: 1 }, engineer); await s.idle(); assert.equal(s.reports()[0].status, 'success'); assert.ok(s.reportArtifact(job.id).html.includes(s.frame().revision)); const at = Date.UTC(2026, 8, 17, 12, 0); s.schedule(at); s.schedule(at + 10000); await s.idle(); assert.equal(s.reports().filter((r: any) => r.trigger === 'schedule').length, 1); assert.ok(s.store.db.all('SELECT * FROM outbox').length >= 2); s.store.db.close(); });
+    s.tick(); const job = s.dispatch('thermal-balance', { scale: 1 }, engineer); await s.idle(); assert.equal(s.reports()[0].status, 'success'); assert.ok(s.reportArtifact(job.id).html.includes(s.frame().revision)); const at = Date.UTC(2026, 8, 17, 12, 0); s.schedule(at); s.schedule(at + 10000); await s.idle(); assert.equal(s.reports().filter(r => r.trigger === 'schedule').length, 1); assert.ok(s.store.db.all('SELECT * FROM outbox').length >= 2); s.store.db.close(); });
 test('cron UTC matching supports ranges, steps and DOM/DOW semantics', () => { assert.equal(cronMatches('*/15 9-17 * * 1-5', Date.UTC(2026, 8, 17, 12, 30)), true); assert.equal(cronMatches('*/15 9-17 * * 1-5', Date.UTC(2026, 8, 17, 12, 31)), false); assert.equal(cronMatches('0 0 1 * 4', Date.UTC(2026, 8, 17, 0, 0)), true); });
 test('native report worker runs the same capsule with bounded execution', async () => { const result = await runReport(task()); assert.equal(result.rows[0].coverage, 80); });
-test('Web Push allowlist, per-session subscription, expired endpoint handling', async () => { assert.equal(allowedPushEndpoint('https://127.0.0.1/api'), false); assert.equal(allowedPushEndpoint('http://fcm.googleapis.com/x'), false); assert.equal(allowedPushEndpoint('https://fcm.googleapis.com.evil.test/x'), false); const store = new Store(new NodeSql()), auth = new Auth(store); auth.seed('engineer', 'password-for-tests'); const login = auth.login('engineer', 'password-for-tests', 'local'), session = auth.session(`scada_session=${login.token}`); const ecdh = createECDH('prime256v1'); ecdh.generateKeys(); const subscription = { endpoint: 'https://fcm.googleapis.com/fcm/send/test', keys: { p256dh: ecdh.getPublicKey().toString('base64url'), auth: randomBytes(16).toString('base64url') } }; let sent = 0; const push = new Push(store, 'mailto:operator@example.org', (async (_s: unknown, payload: unknown) => { sent++; assert.ok(!payload?.toString().includes('temperature')); throw Object.assign(new Error('Expired'), { statusCode: 410 }); }) as any); push.subscribe(subscription, engineer, session.sessionId); store.notify('notice', Date.now(), 'alarm', 'temperature'); await push.flush(); assert.equal(sent, 1); assert.equal(store.db.all('SELECT * FROM subscriptions').length, 0); assert.equal(store.db.all('SELECT status FROM deliveries')[0].status, 'expired'); auth.logout(session.sessionId); assert.throws(() => auth.session(`scada_session=${login.token}`), /expired/); store.db.close(); });
+test('Web Push allowlist, per-session subscription, expired endpoint handling', async () => { assert.equal(allowedPushEndpoint('https://127.0.0.1/api'), false); assert.equal(allowedPushEndpoint('http://fcm.googleapis.com/x'), false); assert.equal(allowedPushEndpoint('https://fcm.googleapis.com.evil.test/x'), false); const store = new Store(new NodeSql()), auth = new Auth(store); auth.seed('engineer', 'password-for-tests'); const login = auth.login('engineer', 'password-for-tests', 'local'), session = auth.session(`scada_session=${login.token}`); const ecdh = createECDH('prime256v1'); ecdh.generateKeys(); const subscription = { endpoint: 'https://fcm.googleapis.com/fcm/send/test', keys: { p256dh: ecdh.getPublicKey().toString('base64url'), auth: randomBytes(16).toString('base64url') } }; let sent = 0; const sendExpired: PushSender = async (_subscription, payload) => { sent++; assert.ok(!String(payload).includes('temperature')); throw Object.assign(new Error('Expired'), { statusCode: 410 }); };
+    const push = new Push(store, 'mailto:operator@example.org', sendExpired); push.subscribe(subscription, engineer, session.sessionId); store.notify('notice', Date.now(), 'alarm', 'temperature'); await push.flush(); assert.equal(sent, 1); assert.equal(store.db.all('SELECT * FROM subscriptions').length, 0); assert.equal(store.db.all('SELECT status FROM deliveries')[0].status, 'expired'); auth.logout(session.sessionId); assert.throws(() => auth.session(`scada_session=${login.token}`), /expired/); store.db.close(); });
 test('HTTP auth, CSRF, private HTML, SQL reports, SSE and revocation', async () => { const dir = await mkdtemp(join(tmpdir(), 'scada-http-test-')); const app = await startPlantServer({ port: 0, data: join(dir, 'db.sqlite'), repository: join(dir, 'repo.git'), password: 'password-for-http-tests', autoTick: false }); try {
     const base = app.origin + '/plant/';
     const landing = await fetch(app.origin + '/');
@@ -165,7 +172,7 @@ test('HTTP auth, CSRF, private HTML, SQL reports, SSE and revocation', async () 
     assert.equal((await fetch(base + 'api/login', { method: 'POST', headers: { 'content-type': 'application/json', Origin: 'https://evil.example' }, body: '{}' })).status, 403);
     const logged = await fetch(base + 'api/login', { method: 'POST', headers: { 'content-type': 'application/json', Origin: app.origin }, body: JSON.stringify({ user: 'engineer', password: 'password-for-http-tests' }) });
     assert.equal(logged.status, 200);
-    const cookie = logged.headers.get('set-cookie')!.split(';')[0], login = await logged.json() as any;
+    const cookie = logged.headers.get('set-cookie')!.split(';')[0], login = await logged.json() as LoginPayload;
     const page = await fetch(base + 'app/', { headers: { Cookie: cookie } });
     assert.equal(page.status, 200);
     assert.equal(page.headers.get('cache-control'), 'no-store');
@@ -181,7 +188,7 @@ test('HTTP auth, CSRF, private HTML, SQL reports, SSE and revocation', async () 
     await app.service.idle();
     assert.equal(app.service.reports()[0].status, 'success');
     const firmware=await fetch(base+'api/firmware',{method:'POST',headers:{Cookie:cookie,Origin:app.origin,'content-type':'application/json','x-csrf-token':login.csrf},body:JSON.stringify({controllerId:'SATURN-1',revision:app.service.frame().revision})});
-    assert.equal(firmware.status,200);const program=await firmware.json() as any;assert.equal(program.hardwareVerified,false);assert.ok(program.fbdbin.length>100);
+    assert.equal(firmware.status,200);const program=await firmware.json() as FirmwarePayload;assert.equal(program.hardwareVerified,false);assert.ok(program.fbdbin.length>100);
     assert.equal((await fetch(base+'api/firmware',{method:'POST',headers:{Cookie:cookie,Origin:app.origin,'content-type':'application/json'},body:'{}'})).status,403);
     const logout = await fetch(base + 'api/logout', { method: 'POST', headers: { Cookie: cookie, Origin: app.origin, 'content-type': 'application/json', 'x-csrf-token': login.csrf }, body: '{}' });
     assert.equal(logout.status, 200);
@@ -200,7 +207,8 @@ test('per-signal archive policies suppress unchanged values without hiding quali
 test('checkpoint restore rejects incompatible installed model versions', () => { const p = project(), k = new Kernel(p, 'r', 'run', 0); k.state.modelVersions.pump = 'incompatible'; assert.throws(() => new Kernel(p, 'r', 'run', 0, k.state), /version mismatch/); });
 test('invalid report SQL closes its isolated database', () => { const db = new NodeSql(), t = task(); t.report.sql = 'DELETE FROM samples'; assert.throws(() => executeReport(t, db)); assert.throws(() => db.all('SELECT 1'), /not open|closed/i); });
 test('browser-sized DSL rejects excessive banks and unknown visual types', () => { assert.throws(() => compileProject({ ...demoFiles, 'core.ts': demoFiles['core.ts'].replace('count: 6', 'count: 999') })); const p = project(); p.devices[0].type = 'missing-symbol'; assert.throws(() => validateProject(p), /device type/); });
-test('push survives cookie expiration, but explicit logout revokes the device subscription', async () => { const store = new Store(new NodeSql()), auth = new Auth(store); auth.seed('engineer', 'password-for-expiry-tests'); const login = auth.login('engineer', 'password-for-expiry-tests', 'local'), session = auth.session(`scada_session=${login.token}`); const key = createECDH('prime256v1'); key.generateKeys(); let sent = 0; const push = new Push(store, 'mailto:operator@example.org', (async () => { sent++; return { statusCode: 201 }; }) as any); push.subscribe({ endpoint: 'https://fcm.googleapis.com/fcm/send/expiry', keys: { p256dh: key.getPublicKey().toString('base64url'), auth: randomBytes(16).toString('base64url') } }, engineer, session.sessionId); store.db.exec('UPDATE sessions SET expires=0'); store.notify('first', Date.now(), 'report', 'report-id'); await push.flush(); assert.equal(sent, 1); auth.logout(session.sessionId); store.notify('second', Date.now(), 'alarm', 'alarm-id'); await push.flush(); assert.equal(sent, 1); store.db.close(); });
+test('push survives cookie expiration, but explicit logout revokes the device subscription', async () => { const store = new Store(new NodeSql()), auth = new Auth(store); auth.seed('engineer', 'password-for-expiry-tests'); const login = auth.login('engineer', 'password-for-expiry-tests', 'local'), session = auth.session(`scada_session=${login.token}`); const key = createECDH('prime256v1'); key.generateKeys(); let sent = 0; const sendAccepted: PushSender = async () => { sent++; return { statusCode: 201 } as Awaited<ReturnType<PushSender>>; };
+    const push = new Push(store, 'mailto:operator@example.org', sendAccepted); push.subscribe({ endpoint: 'https://fcm.googleapis.com/fcm/send/expiry', keys: { p256dh: key.getPublicKey().toString('base64url'), auth: randomBytes(16).toString('base64url') } }, engineer, session.sessionId); store.db.exec('UPDATE sessions SET expires=0'); store.notify('first', Date.now(), 'report', 'report-id'); await push.flush(); assert.equal(sent, 1); auth.logout(session.sessionId); store.notify('second', Date.now(), 'alarm', 'alarm-id'); await push.flush(); assert.equal(sent, 1); store.db.close(); });
 
 test('native SQL runaway is terminated in its isolated process without stopping the runtime', async () => {
     const t = task();
@@ -244,7 +252,7 @@ test('Saturn instances link live runtime through a memory-only bearer bridge', a
         });
         assert.equal(loginResponse.status, 200);
         const cookie = loginResponse.headers.get('set-cookie')!.split(';')[0];
-        const login = await loginResponse.json() as any;
+        const login = await loginResponse.json() as LoginPayload;
 
         const connect = await fetch(engineerBase + 'environment/connect', {
             method: 'POST',
@@ -262,14 +270,14 @@ test('Saturn instances link live runtime through a memory-only bearer bridge', a
             }),
         });
         assert.equal(connect.status, 200);
-        const descriptor = await connect.json() as any;
+        const descriptor = await connect.json() as EnvironmentDescriptor;
         assert.equal(descriptor.name, 'Plant-01');
         assert.equal(descriptor.projectId, operatorApp.service.project.id);
         assert.equal(descriptor.instanceId, operatorApp.service.instanceId);
 
         const remoteSession = await fetch(engineerBase + 'environment/session', { headers: { Cookie: cookie } });
         assert.equal(remoteSession.status, 200);
-        const status = await remoteSession.json() as any;
+        const status = await remoteSession.json() as RemoteSessionPayload;
         assert.equal(status.project.id, engineerApp.service.project.id);
         assert.equal(status.instance.instanceId, operatorApp.service.instanceId);
         assert.equal(status.csrf, login.csrf);
@@ -300,7 +308,7 @@ test('Saturn instances link live runtime through a memory-only bearer bridge', a
         assert.equal(operatorApp.service.frame().paused, true);
 
         const localStatus = await fetch(engineerBase + 'session', { headers: { Cookie: cookie } });
-        const local = await localStatus.json() as any;
+        const local = await localStatus.json() as LocalSessionPayload;
         assert.equal(local.environment.instanceId, operatorApp.service.instanceId);
         assert.equal(local.frame.paused, false, 'remote command must not mutate engineering runtime');
 
