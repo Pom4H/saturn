@@ -37,12 +37,6 @@ export async function startPlantHttpServer(options: {
     uiMode?: 'ide' | 'runtime' | 'kiosk';
     application?: {
         version: string;
-        extensions?: {
-            list(): Promise<Array<{ id: string; name: string; version: string; entry: string; capabilities: string[]; elements: Array<{ type: string; title: string; tag: string }> }>>;
-            install(specifier: string): Promise<{ id: string; name: string; version: string; entry: string; capabilities: string[]; elements: Array<{ type: string; title: string; tag: string }> }>;
-            remove(name: string): Promise<void>;
-            readAsset(id: string, path: string): Promise<Uint8Array>;
-        };
         update?: {
             check(): Promise<{ configured: boolean; available: boolean; currentVersion: string; version?: string; channel?: string; publishedAt?: string; target?: string }>;
             install(): Promise<{ scheduled: true; version: string }>;
@@ -145,25 +139,6 @@ export async function startPlantHttpServer(options: {
                 html(200, (await readStatic('index.html')).toString('utf8'));
                 return;
             }
-            if (path.startsWith(`${prefix}/extensions/`) && req.method === 'GET') {
-                auth.session(req.headers.cookie, req.headers.authorization);
-                const host = options.application?.extensions;
-                if (!host)
-                    failCode('SATURN_NOT_FOUND',{resource:'extensions',id:'host'},{path},{status:404});
-                const parts = path.slice(`${prefix}/extensions/`.length).split('/').filter(Boolean);
-                const id = parts.shift() ?? '';
-                const relative = parts.join('/');
-                try {
-                    const data = await host.readAsset(id, relative);
-                    const mime: Record<string, string> = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png' };
-                    res.writeHead(200, { 'Content-Type': mime[extname(relative)] ?? 'application/octet-stream', 'Cache-Control': 'no-store' });
-                    res.end(data);
-                }
-                catch (error) {
-                    failCode('SATURN_NOT_FOUND',{resource:'extensionAsset',id:relative},{extension:id,detail:error instanceof Error?error.message:String(error)},{status:404});
-                }
-                return;
-            }
             if (path.startsWith(`${prefix}/api/`)) {
                 const session = auth.session(req.headers.cookie, req.headers.authorization), actor = session.actor;
                 if (req.method === 'POST' && !session.bearer && req.headers['x-csrf-token'] !== session.csrf)
@@ -247,14 +222,7 @@ export async function startPlantHttpServer(options: {
                         return;
                     }
                     if (action === 'application') {
-                        const installed = await options.application?.extensions?.list() ?? [];
-                        json(200, {
-                            version: options.application?.version ?? null,
-                            extensions: installed.map(extension => ({
-                                ...extension,
-                                entryUrl: `${prefix}/extensions/${extension.id}/${extension.entry.split('/').map(encodeURIComponent).join('/')}`,
-                            })),
-                        });
+                        json(200, { version: options.application?.version ?? null });
                         return;
                     }
                     if (action === 'instance') {
@@ -325,26 +293,6 @@ export async function startPlantHttpServer(options: {
                         if (!options.application?.update)
                             failCode('SATURN_UPDATE_INVALID',{reason:'disabled'},{resource:'self-update'},{status:503});
                         json(202, await options.application.update.install());
-                        return;
-                    }
-                    if (action === 'extensions/install') {
-                        requireRole(actor, 'engineer');
-                        if (!options.application?.extensions)
-                            failCode('SATURN_EXTENSION_INVALID',{reason:'disabled'},{resource:'extension-host'},{status:503});
-                        if (typeof input.specifier !== 'string')
-                            failCode('SATURN_EXTENSION_INVALID',{reason:'missing'},{field:'specifier'});
-                        const extension = await options.application.extensions.install(input.specifier);
-                        json(200, { ...extension, entryUrl: `${prefix}/extensions/${extension.id}/${extension.entry.split('/').map(encodeURIComponent).join('/')}` });
-                        return;
-                    }
-                    if (action === 'extensions/remove') {
-                        requireRole(actor, 'engineer');
-                        if (!options.application?.extensions)
-                            failCode('SATURN_EXTENSION_INVALID',{reason:'disabled'},{resource:'extension-host'},{status:503});
-                        if (typeof input.name !== 'string')
-                            failCode('SATURN_EXTENSION_INVALID',{reason:'missing'},{field:'name'});
-                        await options.application.extensions.remove(input.name);
-                        json(200, { ok: true });
                         return;
                     }
                     if (action === 'logout') {
