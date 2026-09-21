@@ -1,4 +1,3 @@
-import { resolve } from 'node:path';
 import { models } from '../plant/models';
 import { compileProject } from '../plant/compiler';
 import { installEquipment, sceneFor } from '../plant/equipment';
@@ -9,7 +8,7 @@ import { localizedDslEntities, localizedDslOperators } from '../plant/dsl-i18n';
 import { modelTitle } from '../plant/i18n';
 import { formatDiagnostic, SaturnDiagnosticError, type SaturnLocale } from '../plant/diagnostics';
 import { catalog } from '../src/core';
-import { ExtensionManager } from './extensions';
+import { listRegistry } from './registry';
 import { loadProjectDirectory } from './project-loader';
 
 export interface IdeCatalogItem {
@@ -91,7 +90,7 @@ export function ideDocs(locale: SaturnLocale): IdeDocsDocument {
 export async function ideCheck(projectPath: string, locale: SaturnLocale): Promise<IdeCheckDocument> {
     const loaded = await loadProjectDirectory(projectPath);
     try {
-        compileProject(loaded.files);
+        compileProject(loaded.sources);
         return { schema: 1, locale, diagnostics: [] };
     } catch (error) {
         if (error instanceof SaturnDiagnosticError) {
@@ -113,7 +112,7 @@ export async function ideCheck(projectPath: string, locale: SaturnLocale): Promi
     }
 }
 
-export async function ideCatalog(appData: string, locale: SaturnLocale = 'en'): Promise<IdeCatalogDocument> {
+export async function ideCatalog(locale: SaturnLocale = 'en'): Promise<IdeCatalogDocument> {
     const core: IdeCatalogGroup = {
         id: 'core',
         title: 'Saturn Core',
@@ -122,30 +121,21 @@ export async function ideCatalog(appData: string, locale: SaturnLocale = 'en'): 
             .map(item => ({ type: item.kind, title: modelTitle(item.kind, locale), source: '@saturn/core', visual: item.visual }))
             .sort((a, b) => a.title.localeCompare(b.title)),
     };
-
-    const extensions = await new ExtensionManager(resolve(appData, 'extensions')).list();
-    const catalogs: IdeCatalogGroup[] = [core];
-    for (const extension of extensions) {
-        if (!extension.elements.length)
-            continue;
-        catalogs.push({
-            id: extension.name,
-            title: extension.name,
-            source: `${extension.name}@${extension.version}`,
-            items: extension.elements.map(element => ({
-                type: element.type,
-                title: element.title,
-                source: extension.name,
-                ...(element.tag ? { tag: element.tag } : {}),
-            })),
-        });
-    }
-    return { schema: 1, catalogs };
+    const available: IdeCatalogGroup = {
+        id: 'registry',
+        title: 'Add to project',
+        source: 'Saturn registry',
+        items: listRegistry()
+            .filter(item => item.kind === 'equipment')
+            .map(item => ({ type: item.name, title: item.title, source: `saturn add ${item.name}` }))
+            .sort((a, b) => a.title.localeCompare(b.title)),
+    };
+    return { schema: 1, catalogs: [core, available] };
 }
 
 export async function ideDiagram(projectPath: string, locale: SaturnLocale = 'en'): Promise<IdeDiagramDocument> {
     const loaded = await loadProjectDirectory(projectPath);
-    const project = compileProject(loaded.files);
+    const project = compileProject(loaded.sources);
     installEquipment(locale);
     const scene = sceneFor(project);
     const definitions = Object.fromEntries(
@@ -178,7 +168,7 @@ function reportSummary(report: Report): IdeReportSummary {
 
 export async function ideReports(projectPath: string): Promise<IdeReportsDocument> {
     const loaded = await loadProjectDirectory(projectPath);
-    const project = compileProject(loaded.files);
+    const project = compileProject(loaded.sources);
     return {
         schema: 1,
         project: { id: loaded.id, title: loaded.title, directory: loaded.directory },
@@ -209,7 +199,7 @@ function previewData(report: Report, from: number, to: number): ReportData {
 
 export async function ideReportPreview(projectPath: string, reportId: string): Promise<IdeReportPreviewDocument> {
     const loaded = await loadProjectDirectory(projectPath);
-    const project = compileProject(loaded.files);
+    const project = compileProject(loaded.sources);
     const report = project.reports.find(item => item.id === reportId);
     if (!report)
         throw new Error(`Unknown report: ${reportId}`);
@@ -243,12 +233,12 @@ function option(args: string[], name: string): string | undefined {
     return index >= 0 ? args[index + 1] : undefined;
 }
 
-export async function runIdeCommand(args: string[], appData: string): Promise<void> {
+export async function runIdeCommand(args: string[]): Promise<void> {
     const positional = args.filter((arg, index) => arg !== '--json' && args[index - 1] !== '--project');
     const [action = 'catalog'] = positional;
     const locale = (option(args, '--locale') === 'ru' ? 'ru' : 'en') as SaturnLocale;
     if (action === 'catalog') {
-        console.log(JSON.stringify(await ideCatalog(appData, locale)));
+        console.log(JSON.stringify(await ideCatalog(locale)));
         return;
     }
     if (action === 'docs') {
