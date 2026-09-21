@@ -277,7 +277,7 @@ html,body{height:100%;margin:0;background:var(--vscode-editor-background);color:
 main{height:100%;display:grid;grid-template-rows:36px 1fr;overflow:hidden}
 header{display:flex;align-items:center;gap:10px;padding:0 12px;border-bottom:1px solid var(--vscode-panel-border);background:var(--vscode-sideBar-background)}
 header strong{font-weight:600} header span{opacity:.65;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#viewport{position:relative;overflow:hidden;background:var(--vscode-editor-background)}
+#viewport{position:relative;overflow:hidden;background:#f4f8fa}
 #scene{display:block;width:100%;height:100%;touch-action:none;outline:none}
 .node{cursor:pointer}
 .node .selection{opacity:0}
@@ -294,7 +294,7 @@ header strong{font-weight:600} header span{opacity:.65;overflow:hidden;text-over
 </head>
 <body>
 <main>
-<header><strong>Saturn Diagram</strong><span>${title}</span></header>
+<header><strong>Saturn Diagram</strong><span>${title}</span><span style="margin-left:auto">wheel · + − · 0 fit</span></header>
 <div id="viewport"><svg id="scene" xmlns="http://www.w3.org/2000/svg"></svg></div>
 </main>
 <script id="data" type="application/json">${payload}</script>
