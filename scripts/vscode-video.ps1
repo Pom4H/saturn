@@ -128,6 +128,15 @@ export default project('vscode-demo', {
   ],
 });
 '@ | Set-Content -Encoding UTF8 (Join-Path $workspace 'plant.ts')
+
+@'
+{
+  "version": 1,
+  "entry": "plant.ts",
+  "files": ["plant.ts"]
+}
+'@ | Set-Content -Encoding UTF8 (Join-Path $workspace 'scada.project.json')
+
 $file = Join-Path $workspace 'plant.ts'
 
 $diagramJson = & (Join-Path $env:RUNNER_TEMP 'saturn.exe') ide diagram --project $workspace --json
