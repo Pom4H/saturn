@@ -2,8 +2,8 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0d1115"><title>Saturn SCADA</title>
-  <meta name="description" content="SCADA-редактор: схема, TypeScript и свойства в одном проекте.">
+  <meta name="theme-color" content="#0d1115"><title>Saturn — инженерная IDE для физических систем</title>
+  <meta name="description" content="Open-source инженерная IDE и runtime: TypeScript-модель, HMI, телеметрия, история, отчёты, PLC и развёртывание в одном проекте.">
   <link rel="icon" href="/site/assets/mark.svg" type="image/svg+xml"><link rel="manifest" href="/site/assets/manifest.json"><link rel="apple-touch-icon" href="/site/assets/icon-192.png">
   <link rel="stylesheet" href="/site/assets/site.css"><script type="module" src="/site/assets/site.js"></script>
 </head>
@@ -28,7 +28,7 @@
 <a class="skip-link" href="#studio-shell">К редактору</a>
 <header class="site-header"><a class="brand" href="#top"><img src="/site/assets/saturn-icon.png" alt="" width="30" height="30">Saturn</a><div><a href="https://github.com/Pom4H/saturn" target="_blank" rel="noopener">GitHub ↗</a><button data-install-studio>Установить</button></div></header>
 <main id="top">
-  <section class="hero" aria-labelledby="hero-title"><h1 id="hero-title">Saturn SCADA</h1><p>Схема и TypeScript в одном проекте.</p></section>
+  <section class="hero" aria-labelledby="hero-title"><h1 id="hero-title">Saturn</h1><p>Инженерная IDE и runtime для физических систем.</p></section>
   <section class="shell-stage" id="studio" aria-label="SCADA-редактор">
     <div class="shell-frame">
       <div class="shell" id="studio-shell" data-mode="3d" data-view="scene" style="--studio-progress:0">
@@ -78,6 +78,61 @@
       </div>
     </div>
   </section>
+  <section class="product-summary" aria-labelledby="capabilities-title">
+    <div class="section-heading">
+      <h2 id="capabilities-title">Что уже входит</h2>
+      <p>Один типизированный проект описывает объект и остаётся источником правды для инженерной работы, runtime и эксплуатации.</p>
+    </div>
+    <div class="feature-matrix">
+      <article><h3>Инженерия</h3><div class="feature-tags"><span>TypeScript DSL</span><span>2D / 3D</span><span>visual ↔ source</span><span>типы сигналов и единиц</span><span>каталог оборудования</span></div></article>
+      <article><h3>Runtime</h3><div class="feature-tags"><span>live telemetry</span><span>controls + alarms</span><span>historian + replay</span><span>simulation / adapters</span><span>stale + fail-closed</span></div></article>
+      <article><h3>HMI и отчёты</h3><div class="feature-tags"><span>operator HMI</span><span>единый Presentation IR</span><span>PLC HMI 320×240</span><span>графики + таблицы</span><span>A4 + расписание</span></div></article>
+      <article><h3>Доставка</h3><div class="feature-tags"><span>Git revisions</span><span>PWA / offline</span><span>standalone</span><span>VS Code host</span><span>signed updates</span></div></article>
+    </div>
+  </section>
+
+  <section class="deploy-section" aria-labelledby="deploy-title">
+    <div class="section-heading">
+      <h2 id="deploy-title">Запускайте Saturn в нужной форме</h2>
+      <p>Проект остаётся обычными файлами. Меняется оболочка и роль экземпляра, а не формат проекта.</p>
+    </div>
+    <div class="deploy-grid">
+      <article class="deploy-card"><div><h3>Browser / PWA</h3><p>Редактор и операторский интерфейс в браузере, установка как PWA, offline-сценарии.</p></div><code>static web · installable</code></article>
+      <article class="deploy-card"><div><h3>Standalone</h3><p>Один Saturn открывает разные проекты без Node/npm на целевой машине.</p></div><code>Windows x64 · Linux x64/arm64 · macOS x64/arm64</code></article>
+      <article class="deploy-card"><div><h3>Operator / kiosk</h3><p>Та же runtime-модель без инженерных элементов управления.</p></div><code>saturn run ./plant --kiosk</code></article>
+      <article class="deploy-card"><div><h3>Server</h3><p>Bun runtime, SQLite, аутентификация, SSE, история, отчёты и граница промышленных адаптеров.</p></div><code>npm run plant</code></article>
+      <article class="deploy-card"><div><h3>VS Code</h3><p>Нативные TreeView, Problems, Git SCM, TypeScript editor и отдельная мнемосхема.</p></div><code>Saturn extension host</code></article>
+      <article class="deploy-card"><div><h3>Git-managed production</h3><p>Инженерная ревизия и применённая ревизия различаются; невалидный релиз не заменяет работающий.</p></div><code>main → production → applied</code></article>
+    </div>
+    <div class="deploy-command"><span>Собрать приложение</span><code>npm run saturn -- pack --target windows-x64</code></div>
+  </section>
+
+  <section class="extensions-section" aria-labelledby="extensions-title">
+    <div class="extensions-intro">
+      <div class="section-heading">
+        <h2 id="extensions-title">Расширяйте предметную область без форка Saturn</h2>
+        <p>Расширение — self-contained пакет с явными capabilities. Saturn проверяет sha512, не запускает npm lifecycle scripts и устанавливает точную версию сам.</p>
+      </div>
+      <div class="extension-install"><code>saturn extension add @factory/equipment</code><span>npm-compatible registry · public или private</span></div>
+    </div>
+    <div class="extension-grid">
+      <article><code>elements</code><h3>Оборудование</h3><p>Новые типы устройств, порты, сигналы, SVG/3D представление и доменная семантика.</p></article>
+      <article><code>protocol</code><h3>Протоколы</h3><p>Драйверы промышленных и vendor-specific протоколов через ограниченную границу интеграции.</p></article>
+      <article><code>datasource</code><h3>Источники данных</h3><p>Историки, внешние БД, облачные телеметрические сервисы и другие источники наблюдений.</p></article>
+      <article><code>panel</code><h3>Панели</h3><p>Пусконаладка, диагностика, сервисные инструменты и специализированные рабочие места.</p></article>
+      <article><code>report</code><h3>Отчёты</h3><p>Отраслевые шаблоны, расчёты, формы и экспорт поверх общей модели сигналов и истории.</p></article>
+      <article><code>command</code><h3>Команды и workflow</h3><p>Калибровка, обслуживание, резервное копирование и другие ограниченные действия.</p></article>
+    </div>
+    <div class="target-provider">
+      <div><code>target provider</code><h3>PLC compiler / deploy / flash</h3></div>
+      <p>Контроллер-специфичная часть живёт за provider boundary: компиляция проекта в target artifact, прошивка, мониторинг и deployment не требуют отдельного Saturn IDE.</p>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div><img src="/site/assets/saturn-icon.png" alt="" width="28" height="28"><strong>Saturn</strong><span>MIT</span></div>
+    <nav aria-label="Документация"><a href="https://github.com/Pom4H/saturn" target="_blank" rel="noopener">GitHub ↗</a><a href="https://github.com/Pom4H/saturn/blob/main/docs/adr/0001-saturn-system-architecture.md" target="_blank" rel="noopener">Architecture</a><a href="https://github.com/Pom4H/saturn/blob/main/docs/developer/README.md" target="_blank" rel="noopener">Develop extensions</a><a href="https://github.com/Pom4H/saturn/blob/main/SECURITY.md" target="_blank" rel="noopener">Security</a></nav>
+  </footer>
 </main>
 <div id="project-picker" popover="auto" role="dialog" aria-label="Переключить проект">
  <div class="project-picker-search"><svg aria-hidden="true"><use href="#i-search"/></svg><input id="project-picker-search" type="search" placeholder="Найти проект…" aria-label="Найти проект" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="project-picker-list" autocomplete="off"></div>

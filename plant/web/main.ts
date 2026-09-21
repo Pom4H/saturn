@@ -467,7 +467,11 @@ async function start(memory = false) {
         void guard(setupPwa);
     }
     catch (e) {
-        $('loading').querySelector('p')!.textContent = e instanceof Error ? e.message : String(e);
+        const raw = e instanceof Error ? e.message : String(e);
+        const storageOwnerConflict = demo && !memory && /Conflict in browser\.database|state changed since the request was prepared|OPFS|SAHPool/i.test(raw);
+        $('loading').querySelector('p')!.textContent = storageOwnerConflict
+            ? 'Хранилище уже открыто в другой вкладке. Закройте другую вкладку или откройте отдельное демо в памяти.'
+            : raw;
         $('memory').hidden = !demo;
         client.close();
     }

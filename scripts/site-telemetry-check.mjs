@@ -128,7 +128,8 @@ export async function checkTelemetry(browser) {
     const port = Number(new URL(app.origin).port);
     await app.close(); app = undefined;
     await page.waitForFunction(() => document.getElementById('studio-shell')?.dataset.telemetry === 'stale', undefined, { timeout: 15000 });
-    assert.equal(await page.locator('#studio-svg [data-node][data-mode="stale"]').count(), initial.project.devices.length);
+    assert.equal(await page.locator('#studio-svg [data-node][data-quality="stale"]').count(), initial.project.devices.length, 'Every retained equipment value is visibly stale');
+    assert.equal(await page.locator('#studio-svg [data-node][data-mode="simulation"]').count(), initial.project.devices.length, 'Stale rendering retains the identity of the last confirmed simulation frame');
     const stale = await readSignal();
     assert.equal(stale?.text?.trim(), beforeLoss?.text?.trim(), 'Server loss preserves the last confirmed numeric value');
     assert.match(stale?.source ?? '', /stale/i, 'The retained value must be visibly marked stale');
