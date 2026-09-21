@@ -21,6 +21,11 @@ export type {
   SignalRef,
   SignalUnitOf,
   SignalValueOf,
+  ExcelColumnSpec,
+  ExcelSheetSpec,
+  ExcelSortSpec,
+  ExcelWorkbookSpec,
+  ReportField,
   System,
 } from '../../plant/types';
 export type {
@@ -29,3 +34,5 @@ export type {
   Medium,
   Terminal,
 } from '../../plant/ports';
+
+export type { ReportFieldRef, ReportSchema } from '../../plant/reporting';
