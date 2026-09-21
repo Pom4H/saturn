@@ -1,6 +1,7 @@
 import webpush from 'web-push';
 import { createHash } from 'node:crypto';
-import { AppError, type Actor } from '../types';
+import type { Actor } from '../types';
+import { failCode } from '../diagnostics';
 import type { Store } from '../store';
 export const allowedPushEndpoint = (endpoint: string): boolean => {
     try {
@@ -19,21 +20,21 @@ export class Push {
     };
     constructor(readonly store: Store, private subject: string, private send: typeof webpush.sendNotification = webpush.sendNotification) {
         if (!/^mailto:[^\s@]+@[^\s@]+$/.test(subject) && !/^https:\/\//.test(subject))
-            throw new AppError('Set SCADA_PUSH_SUBJECT to a contact mailto: or HTTPS URL');
+            failCode('SATURN_VALUE_INVALID',{field:'push.subject',reason:'invalid'});
         this.keys = store.meta('vapid', null) ?? webpush.generateVAPIDKeys();
         store.set('vapid', this.keys);
     }
     subscribe(value: unknown, actor: Actor, sessionId: string) {
         const sub = value as webpush.PushSubscription;
         if (!sub || typeof sub.endpoint !== 'string' || sub.endpoint.length > 2048 || !allowedPushEndpoint(sub.endpoint) || !sub.keys || !/^[A-Za-z0-9_-]{87}$/.test(sub.keys.p256dh) || !/^[A-Za-z0-9_-]{22}$/.test(sub.keys.auth))
-            throw new AppError('Invalid Web Push subscription or unapproved push provider');
+            failCode('SATURN_VALUE_INVALID',{field:'push.subscription',reason:'invalid'});
         const previous = this.store.db.all<{
             user_id: string;
         }>('SELECT user_id FROM subscriptions WHERE endpoint=?', [sub.endpoint])[0];
         if (previous && previous.user_id !== actor.id)
-            throw new AppError('Subscription belongs to another user', 409);
+            failCode('SATURN_CONFLICT',{resource:'push.subscription',reason:'stateChanged'},{actor:actor.id},{status:409});
         if (!previous && this.store.db.all('SELECT endpoint FROM subscriptions WHERE user_id=?', [actor.id]).length >= 5)
-            throw new AppError('Five subscriptions per user maximum', 429);
+            failCode('SATURN_LIMIT',{resource:'push.subscriptions',reason:'tooMany'},{max:5,actor:actor.id},{status:429});
         this.store.db.exec('INSERT INTO subscriptions VALUES(?,?,?,?) ON CONFLICT(endpoint) DO UPDATE SET session_id=excluded.session_id,subscription=excluded.subscription', [sub.endpoint, actor.id, sessionId, JSON.stringify({ endpoint: sub.endpoint, keys: sub.keys })]);
         return { subscribed: true };
     }
