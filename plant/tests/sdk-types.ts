@@ -1,6 +1,12 @@
 import { simulation, bank, aggregate, control, gt, signal } from '../dsl';
+import type { SignalId, SignalUnitOf, SignalValueOf } from '../types';
+type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
+type Assert<T extends true> = T;
 const pump = simulation('P', 'pump', { system: 'cooling', at: { x: 0, y: 0 }, inputs: { voltage: 1 }, parameters: { inertia: 2 } });
 const flow = pump.flow;
+type _FlowId = Assert<Equal<SignalId<typeof flow>, 'P.flow'>>;
+type _FlowValue = Assert<Equal<SignalValueOf<typeof flow>, number>>;
+type _FlowUnit = Assert<Equal<SignalUnitOf<typeof flow>, 'отн.'>>;
 // @ts-expect-error Signals are inferred from installed model metadata.
 pump.pressure;
 // @ts-expect-error Unknown model parameter.
@@ -29,3 +35,8 @@ const heatBalance = lab.balance;
 lab.reactivity;
 // @ts-expect-error Invalid drive input must not typecheck.
 simulation('DRIVE', 'electric-motor', {system:'lab', at:{x:0,y:0}, inputs:{frequency:50}});
+
+
+type _BlockedId = Assert<Equal<SignalId<typeof valveDemand.blocked>, 'DEMAND.blocked'>>;
+type _BlockedValue = Assert<Equal<SignalValueOf<typeof valveDemand.blocked>, boolean>>;
+type _BlockedUnit = Assert<Equal<SignalUnitOf<typeof valveDemand.blocked>, 'лог.'>>;
