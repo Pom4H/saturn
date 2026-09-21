@@ -18,12 +18,49 @@ export interface SaturnDiagnostic {
 
 type Catalog = Record<string, Record<SaturnLocale, string>>;
 
+type CodeDefinition = {
+  key: string;
+  status?: number;
+  severity?: DiagnosticSeverity;
+  en: string;
+  ru: string;
+};
+
+export const codeCatalog = {
+  SATURN_VALUE_INVALID: { key:'value.invalid', en:'Invalid value for {field}: {reason}', ru:'Некорректное значение {field}: {reason}' },
+  SATURN_PERMISSION: { key:'security.permission', status:403, en:'Insufficient permission: requires {role}', ru:'Недостаточно прав: требуется роль {role}' },
+  SATURN_NOT_FOUND: { key:'resource.notFound', status:404, en:'{resource} not found: {id}', ru:'Объект {resource} не найден: {id}' },
+  SATURN_CONFLICT: { key:'resource.conflict', status:409, en:'Conflict in {resource}: {reason}', ru:'Конфликт {resource}: {reason}' },
+  SATURN_LIMIT: { key:'limits.exceeded', en:'{resource} exceeds limit: {reason}', ru:'Превышен лимит {resource}: {reason}' },
+  SATURN_DSL_INVALID: { key:'dsl.invalid', en:'Invalid declarative TypeScript: {reason}', ru:'Некорректный декларативный TypeScript: {reason}' },
+  SATURN_DSL_UNKNOWN: { key:'dsl.unknown', en:'Unknown {kind}: {name}', ru:'Неизвестный объект {kind}: {name}' },
+  SATURN_PROJECT_INVALID: { key:'project.invalid', en:'Invalid project: {reason}', ru:'Некорректный проект: {reason}' },
+  SATURN_MODEL_INVALID: { key:'model.invalid', en:'Invalid model {model}: {reason}', ru:'Некорректная модель {model}: {reason}' },
+  SATURN_PLC_INVALID: { key:'plc.invalid', en:'Invalid PLC program: {reason}', ru:'Некорректная программа PLC: {reason}' },
+  SATURN_PRESENTATION_INVALID: { key:'presentation.invalid', en:'Invalid presentation: {reason}', ru:'Некорректное представление: {reason}' },
+  SATURN_REPORT_INVALID: { key:'report.invalid', en:'Invalid report {report}: {reason}', ru:'Некорректный отчёт {report}: {reason}' },
+  SATURN_CRON_INVALID: { key:'cron.invalid', en:'Invalid cron expression: {reason}', ru:'Некорректное cron-выражение: {reason}' },
+  SATURN_SQL_INVALID: { key:'sql.invalid', en:'Invalid report SQL: {reason}', ru:'Некорректный SQL отчёта: {reason}' },
+  SATURN_HISTORY_INVALID: { key:'history.invalid', en:'Invalid history request: {reason}', ru:'Некорректный запрос истории: {reason}' },
+  SATURN_RUNTIME_INVALID: { key:'runtime.invalid', en:'Runtime operation failed: {reason}', ru:'Ошибка runtime: {reason}' },
+  SATURN_HTTP_INVALID: { key:'http.invalid', en:'HTTP request rejected: {reason}', ru:'HTTP-запрос отклонён: {reason}' },
+  SATURN_EXTENSION_INVALID: { key:'extension.invalid', en:'Invalid extension: {reason}', ru:'Некорректное расширение: {reason}' },
+  SATURN_UPDATE_INVALID: { key:'update.invalid', en:'Invalid update: {reason}', ru:'Некорректное обновление: {reason}' },
+  SATURN_STORAGE_INVALID: { key:'storage.invalid', en:'Storage operation failed: {reason}', ru:'Ошибка хранилища: {reason}' },
+} as const satisfies Record<string, CodeDefinition>;
+
+export type CentralDiagnosticCode = keyof typeof codeCatalog;
+
 export type LocalizedText = string | { en: string; ru?: string };
 export function localizeText(value: LocalizedText, locale: SaturnLocale = 'en'): string {
   return typeof value === 'string' ? value : value[locale] ?? value.en;
 }
 
 const messages: Catalog = {
+  ...Object.fromEntries(Object.values(codeCatalog).map(definition => [
+    definition.key,
+    { en: definition.en, ru: definition.ru },
+  ])),
   'ports.profileMissing': { en: 'No physical port profile: {type}', ru: 'Нет профиля физических портов: {type}' },
   'ports.unknownTerminal': { en: 'Unknown terminal {device}.{port}', ru: 'Неизвестная клемма {device}.{port}' },
   'ports.connectionLimit': { en: 'At most 512 connections', ru: 'Допустимо не более 512 соединений' },
@@ -90,6 +127,19 @@ export function failDiagnostic(
   data?: Record<string, unknown>,
 ): never {
   throw new SaturnDiagnosticError(diagnostic(code, key, args, data));
+}
+
+export function failCode(
+  code: CentralDiagnosticCode,
+  args?: Record<string, DiagnosticValue>,
+  data?: Record<string, unknown>,
+): never {
+  const definition = codeCatalog[code];
+  throw new SaturnDiagnosticError(
+    diagnostic(code, definition.key, args, data, definition.severity ?? 'error'),
+    'en',
+    definition.status ?? 400,
+  );
 }
 
 export interface SaturnErrorPayload {
