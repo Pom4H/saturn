@@ -1,5 +1,5 @@
 import { benchPanel } from './views';
-import { system, simulation, control, plc, pin, gt, cable, expansion, alarm, view } from '@saturn/core';
+import { system, simulation, control, plc, pin, signal, gt, cable, expansion, alarm, view } from '@saturn/core';
 // Generic isolated low-voltage commissioning bench; never connected to reactor controls.
 export const benchSystem=system('commissioning','PLC · стенд подключения клемм','site');
 export const level=control('BENCH-LEVEL',{title:'Датчик уровня · тестовый сигнал',system:'commissioning',min:0,max:10,initial:3,rate:1,unit:'V'});
@@ -29,4 +29,4 @@ export const benchWires=[
  cable('module-positive',psu.ports.plus,module.ports.plus,{medium:'power'}),
  cable('module-return',psu.ports.minus,module.ports.minus,{medium:'power'}),
 ];
-export const benchAlarm=alarm('plc-unhealthy',{title:'Стенд: PLC не готов · питание или входы',signal:gt(1, {ref:'SATURN-1.healthy'}),above:.5,clearBelow:.1,delay:2000});
+export const benchAlarm=alarm('plc-unhealthy',{title:'Стенд: PLC не готов · питание или входы',signal:gt(1, signal('SATURN-1.healthy')),above:.5,clearBelow:.1,delay:2000});
