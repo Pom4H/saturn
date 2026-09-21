@@ -1,7 +1,8 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { Auth } from './auth';
 import type { Store } from '../store';
-import { AppError, type Actor } from '../types';
+import type { Actor } from '../types';
+import { failCode } from '../diagnostics';
 
 const tokenHash = (value: string) => createHash('sha256').update(value).digest('hex');
 const marker = 'bun:argon2id';
@@ -35,7 +36,7 @@ export class BunAuth {
 
     async seed(id: string, password: string, role: Actor['role'] = 'engineer'): Promise<boolean> {
         if (!/^[A-Za-z0-9_.@-]{1,100}$/.test(id) || password.length < 12)
-            throw new AppError('Use a named user and a password of at least 12 characters');
+            failCode('SATURN_VALUE_INVALID',{field:'credentials',reason:'invalid'});
         if (this.store.db.all('SELECT id FROM users WHERE id=?', [id]).length) return false;
         const hash = await runtime.password.hash(password, 'argon2id');
         this.store.db.exec('INSERT INTO users VALUES(?,?,?,?)', [id, role, marker, hash]);
@@ -44,7 +45,7 @@ export class BunAuth {
 
     async login(user: string, password: string, remote: string) {
         if (typeof user !== 'string' || typeof password !== 'string' || user.length > 100 || password.length > 1024)
-            throw new AppError('Invalid credentials', 401);
+            failCode('SATURN_HTTP_INVALID',{reason:'invalidCredentials'},undefined,{status:401});
         const now = Date.now();
         let attempts = this.attempts.get(remote);
         if (!attempts || attempts.until < now) {
@@ -52,7 +53,7 @@ export class BunAuth {
             if (this.attempts.size > 1024) this.attempts.clear();
             this.attempts.set(remote, attempts);
         }
-        if (++attempts.count > 10) throw new AppError('Too many login attempts', 429);
+        if (++attempts.count > 10) failCode('SATURN_LIMIT',{resource:'auth.login',reason:'tooMany'},undefined,{status:429});
 
         const row = this.store.db.all<{
             id: string;
@@ -73,7 +74,7 @@ export class BunAuth {
         } else {
             await runtime.password.verify(password, await this.dummyHash, 'argon2id');
         }
-        if (!row || !valid) throw new AppError('Invalid credentials', 401);
+        if (!row || !valid) failCode('SATURN_HTTP_INVALID',{reason:'invalidCredentials'},undefined,{status:401});
 
         attempts.count = 0;
         if (legacy) {
