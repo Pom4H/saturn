@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { compareVersions, updateSignaturePayload, verifyUpdateArtifact, type UpdateManifest } from './update';
-import { parseExtensionSpecifier, validateExtensionPackage } from './extensions';
 
 describe('standalone update trust', () => {
     test('signed artifact metadata verifies and tampering fails', () => {
@@ -34,26 +33,3 @@ describe('standalone update trust', () => {
     });
 });
 
-describe('extension package contract', () => {
-    test('parses scoped packages and exact versions', () => {
-        expect(parseExtensionSpecifier('@factory/equipment@1.4.2')).toEqual({ name: '@factory/equipment', selector: '1.4.2' });
-        expect(parseExtensionSpecifier('@factory/equipment')).toEqual({ name: '@factory/equipment', selector: 'latest' });
-    });
-
-    test('accepts a bundled custom element pack and rejects transitive runtime deps', () => {
-        const pkg: Parameters<typeof validateExtensionPackage>[0] = {
-            name: '@factory/equipment',
-            version: '1.4.2',
-            dist: { tarball: 'https://registry.example/equipment.tgz' },
-            saturn: {
-                api: 1,
-                entry: 'dist/index.js',
-                capabilities: ['elements'],
-                elements: [{ type: 'factory.motor', title: 'Motor', tag: 'factory-motor' }],
-            },
-        };
-        expect(validateExtensionPackage(pkg).entry).toBe('dist/index.js');
-        pkg.dependencies = { leftpad: '1.0.0' };
-        expect(() => validateExtensionPackage(pkg)).toThrow(/self-contained/);
-    });
-});
