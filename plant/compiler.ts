@@ -6,6 +6,7 @@ import * as dsl from './dsl';
 import { model, models } from './models';
 import { AppError, finite, id, type Project, type Expr } from './types';
 import { validateCron } from './workflows';
+import { SaturnDiagnosticError } from './diagnostics';
 const own = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k);
 const reserved = new Set(['__proto__', 'constructor', 'prototype']);
 export function projectPath(path: string): boolean { return /^[A-Za-z0-9_/-]+\.(ts|sql|html|md|json|css)$/.test(path) && !path.startsWith('/') && !path.split('/').some(p => p === '..' || p === '.' || !p); }
@@ -156,7 +157,19 @@ export function compileProject(files: Record<string, string>, entry = 'plant.ts'
                 const fn = scope[n.expression.text];
                 if (typeof fn !== 'function' || !Object.values(builtins).includes(fn))
                     return fail(n, 'Only installed DSL functions may be called');
-                return fn(...n.arguments.map(ev));
+                try {
+                    return fn(...n.arguments.map(ev));
+                } catch (error) {
+                    if (error instanceof SaturnDiagnosticError) {
+                        const start = n.getStart(file), end = n.getEnd();
+                        const point = file.getLineAndCharacterOfPosition(start);
+                        error.diagnostic.data = {
+                            ...(error.diagnostic.data ?? {}),
+                            source: { path, from: start, to: end, line: point.line, character: point.character },
+                        };
+                    }
+                    throw error;
+                }
             }
             return fail(n, 'Only declarative expressions are accepted; no executable project code');
         }
