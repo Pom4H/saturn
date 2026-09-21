@@ -51,6 +51,43 @@ export const codeCatalog = {
 
 export type CentralDiagnosticCode = keyof typeof codeCatalog;
 
+const reasonCatalog: Record<string, Record<SaturnLocale,string>> = {
+  invalid:{en:'invalid value',ru:'некорректное значение'},
+  malformed:{en:'malformed declaration',ru:'некорректное объявление'},
+  tooLarge:{en:'size limit exceeded',ru:'превышен лимит размера'},
+  tooMany:{en:'item count limit exceeded',ru:'превышен лимит количества'},
+  missing:{en:'required value is missing',ru:'отсутствует обязательное значение'},
+  duplicate:{en:'duplicate identity',ru:'повторяющийся идентификатор'},
+  unknown:{en:'unknown reference',ru:'неизвестная ссылка'},
+  unsafeName:{en:'unsafe name',ru:'небезопасное имя'},
+  evaluationLimit:{en:'evaluation limit exceeded',ru:'превышен лимит вычисления'},
+  nestingLimit:{en:'nesting limit exceeded',ru:'превышен лимит вложенности'},
+  unsupportedOperator:{en:'unsupported operator',ru:'оператор не поддерживается'},
+  numericRequired:{en:'a number is required',ru:'требуется число'},
+  divisionByZero:{en:'division by zero',ru:'деление на ноль'},
+  arrayLimit:{en:'array expansion limit exceeded',ru:'превышен лимит массива'},
+  objectLimit:{en:'object expansion limit exceeded',ru:'превышен лимит объекта'},
+  methodsForbidden:{en:'methods and accessors are not allowed',ru:'методы и аксессоры запрещены'},
+  literalKeyRequired:{en:'a literal key is required',ru:'требуется литеральный ключ'},
+  installedDslOnly:{en:'only installed DSL functions may be called',ru:'можно вызывать только установленные функции DSL'},
+  declarativeOnly:{en:'executable project code is forbidden',ru:'исполняемый код проекта запрещён'},
+  namedImports:{en:'use named imports',ru:'используйте именованные импорты'},
+  localImportsOnly:{en:'only local modules or @saturn/core are allowed',ru:'разрешены только локальные модули и @saturn/core'},
+  importEscape:{en:'import escapes project root',ru:'импорт выходит за пределы проекта'},
+  constOnly:{en:'only const declarations are supported',ru:'поддерживаются только const-объявления'},
+  initializedConst:{en:'const must have an initializer',ru:'const должен иметь инициализатор'},
+  defaultProject:{en:'export project() as default',ru:'экспортируйте project() по умолчанию'},
+  cycle:{en:'dependency cycle detected',ru:'обнаружен цикл зависимостей'},
+  range:{en:'value is outside the allowed range',ru:'значение вне допустимого диапазона'},
+  schema:{en:'schema does not match declaration',ru:'схема не соответствует объявлению'},
+  readOnlySelect:{en:'only one read-only SELECT is allowed',ru:'разрешён только один SELECT без записи'},
+  rowBudget:{en:'result row budget exceeded',ru:'превышен лимит строк результата'},
+  stateChanged:{en:'state changed since the request was prepared',ru:'состояние изменилось после подготовки запроса'},
+  disabled:{en:'operation is disabled',ru:'операция отключена'},
+  queueFull:{en:'queue is full',ru:'очередь заполнена'},
+  runtimeRejected:{en:'runtime rejected the artifact',ru:'runtime отклонил артефакт'},
+};
+
 export type LocalizedText = string | { en: string; ru?: string };
 export function localizeText(value: LocalizedText, locale: SaturnLocale = 'en'): string {
   return typeof value === 'string' ? value : value[locale] ?? value.en;
@@ -93,13 +130,17 @@ const messages: Catalog = {
   },
 };
 
-function interpolate(template: string, args: Record<string, DiagnosticValue> = {}): string {
-  return template.replace(/\{([A-Za-z0-9_]+)\}/g, (_match, key: string) => String(args[key] ?? ('{' + key + '}')));
+function interpolate(template: string, args: Record<string, DiagnosticValue> = {}, locale: SaturnLocale = 'en'): string {
+  return template.replace(/\{([A-Za-z0-9_]+)\}/g, (_match, key: string) => {
+    const value=args[key];
+    if(key==='reason'&&typeof value==='string') return reasonCatalog[value]?.[locale] ?? value;
+    return String(value ?? ('{' + key + '}'));
+  });
 }
 
 export function formatDiagnostic(diagnostic: SaturnDiagnostic, locale: SaturnLocale = 'en'): string {
   const template = messages[diagnostic.message.key]?.[locale] ?? messages[diagnostic.message.key]?.en ?? diagnostic.message.key;
-  return interpolate(template, diagnostic.message.args);
+  return interpolate(template, diagnostic.message.args, locale);
 }
 
 export function diagnostic(
