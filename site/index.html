@@ -28,25 +28,53 @@
 <a class="skip-link" href="#studio-shell">К редактору</a>
 <header class="site-header"><a class="brand" href="#top"><img src="./site/assets/saturn-icon.png" alt="" width="30" height="30">Saturn</a><div><a href="https://github.com/Pom4H/saturn" target="_blank" rel="noopener">GitHub ↗</a><button data-install-studio>Установить</button></div></header>
 <main id="top">
-  <section class="hero" aria-labelledby="hero-title"><h1 id="hero-title">Saturn</h1><p>Инженерная IDE и runtime для физических систем.</p></section>
+  <section class="hero" aria-labelledby="hero-title"><h1 id="hero-title">Saturn</h1><p>Один TypeScript-проект — схема, runtime, HMI, история, отчёты и PLC.</p></section>
   <section class="shell-stage" id="studio" aria-label="SCADA-редактор">
     <div class="shell-frame">
       <div class="shell" id="studio-shell" data-mode="3d" data-view="scene" style="--studio-progress:0">
         <header class="shell-topbar">
-          <button id="files-toggle" class="icon-button" aria-label="Файлы · Ctrl/⌘ B" title="Файлы · Ctrl/⌘ B" aria-expanded="false"><svg aria-hidden="true"><use href="#i-panel"/></svg></button><select id="project-switch" aria-label="Открытый проект" hidden></select><button id="project-trigger" aria-haspopup="dialog" aria-expanded="false" aria-controls="project-picker"><span class="project-trigger-name">Проект</span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
-          <details class="export-options"><summary aria-label="Меню проекта" title="Меню проекта"><svg aria-hidden="true"><use href="#i-more"/></svg></summary><div>
-            <span class="menu-group">Проект</span><button data-new-project>Новый проект</button><button id="studio-import">Открыть файл…</button><button id="server-open" data-server-open>Открыть с сервера…</button><button id="project-duplicate" hidden>Дублировать</button><button data-shell-view="projects">Все проекты</button>
-            <span class="menu-group">Экспорт</span><button id="studio-download">Скачать исходник</button><button id="studio-share">Скопировать ссылку</button><button id="studio-html">Скачать HTML</button>
-            <span class="menu-group">Приложение</span><button data-app-settings>Настройки</button><button data-open-help>Справка и сочетания клавиш</button><button data-install-studio>Установить Saturn</button>
-          </div></details>
-          <button id="command-launcher" aria-label="Найти команду" title="Команды · Ctrl/⌘ K"><svg aria-hidden="true"><use href="#i-search"/></svg><span>Команды…</span><kbd>⌘ K</kbd></button>
+          <div class="shell-project-context">
+            <button id="files-toggle" class="icon-button" aria-label="Файлы · Ctrl/⌘ B" title="Файлы · Ctrl/⌘ B" aria-expanded="false"><svg aria-hidden="true"><use href="#i-panel"/></svg></button>
+            <select id="project-switch" aria-label="Открытый проект" hidden></select>
+            <button id="project-trigger" aria-haspopup="dialog" aria-expanded="false" aria-controls="project-picker"><span class="project-trigger-name">Проект</span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
+            <details class="export-options"><summary aria-label="Меню проекта" title="Меню проекта"><svg aria-hidden="true"><use href="#i-more"/></svg></summary><div>
+              <span class="menu-group">Проект</span><button data-new-project>Новый проект</button><button id="studio-import">Открыть файл…</button><button id="server-open" data-server-open>Открыть с сервера…</button><button id="project-duplicate" hidden>Дублировать</button><button data-shell-view="projects">Все проекты</button>
+              <span class="menu-group">Экспорт</span><button id="studio-download">Скачать исходник</button><button id="studio-share">Скопировать ссылку</button><button id="studio-html">Скачать HTML</button>
+              <span class="menu-group">Saturn</span><button id="shell-notifications" data-app-settings="notifications">Уведомления</button><button id="shell-help" data-open-help>Справка и сочетания клавиш</button><button id="shell-settings" data-app-settings>Настройки</button><button data-install-studio>Установить Saturn</button>
+            </div></details>
+          </div>
+
+          <nav class="surface-nav" aria-label="Рабочая область">
+            <button class="surface-tab" data-shell-view="scene" aria-pressed="true">Схема</button>
+            <button id="studio-code" class="surface-tab" aria-label="Код" aria-pressed="false">Код</button>
+            <button class="surface-tab" data-shell-view="signals" aria-pressed="false">Сигналы</button>
+          </nav>
+
           <div class="shell-actions">
-          <button data-create-project id="project-create" class="primary">Создать проект</button>
-          <button id="mobile-scene" class="icon-button" aria-label="Схема" title="Схема" aria-pressed="true"><svg aria-hidden="true"><use href="#i-grid"/></svg></button><button id="studio-code" class="icon-button" aria-label="Код" title="Код" aria-pressed="false"><svg aria-hidden="true"><use href="#i-code"/></svg></button><button id="inspector-toggle" class="icon-button" aria-label="Свойства" title="Свойства" aria-pressed="false"><svg aria-hidden="true"><use href="#i-inspector"/></svg></button><button class="icon-button" data-shell-view="signals" aria-label="Сигналы" title="Сигналы"><svg aria-hidden="true"><use href="#i-signal"/></svg></button><button id="runtime-controls" class="icon-button" data-shell-view="controls" aria-label="Управление" title="Управление" hidden><svg aria-hidden="true"><use href="#i-settings"/></svg></button><button id="runtime-alarms" class="icon-button" data-shell-view="alarms" aria-label="Алармы" title="Алармы" hidden><svg aria-hidden="true"><use href="#i-bell"/></svg><span id="runtime-alarm-count" class="alarm-count" hidden>0</span></button><button id="server-save" class="icon-button engineer-only" aria-label="Сохранить ревизию" title="Сохранить ревизию" hidden><svg aria-hidden="true"><use href="#i-check"/></svg></button><button id="server-publish" class="icon-button engineer-only" aria-label="Опубликовать ревизию" title="Опубликовать ревизию" hidden><svg aria-hidden="true"><use href="#i-arrow"/></svg></button>
-          <span class="toolbar-divider"></span>
-          <button id="shell-notifications" class="icon-button" aria-label="Уведомления" title="Уведомления" data-app-settings="notifications"><svg aria-hidden="true"><use href="#i-bell"/></svg></button><button id="shell-help" class="icon-button" aria-label="Справка · F1" title="Справка · F1" ><svg aria-hidden="true"><use href="#i-help"/></svg></button><button id="shell-settings" class="icon-button" aria-label="Настройки" title="Настройки" data-app-settings><svg aria-hidden="true"><use href="#i-settings"/></svg></button><button id="shell-fullscreen" class="icon-button" aria-label="Развернуть на весь экран" title="Развернуть на весь экран" ><svg aria-hidden="true"><use href="#i-expand"/></svg></button>
+            <button data-create-project id="project-create" class="primary">Создать проект</button>
+            <button id="environment-trigger" class="environment-trigger" data-server-open aria-label="Окружение">
+              <span class="environment-indicator" aria-hidden="true"></span>
+              <span class="environment-copy"><strong id="environment-name">Local</strong><small id="studio-context" title="Расчётная демонстрационная модель, без подключения к оборудованию">Демо</small></span>
+            </button>
+            <button id="command-launcher" class="icon-button" aria-label="Найти команду" title="Команды · Ctrl/⌘ K"><svg aria-hidden="true"><use href="#i-search"/></svg><kbd>⌘K</kbd></button>
+            <button id="mobile-scene" class="icon-button" aria-label="Схема" title="Схема" aria-pressed="true"><svg aria-hidden="true"><use href="#i-grid"/></svg></button>
+            <button id="shell-fullscreen" class="icon-button" aria-label="Развернуть на весь экран" title="Развернуть на весь экран"><svg aria-hidden="true"><use href="#i-expand"/></svg></button>
           </div>
         </header>
+        <div class="shell-contextbar">
+          <div class="revision-chain" id="revision-chain" aria-label="Состояние ревизий">
+            <span><small>source</small><strong id="revision-source">local</strong></span><i>→</i>
+            <span><small>published</small><strong id="revision-published">—</strong></span><i>→</i>
+            <span><small>applied</small><strong id="revision-applied">—</strong></span>
+          </div>
+          <div class="runtime-context-actions">
+            <span id="server-role" hidden></span>
+            <button id="runtime-controls" data-shell-view="controls" hidden>Управление</button>
+            <button id="runtime-alarms" data-shell-view="alarms" hidden>Алармы <span id="runtime-alarm-count" class="alarm-count" hidden>0</span></button>
+            <button id="server-save" class="engineer-only" hidden>Сохранить ревизию</button>
+            <button id="server-publish" class="engineer-only context-primary" hidden>Опубликовать</button>
+          </div>
+        </div>
         <div class="shell-workspace">
           <section class="scene-panel" id="scene-panel" aria-label="Установка">
             <div class="studio-workarea">
@@ -65,7 +93,7 @@
               <aside class="equipment-browser" id="equipment-browser" hidden><div class="panel-heading">Оборудование<button id="equipment-close" aria-label="Закрыть каталог">×</button></div><div class="studio-add-box"><select id="studio-catalog" aria-label="Тип оборудования"><option value="pump">Насос</option><option value="tank">Резервуар</option><option value="valve">Клапан</option><option value="flowmeter">Расходомер</option><option value="exchanger">Теплообменник</option><option value="outlet">Выход</option><option value="pressure">Манометр на трубе</option><option value="temperature">Термометр на трубе</option></select><button id="studio-add">Добавить</button></div><div id="studio-tree"></div></aside>
               <div id="studio-editor-pane" class="studio-editor-pane" hidden><div id="file-tabs" aria-label="Открытые файлы"></div><div id="file-path"></div><div id="studio-editor"></div></div>
               <div id="source-splitter" role="separator" aria-label="Ширина кода" aria-orientation="vertical" tabindex="0" hidden></div>
-              <div class="studio-viewport"><div class="canvas-toolbar"><div class="canvas-tools"><button id="equipment-toggle" aria-expanded="false"><svg aria-hidden="true"><use href="#i-plus"/></svg><span>Добавить</span></button><button id="studio-connect" class="icon-button" aria-label="Соединить" title="Соединить" aria-pressed="false" disabled><svg aria-hidden="true"><use href="#i-link"/></svg></button><span class="toolbar-divider"></span><button id="studio-undo" class="icon-button" aria-label="Отменить · Ctrl/⌘ Z" title="Отменить · Ctrl/⌘ Z" ><svg aria-hidden="true"><use href="#i-undo"/></svg></button><button id="studio-redo" class="icon-button" aria-label="Повторить · Ctrl/⌘ Shift Z" title="Повторить · Ctrl/⌘ Shift Z" ><svg aria-hidden="true"><use href="#i-redo"/></svg></button></div><div class="canvas-tools canvas-view"><div class="view-switch" role="group" aria-label="Вид"><button id="studio-2d" aria-pressed="false">2D</button><button id="studio-3d" aria-pressed="true">3D</button></div><button id="studio-play" class="icon-button" aria-label="Приостановить демонстрацию" title="Приостановить демонстрацию" aria-pressed="true"><svg aria-hidden="true"><use href="#i-pause"/></svg></button></div></div><div class="canvas-zoom"><button id="studio-minus" aria-label="Уменьшить масштаб">−</button><button id="studio-fit" class="icon-button" aria-label="Вписать · F" title="Вписать · F" ><svg aria-hidden="true"><use href="#i-fit"/></svg></button><button id="studio-plus" aria-label="Увеличить масштаб">+</button></div><div id="studio-spatial"></div><div id="studio-flat" inert><svg id="studio-svg" xmlns="http://www.w3.org/2000/svg"></svg></div><div id="empty-canvas" hidden><button id="empty-add" class="primary">＋ Добавить оборудование</button></div><div id="studio-mode-note" role="status" hidden></div></div>
+              <div class="studio-viewport"><div class="canvas-toolbar"><div class="canvas-tools"><button id="equipment-toggle" aria-expanded="false"><svg aria-hidden="true"><use href="#i-plus"/></svg><span>Добавить</span></button><button id="studio-connect" class="icon-button" aria-label="Соединить" title="Соединить" aria-pressed="false" disabled><svg aria-hidden="true"><use href="#i-link"/></svg></button><span class="toolbar-divider"></span><button id="studio-undo" class="icon-button" aria-label="Отменить · Ctrl/⌘ Z" title="Отменить · Ctrl/⌘ Z" ><svg aria-hidden="true"><use href="#i-undo"/></svg></button><button id="studio-redo" class="icon-button" aria-label="Повторить · Ctrl/⌘ Shift Z" title="Повторить · Ctrl/⌘ Shift Z" ><svg aria-hidden="true"><use href="#i-redo"/></svg></button></div><div class="canvas-tools canvas-view"><button id="inspector-toggle" class="icon-button" aria-label="Свойства" title="Свойства" aria-pressed="false"><svg aria-hidden="true"><use href="#i-inspector"/></svg></button><span class="toolbar-divider"></span><div class="view-switch" role="group" aria-label="Вид"><button id="studio-2d" aria-pressed="false">2D</button><button id="studio-3d" aria-pressed="true">3D</button></div><button id="studio-play" class="icon-button" aria-label="Приостановить демонстрацию" title="Приостановить демонстрацию" aria-pressed="true"><svg aria-hidden="true"><use href="#i-pause"/></svg></button></div></div><div class="canvas-zoom"><button id="studio-minus" aria-label="Уменьшить масштаб">−</button><button id="studio-fit" class="icon-button" aria-label="Вписать · F" title="Вписать · F" ><svg aria-hidden="true"><use href="#i-fit"/></svg></button><button id="studio-plus" aria-label="Увеличить масштаб">+</button></div><div id="studio-spatial"></div><div id="studio-flat" inert><svg id="studio-svg" xmlns="http://www.w3.org/2000/svg"></svg></div><div id="empty-canvas" hidden><button id="empty-add" class="primary">＋ Добавить оборудование</button></div><div id="studio-mode-note" role="status" hidden></div></div>
               <aside class="studio-inspector" hidden><div class="panel-heading">Свойства<button id="inspector-close" aria-label="Закрыть свойства">×</button></div><h3 id="studio-selected"></h3><button id="object-source" hidden>В исходник ↗</button><p id="studio-kind"></p><div id="studio-fields"></div></aside>
             </div>
           </section>
@@ -74,7 +102,7 @@
           <section class="alarms-panel shell-content" id="alarms-panel" hidden><div class="content-heading"><div><h2>Алармы</h2><p>Активные и неподтверждённые события текущего прогона.</p></div><button data-shell-view="scene">← Схема</button></div><div id="runtime-alarm-list" class="runtime-alarm-list"></div></section>
           <section class="projects-panel shell-content" id="projects-panel" hidden><div class="content-heading"><h2>Проекты</h2><button data-shell-view="scene">← Схема</button></div><div id="project-list"></div></section>
         </div>
-        <footer class="shell-status"><button id="studio-diagnostics" aria-live="polite">Загрузка…</button><span id="studio-count"></span><span class="toolbar-space"></span><span id="studio-message" role="status"></span><span id="server-role" hidden></span><span id="studio-network">Локально</span><span id="studio-context" title="Расчётная демонстрационная модель, без подключения к оборудованию">Демо</span></footer>
+        <footer class="shell-status"><button id="studio-diagnostics" aria-live="polite">Загрузка…</button><span id="studio-count"></span><span class="toolbar-space"></span><span id="studio-message" role="status"></span><span id="studio-network">Локально</span></footer>
       </div>
     </div>
   </section>

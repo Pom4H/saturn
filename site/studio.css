@@ -16,7 +16,7 @@
 .shell-workspace { display: flex; flex: 1; min-height: 0; position: relative; }
 .scene-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
 .studio-workarea { display: flex; flex: 1; min-height: 0; min-width: 0; position: relative; }
-.studio-viewport { position: relative; flex: 1; min-width: 0; min-height: 0; background: #0e151b; overflow: hidden; }
+.studio-viewport { position: relative; flex: 1; min-width: 0; min-height: 0; background: var(--canvas-bg); overflow: hidden; }
 #studio-spatial, #studio-flat { position: absolute; inset: 0; }
 #studio-spatial { opacity: calc(1 - var(--studio-progress)); touch-action: pan-y; }
 #studio-spatial>canvas { width: 100%; height: 100%; display: block; }
@@ -30,8 +30,8 @@
 #studio-svg .node:active { cursor: grabbing; }
 #studio-svg .ports { opacity: 0; pointer-events: none; }
 .connecting #studio-svg .ports { opacity: 1; pointer-events: auto; }
-.connecting #studio-svg .ports circle { cursor: crosshair; fill: #172f3e; stroke: #ace6ef; stroke-width: 2; }
-#studio-svg .edge.selected>path:first-child { stroke: #a3dce6; stroke-width: 28; }
+.connecting #studio-svg .ports circle { cursor: crosshair; fill: color-mix(in srgb, var(--accent) 18%, var(--canvas-bg)); stroke: var(--accent); stroke-width: 2; }
+#studio-svg .edge.selected>path:first-child { stroke: var(--accent); stroke-width: 28; }
 #studio-svg .edge-hit { cursor: pointer; pointer-events: all; }
 .panel-heading { height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; background: var(--panel); border-bottom: 0; font-size: 11px; color: var(--muted); }
 .panel-heading button { font-size: 18px; padding: 3px 7px; }
@@ -77,7 +77,7 @@
 #studio-spatial .scene3d-labels { position: absolute; inset: 0; pointer-events: none; }
 #studio-spatial .scene3d-leaders { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 #studio-spatial .scene3d-leaders line { stroke: #527184; stroke-width: 1; opacity: .7; }
-#studio-spatial .scene3d-label { position: absolute; transform: translate(-50%,-100%); display: flex; flex-direction: column; gap: 5px; min-width: 76px; padding: 8px 10px; background: #13212ce8; border: 1px solid #3a5667; border-radius: 5px; color: #9eb9ca; pointer-events: auto; font: 10px var(--mono); }
+#studio-spatial .scene3d-label { position: absolute; transform: translate(-50%,-100%); display: flex; flex-direction: column; gap: 5px; min-width: 76px; padding: 8px 10px; background: var(--canvas-label-bg); border: 1px solid var(--canvas-label-border); border-radius: 5px; color: var(--canvas-label-text); pointer-events: auto; font: 10px var(--mono); }
 #studio-spatial .scene3d-label strong { color: #cbe4f1; font-size: 11px; font-weight: 500; }
 #studio-spatial .scene3d-label small:empty { display: none; }
 #studio-spatial .scene3d-label.selected { border-color: #87c9db; }
@@ -132,11 +132,11 @@
 .menu-group { display: block; color: var(--muted); font-size: 10px; padding: 10px 10px 4px; }
 .menu-group:not(:first-child) { border-top: 1px solid var(--line); margin-top: 5px; }
 .canvas-toolbar { position: absolute; z-index: 4; left: 12px; right: 12px; top: 12px; display: flex; justify-content: space-between; gap: 12px; pointer-events: none; }
-.canvas-tools,.canvas-zoom { display: flex; align-items: center; padding: 3px; gap: 2px; border: 1px solid #353a3f; border-radius: 9px; background: #1c2024ed; box-shadow: 0 3px 12px #0003; color: #dce1e6; pointer-events: auto; }
-.canvas-toolbar button,.canvas-zoom button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; color: #bdc6cf; font-size: 11px; }
-.canvas-toolbar button:hover,.canvas-zoom button:hover { background: #353b41; color: #fff; }
-.canvas-toolbar button[aria-pressed=true],.canvas-toolbar button[aria-expanded=true] { background: #3a424b; color: #fff; }
-.canvas-toolbar .toolbar-divider { margin: 0 3px; background: #3a4148; }
+.canvas-tools,.canvas-zoom { display: flex; align-items: center; padding: 3px; gap: 2px; border: 1px solid var(--overlay-border); border-radius: 9px; background: var(--overlay-bg); box-shadow: 0 3px 12px #0003; color: var(--overlay-text); pointer-events: auto; }
+.canvas-toolbar button,.canvas-zoom button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; color: var(--overlay-text); font-size: 11px; }
+.canvas-toolbar button:hover,.canvas-zoom button:hover { background: var(--overlay-hover); color: #fff; }
+.canvas-toolbar button[aria-pressed=true],.canvas-toolbar button[aria-expanded=true] { background: var(--overlay-active); color: #fff; }
+.canvas-toolbar .toolbar-divider { margin: 0 3px; background: var(--overlay-border); }
 .canvas-tools .icon-button { width: 28px; }
 .view-switch { display: flex; gap: 2px; }
 .view-switch button { font: 11px var(--mono); padding: 0 8px; }
@@ -219,9 +219,6 @@
 
 #studio-spatial .scene3d-alert[data-preview=true] { top: 58px; left: 12px; right: 12px; padding: 7px 9px; border: 0; background: #182027e8; color: #a3aeb8; font-size: 10px; border-radius: 6px; }
 
-.shell { --status-live: #6fba9a; --status-warning: #cb9b6f; }
-:root[data-theme=light] .shell { --status-live: #267052; --status-warning: #85511e; }
-@media(prefers-color-scheme: light) { :root[data-theme=system] .shell { --status-live: #267052; --status-warning: #85511e; } }
 .shell[data-telemetry=live] #studio-context { color: var(--status-live); }
 .shell[data-telemetry=offline] #studio-context,.shell[data-telemetry=auth] #studio-context,.shell[data-telemetry=revision] #studio-context { color: var(--status-warning); }
 #studio-context { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
@@ -229,7 +226,7 @@
 
 /* Integrated installation runtime. Engineering chrome is removed, not merely disabled,
    when the authenticated role does not own source/release permissions. */
-.alarm-count { min-width: 15px; height: 15px; padding: 0 4px; border-radius: 9px; display: inline-grid; place-items: center; background: #8b3f3b; color: #fff; font: 9px var(--mono); margin-left: -5px; }
+.alarm-count { min-width: 15px; height: 15px; padding: 0 4px; border-radius: 9px; display: inline-grid; place-items: center; background: var(--danger-bg); color: #fff; font: 9px var(--mono); margin-left: -5px; }
 .runtime-heading-actions { display: flex; gap: 8px; align-items: center; }
 .content-heading p { margin-top: 6px; color: var(--muted); font-size: 11px; }
 .runtime-control-list { display: grid; grid-template-columns: repeat(auto-fit,minmax(260px,1fr)); gap: 12px; margin-top: 20px; }
@@ -246,7 +243,7 @@
 .runtime-control-card[data-blocked=true] { opacity: .65; }
 .runtime-alarm-list { display: grid; gap: 8px; margin-top: 20px; }
 .runtime-alarm { display: grid; grid-template-columns: minmax(100px,1fr) auto auto; gap: 12px; align-items: center; padding: 12px 14px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); }
-.runtime-alarm[data-active=true] { border-color: #72514a; background: color-mix(in srgb,#713d35 12%,var(--panel)); }
+.runtime-alarm[data-active=true] { border-color: color-mix(in srgb,var(--status-danger) 45%,var(--line)); background: color-mix(in srgb,var(--status-danger) 10%,var(--panel)); }
 .runtime-alarm strong { font: 12px var(--mono); font-weight: 500; }
 .runtime-alarm small { color: var(--muted); font-size: 10px; }
 .runtime-empty { padding: 40px 12px; text-align: center; color: var(--muted); font-size: 12px; }
@@ -282,4 +279,173 @@
   .runtime-alarm { grid-template-columns: 1fr auto; }
   .runtime-alarm small { grid-column: 1 / -1; }
   .controls-panel,.alarms-panel { padding: 14px; }
+}
+
+
+/* Product IA: Project / Surface / Environment are persistent contexts.
+   Canvas tools stay contextual to the canvas. */
+.shell { border-radius: var(--radius-window); }
+.shell-topbar {
+  height: 48px;
+  display: grid;
+  grid-template-columns: minmax(210px,1fr) auto minmax(210px,1fr);
+  gap: 12px;
+  padding: 0 10px;
+}
+.shell-project-context,.shell-actions,.runtime-context-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.shell-actions { justify-content: flex-end; margin-left: 0; }
+#project-trigger {
+  min-width: 0;
+  max-width: 260px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 7px;
+  color: var(--text);
+}
+.project-trigger-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 550;
+}
+.surface-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb,var(--bg) 72%,transparent);
+}
+.shell .surface-tab {
+  min-width: 62px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.shell .surface-tab[aria-pressed=true] {
+  background: var(--shell-hover);
+  color: var(--text);
+}
+.environment-trigger {
+  height: 34px;
+  max-width: 180px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px!important;
+  border: 1px solid var(--line)!important;
+  border-radius: 8px!important;
+  text-align: left;
+}
+.environment-indicator {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.environment-copy {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+.environment-copy strong,.environment-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.environment-copy strong { font-size: 10px; font-weight: 600; color: var(--text); }
+.environment-copy small { max-width: 130px; font-size: 9px; color: var(--muted); }
+.shell[data-telemetry=live] .environment-indicator,.shell[data-telemetry=paused] .environment-indicator { background: var(--status-live); box-shadow: 0 0 0 3px color-mix(in srgb,var(--status-live) 13%,transparent); }
+.shell[data-telemetry=stale] .environment-indicator,.shell[data-telemetry=offline] .environment-indicator,.shell[data-telemetry=auth] .environment-indicator,.shell[data-telemetry=revision] .environment-indicator { background: var(--status-warning); }
+.shell[data-telemetry=stale] #studio-context,.shell[data-telemetry=offline] #studio-context,.shell[data-telemetry=auth] #studio-context,.shell[data-telemetry=revision] #studio-context { color: var(--status-warning); }
+#command-launcher { width: 46px; margin: 0; justify-content: center; }
+#command-launcher kbd { display: none; }
+.shell-contextbar {
+  min-height: 31px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 10px 0 13px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb,var(--panel) 88%,var(--bg));
+}
+.revision-chain {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--muted);
+  font: 9px/1 var(--mono);
+}
+.revision-chain span { display: inline-flex; align-items: baseline; gap: 5px; min-width: 0; }
+.revision-chain small { color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.revision-chain strong {
+  max-width: 86px;
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 500;
+  text-overflow: ellipsis;
+}
+.revision-chain i { color: var(--line); font-style: normal; }
+.shell[data-revision-state=drift] #revision-applied { color: var(--status-warning); }
+.runtime-context-actions { margin-left: auto; }
+.runtime-context-actions button {
+  height: 24px;
+  padding: 3px 7px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.runtime-context-actions button:hover { color: var(--text); }
+.runtime-context-actions .context-primary {
+  color: var(--bg);
+  background: var(--text);
+}
+.runtime-context-actions .context-primary:hover { color: var(--bg); background: var(--muted); }
+#server-role {
+  padding-right: 7px;
+  border-right: 1px solid var(--line);
+  color: var(--muted);
+  font: 9px/1 var(--mono);
+  text-transform: capitalize;
+}
+#studio-context { max-width: 132px; }
+.shell-status { color: color-mix(in srgb,var(--muted) 86%,transparent); }
+
+@media(max-width:1000px) {
+  .shell-topbar { grid-template-columns: minmax(170px,1fr) auto minmax(150px,1fr); gap: 5px; }
+  .environment-trigger { max-width: 125px; }
+  .environment-copy small { max-width: 82px; }
+  .shell .surface-tab { min-width: auto; padding-inline: 8px; }
+  #project-create { display: none; }
+}
+@media(max-width:720px) {
+  .shell-topbar { grid-template-columns: minmax(120px,1fr) auto auto; }
+  .environment-trigger { width: 34px; padding: 0!important; justify-content: center; }
+  .environment-copy { display: none; }
+  .revision-chain small { display: none; }
+  .revision-chain strong { max-width: 62px; }
+}
+@media(max-width:520px) {
+  .shell-topbar { height: 48px; padding: 0 6px; grid-template-columns: minmax(100px,1fr) auto auto; }
+  .shell-actions { position: static; inset: auto; height: auto; border: 0; }
+  .shell-project-context .export-options { display: none; }
+  .surface-nav { gap: 0; }
+  .shell .surface-tab { min-width: 0; padding: 6px 7px; }
+  .shell .surface-tab[data-shell-view=signals] { display: none; }
+  #command-launcher { display: none; }
+  #mobile-scene { display: none; }
+  .shell-contextbar { padding-inline: 8px; gap: 8px; }
+  .revision-chain { gap: 4px; }
+  .revision-chain span:nth-of-type(2),.revision-chain span:nth-of-type(2)+i { display: none; }
+  .runtime-context-actions button { font-size: 9px; padding-inline: 5px; }
 }

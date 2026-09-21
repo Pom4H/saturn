@@ -43,7 +43,7 @@ export async function mountStudio() {
   let serverRevision: ServerRevision | null = null, pendingRevision: ServerRevision | null = null;
   let serverSession: ServerSession | null = null, runtimeOnly = false, runtimeRevision: string | null = null;
   let documents: Documents;
-  let codeVisible = false, propertiesVisible = false, mobilePane: 'scene' | 'source' | 'properties' = 'scene';
+  let codeVisible = !compact.matches, propertiesVisible = false, mobilePane: 'scene' | 'source' | 'properties' = 'scene';
   let progress = 0, explicit: '2d' | '3d' = '3d', fullscreen = false, scrollBeforeFullscreen = 0;
   let visible = false, paused = reduced.matches, toastTimer = 0;
   let connecting: Endpoint | 'choose' | null = null;
@@ -84,6 +84,21 @@ export async function mountStudio() {
     applyTelemetry();
   });
   let serverLoading = false;
+  const shortRevision = (value: string | null | undefined) => value ? value.slice(0, 7) : '—';
+  function syncProductContext() {
+    const source = serverSession?.head ?? serverRevision?.id ?? null;
+    const published = serverSession?.desired ?? null;
+    const applied = telemetry.frame?.revision ?? runtimeRevision ?? null;
+    $('revision-source').textContent = source ? shortRevision(source) : workspace.active.kind === 'example' ? 'demo' : 'local';
+    $('revision-published').textContent = shortRevision(published);
+    $('revision-applied').textContent = shortRevision(applied);
+    const drift = Boolean(published && applied && published !== applied);
+    shell.dataset.revisionState = drift ? 'drift' : published && applied ? 'synced' : 'local';
+    $('revision-chain').title = drift
+      ? 'Опубликованная и применённая ревизии различаются'
+      : published && applied ? 'Runtime работает на опубликованной ревизии' : 'Локальный инженерный контекст';
+    $('environment-name').textContent = serverSession ? (runtimeOnly ? 'Runtime' : 'Server') : workspace.active.kind === 'example' ? 'Demo' : 'Local';
+  }
   function setServerRole(session: ServerSession | null) {
     serverSession = session;
     if (session) {
@@ -96,6 +111,7 @@ export async function mountStudio() {
       $('server-role').hidden = true;
       $('server-role').textContent = '';
     }
+    syncProductContext();
   }
   function syncTelemetry() {
     if ((serverRevision || runtimeOnly) && plant) stream.start();
@@ -126,6 +142,7 @@ export async function mountStudio() {
     if (!['live','paused','stale'].includes(status)) observedRuntime = plantTools.unavailableRuntime(plant.project, status === 'draft' || status === 'revision' ? 'draft' : 'offline');
     shell.dataset.telemetry = status; shell.dataset.runtimeSeq = String(status === 'live' || status === 'paused' ? liveFrame?.seq ?? '' : '');
     $('studio-context').textContent = label || (runtimeOnly ? 'Установка' : 'Черновик'); $('studio-context').title = telemetry.message || label;
+    syncProductContext();
     view.setRuntime(observedRuntime); spatial?.setRuntime(observedRuntime);
     animateState();
     renderRuntimeControls(); renderRuntimeAlarms();
@@ -487,7 +504,7 @@ export async function mountStudio() {
     $('studio-html').hidden = isPlant() || runtimeOnly; $('studio-share').hidden = isPlant() || runtimeOnly;
     $('equipment-toggle').hidden = isPlant() || runtimeOnly; $('studio-connect').hidden = isPlant() || runtimeOnly;
     $('studio-download').hidden = runtimeOnly; $('studio-download').textContent = isPlant() ? 'Скачать проект (.json)' : 'Скачать исходник (.ts)';
-    syncServerActions();
+    syncServerActions(); syncProductContext();
     documentTitle(); renderProjects();
   }
   function documentTitle() { document.title = fullscreen ? `${(serverRevision || runtimeOnly ? plant?.project.title ?? serverSession?.project.title ?? 'Установка' : currentDocument(workspace).title)} — Saturn` : 'Saturn'; }
@@ -822,7 +839,7 @@ export async function mountStudio() {
     if (!storageAvailable || serverRevision && documents.dirty() || serverDraft?.documents.dirty()) event.preventDefault();
   });
   window.addEventListener('beforeunload', event => { if (serverRevision && documents.dirty() || serverDraft?.documents.dirty()) { event.preventDefault(); event.returnValue = ''; } });
-  try { const layout = JSON.parse(localStorage.getItem('saturn.shell.layout.v1') ?? '{}'); filesVisible = layout.filesVisible === true; codeVisible = layout.codeVisible === true; if (/^\d+(\.\d+)?px$/.test(layout.navigatorWidth ?? '')) shell.style.setProperty('--navigator-width', layout.navigatorWidth); if (/^\d+(\.\d+)?px$/.test(layout.sourceWidth ?? '')) shell.style.setProperty('--source-width', layout.sourceWidth); } catch {}
+  try { const layout = JSON.parse(localStorage.getItem('saturn.shell.layout.v1') ?? '{}'); filesVisible = layout.filesVisible === true; if (typeof layout.codeVisible === 'boolean') codeVisible = layout.codeVisible; if (/^\d+(\.\d+)?px$/.test(layout.navigatorWidth ?? '')) shell.style.setProperty('--navigator-width', layout.navigatorWidth); if (/^\d+(\.\d+)?px$/.test(layout.sourceWidth ?? '')) shell.style.setProperty('--source-width', layout.sourceWidth); } catch {}
   if (isPlant()) await ensurePlant();
   view.render(compiled.scene); refresh(false); fitScene(); updatePause(); renderMeta();
   message(storageAvailable ? '' : 'Хранилище недоступно');
