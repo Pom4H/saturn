@@ -194,7 +194,7 @@ export function failCode(
   data?: Record<string, unknown>,
   overrides?: { status?: number; severity?: DiagnosticSeverity },
 ): never {
-  const definition = codeCatalog[code];
+  const definition: CodeDefinition = codeCatalog[code];
   throw new SaturnDiagnosticError(
     diagnostic(code, definition.key, args, data, overrides?.severity ?? definition.severity ?? 'error'),
     'en',
