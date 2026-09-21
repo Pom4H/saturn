@@ -392,24 +392,32 @@ export async function queueCommand(site: Site, payload: Record<string, unknown>,
     const commandId = typeof payload.id === 'string' ? payload.id : '';
     const revision = typeof payload.revision === 'string' ? payload.revision : '';
     const action = typeof payload.action === 'string' ? payload.action : '';
-    if (!commandId || !revision || !action) throw httpError(400, 'Command id, revision and action are required');
+    if (!commandId || commandId.length > 160 || !revision || revision.length > 200 || !action || action.length > 80)
+        throw httpError(400, 'Command id, revision and action are required');
+    const cloudId = randomUUID();
+    const payloadJson = JSON.stringify(payload);
+    const actorJson = JSON.stringify(actor);
+    const inserted = await sql`
+        INSERT INTO commands(cloud_id,site_id,command_id,payload,actor)
+        VALUES(${cloudId}::uuid,${site.id}::uuid,${commandId},${payloadJson}::jsonb,${actorJson}::jsonb)
+        ON CONFLICT(site_id,command_id) DO NOTHING
+        RETURNING cloud_id
+    ` as unknown as DbRecord[];
+    if (inserted[0]) return stringField(inserted[0], 'cloud_id');
+
     const existing = await sql`
-        SELECT cloud_id,payload,actor,status
+        SELECT cloud_id,
+               payload = ${payloadJson}::jsonb AS payload_matches,
+               actor = ${actorJson}::jsonb AS actor_matches
         FROM commands
         WHERE site_id=${site.id}::uuid AND command_id=${commandId}
         LIMIT 1
     ` as unknown as DbRecord[];
-    if (existing[0]) {
-        if (JSON.stringify(existing[0].payload) !== JSON.stringify(payload) || JSON.stringify(existing[0].actor) !== JSON.stringify(actor))
-            throw httpError(409, 'Command id already exists with different payload');
-        return stringField(existing[0], 'cloud_id');
-    }
-    const cloudId = randomUUID();
-    await sql`
-        INSERT INTO commands(cloud_id,site_id,command_id,payload,actor)
-        VALUES(${cloudId}::uuid,${site.id}::uuid,${commandId},${JSON.stringify(payload)}::jsonb,${JSON.stringify(actor)}::jsonb)
-    `;
-    return cloudId;
+    const row = existing[0];
+    if (!row) throw httpError(409, 'Command id conflict');
+    if (row.payload_matches !== true || row.actor_matches !== true)
+        throw httpError(409, 'Command id already exists with different payload');
+    return stringField(row, 'cloud_id');
 }
 
 export async function commandResult(cloudId: string): Promise<{ status: string; receipt: unknown; error: string | null } | null> {

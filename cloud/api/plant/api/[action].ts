@@ -158,15 +158,14 @@ export default async function handler(request: IncomingMessage, response: Server
                 const payload = await readJson(request);
                 site = await siteBySlug(slug) ?? site;
                 const cloudId = await queueCommand(site, payload, session.actor);
-                const result = await waitForCommand(cloudId);
+                const result = await waitForCommand(cloudId, 12_000);
                 if (result.status === 'applied') {
                     sendJson(response, 200, result.receipt);
                     return;
                 }
                 if (result.status === 'rejected')
                     throw httpError(409, result.error ?? 'Runtime rejected command');
-                sendJson(response, 202, { id: cloudId, status: result.status });
-                return;
+                throw httpError(504, 'Command confirmation timed out; runtime state is uncertain');
             }
             if (action === 'restart')
                 throw httpError(501, 'Remote runtime restart is not part of the Saturn Cloud MVP');
