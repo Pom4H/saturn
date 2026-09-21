@@ -1,4 +1,5 @@
-import { AppError, type Actor, type Frame } from './types';
+import type { Actor, Frame } from './types';
+import { failCode } from './diagnostics';
 
 export interface EnvironmentDescriptor {
     name: string;
@@ -21,24 +22,28 @@ interface EnvironmentLink {
 
 const cleanName = (value: unknown) => {
     if (typeof value !== 'string' || !/^[A-Za-z0-9_. -]{1,80}$/.test(value))
-        throw new AppError('Invalid environment name');
+        failCode('SATURN_VALUE_INVALID',{field:'environment.name',reason:'invalid'},{value});
     return value.trim();
 };
 
 const apiBase = (value: unknown): URL => {
     if (typeof value !== 'string' || value.length > 2048)
-        throw new AppError('Invalid environment URL');
+        failCode('SATURN_VALUE_INVALID',{field:'environment.url',reason:'invalid'});
     const input = new URL(value);
     if (!['http:', 'https:'].includes(input.protocol) || input.username || input.password || input.hash)
-        throw new AppError('Environment URL must be HTTP(S) without credentials or fragments');
+        failCode('SATURN_VALUE_INVALID',{field:'environment.url',reason:'invalid'},{protocol:input.protocol});
     // A Saturn installation is addressed by origin. Paths are deliberately not trusted.
     return new URL('/plant/api/', input.origin);
 };
 
 async function responseJson<T>(response: Response): Promise<T> {
-    const value = await response.json().catch(() => null) as any;
-    if (!response.ok)
-        throw new AppError(value?.error ?? `Remote Saturn returned HTTP ${response.status}`, response.status >= 400 && response.status < 600 ? response.status : 502);
+    const value: unknown = await response.json().catch(() => null);
+    if (!response.ok) {
+        const remoteMessage = value && typeof value === 'object' && 'error' in value && typeof (value as {error?:unknown}).error === 'string'
+            ? (value as {error:string}).error
+            : undefined;
+        failCode('SATURN_HTTP_INVALID',{reason:'stateChanged'},{status:response.status,...(remoteMessage?{remoteMessage}:{})},{status:response.status>=400&&response.status<600?response.status:502});
+    }
     return value as T;
 }
 
@@ -60,7 +65,7 @@ export class EnvironmentBroker {
         const name = cleanName(input.name ?? 'production');
         const api = apiBase(input.url);
         if (typeof input.user !== 'string' || input.user.length > 100 || typeof input.password !== 'string' || input.password.length > 1024)
-            throw new AppError('Invalid remote credentials');
+            failCode('SATURN_VALUE_INVALID',{field:'environment.credentials',reason:'invalid'});
 
         const login = await fetch(new URL('login', api), {
             method: 'POST',
@@ -71,7 +76,7 @@ export class EnvironmentBroker {
         });
         const authenticated = await responseJson<{token: string; actor: Actor}>(login);
         if (!/^[A-Za-z0-9_-]{43}$/.test(authenticated.token))
-            throw new AppError('Remote Saturn returned an invalid session token', 502);
+            failCode('SATURN_HTTP_INVALID',{reason:'malformed'},{field:'session.token'},{status:502});
 
         const instanceResponse = await fetch(new URL('instance', api), {
             headers: { Authorization: `Bearer ${authenticated.token}` },
@@ -114,7 +119,7 @@ export class EnvironmentBroker {
     private link(sessionId: string): EnvironmentLink {
         const link = this.links.get(sessionId);
         if (!link)
-            throw new AppError('No live environment is connected', 409);
+            failCode('SATURN_CONFLICT',{resource:'environment',reason:'missing'},{sessionId},{status:409});
         return link;
     }
 
@@ -125,7 +130,7 @@ export class EnvironmentBroker {
     } = {}): Promise<Response> {
         const allowed = new Set(['session', 'instance', 'events', 'reports', 'history', 'report', 'command', 'restart', 'firmware', 'subscribe', 'unsubscribe']);
         if (!allowed.has(action))
-            throw new AppError('Environment action is not allowed', 403);
+            failCode('SATURN_PERMISSION',{role:'environment-action'},{action},{status:403});
         const link = this.link(sessionId);
         const url = new URL(action, link.api);
         if (init.query)
