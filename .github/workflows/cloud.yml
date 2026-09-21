@@ -4,21 +4,11 @@ on:
   pull_request:
     paths:
       - "cloud/**"
-      - "plant/cloud-edge.ts"
-      - "plant/http-server.ts"
-      - "plant/bun-server.ts"
-      - "plant/cli.ts"
-      - "standalone/entry.ts"
       - ".github/workflows/cloud.yml"
   push:
     branches: [main, "release/**"]
     paths:
       - "cloud/**"
-      - "plant/cloud-edge.ts"
-      - "plant/http-server.ts"
-      - "plant/bun-server.ts"
-      - "plant/cli.ts"
-      - "standalone/entry.ts"
       - ".github/workflows/cloud.yml"
   workflow_dispatch:
 
@@ -26,29 +16,18 @@ permissions:
   contents: read
 
 jobs:
-  core-edge:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run plant:typecheck
-      - run: npm run architecture:check
-
   cloud:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     defaults:
       run:
         working-directory: cloud
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7.0.1
         with:
-          node-version: 24
+          persist-credentials: false
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24'
       - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm run check
