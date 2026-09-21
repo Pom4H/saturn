@@ -96,8 +96,11 @@ export class CloudEdge {
     private latestFrame: Frame | null = null;
     private sentSeq = -1;
     private sentProjectRevision = '';
+    private readonly target: string;
 
-    constructor(private readonly service: Service, private readonly options: CloudEdgeOptions) {}
+    constructor(private readonly service: Service, private readonly options: CloudEdgeOptions) {
+        this.target = endpoint(options);
+    }
 
     start(): void {
         if (!this.stopped) return;
@@ -132,7 +135,7 @@ export class CloudEdge {
     private connect(): void {
         if (this.stopped) return;
         let socket: WebSocket;
-        try { socket = new WebSocket(endpoint(this.options)); }
+        try { socket = new WebSocket(this.target); }
         catch {
             this.scheduleReconnect();
             return;

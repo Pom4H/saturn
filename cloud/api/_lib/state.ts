@@ -340,31 +340,46 @@ export async function history(site: Site, signals: string[], from: number, to: n
     if (!runId) throw httpError(409, 'Site run is unknown');
     if (!signals.length || signals.length > 64 || !Number.isFinite(from) || !Number.isFinite(to) || to < from || to - from > 7 * 86_400_000)
         throw httpError(400, 'Invalid history range');
-    const rows = await sql`
-        SELECT signal,time,value,quality
-        FROM samples
-        WHERE site_id=${site.id}::uuid
-          AND run_id=${runId}
-          AND signal = ANY(${signals}::text[])
-          AND time >= ${Math.floor(from)}
-          AND time <= ${Math.floor(to)}
-        ORDER BY signal,time
-        LIMIT 20001
-    ` as unknown as DbRecord[];
+    const [rows, previousRows] = await Promise.all([
+        sql`
+            SELECT signal,time,value,quality
+            FROM samples
+            WHERE site_id=${site.id}::uuid
+              AND run_id=${runId}
+              AND signal = ANY(${signals}::text[])
+              AND time >= ${Math.floor(from)}
+              AND time <= ${Math.floor(to)}
+            ORDER BY signal,time
+            LIMIT 20001
+        `,
+        sql`
+            SELECT DISTINCT ON (signal) signal,time,value,quality
+            FROM samples
+            WHERE site_id=${site.id}::uuid
+              AND run_id=${runId}
+              AND signal = ANY(${signals}::text[])
+              AND time < ${Math.floor(from)}
+            ORDER BY signal,time DESC
+        `,
+    ]) as unknown as [DbRecord[], DbRecord[]];
     if (rows.length > 20_000) throw httpError(413, 'History row budget exceeded');
-    const samples: SampleRow[] = rows.map(row => ({
+    const convert = (row: DbRecord): SampleRow => ({
         signal: stringField(row, 'signal'),
         time: Number(row.time),
         value: row.value === null ? null : Number(row.value),
         quality: stringField(row, 'quality'),
-    }));
+    });
+    const samples = rows.map(convert);
+    const previous = previousRows.map(convert);
     const segments: Array<SampleRow & { start: number; end: number }> = [];
     for (const signal of signals) {
         const points = samples.filter(sample => sample.signal === signal);
-        for (let index = 0; index < points.length; index++) {
-            const sample = points[index];
+        const before = previous.find(sample => sample.signal === signal);
+        const all = before ? [before, ...points] : points;
+        for (let index = 0; index < all.length; index++) {
+            const sample = all[index];
             const start = Math.max(sample.time, from);
-            const end = Math.min(points[index + 1]?.time ?? to, to);
+            const end = Math.min(all[index + 1]?.time ?? to, to);
             if (end > start) segments.push({ ...sample, start, end });
         }
     }
