@@ -32,7 +32,7 @@ export interface Renderer3DContext extends VisualState {
   invalidate?: () => void;
   THREE: typeof Three;
   equipment: Equipment;
-  materials: { steel: Three.Material; dark: Three.Material; teal: Three.Material; fluid: Three.Material };
+  materials: { steel: Three.Material; dark: Three.Material; teal: Three.Material; fluid: Three.Material; greyFluid: Three.Material; pipeShell: Three.Material; fluidSurface: Three.Material; fluidHighlight: Three.Material };
 }
 export interface EquipmentModel3D {
   root: Three.Group;

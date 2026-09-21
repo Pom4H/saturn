@@ -1,15 +1,23 @@
 import * as THREE from 'three';
-import { advancePhase, readSignal, rotate, type Asset, type Signals } from '../src/next/model';
-import { registry } from '../src/next/components';
+import { advancePhase, readSignal, rotate, type Asset, type Signals } from '../src/elements/model';
+import { registry } from '../src/elements/core-elements';
+import { materialPresets, type MaterialPresetId } from '../src/elements/materials';
 
-const steel = new THREE.MeshStandardMaterial({ color: 0xbac9d0, metalness: .55, roughness: .34 });
-const lightSteel = new THREE.MeshStandardMaterial({ color: 0xe1e9e9, metalness: .35, roughness: .35 });
-const dark = new THREE.MeshStandardMaterial({ color: 0x284655, metalness: .4, roughness: .42 });
-const teal = new THREE.MeshStandardMaterial({ color: 0x167c88, metalness: .3, roughness: .32 });
-const amber = new THREE.MeshStandardMaterial({ color: 0xe9ac43, metalness: .35, roughness: .3 });
-const fluid = new THREE.MeshStandardMaterial({ color: 0x21bdc6, metalness: .12, roughness: .22 });
-const greyFluid = new THREE.MeshStandardMaterial({ color: 0x819199, roughness: .6 });
-const sharedMaterials = new Set<THREE.Material>([steel, lightSteel, dark, teal, amber, fluid, greyFluid]);
+function presetMaterial(id: MaterialPresetId): THREE.Material {
+  const p=materialPresets[id], transparent=(p.opacity??1)<1 || (p.transmission??0)>0;
+  if ((p.transmission??0)>0 || (p.clearcoat??0)>0) return new THREE.MeshPhysicalMaterial({
+    color:p.color,metalness:p.metalness,roughness:p.roughness,transparent,opacity:p.opacity??1,
+    transmission:p.transmission??0,thickness:p.thickness??0,ior:p.ior??1.5,
+    clearcoat:p.clearcoat??0,clearcoatRoughness:p.clearcoatRoughness??0,
+    depthWrite:p.depthWrite??true,side:transparent?THREE.DoubleSide:THREE.FrontSide,
+  });
+  return new THREE.MeshStandardMaterial({color:p.color,metalness:p.metalness,roughness:p.roughness,transparent,opacity:p.opacity??1,depthWrite:p.depthWrite??true});
+}
+const steel=presetMaterial('steel'), lightSteel=presetMaterial('lightSteel'), dark=presetMaterial('darkMetal');
+const teal=presetMaterial('paintedIndustrial'), amber=presetMaterial('warning');
+const fluid=presetMaterial('water'), fluidSurface=presetMaterial('waterSurface'), fluidHighlight=presetMaterial('waterHighlight');
+const greyFluid=presetMaterial('staleFluid'), pipeShell=presetMaterial('pipeShell');
+const sharedMaterials = new Set<THREE.Material>([steel, lightSteel, dark, teal, amber, fluid, fluidSurface, fluidHighlight, greyFluid, pipeShell]);
 const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 function mesh(parent: THREE.Object3D, geometry: THREE.BufferGeometry, material: THREE.Material, position = v(0, 0, 0)) {
   const object = new THREE.Mesh(geometry, material); object.position.copy(position);
@@ -81,7 +89,8 @@ registerModel('process.tank.vertical', asset => {
     mesh(root, new THREE.TorusGeometry(r, .035, 10, 64), lightSteel, v(0, 0, z));
   }
   for (const a of [-.7, .7]) tubeBetween(root, v(Math.sin(a) * r, -Math.cos(a) * r, .28), v(Math.sin(a) * r, -Math.cos(a) * r, .28 + h), .022, lightSteel);
-  const liquid = cylinder(root, r - .035, 1, v(0, 0, .28), fluid);
+  const liquid = cylinder(root, r - .035, 1, v(0, 0, .28), fluid); liquid.renderOrder=2;
+  const surface = mesh(root, new THREE.CircleGeometry(r - .045, 64), fluidSurface, v(0, 0, .28)); surface.renderOrder=3;
   tubeBetween(root, v(r - .12, 0, .48), v(r + .28, 0, .48)); flange(root, v(r + .28, 0, .48), v(1, 0, 0));
   // A physical level scale along the open cutaway, independent of screen labels.
   for (let i = 0; i <= 10; i++) box(root, [.1 + (i % 5 === 0 ? .08 : 0), .025, .018], [-.45, -r * .9, .28 + h * i / 10], dark);
@@ -89,9 +98,12 @@ registerModel('process.tank.vertical', asset => {
   return finish(asset, root, signals => {
     level = readSignal(signals, 'level', '%');
     const valid = level !== null && level >= 0 && level <= 100;
-    liquid.visible = valid && level! > 0;
-    if (valid) { liquid.scale.y = h * level! / 100; liquid.position.z = .28 + h * level! / 200; }
-  }, () => { level = null; liquid.visible = false; }, () => ({ level, liquidTop: liquid.visible ? .28 + h * level! / 100 : null }));
+    liquid.visible = surface.visible = valid && level! > 0;
+    if (valid) {
+      const top=.28+h*level!/100; liquid.scale.y=h*level!/100; liquid.position.z=.28+h*level!/200;
+      surface.position.z=top+.004;
+    }
+  }, () => { level = null; liquid.visible = surface.visible = false; }, () => ({ level, liquidTop: liquid.visible ? .28 + h * level! / 100 : null }));
 });
 registerModel('process.pump.centrifugal', asset => {
   const root = new THREE.Group(), machine = new THREE.Group(); root.add(machine); machine.scale.setScalar(asset.parameters.scale);
@@ -123,6 +135,35 @@ registerModel('process.pump.centrifugal', asset => {
     rotor.visible = rpm !== null; // Unknown drive state must not look like a confirmed stop.
   }, () => { phase = 0; rotor.rotation.x = 0; }, () => ({ phase, rpm, flow }));
 });
+registerModel('process.valve.control', asset => {
+  const root=new THREE.Group(), machine=new THREE.Group();root.add(machine);machine.scale.setScalar(asset.parameters.scale);
+  box(machine,[1.45,.72,.10],[0,0,.10],dark);
+  tubeBetween(machine,v(-.72,0,.62),v(.72,0,.62),.16,steel);
+  flange(machine,v(-.72,0,.62),v(-1,0,0));flange(machine,v(.72,0,.62),v(1,0,0));
+  const body=mesh(machine,new THREE.SphereGeometry(.31,40,24),teal,v(0,0,.62));body.scale.x=1.18;
+  tubeBetween(machine,v(0,0,.80),v(0,0,1.12),.065,steel);
+  box(machine,[.52,.40,.24],[0,0,1.22],dark);
+  const indicator=new THREE.Group();indicator.position.z=1.39;machine.add(indicator);
+  box(indicator,[.38,.045,.035],[.02,0,0],amber);
+  let opening:number|null=null;
+  return finish(asset,root,signals=>{opening=readSignal(signals,'opening','%');indicator.visible=opening!==null;indicator.rotation.z=(opening??0)*Math.PI/200;},()=>{},()=>({opening}));
+});
+registerModel('instrumentation.flowmeter.inline', asset => {
+  const root=new THREE.Group(), machine=new THREE.Group();root.add(machine);machine.scale.setScalar(asset.parameters.scale);
+  tubeBetween(machine,v(-.58,0,.62),v(.58,0,.62),.13,steel);flange(machine,v(-.58,0,.62),v(-1,0,0));flange(machine,v(.58,0,.62),v(1,0,0));
+  const housing=mesh(machine,new THREE.CylinderGeometry(.32,.32,.22,40),dark,v(0,0,1.02));housing.rotation.x=Math.PI/2;
+  const face=mesh(machine,new THREE.CircleGeometry(.27,40),presetMaterial('glass'),v(0,-.12,1.02));face.rotation.x=Math.PI/2;
+  tubeBetween(machine,v(0,0,.66),v(0,0,.88),.055,steel);
+  let flow:number|null=null;return finish(asset,root,signals=>{flow=readSignal(signals,'flow','m3/h');},()=>{},()=>({flow}));
+});
+registerModel('process.heat-exchanger.plate', asset => {
+  const root=new THREE.Group(), machine=new THREE.Group();root.add(machine);machine.scale.setScalar(asset.parameters.scale);
+  box(machine,[1.25,.78,.10],[0,0,.08],dark);box(machine,[1.08,.56,.96],[0,0,.68],dark);
+  for(let i=0;i<13;i++) box(machine,[.035,.64,.92],[(i-6)*.075,0,.68],i%2?steel:lightSteel);
+  for(const x of [-.70,.70]){tubeBetween(machine,v(x>0?.45:-.45,0,.62),v(x,0,.62),.13,steel);flange(machine,v(x,0,.62),v(Math.sign(x),0,0));}
+  let flow:number|null=null,temperature:number|null=null;
+  return finish(asset,root,signals=>{flow=readSignal(signals,'flow','m3/h');temperature=readSignal(signals,'temperature','°C');},()=>{},()=>({flow,temperature}));
+});
 registerModel('process.valve.three-way.diverting', asset => {
   const root = new THREE.Group(), machine = new THREE.Group(); root.add(machine); machine.scale.setScalar(asset.parameters.scale);
   box(machine, [.7, .65, .1], [0, 0, .1]);
@@ -148,4 +189,4 @@ export function createModel(asset: Asset): Model {
   if (!builder) throw new Error(`No 3D renderer for ${asset.type}`);
   return builder(asset);
 }
-export const materials = { steel, dark, teal, fluid, greyFluid };
+export const materials = { steel, dark, teal, fluid, greyFluid, pipeShell, fluidSurface, fluidHighlight };

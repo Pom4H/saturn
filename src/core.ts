@@ -1,5 +1,6 @@
 /** Installed declarative vocabulary. Definitions are code; projects never execute it. */
 import type { RuntimeConfig, Signal } from './runtime/protocol';
+import type { ElementVisualIdentity } from './elements/model';
 export type Quality = 'good' | 'stale' | 'bad';
 export type Alarm = 'none' | 'warning' | 'trip';
 export type Point = { x: number; y: number };
@@ -10,7 +11,7 @@ export interface Field { scope?: 'layout' | 'behavior'; label: string; min?: num
 export interface PortSpec extends Point { direction: Direction; role: 'in' | 'out' }
 export interface CommandDefinition { label: string; valueType?: 'number' | 'boolean' | 'string'; min?: number; max?: number; choices?: readonly string[] }
 export interface SignalDefinition { label: string; type: Signal['type']; unit: string }
-export interface Definition { label: string; width: number; height: number; fields: Record<string, Field>; ports: Record<string, PortSpec>; instrument?: boolean; version?: string; prefix?: string; signals?: Record<string, SignalDefinition>; commands?: Record<string, CommandDefinition> }
+export interface Definition { label: string; width: number; height: number; fields: Record<string, Field>; ports: Record<string, PortSpec>; instrument?: boolean; version?: string; prefix?: string; signals?: Record<string, SignalDefinition>; commands?: Record<string, CommandDefinition>; visual?: ElementVisualIdentity }
 const num = (label: string, value: number, min: number, max: number, step = 1, unit = ''): Field => ({ label, default: value, min, max, step, unit });
 const common: Record<string, Field> = {
   quality: { label: 'Качество', default: 'good', choices: ['good', 'stale', 'bad'] },
@@ -29,6 +30,17 @@ export const catalog: Record<Kind, Definition> = {
   pressure: { label: 'Манометр', width: 66, height: 90, instrument: true, fields: { value: num('Давление', 5.8, 0, 16, .1, 'бар'), at: num('Точка отвода', .6, .1, .9, .05), offset: num('Отступ', 100, 80, 240, 10), ...common }, ports: {} },
   temperature: { label: 'Термометр', width: 70, height: 70, instrument: true, fields: { value: num('Температура', 72, -40, 150, 1, '°C'), at: num('Точка отвода', .5, .1, .9, .05), offset: num('Отступ', 95, 80, 240, 10), ...common }, ports: {} },
 };
+
+const visual = (glyph: string, category: ElementVisualIdentity['category'], geometry: string, min: readonly [number,number,number], max: readonly [number,number,number], materials: readonly string[] = []): ElementVisualIdentity => ({ glyph, category, geometry, envelope: { min, max }, materials });
+catalog.tank.visual = visual('process.tank.vertical','process','process.tank.vertical',[-.9,-.9,.05],[1.15,.9,2.6],['steel','water']);
+catalog.pump.visual = visual('process.pump.centrifugal','process','process.pump.centrifugal',[-1.05,-.55,.04],[1.02,.55,1.45],['steel','paintedIndustrial']);
+catalog.valve.visual = visual('process.valve.control','process','process.valve.control',[-.82,-.48,.04],[.82,.48,1.55],['steel','paintedIndustrial']);
+catalog.flowmeter.visual = visual('instrumentation.flowmeter','instrumentation','instrumentation.flowmeter.inline',[-.68,-.42,.05],[.68,.42,1.42],['steel','glass']);
+catalog.exchanger.visual = visual('process.heat-exchanger','process','process.heat-exchanger.plate',[-.78,-.46,.04],[.78,.46,1.42],['steel','paintedIndustrial']);
+catalog.outlet.visual = visual('process.outlet','process','process.outlet',[-.3,-.2,.05],[.35,.2,1.2],['steel']);
+catalog.pressure.visual = visual('instrumentation.pressure','instrumentation','instrumentation.pressure',[-.36,-.2,.05],[.36,.2,1.5],['steel','glass']);
+catalog.temperature.visual = visual('instrumentation.temperature','instrumentation','instrumentation.temperature',[-.32,-.2,.05],[.32,.2,1.5],['steel','glass']);
+
 for (const kind of ['pressure', 'temperature']) for (const key of ['at', 'offset']) catalog[kind].fields[key].scope = 'layout';
 const numericSignal = (label: string, unit: string): SignalDefinition => ({ label, type: 'number', unit });
 for (const definition of Object.values(catalog)) definition.version = '1.0.0';
@@ -52,6 +64,7 @@ export function registerComponent(kind: string, definition: Definition): void {
   if (!/^[a-z][a-zA-Z0-9_]{0,47}$/.test(kind) || ['__proto__', 'prototype', 'constructor', 'component', 'runtime', 'connect', 'tap'].includes(kind)) throw new Error(`Invalid component type: ${kind}`);
   if (Object.prototype.hasOwnProperty.call(catalog, kind)) throw new Error(`Duplicate component type: ${kind}`);
   if (!(Number.isFinite(definition.width) && definition.width > 0 && Number.isFinite(definition.height) && definition.height > 0) || !definition.version) throw new Error('A component needs dimensions and a version');
+  if (definition.visual && (!/^[a-z][a-z0-9_.-]+$/i.test(definition.visual.glyph) || !definition.visual.geometry)) throw new Error('Invalid component visual identity');
   for (const name of [...Object.keys(definition.fields), ...Object.keys(definition.ports), ...Object.keys(definition.signals ?? {}), ...Object.keys(definition.commands ?? {})]) if (['__proto__', 'prototype', 'constructor'].includes(name)) throw new Error(`Invalid member: ${name}`);
   catalog[kind] = definition;
 }

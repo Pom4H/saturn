@@ -7,7 +7,7 @@ import { layout, tapPoint } from './geometry';
 import { numeric, type RuntimeFrame } from './runtime/protocol';
 import { get3dRenderer, observation, observationAlarm, observationQuality, observedFlows, type EquipmentModel3D, type Renderer3D, type Renderer3DContext } from './view';
 import { createModel, materials, tubeBetween } from '../lab3d/models';
-import { registry } from './next/components';
+import { registry } from './elements/core-elements';
 import type { Signals } from './next/model';
 
 const v = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -71,7 +71,10 @@ function procedural(type: string, portNames: Record<string, string>): Renderer3D
 const builtins = new Map<string, Renderer3D>([
   ['tank', procedural('process.tank.vertical', { OUT: 'outlet' })],
   ['pump', procedural('process.pump.centrifugal', { IN: 'inlet', OUT: 'outlet' })],
-  ...['valve', 'flowmeter', 'pressure', 'temperature', 'exchanger', 'outlet'].map(kind => [kind, (context: Renderer3DContext) => primitiveModel(context, kind)] as const),
+  ['valve', procedural('process.valve.control', { IN: 'inlet', OUT: 'outlet' })],
+  ['flowmeter', procedural('instrumentation.flowmeter.inline', { IN: 'inlet', OUT: 'outlet' })],
+  ['exchanger', procedural('process.heat-exchanger.plate', { IN: 'inlet', OUT: 'outlet' })],
+  ...['pressure', 'temperature', 'outlet'].map(kind => [kind, (context: Renderer3DContext) => primitiveModel(context, kind)] as const),
 ]);
 interface Rendered { equipment: Equipment; model: EquipmentModel3D; label: HTMLButtonElement; text: HTMLElement; state: HTMLElement; leader: SVGLineElement }
 interface FlowTrack { id: string; curve: THREE.CurvePath<THREE.Vector3>; particles: THREE.Mesh[]; body: THREE.Mesh[]; phase: number; value: number | null }
@@ -305,9 +308,13 @@ export class SceneView3D {
       const startLead = start.clone().addScaledVector(normal(a!, edge.from.port), .30), endLead = end.clone().addScaledVector(normal(b!, edge.to.port), .30);
       const curve = new THREE.CurvePath<THREE.Vector3>(), high = Math.max(startLead.z, endLead.z), middleX = (startLead.x + endLead.x) / 2;
       const points = [start, startLead, v(startLead.x, startLead.y, high), v(middleX, startLead.y, high), v(middleX, endLead.y, high), v(endLead.x, endLead.y, high), endLead, end], body: THREE.Mesh[] = [];
-      for (let i = 1; i < points.length; i++) if (points[i].distanceTo(points[i - 1]) > .001) { curve.add(new THREE.LineCurve3(points[i - 1], points[i])); body.push(tubeBetween(this.pipeLayer, points[i - 1], points[i], .085, materials.fluid)); }
+      for (let i = 1; i < points.length; i++) if (points[i].distanceTo(points[i - 1]) > .001) {
+        curve.add(new THREE.LineCurve3(points[i - 1], points[i]));
+        const shell = tubeBetween(this.pipeLayer, points[i - 1], points[i], .12, materials.pipeShell); shell.renderOrder = 1;
+        const liquid = tubeBetween(this.pipeLayer, points[i - 1], points[i], .078, materials.fluid); liquid.renderOrder = 2; body.push(liquid);
+      }
       if (!curve.curves.length) continue;
-      const particles = [0, 1, 2, 3].map(() => addMesh(this.pipeLayer, new THREE.ConeGeometry(.14, .28, 8), materials.dark));
+      const particles = [0, 1, 2, 3].map(() => { const arrow=addMesh(this.pipeLayer, new THREE.ConeGeometry(.105, .23, 12), materials.fluidHighlight); arrow.renderOrder=3; return arrow; });
       this.tracks.push({ id: edge.id, curve, particles, body, phase: trackPhases.get(edge.id) ?? 0, value: null });
     }
     for (const { equipment, model } of this.objects.values()) {

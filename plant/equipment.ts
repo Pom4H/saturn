@@ -99,6 +99,19 @@ Object.assign(shapes, {
  junction:(c:SvgRendererContext)=>{el(c.root,'path',{d:'M0 48H150 M75 48V85',stroke:metalStroke,'stroke-width':17,fill:'none'});el(c.root,'path',{d:'M0 48H150 M75 48V85',stroke:'#c9e2e7','stroke-width':11,fill:'none'});},
  saturn:(c:SvgRendererContext)=>{const shell=el(c.root,'g',{});shell.innerHTML=renderSaturnPlcSvg({defsPrefix:'saturn-'+c.equipment.id});const svg=shell.querySelector('svg')!;svg.setAttribute('width','310');svg.setAttribute('height','170');const screen=svg.querySelector<SVGSVGElement>('.runtime-hmi')!;c.onUpdate(()=>drawHmiSvg(screen,c.equipment.id));},
 });
+const glyphByVisual:Record<string,string>={
+ pump:'process.pump.centrifugal',turbine:'mechanical.rotating',reactor:'process.reactor',channel:'generic.element',separator:'process.tank.vertical',
+ exchanger:'process.heat-exchanger',generator:'electrical.generator',control:'control.panel',sensor:'instrumentation.sensor',reservoir:'process.tank.vertical',
+ valve:'process.valve.control',battery:'electrical.battery',switchgear:'control.panel',fan:'mechanical.rotating',motor:'electrical.motor',tower:'generic.element',
+ filter:'process.filter.inline',checkvalve:'process.valve.control',accumulator:'process.tank.vertical',relief:'process.valve.control',transformer:'electrical.transformer',
+ alternator:'electrical.generator',calorimeter:'instrumentation.sensor',dcSupply:'electrical.battery',transmitter:'instrumentation.sensor',contactor:'control.panel',
+ indicator:'instrumentation.sensor',ioModule:'control.panel',junction:'generic.element',saturn:'control.panel'
+};
+const categoryByVisual=(visual:string)=>visual==='motor'||visual==='generator'||visual==='alternator'||visual==='transformer'||visual==='battery'||visual==='dcSupply'?'electrical'
+  :visual==='sensor'||visual==='transmitter'||visual==='calorimeter'||visual==='indicator'?'instrumentation'
+  :visual==='control'||visual==='switchgear'||visual==='contactor'||visual==='ioModule'||visual==='saturn'?'control'
+  :visual==='turbine'||visual==='fan'?'mechanical':'process';
+
 const installed = new Set<string>();
 export function installEquipment(locale: SaturnLocale = 'en') {
     const specs: Array<Pick<ModelSpec,'kind'|'visual'|'titleKey'|'outputs'|'outputTypes'>> = [
@@ -118,7 +131,7 @@ export function installEquipment(locale: SaturnLocale = 'en') {
             continue;
         installed.add(kind);
         if (!catalog[kind])
-            registerComponent(kind, { version: '1.0.0', label: modelTitle(spec.kind, locale), ...footprint(spec.visual), fields: { x: { label: 'X', scope: 'layout', default: 0 }, y: { label: 'Y', scope: 'layout', default: 0 } }, ports: Object.fromEntries(Object.entries(terminals(spec.visual)).map(([name,t])=>[name,{x:t.x,y:t.y,direction:t.side,role:t.role==='source'?'out':'in'}])), signals: Object.fromEntries(Object.entries(spec.outputs).map(([k, unit]) => [k, { label: k, unit, type: outputType(spec, k) }])) });
+            registerComponent(kind, { version: '1.0.0', label: modelTitle(spec.kind, locale), ...footprint(spec.visual), visual:{glyph:glyphByVisual[spec.visual]??'generic.element',category:categoryByVisual(spec.visual) as any,geometry:`plant.${spec.visual}`,envelope:{min:[-.8,-.6,.02],max:[.8,.6,1.9]}}, fields: { x: { label: 'X', scope: 'layout', default: 0 }, y: { label: 'Y', scope: 'layout', default: 0 } }, ports: Object.fromEntries(Object.entries(terminals(spec.visual)).map(([name,t])=>[name,{x:t.x,y:t.y,direction:t.side,role:t.role==='source'?'out':'in'}])), signals: Object.fromEntries(Object.entries(spec.outputs).map(([k, unit]) => [k, { label: k, unit, type: outputType(spec, k) }])) });
         registerSvgRenderer(kind, c => { shapes[spec.visual](c); if(spec.visual==='saturn')return; const key = Object.keys(spec.outputs)[0]; const text = el(c.root, 'text', { x: 75, y: 111, 'text-anchor': 'middle', 'font-family': 'ui-monospace,monospace', 'font-size': 15, fill: '#214d5f' }); c.onUpdate(dt => { const value = c.number(key, dt); text.textContent = value === null ? '—' : `${value.toFixed(2)} ${spec.outputs[key]}`; }); });
         register3dRenderer(kind, c => createPlantModel(c, spec.visual, Object.keys(spec.outputs)[0]));
     }
