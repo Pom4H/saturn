@@ -43,11 +43,10 @@ export class WorkspaceHost {
 
   async snapshot(): Promise<WorkspaceSnapshot> {
     const loaded = await loadProjectDirectory(this.directory);
-    const id = 'workspace:' + await sha256(canonicalFiles(loaded.sources));
-    const git = await this.gitRevision();
+    const artifact = await this.build();
     return {
-      id,
-      sourceRevision: git,
+      id: artifact.hash,
+      sourceRevision: artifact.provenance.sourceRevision ?? null,
       time: Date.now(),
       actor: 'filesystem',
       message: 'Workspace files',
