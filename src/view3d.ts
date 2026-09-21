@@ -84,6 +84,8 @@ export class SceneView3D {
   onSelect?: (id: string | null) => void;
   onPortSelect?: (id:string,port:string)=>void;
   onOverview?: () => void;
+  canMove?: (id: string) => boolean;
+  onMove?: (id: string, x: number, y: number, commit: boolean) => void;
   private frame: RuntimeFrame | null = null;
   private renderer: THREE.WebGLRenderer;
   private world = new THREE.Scene();
@@ -114,7 +116,8 @@ export class SceneView3D {
   private last = 0;
   private motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
   private raycaster = new THREE.Raycaster();
-  private down: { x: number; y: number } | null = null;
+  private ground = new THREE.Plane(v(0, 0, 1), 0);
+  private down: { x: number; y: number; id: string | null; moved: boolean; offset?: THREE.Vector3; orbitEnabled?: boolean } | null = null;
   constructor(public host: HTMLElement, options: { landing?: boolean } = {}) {
     host.classList.add('scene3d');
     this.canvas = document.createElement('canvas'); this.canvas.tabIndex = 0;
@@ -151,16 +154,58 @@ export class SceneView3D {
       if (event.key.toLowerCase() === 'f') { this.fit(); this.onOverview?.(); event.preventDefault(); event.stopPropagation(); }
       if (event.key === 'Escape') { this.select(null); this.onSelect?.(null); }
     });
-    this.canvas.addEventListener('pointerdown', e => { this.down = { x: e.clientX, y: e.clientY }; });
+    this.canvas.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      const picked = this.pick(e.clientX, e.clientY), id = picked.id;
+      this.down = { x: e.clientX, y: e.clientY, id, moved: false };
+      if (!id || !this.canMove?.(id)) return;
+      const point = this.groundPoint(e.clientX, e.clientY), object = this.objects.get(id);
+      if (!point || !object) return;
+      this.down.offset = object.model.root.position.clone().sub(point);
+      this.down.orbitEnabled = this.controls.enabled;
+      this.controls.enabled = false;
+      this.canvas.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    this.canvas.addEventListener('pointermove', e => {
+      const drag = this.down;
+      if (!drag?.id || !drag.offset || !this.canMove?.(drag.id)) return;
+      if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 3) return;
+      const point = this.groundPoint(e.clientX, e.clientY), object = this.objects.get(drag.id);
+      if (!point || !object) return;
+      drag.moved = true;
+      const world = point.add(drag.offset), definition = catalog[object.equipment.kind], centered = !!this.scene.groups?.length;
+      const x = world.x * 100 - (centered ? definition.width / 2 : 0);
+      const y = -world.y * 100 - (centered ? definition.height / 2 : 0);
+      this.onMove?.(drag.id, Math.round(x), Math.round(y), false);
+      e.preventDefault();
+    });
     this.canvas.addEventListener('pointerup', e => {
-      if (!this.down || Math.hypot(e.clientX - this.down.x, e.clientY - this.down.y) > 5) return;
-      const rect = this.canvas.getBoundingClientRect(), drawingHeight = rect.height - (rect.width <= 650 ? 77 : 0);
-      if (e.clientY - rect.top > drawingHeight) return;
-      this.raycaster.setFromCamera(new THREE.Vector2((e.clientX - rect.left) / rect.width * 2 - 1, -(e.clientY - rect.top) / drawingHeight * 2 + 1), this.camera);
-      let object: THREE.Object3D | undefined = this.raycaster.intersectObjects(this.equipmentLayer.children, true)[0]?.object;
-      const terminal=object?.userData.terminal;
-      while (object && !object.userData.equipmentId) object = object.parent ?? undefined;
-      const id = object?.userData.equipmentId ?? null; this.select(id); this.onSelect?.(id); if(id&&terminal)this.onPortSelect?.(id,terminal);
+      const drag = this.down; this.down = null;
+      if (!drag) return;
+      if (drag.offset) {
+        this.controls.enabled = drag.orbitEnabled ?? this.controls.enabled;
+        if (this.canvas.hasPointerCapture(e.pointerId)) this.canvas.releasePointerCapture(e.pointerId);
+        if (drag.moved && drag.id) {
+          const point = this.groundPoint(e.clientX, e.clientY), object = this.objects.get(drag.id);
+          if (point && object) {
+            const world = point.add(drag.offset), definition = catalog[object.equipment.kind], centered = !!this.scene.groups?.length;
+            const x = world.x * 100 - (centered ? definition.width / 2 : 0);
+            const y = -world.y * 100 - (centered ? definition.height / 2 : 0);
+            this.onMove?.(drag.id, Math.round(x), Math.round(y), true);
+          }
+          return;
+        }
+      }
+      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 5) return;
+      const picked = this.pick(e.clientX, e.clientY), id = picked.id;
+      this.select(id); this.onSelect?.(id); if(id&&picked.terminal)this.onPortSelect?.(id,picked.terminal);
+    });
+    this.canvas.addEventListener('pointercancel', e => {
+      const drag = this.down; this.down = null;
+      if (drag?.orbitEnabled !== undefined) this.controls.enabled = drag.orbitEnabled;
+      if (this.canvas.hasPointerCapture(e.pointerId)) this.canvas.releasePointerCapture(e.pointerId);
+      if (drag?.moved && drag.id) this.onMove?.(drag.id, 0, 0, false);
     });
     const animate = (now: number) => {
       const dt = Math.min(.1, this.last ? (now - this.last) / 1000 : 0); this.last = now;
@@ -171,6 +216,24 @@ export class SceneView3D {
       this.raf = requestAnimationFrame(animate);
     };
     this.resize(); this.raf = requestAnimationFrame(animate);
+  }
+  private ndc(clientX: number, clientY: number) {
+    const rect = this.canvas.getBoundingClientRect(), bottom = rect.width <= 650 ? 77 : 0, drawingHeight = Math.max(1, rect.height - bottom);
+    if (clientY - rect.top > drawingHeight) return null;
+    return new THREE.Vector2((clientX - rect.left) / rect.width * 2 - 1, -(clientY - rect.top) / drawingHeight * 2 + 1);
+  }
+  private pick(clientX: number, clientY: number) {
+    const ndc = this.ndc(clientX, clientY); if (!ndc) return { id: null as string | null, terminal: undefined as string | undefined };
+    this.raycaster.setFromCamera(ndc, this.camera);
+    let object: THREE.Object3D | undefined = this.raycaster.intersectObjects(this.equipmentLayer.children, true)[0]?.object;
+    const terminal = object?.userData.terminal as string | undefined;
+    while (object && !object.userData.equipmentId) object = object.parent ?? undefined;
+    return { id: (object?.userData.equipmentId as string | undefined) ?? null, terminal };
+  }
+  private groundPoint(clientX: number, clientY: number) {
+    const ndc = this.ndc(clientX, clientY); if (!ndc) return null;
+    this.raycaster.setFromCamera(ndc, this.camera);
+    return this.raycaster.ray.intersectPlane(this.ground, v());
   }
   private context(equipment: Equipment): Renderer3DContext {
     return { THREE, equipment, materials, invalidate: () => this.draw(),

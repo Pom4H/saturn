@@ -116,9 +116,14 @@ export async function mountStudio() {
         status = liveFrame.paused ? 'paused' : 'live';
         label = liveFrame.paused ? 'Симуляция · пауза' : 'Симуляция · подключена';
         observedRuntime = plantTools.visualFrame(plant.project, liveFrame);
+      } else if (telemetry.state === 'stale' && liveFrame) {
+        status = 'stale'; label = telemetry.message || 'Связь потеряна · показан последний подтверждённый кадр';
+        observedRuntime = plantTools.visualFrame(plant.project, liveFrame);
+        for (const equipment of Object.values(observedRuntime.equipment)) for (const signal of Object.values(equipment.signals)) signal.quality = 'stale';
+        for (const signal of Object.values(observedRuntime.flows)) signal.quality = 'stale';
       }
     } else if (serverRevision) label = 'Черновик · данные приостановлены';
-    if (status !== 'live' && status !== 'paused') observedRuntime = plantTools.unavailableRuntime(plant.project, status === 'draft' || status === 'revision' ? 'draft' : 'offline');
+    if (!['live','paused','stale'].includes(status)) observedRuntime = plantTools.unavailableRuntime(plant.project, status === 'draft' || status === 'revision' ? 'draft' : 'offline');
     shell.dataset.telemetry = status; shell.dataset.runtimeSeq = String(status === 'live' || status === 'paused' ? liveFrame?.seq ?? '' : '');
     $('studio-context').textContent = label || (runtimeOnly ? 'Установка' : 'Черновик'); $('studio-context').title = telemetry.message || label;
     view.setRuntime(observedRuntime); spatial?.setRuntime(observedRuntime);
@@ -312,6 +317,42 @@ export async function mountStudio() {
     openFile(target.path, true, false);
     editor.dispatch({ changes, annotations: isolateHistory.of('full'), userEvent: 'input.visual' });
   }
+  let positionPreview: { id: string; x: number; y: number } | null = null, positionPreviewFrame = 0;
+  function canMoveNode(id: string) {
+    if (error || runtimeOnly) return false;
+    const node = compiled.scene.nodes.find(item => item.id === id);
+    if (!node || node.tap) return false;
+    if (isPlant()) {
+      const target = plant?.objects.get(id);
+      return Boolean(target?.fields.some(field => field.key === 'x') && target.fields.some(field => field.key === 'y'));
+    }
+    return editable(compiled, id, 'x') && editable(compiled, id, 'y');
+  }
+  function previewPosition(id: string, x: number, y: number) {
+    if (!canMoveNode(id)) return;
+    positionPreview = { id, x, y };
+    if (positionPreviewFrame) return;
+    positionPreviewFrame = requestAnimationFrame(() => {
+      positionPreviewFrame = 0;
+      const preview = positionPreview; if (!preview) return;
+      const scene = { ...compiled.scene, nodes: compiled.scene.nodes.map(node => node.id === preview.id ? { ...node, props: { ...node.props, x: preview.x, y: preview.y } } : node) };
+      view.render(scene); spatial?.render(scene); view.select(selected); spatial?.select(selected);
+    });
+  }
+  function restorePositionPreview() {
+    positionPreview = null;
+    if (positionPreviewFrame) cancelAnimationFrame(positionPreviewFrame);
+    positionPreviewFrame = 0;
+    view.render(compiled.scene); spatial?.render(compiled.scene); view.select(selected); spatial?.select(selected);
+  }
+  function commitPosition(id: string, x: number, y: number) {
+    positionPreview = null;
+    if (positionPreviewFrame) cancelAnimationFrame(positionPreviewFrame);
+    positionPreviewFrame = 0;
+    if (!canMoveNode(id)) { restorePositionPreview(); return; }
+    fields(id, { x, y });
+  }
+
   $('object-source').onclick = () => {
     if (error || !selected) return;
     const object = compiled.objects.get(selected);
@@ -787,6 +828,8 @@ export async function mountStudio() {
   message(storageAvailable ? '' : 'Хранилище недоступно');
   try {
     const { SceneView3D } = await import('../src/view3d'); spatial = new SceneView3D(spatialHost, { landing: true }); spatial.onSelect = select;
+    spatial.canMove = canMoveNode;
+    spatial.onMove = (id, x, y, commit) => commit ? commitPosition(id, x, y) : (x === 0 && y === 0 ? restorePositionPreview() : previewPosition(id, x, y));
     spatial.render(compiled.scene); spatial.setRuntime(observedRuntime ?? plant?.runtime ?? null); spatial.select(selected); setMode(explicit);
   } catch { $('studio-3d').setAttribute('disabled', ''); present(1); toast('WebGL недоступен. Работайте с 2D-схемой.'); }
   const requestedServer = !shared && new URLSearchParams(location.search).get('project') === 'server';
