@@ -23,7 +23,13 @@ An extension package is ordinary npm package metadata plus a Saturn manifest:
     "entry": "dist/index.js",
     "capabilities": ["elements"],
     "elements": [
-      { "type": "saturn.example", "title": "Motor", "tag": "factory-motor" }
+      {
+        "type": "saturn.example",
+        "title": "Motor",
+        "tag": "factory-motor",
+        "glyph": "electrical.motor",
+        "category": "electrical"
+      }
     ]
   }
 }
@@ -116,3 +122,18 @@ Rejected because trusted executable application code and authored declarative pr
 ### Invent a proprietary package registry
 
 Rejected because npm-compatible registries already solve naming, version metadata, private scopes and artifact distribution.
+
+
+### Element packs and visual identity
+
+The `elements` capability uses the same element design system as Saturn Core. Package metadata may expose a stable `glyph` and `category` for discovery before trusted package code is activated. Raw SVG is intentionally not accepted in the manifest.
+
+Trusted extension code may register richer element definitions and visual renderers. A device family should keep these concerns distinct:
+
+- semantic type, ports, signals and commands;
+- stable engineering glyph for catalog/tree/navigation;
+- canonical spatial geometry identity;
+- material and medium presets;
+- optional vendor-specific renderers.
+
+The glyph answers **what kind of equipment is this?** while the spatial representation answers **which physical/vendor variant is this?**. Multiple vendor models can therefore share one engineering glyph without sharing geometry.

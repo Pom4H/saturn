@@ -31,6 +31,9 @@ try {
   assert.equal(await page.locator('#revision-published').textContent(), '—');
   assert.equal(await page.locator('#revision-applied').textContent(), '—');
   assert(await page.locator('#studio-editor-pane').isVisible(), 'Desktop landing starts with source + diagram together');
+  await page.locator('#equipment-toggle').click();
+  assert((await page.locator('.equipment-catalog-item .equipment-glyph').count()) >= 8, 'Equipment catalog uses registered engineering glyphs');
+  await page.locator('#equipment-close').click();
   await mkdir('test-results/site-studio', { recursive: true });
   await page.screenshot({ path: 'test-results/site-studio/landing.png' });
   await page.evaluate(() => { document.documentElement.style.scrollBehavior = 'auto'; window.scrollTo(0, document.getElementById('studio').offsetTop); });

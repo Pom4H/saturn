@@ -6,7 +6,7 @@ export interface SaturnExtensionManifest {
     api: 1;
     entry: string;
     capabilities: Array<'elements' | 'protocol' | 'datasource' | 'panel' | 'command' | 'report'>;
-    elements?: Array<{ type: string; title: string; tag: string }>;
+    elements?: Array<{ type: string; title: string; tag: string; glyph?: string; category?: 'process'|'instrumentation'|'electrical'|'mechanical'|'control'|'structure'|'generic' }>;
 }
 
 export interface InstalledExtension {
@@ -87,6 +87,8 @@ export function validateExtensionPackage(pkg: RegistryVersion & { saturn?: Satur
     for (const element of manifest.elements ?? []) {
         if (!/^[A-Za-z0-9_.-]{1,100}$/.test(element.type) || typeof element.title !== 'string' || element.title.length > 100 || !/^[a-z][a-z0-9.-]*-[a-z0-9.-]+$/.test(element.tag))
             throw new Error('Invalid custom element declaration');
+        if (element.glyph && !/^[a-z][a-z0-9_.-]{1,99}$/i.test(element.glyph)) throw new Error('Invalid custom element glyph');
+        if (element.category && !['process','instrumentation','electrical','mechanical','control','structure','generic'].includes(element.category)) throw new Error('Invalid custom element category');
     }
     return manifest;
 }

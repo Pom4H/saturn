@@ -449,3 +449,24 @@
   .revision-chain span:nth-of-type(2),.revision-chain span:nth-of-type(2)+i { display: none; }
   .runtime-context-actions button { font-size: 9px; padding-inline: 5px; }
 }
+
+
+/* Element design system: catalog glyphs are semantic identity; previews/3D may vary by vendor. */
+.equipment-catalog-search { display:flex;align-items:center;gap:7px;margin:8px 9px;padding:0 8px;height:30px;border:1px solid var(--line);border-radius:7px;background:var(--bg); }
+.equipment-catalog-search svg { width:13px;height:13px;color:var(--muted); }
+#equipment-search { width:100%;min-width:0;border:0;outline:0;background:transparent;color:var(--text);font-size:11px; }
+#equipment-search::placeholder { color:var(--muted); }
+.equipment-catalog-list { max-height:52%;overflow:auto;padding:0 7px 8px; }
+.equipment-catalog-group h3,.catalog-scene-heading { margin:0;padding:10px 7px 5px;color:var(--muted);font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase; }
+.shell .equipment-catalog-item { width:100%;min-height:44px;display:flex;align-items:center;gap:10px;padding:7px 8px;text-align:left;color:var(--text); }
+.equipment-catalog-item>span { min-width:0;display:grid;gap:3px; }
+.equipment-catalog-item strong { overflow:hidden;text-overflow:ellipsis;font-size:11px;font-weight:550; }
+.equipment-catalog-item small { overflow:hidden;text-overflow:ellipsis;color:var(--muted);font:9px/1.2 var(--mono);white-space:nowrap; }
+.equipment-glyph { width:26px;height:26px;flex:0 0 26px;color:var(--muted); }
+.equipment-catalog-item:hover .equipment-glyph { color:var(--accent); }
+.catalog-fallback { padding:8px 9px;border-top:1px solid var(--line);grid-template-columns:1fr auto; }
+.catalog-fallback select { height:30px;padding:4px 6px; }
+.catalog-fallback button { font-size:10px; }
+.catalog-scene-heading { border-top:1px solid var(--line);padding-inline:13px; }
+.equipment-tree-glyph { width:20px!important;display:inline-flex;justify-content:center; }
+.equipment-tree-glyph .equipment-glyph { width:17px;height:17px; }

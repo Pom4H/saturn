@@ -10,6 +10,7 @@ import { compile, patchFields, editable, appendEquipment, appendConnection, appe
 import { catalog, type Endpoint, type Value } from '../src/core';
 import { dslCompletions } from '../src/completion';
 import { SceneView } from '../src/view';
+import { createGlyphSvg } from '../src/elements/symbols';
 import '../src/visual-components';
 import type { SceneView3D } from '../src/view3d';
 import { examples, emptySource, createWorkspace, parseWorkspace, currentDocument, updateSource, createProject, workspaceKey, type ExampleId, type WorkspaceState } from './shell-projects';
@@ -243,7 +244,7 @@ export async function mountStudio() {
     errors: new Set(errorPath ? [errorPath] : []),
     title: serverRevision ? plant?.project.title ?? 'Серверный проект' : currentDocument(workspace).title,
   }), openFile);
-  async function ensurePlant() { plantTools ??= await import('./plant-project'); }
+  async function ensurePlant() { if(!plantTools){ plantTools=await import('./plant-project'); renderEquipmentCatalog(); } }
   function openFile(path: string, pinned = false, show = true) {
     documents.capture(editor.state); editor.setState(documents.open(path, pinned));
     if (show) { codeVisible = true; mobilePane = 'source'; if (surface !== 'scene') setSurface('scene'); }
@@ -378,6 +379,7 @@ export async function mountStudio() {
   };
   document.querySelectorAll<HTMLButtonElement>('[data-shell-action]').forEach(button => button.onclick = () => { $(button.dataset.shellAction!).click(); button.closest('details')!.open = false; });
   function showFiles(toggle = false) { filesVisible = surface !== 'scene' || !toggle || !filesVisible; if (surface !== 'scene') setSurface('scene'); syncPanels(); saveLayout(); }
+  $('equipment-search').oninput=()=>renderEquipmentCatalog();
   $('files-toggle').onclick = () => showFiles(true);
   $('files-close').onclick = () => { filesVisible = false; syncPanels(); saveLayout(); };
 
@@ -526,11 +528,33 @@ export async function mountStudio() {
     try { editor.dispatch({ changes: removeObject(editor.state.doc.toString(), selected), annotations: isolateHistory.of('full'), userEvent: 'delete' }); }
     catch (e) { toast(e instanceof Error ? e.message : String(e)); }
   }
+  const categoryTitle:Record<string,string>={process:'Process',instrumentation:'Instrumentation',electrical:'Electrical',mechanical:'Mechanical',control:'Control',structure:'Structure',generic:'Other'};
+  function renderEquipmentCatalog() {
+    const select=$<HTMLSelectElement>('studio-catalog'), host=$('equipment-catalog-list'), query=$<HTMLInputElement>('equipment-search').value.trim().toLocaleLowerCase();
+    const previous=select.value; select.replaceChildren(); host.replaceChildren();
+    const entries=Object.entries(catalog).filter(([,definition])=>!query || (definition.label+' '+definition.visual?.geometry).toLocaleLowerCase().includes(query));
+    const groups=new Map<string,typeof entries>();
+    for(const entry of entries){const category=entry[1].visual?.category??'generic';const list=groups.get(category)??[];list.push(entry);groups.set(category,list);}
+    for(const [category,items] of groups){
+      const section=document.createElement('section');section.className='equipment-catalog-group';
+      const heading=document.createElement('h3');heading.textContent=categoryTitle[category]??category;section.append(heading);
+      for(const [kind,definition] of items.sort((a,b)=>a[1].label.localeCompare(b[1].label))){
+        const option=document.createElement('option');option.value=kind;option.textContent=definition.label;select.append(option);
+        const button=document.createElement('button');button.type='button';button.className='equipment-catalog-item';button.dataset.catalogKind=kind;
+        button.append(createGlyphSvg(document,definition.visual?.glyph??'generic.element','equipment-glyph'));
+        const copy=document.createElement('span'),title=document.createElement('strong'),meta=document.createElement('small');
+        title.textContent=definition.label;meta.textContent=definition.visual?.geometry??kind;copy.append(title,meta);button.append(copy);
+        button.onclick=()=>{select.value=kind;$('studio-add').click();};section.append(button);
+      }
+      host.append(section);
+    }
+    if(previous&&[...select.options].some(o=>o.value===previous))select.value=previous;
+  }
   function renderTree() {
     const tree = $('studio-tree'); tree.replaceChildren();
     for (const node of compiled.scene.nodes) {
       const button = document.createElement('button'); button.dataset.id = node.id;
-      const icon = document.createElement('span'); icon.textContent = ({ tank: '▥', pump: '◉', valve: '⋈', flowmeter: '⊙', outlet: '↗', exchanger: '▥' } as Record<string, string>)[node.kind] ?? '◇';
+      const icon=document.createElement('span');icon.className='equipment-tree-glyph';icon.append(createGlyphSvg(document,catalog[node.kind]?.visual?.glyph??'generic.element','equipment-glyph'));
       const label = document.createElement('span'); label.textContent = node.id;
       button.append(icon, label); button.title = catalog[node.kind]?.label ?? node.kind; button.onclick = () => select(node.id); tree.append(button);
     }
@@ -841,6 +865,7 @@ export async function mountStudio() {
   window.addEventListener('beforeunload', event => { if (serverRevision && documents.dirty() || serverDraft?.documents.dirty()) { event.preventDefault(); event.returnValue = ''; } });
   try { const layout = JSON.parse(localStorage.getItem('saturn.shell.layout.v1') ?? '{}'); filesVisible = layout.filesVisible === true; if (typeof layout.codeVisible === 'boolean') codeVisible = layout.codeVisible; if (/^\d+(\.\d+)?px$/.test(layout.navigatorWidth ?? '')) shell.style.setProperty('--navigator-width', layout.navigatorWidth); if (/^\d+(\.\d+)?px$/.test(layout.sourceWidth ?? '')) shell.style.setProperty('--source-width', layout.sourceWidth); } catch {}
   if (isPlant()) await ensurePlant();
+  renderEquipmentCatalog();
   view.render(compiled.scene); refresh(false); fitScene(); updatePause(); renderMeta();
   message(storageAvailable ? '' : 'Хранилище недоступно');
   try {

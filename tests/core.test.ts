@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { compile, patchFields, applyChanges, editable, removeObject, appendEquipment, appendConnection, appendTap, formatSource } from '../src/source';
 import { catalog, simulate, worldPort, pump, valve, connect } from '../src/core';
 import { layout, segmentClear, bounds } from '../src/geometry';
+import { deriveSchematicProjection, defineElementPack } from '../src/elements/model';
+import { registry as elementRegistry } from '../src/elements/core-elements';
+import { getGlyph } from '../src/elements/symbols';
 import { booster, twin, empty } from '../src/examples';
 const patch = (s: string, id: string, props: Record<string, string | number | boolean>) => applyChanges(s, patchFields(s,id,props));
 test('initial scene: eight nodes, five connections, two taps', () => {
@@ -112,4 +115,18 @@ test('obstruction is reported, never silently marked correct',()=>{
 
 test('short tap section reports an explicit placement warning without detaching pipes',()=>{
  const c=compile(patch(booster,'HX-101',{x:1080,y:380})).scene; const g=layout(c); assert(g.warnings.some(w=>w.startsWith('TT-101:'))); assert([...g.routes.values()].every(r=>r.valid));
+});
+
+test('element system derives 2D ports from canonical 3D semantics', () => {
+  const definition=elementRegistry.get('process.pump.centrifugal');
+  const projection=deriveSchematicProjection(definition,{}, {width:220,height:170,padding:12});
+  assert.equal(projection.ports.IN.direction,'left');
+  assert.equal(projection.ports.OUT.direction,'up');
+  assert.equal(projection.ports.IN.x,0);
+  assert.equal(projection.ports.OUT.y,0);
+  assert.equal(getGlyph(definition.visual.glyph).id,'process.pump.centrifugal');
+});
+test('element packs require stable geometry and glyph identity', () => {
+  const pack=defineElementPack({id:'@factory/equipment',version:'1.0.0',title:'Factory equipment',elements:[elementRegistry.get('process.filter.inline')]});
+  assert.equal(pack.elements[0].visual.geometry,'process.filter.inline');
 });
