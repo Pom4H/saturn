@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "api/edge.ts": { "maxDuration": 1800 },
-    "api/plant/api/[action].ts": { "maxDuration": 1800 }
+    "api/plant/api/*.ts": { "maxDuration": 1800 }
   },
   "rewrites": [
     { "source": "/plant/api/:action", "destination": "/api/plant/api/:action" }

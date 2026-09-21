@@ -80,7 +80,10 @@ export default async function handler(request: IncomingMessage, response: Server
         if (request.method === 'GET') {
             if (action === 'instance') {
                 site = await siteBySlug(slug) ?? site;
-                sendJson(response, 200, { ...publicInstance(site), actor: session.actor });
+                const instance = publicInstance(site);
+                if (typeof instance.instanceId !== 'string' || typeof instance.projectId !== 'string' || typeof instance.applied !== 'string' || typeof instance.runId !== 'string')
+                    throw httpError(409, 'Site has not connected to Saturn Cloud yet');
+                sendJson(response, 200, { ...instance, actor: session.actor });
                 return;
             }
             if (action === 'session') {
