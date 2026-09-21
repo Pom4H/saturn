@@ -19,7 +19,9 @@
     "onView:saturn.catalog",
     "onView:saturn.targets",
     "onCommand:saturn.openDiagram",
-    "onCommand:saturn.runServer"
+    "onCommand:saturn.runServer",
+    "onView:saturn.reports",
+    "onCommand:saturn.openReport"
   ],
   "contributes": {
     "viewsContainers": {
@@ -40,6 +42,10 @@
         {
           "id": "saturn.catalog",
           "name": "Equipment Catalog"
+        },
+        {
+          "id": "saturn.reports",
+          "name": "Reports"
         },
         {
           "id": "saturn.targets",
@@ -83,6 +89,10 @@
       {
         "command": "saturn.openTarget",
         "title": "Saturn: Open Target"
+      },
+      {
+        "command": "saturn.openReport",
+        "title": "Saturn: Open Report Preview"
       }
     ],
     "menus": {
@@ -112,6 +122,11 @@
         {
           "command": "saturn.openTarget",
           "when": "view == saturn.targets && viewItem == saturnTarget",
+          "group": "inline"
+        },
+        {
+          "command": "saturn.openReport",
+          "when": "view == saturn.reports && viewItem == saturnReport",
           "group": "inline"
         }
       ]
