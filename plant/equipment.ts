@@ -7,7 +7,7 @@ import { createPlantModel } from './visual3d';
 import { registerComponent, catalog, type Equipment, type Scene } from '../src/core';
 import { registerSvgRenderer, register3dRenderer, el, type SvgRendererContext } from '../src/view';
 import type { RuntimeFrame } from '../src/runtime/protocol';
-import { models } from './models';
+import { models, outputType, outputUnit } from './models';
 import { evaluate } from './kernel';
 import type { Project, Frame, Expr } from './types';
 const metalStroke = '#526f7a', water = '#10a6b5', fuel = '#d39b51';
@@ -106,8 +106,8 @@ export function installEquipment() {
             continue;
         installed.add(kind);
         if (!catalog[kind])
-            registerComponent(kind, { version: '1.0.0', label: spec.title, ...footprint(spec.visual), fields: { x: { label: 'X', scope: 'layout', default: 0 }, y: { label: 'Y', scope: 'layout', default: 0 } }, ports: Object.fromEntries(Object.entries(terminals(spec.visual)).map(([name,t])=>[name,{x:t.x,y:t.y,direction:t.side,role:t.role==='source'?'out':'in'}])), signals: Object.fromEntries(Object.entries(spec.outputs).map(([k, unit]) => [k, { label: k, unit, type: 'number' }])) });
-        registerSvgRenderer(kind, c => { shapes[spec.visual](c); if(spec.visual==='saturn')return; const key = Object.keys(spec.outputs)[0]; const text = el(c.root, 'text', { x: 75, y: 111, 'text-anchor': 'middle', 'font-family': 'ui-monospace,monospace', 'font-size': 15, fill: '#214d5f' }); c.onUpdate(dt => { const value = c.number(key, dt); text.textContent = value === null ? '—' : `${value.toFixed(2)} ${(spec.outputs as Record<string,string>)[key]}`; }); });
+            registerComponent(kind, { version: '1.0.0', label: spec.title, ...footprint(spec.visual), fields: { x: { label: 'X', scope: 'layout', default: 0 }, y: { label: 'Y', scope: 'layout', default: 0 } }, ports: Object.fromEntries(Object.entries(terminals(spec.visual)).map(([name,t])=>[name,{x:t.x,y:t.y,direction:t.side,role:t.role==='source'?'out':'in'}])), signals: Object.fromEntries(Object.entries(spec.outputs).map(([k, definition]) => [k, { label: k, unit: outputUnit(definition), type: outputType(definition) }])) });
+        registerSvgRenderer(kind, c => { shapes[spec.visual](c); if(spec.visual==='saturn')return; const key = Object.keys(spec.outputs)[0]; const text = el(c.root, 'text', { x: 75, y: 111, 'text-anchor': 'middle', 'font-family': 'ui-monospace,monospace', 'font-size': 15, fill: '#214d5f' }); c.onUpdate(dt => { const value = c.number(key, dt); text.textContent = value === null ? '—' : `${value.toFixed(2)} ${outputUnit(spec.outputs[key])}`; }); });
         register3dRenderer(kind, c => createPlantModel(c, spec.visual, Object.keys(spec.outputs)[0]));
     }
 }
