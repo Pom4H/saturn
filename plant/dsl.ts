@@ -5,7 +5,7 @@ import { AppError, id, signalRef as createSignalRef, type Expr, type System, typ
 import { reportSchemaFields, type ReportSchema } from './reporting';
 export { reportField, numberField, booleanField, textField, dateTimeField, reportSchema, reportColumn, excelColumn, asc, desc, excelSheet, workbook } from './reporting';
 export type { ReportFieldRef, ReportSchema } from './reporting';
-import { model, type builtInModels } from './models';
+import { model, outputType, outputUnit, type builtInModels } from './models';
 const simulationValue = Symbol('saturn.simulation');
 const controllerValue = Symbol('saturn.controller');
 
@@ -42,12 +42,15 @@ export interface ModelCatalog extends BuiltInModels {
 }
 type VisualOf<M> = M extends { visual: infer V extends PhysicalType } ? V : never;
 type PortsOf<M,ID extends string> = [VisualOf<M>] extends [never] ? {} : PortRefs<VisualOf<M>,ID>;
-type OutputUnit<M, K extends PropertyKey> = M extends { outputs: infer Outputs }
-    ? K extends keyof Outputs
-        ? Outputs[K] extends string ? Outputs[K] : string
-        : string
-    : string;
-type OutputValue<M, K extends PropertyKey> = OutputUnit<M, K> extends 'лог.' ? boolean : number;
+type OutputDefinition<M, K extends PropertyKey> = M extends { outputs: infer Outputs }
+    ? K extends keyof Outputs ? Outputs[K] : never
+    : never;
+type OutputUnit<M, K extends PropertyKey> = OutputDefinition<M, K> extends string
+    ? OutputDefinition<M, K>
+    : OutputDefinition<M, K> extends { unit: infer Unit extends string } ? Unit : string;
+type OutputValue<M, K extends PropertyKey> = OutputDefinition<M, K> extends { type: 'boolean' }
+    ? boolean
+    : OutputDefinition<M, K> extends { type: 'string' } ? string : number;
 
 export type SimRef<
     M = { outputs: {} },
@@ -78,7 +81,7 @@ export function simulation<const ID extends string, K extends keyof ModelCatalog
     const ports = physicalTypes().includes(spec.visual) ? portRefs(node.id as ID, spec.visual as VisualOf<ModelCatalog[K]>) : {} as PortsOf<ModelCatalog[K],ID>;
     return Object.assign(
         { id: node.id as ID, kind: String(kind), ports, [simulationValue]: node },
-        Object.fromEntries(Object.entries(spec.outputs).map(([k, unit]) => [k, createSignalRef(`${name}.${k}`, unit === 'лог.' ? 'boolean' : 'number', unit)])),
+        Object.fromEntries(Object.entries(spec.outputs).map(([k, definition]) => [k, createSignalRef(`${name}.${k}`, outputType(definition), outputUnit(definition))])),
     ) as SimRef<ModelCatalog[K], ID, K & string>;
 }
 export type DerivedRef<ID extends string = string, Unit extends string = string> = Derived & {
