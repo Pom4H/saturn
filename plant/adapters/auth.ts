@@ -33,7 +33,7 @@ export class Auth {
         }>('SELECT * FROM users WHERE id=?', [user])[0];
         const computed = scryptSync(password, row?.salt ?? 'missing-user-dummy-salt', 32);
         if (!row || !timingSafeEqual(computed, Buffer.from(row.hash, 'hex')))
-            throw new AppError('Invalid credentials', 401);
+            failCode('SATURN_PERMISSION',{role:'authenticated'},{user},{status:401});
         attempts.count = 0;
         const token = randomBytes(32).toString('base64url'), csrf = randomBytes(24).toString('base64url');
         this.store.db.exec('DELETE FROM sessions WHERE expires<?', [now]);
