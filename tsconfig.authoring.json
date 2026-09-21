@@ -4,17 +4,26 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "strict": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "skipLibCheck": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "paths": {
-      "@saturn/core": ["./packages/core/index.ts"]
+      "@saturn/core": [
+        "./packages/core/index.ts"
+      ]
     }
   },
   "include": [
     "plant/demo/**/*.ts",
     "plant/tests/sdk-types.ts",
     "packages/core/index.ts"
+  ],
+  "exclude": [
+    "plant/demo/files.ts"
   ]
 }
