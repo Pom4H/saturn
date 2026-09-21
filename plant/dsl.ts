@@ -1,8 +1,8 @@
 import type { Presentation, ViewNode } from './presentation';
 import { inputPins, type Controller, type PlcBlock } from './controller';
 import { portRefs, physicalTypes, type Endpoint, type Connection, type Attachment, type DynamicEndpoint, type PhysicalType, type PortRefs, type Terminal, type TerminalOf, type TypedEndpoint } from './ports';
-import { AppError, expressionInfo, expressionMetadata, id, signalRef as createSignalRef, type Expr, type OperationExpr, type SignalDimension, type SignalDimensionOf, type System, type Simulation, type Project, type Derived, type Device, type AlarmRule, type Report, type Layout, type HistoryPolicy, type Control, type Scalar, type SignalRef } from './types';
-import { failDiagnostic } from './diagnostics';
+import { expressionInfo, expressionMetadata, id, signalRef as createSignalRef, type Expr, type OperationExpr, type SignalDimension, type SignalDimensionOf, type System, type Simulation, type Project, type Derived, type Device, type AlarmRule, type Report, type Layout, type HistoryPolicy, type Control, type Scalar, type SignalRef } from './types';
+import { failCode } from './diagnostics';
 import { reportSchemaFields, type ReportSchema } from './reporting';
 export { reportField, numberField, booleanField, textField, dateTimeField, reportSchema, reportColumn, excelColumn, asc, desc, excelSheet, workbook } from './reporting';
 export type { ReportFieldRef, ReportSchema } from './reporting';
@@ -141,9 +141,9 @@ export function simulation<const ID extends string, K extends keyof ModelCatalog
         const expectedType = spec.inputTypes?.[input] ?? 'number';
         const expectedDimension = spec.inputDimensions?.[input] ?? 'unknown';
         if (actual.type !== expectedType)
-            failDiagnostic('SATURN_TYPE_VALUE', 'typing.valueTypeMismatch', { model: String(kind), input, expected: expectedType, actual: actual.type }, { model: String(kind), input, expectedType, actualType: actual.type });
+            failCode('SATURN_TYPE_VALUE',{model:String(kind),input,expected:expectedType,actual:actual.type},{model:String(kind),input,expectedType,actualType:actual.type});
         if (expectedDimension !== 'unknown' && actual.dimension !== 'unknown' && actual.dimension !== expectedDimension)
-            failDiagnostic('SATURN_TYPE_DIMENSION', 'typing.dimensionMismatch', { model: String(kind), input, expected: expectedDimension, actual: actual.dimension }, { model: String(kind), input, expectedDimension, actualDimension: actual.dimension });
+            failCode('SATURN_TYPE_DIMENSION',{model:String(kind),input,expected:expectedDimension,actual:actual.dimension},{model:String(kind),input,expectedDimension,actualDimension:actual.dimension});
     }
     const node: Simulation = { id: id(name), model: kind, system: options.system, parameters: { ...Object.fromEntries(Object.entries(spec.parameters).map(([k, v]) => [k, v.default])), ...options.parameters }, inputs: { ...spec.inputs, ...options.inputs }, layout: options.at, ...(options.history ? { history: options.history } : {}) };
     const ports = physicalTypes().includes(spec.visual) ? portRefs(node.id as ID, spec.visual as VisualOf<ModelCatalog[K]>) : {} as PortsOf<ModelCatalog[K],ID>;
@@ -175,7 +175,7 @@ export const equipment = (name: string, type: string, options: {
 export const alarm = (name: string, options: Omit<AlarmRule, 'id' | 'notify' | 'delay' | 'priority'> & Partial<Pick<AlarmRule, 'notify' | 'delay' | 'priority'>>): AlarmRule => ({ id: id(name), notify: true, delay: 1000, priority: 'warning', ...options });
 type AuthoredReport = Omit<Report, 'id' | 'notify' | 'signals' | 'schema'> & {
     signals: readonly SignalRef<string, Scalar, string>[];
-    schema?: ReportSchema<any>;
+    schema?: ReportSchema<Record<string, ReportFieldRef<'', unknown, string>>>;
     notify?: boolean;
 };
 export function report(name: string, options: AuthoredReport): Report {
@@ -199,7 +199,7 @@ export function project(name: string, options: Omit<Project, 'id' | 'version' | 
 }): Project {
     const simulations = options.simulations.map(ref => ref[simulationValue]);
     if (simulations.some(x => !x))
-        throw new AppError('project.simulations expects simulation() references');
+        failCode('SATURN_PROJECT_INVALID',{reason:'invalid'},{field:'simulations'});
     const controllers = (options.controllers ?? []).map(c => c[controllerValue]);
     const devices = options.devices ?? simulations.map(s => ({ id: s.id, type: model(s.model).visual, system: s.system, layout: s.layout, signals: Object.fromEntries(Object.keys(model(s.model).outputs).map(k => [k, signal(`${s.id}.${k}`)])) }));
     return { version: 1, id: id(name), stepMs: 100, seed: 1, history: { deadband: .001, maxInterval: 10000, retention: 86400000 }, ...options, simulations, controllers, devices: [...devices, ...controllers.map(c=>({id:c.id,type:'saturn',system:c.system,layout:c.layout,signals:Object.fromEntries([...Object.keys(c.outputs),'healthy','powered'].map(k=>[k,signal(`${c.id}.${k}`)]))}))], controls: (options.controls ?? []).map(c => c.control) };
@@ -211,7 +211,7 @@ export function bank<K extends keyof ModelCatalog>(prefix: string, kind: K, opti
     pitch: Layout;
 }): SimRef<ModelCatalog[K], string, K & string>[] {
     if (!Number.isInteger(options.count) || options.count < 1 || options.count > 128 || !Number.isInteger(options.columns) || options.columns < 1 || options.columns > 128)
-        throw new AppError('Invalid bank dimensions');
+        failCode('SATURN_PROJECT_INVALID',{reason:'range'},{field:'bank',count:options.count,columns:options.columns});
     return Array.from({ length: options.count }, (_, i) => simulation(`${prefix}${i + 1}`, kind, { ...options, at: { x: options.at.x + (i % options.columns) * options.pitch.x, y: options.at.y + Math.floor(i / options.columns) * options.pitch.y } }));
 }
 type NumericSignalKey<T> = {
@@ -223,9 +223,9 @@ export function aggregate<T extends SimRef, K extends NumericSignalKey<T>>(
     method: 'mean' | 'sum' | 'min' | 'max' = 'mean',
 ): OperationExpr<number, SignalDimensionOf<T[K]>> {
     if (!Array.isArray(items) || !items.length || items.length > 256)
-        throw new AppError('Aggregate needs a bounded non-empty equipment list');
+        failCode('SATURN_PROJECT_INVALID',{reason:'range'},{field:'aggregate.items',count:items.length});
     const args = items.map(item => { const node = item[simulationValue]; if (!model(node.model).outputs[output])
-        throw new AppError(`Unknown aggregate output: ${output}`); return signal(`${node.id}.${output}`); });
+        failCode('SATURN_DSL_UNKNOWN',{kind:'aggregateOutput',name:output},{model:node.model,output}); return signal(`${node.id}.${output}`); });
     return operation(method === 'mean' ? 'div' : method === 'sum' ? 'add' : method, method === 'mean' ? [operationNode('add', args), args.length] : args) as OperationExpr<number, SignalDimensionOf<T[K]>>;
 }
 const operationNode = (op: OperationExpr<number, SignalDimension>['op'], args: Expr[]): OperationExpr<number, SignalDimension> => operation(op, args);
@@ -257,7 +257,7 @@ export const pin=<const ID extends string>(name:ID):SignalRef<ID,number,'','unkn
 export function port<M,ID extends string,Kind extends string,P extends keyof PortsOf<M,ID>&string>(device:SimRef<M,ID,Kind>,name:P):PortsOf<M,ID>[P];
 export function port<ID extends string,O extends Record<string,Expr>,P extends keyof PortRefs<'saturn',ID>&string>(device:ControllerRef<ID,O>,name:P):PortRefs<'saturn',ID>[P];
 export function port(device:string|Device,name:string):DynamicEndpoint;
-export function port(device:string|SimRef|ControllerRef|Device,name:string):any {
+export function port(device:string|SimRef|ControllerRef|Device,name:string):Endpoint {
  const deviceId=typeof device==='string'?id(device):device.id;
  if(typeof device!=='string'&&'ports' in device&&device.ports&&Object.hasOwn(device.ports,name))return (device.ports as Record<string,Endpoint>)[name];
  return {device:deviceId,port:name};
