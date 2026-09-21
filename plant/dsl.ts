@@ -156,7 +156,7 @@ export function aggregate<T extends SimRef>(items: T[], output: Exclude<keyof T,
     throw new AppError('Unknown aggregate operation');
 }
 
-export type ControllerRef<ID extends string = string, O extends Record<string, Expr> = Record<string, Expr>> = {
+export type ControllerRef<ID extends string = string, O extends Record<string, Expr> = {}> = {
     readonly id: ID;
     readonly profile: 'saturn-fbd';
     readonly ports: PortRefs<'saturn',ID>;
