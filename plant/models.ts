@@ -21,7 +21,7 @@ const clamp = (x: number, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const approach = (x: number, to: number, dt: number, tau: number) => x + (to - x) * (1 - Math.exp(-dt / Math.max(.02, tau)));
 const installed = <const M>(m: M & Omit<ModelSpec, 'version'>): M & { version: string } => {
     const definition = { ...m, version: '1.0.0' } as M & { version: string };
-    registerModel(definition as ModelSpec);
+    registerModel(definition as unknown as ModelSpec);
     return definition;
 };
 const supply = installed({ kind: 'supply', title: 'Электропитание', visual: 'generator', inputs: {}, parameters: { voltage: p(1, 0, 1.5) }, outputs: { voltage: 'отн.' },
