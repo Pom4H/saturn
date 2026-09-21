@@ -89,6 +89,8 @@ dialog .primary { width: 100%; }
 .deploy-card code, .deploy-command code, .extension-install code, .extension-grid code, .target-provider code { font-family: var(--mono); font-size: 11px; color: var(--accent); }
 .deploy-command { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 12px; padding: 13px 16px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); font-size: 11px; }
 .deploy-command code { overflow-x: auto; white-space: nowrap; }
+.deploy-command a { color: var(--text); text-decoration: none; }
+.deploy-command a:hover { text-decoration: underline; }
 .extensions-intro { display: flex; justify-content: space-between; align-items: end; gap: 40px; }
 .extensions-intro .section-heading { margin-bottom: 0; }
 .extension-install { min-width: 330px; display: grid; gap: 7px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }

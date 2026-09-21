@@ -490,7 +490,7 @@ export async function mountStudio() {
     syncServerActions();
     documentTitle(); renderProjects();
   }
-  function documentTitle() { document.title = fullscreen ? `${(serverRevision || runtimeOnly ? plant?.project.title ?? serverSession?.project.title ?? 'Установка' : currentDocument(workspace).title)} — Saturn SCADA` : 'Saturn SCADA'; }
+  function documentTitle() { document.title = fullscreen ? `${(serverRevision || runtimeOnly ? plant?.project.title ?? serverSession?.project.title ?? 'Установка' : currentDocument(workspace).title)} — Saturn` : 'Saturn'; }
   function select(id: string | null) {
     if (id && id !== selected) propertiesVisible = true;
     if (!id) propertiesVisible = false;

@@ -129,7 +129,7 @@ export async function startPlantHttpServer(options: {
                 return;
             }
             if (path === `${prefix}/login` && req.method === 'GET') {
-                html(200, `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link rel="stylesheet" href="./assets/app.css"><title>SCADA · Вход</title></head><body class="login"><main><p class="eyebrow">SCADA / NODE.JS</p><h1>Вход на установку</h1><form id="login"><label>Пользователь<input name="user" autocomplete="username" required></label><label>Пароль<input name="password" type="password" autocomplete="current-password" required></label><button>Войти</button><p id="error" role="alert"></p></form><a href="./demo/">Открыть автономную демонстрацию</a></main><script src="./assets/login.js" type="module"></script></body></html>`);
+                html(200, `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link rel="stylesheet" href="./assets/app.css"><title>Saturn · Вход</title></head><body class="login"><main><p class="eyebrow">SATURN / NODE.JS</p><h1>Вход на установку</h1><form id="login"><label>Пользователь<input name="user" autocomplete="username" required></label><label>Пароль<input name="password" type="password" autocomplete="current-password" required></label><button>Войти</button><p id="error" role="alert"></p></form><a href="./demo/">Открыть автономную демонстрацию</a></main><script src="./assets/login.js" type="module"></script></body></html>`);
                 return;
             }
             if (path === `${prefix}/app/`) {

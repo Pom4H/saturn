@@ -110,7 +110,7 @@ saturn run ./pump-station
 saturn run ./pump-station --kiosk
 ```
 
-The standalone application is built once and opens projects at runtime. Windows, Linux and macOS targets are supported by the pack workflow.
+The standalone application is built once and opens projects at runtime. Portable Windows, Linux and macOS binaries plus SHA-256 checksums are attached to GitHub Releases; the same targets can be built locally with the pack workflow.
 
 The same project can also be used from the browser/PWA and from the native VS Code host. VS Code keeps TypeScript in the normal editor, Git in native SCM, diagnostics in Problems, project/catalog/targets in TreeViews and the mnemonic as a separate visual view.
 
