@@ -129,13 +129,18 @@ export default project('vscode-demo', {
 });
 '@ | Set-Content -Encoding UTF8 (Join-Path $workspace 'plant.ts')
 
-@'
+$manifestJson = @'
 {
   "version": 1,
   "entry": "plant.ts",
   "files": ["plant.ts"]
 }
-'@ | Set-Content -Encoding UTF8 (Join-Path $workspace 'scada.project.json')
+'@
+[System.IO.File]::WriteAllText(
+  (Join-Path $workspace 'scada.project.json'),
+  $manifestJson,
+  (New-Object System.Text.UTF8Encoding($false))
+)
 
 $file = Join-Path $workspace 'plant.ts'
 
