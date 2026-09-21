@@ -18,7 +18,7 @@ test('one DSL tree is shared by live HMI, report and the compiled controller scr
 });
 test('one canonical Presentation IR projects to web and the physical Saturn target',()=>{
  const p=project(),v=p.views![0];
- const values=bindPresentation(v,Object.fromEntries(Object.values(v.bindings).flatMap(expr=>'ref' in expr?[[expr.ref,{value:700,quality:'good' as const,time:0}]]:[])),0);
+ const values=bindPresentation(v,{},0);
  const web=projectPresentation(v,{target:'web',context:{values,interactive:true}});
  assert.equal(web.target,'web');assert.ok('html' in web);assert.match(web.html,/presentation/);
  const bindings=Object.fromEntries(Object.keys(v.bindings).map((name,index)=>[name,'projection_'+index]));
