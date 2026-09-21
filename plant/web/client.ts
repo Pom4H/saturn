@@ -1,4 +1,4 @@
-import type { Frame, Project, Actor, Revision, ReportArtifact, ReportData } from '../types';
+import type { Frame, Project, Actor, ReportArtifact, ReportData } from '../types';
 import type { SaturnErrorPayload } from '../diagnostics';
 
 export class SaturnClientError extends Error {
@@ -28,7 +28,8 @@ export interface RuntimeInstance {
     authority: 'runtime';
     actor: Actor;
     projectId: string;
-    head: string | null;
+    source: string | null;
+    build: string;
     published: string | null;
     applied: string;
     runId: string;
@@ -169,13 +170,13 @@ export class RemoteClient implements Connection {
         this.onFailure('Нет новых данных от сервера'); }, 2000); return status; }
     close() { this.stream?.close(); clearInterval(this.watchdog); }
 }
-export type { Frame, Project, Actor, Revision, ReportArtifact, ReportData };
+export type { Frame, Project, Actor, ReportArtifact, ReportData };
 
 
 /**
  * One engineering workspace + one live runtime.
  *
- * Project/revision writes stay on the authoring connection. Runtime commands,
+ * Workspace file writes stay on the authoring connection. Runtime commands,
  * history, alarms, reports and telemetry are routed to the operator Saturn.
  */
 export class LinkedClient implements Connection {
