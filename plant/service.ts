@@ -137,7 +137,7 @@ export class Service {
         return this.emit();
     }
 
-    async deploy(candidate: BuildArtifact, expected: string | null, actor: Actor) {
+    async deploy(candidate: unknown, expected: string | null, actor: Actor) {
         requireRole(actor, 'engineer');
         const artifact = await verifyBuildArtifact(candidate);
         this.store.putArtifact(artifact);
