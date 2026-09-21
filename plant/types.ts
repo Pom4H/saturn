@@ -9,9 +9,10 @@ export type Quality = 'good' | 'bad' | 'stale' | 'offline';
 declare const signalValueType: unique symbol;
 export type SignalRuntimeType = 'number' | 'boolean' | 'string';
 export type SignalValueForRuntime<Type extends SignalRuntimeType> = Type extends 'boolean' ? boolean : Type extends 'string' ? string : number;
-export interface SignalRef<ID extends string = string, Value extends Scalar = number, Unit extends string = string> {
+export interface RefExpr { readonly ref: string }
+export interface SignalRef<ID extends string = string, Value extends Scalar = number, Unit extends string = string> extends RefExpr {
     readonly ref: ID;
-    readonly [signalValueType]?: { value: Value; unit: Unit };
+    readonly [signalValueType]: { value: Value; unit: Unit };
 }
 export type SignalId<S> = S extends SignalRef<infer ID, Scalar, string> ? ID : never;
 export type SignalValueOf<S> = S extends SignalRef<string, infer Value, string> ? Value : never;
@@ -21,13 +22,13 @@ export const signalMetadata = Symbol('saturn.signal.metadata');
 export function signalRef<const ID extends string, const Type extends SignalRuntimeType, const Unit extends string>(ref: ID, type: Type, unit: Unit): SignalRef<ID, SignalValueForRuntime<Type>, Unit> {
     const value = { ref };
     Object.defineProperty(value, signalMetadata, { value: { type, unit }, enumerable: false, configurable: false, writable: false });
-    return value as SignalRef<ID, SignalValueForRuntime<Type>, Unit>;
+    return value as unknown as SignalRef<ID, SignalValueForRuntime<Type>, Unit>;
 }
 export function signalInfo(ref: SignalRef<string, Scalar, string>): SignalMetadata {
     return (ref as SignalRef<string, Scalar, string> & { [signalMetadata]?: SignalMetadata })[signalMetadata] ?? { type: 'number', unit: '' };
 }
 
-export type Expr = number | boolean | SignalRef<string, Scalar, string> | {
+export type Expr = number | boolean | RefExpr | {
     op: 'add' | 'mul' | 'sub' | 'div' | 'min' | 'max' | 'gt' | 'lt' | 'not' | 'and';
     args: Expr[];
 };
