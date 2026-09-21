@@ -27,8 +27,8 @@ try {
 
   await page.waitForSelector('#studio-spatial canvas', { state: 'attached' });
   assert.equal(await page.locator('h1').innerText(), 'Saturn');
-  assert.equal(await page.locator('.capability-row').count(), 4);
-  assert.equal(await page.locator('.deploy-row').count(), 6);
+  assert.equal(await page.locator('.capability-row').count(), 5);
+  assert.equal(await page.locator('.distribution-item').count(), 6);
   assert.equal(await page.locator('.extension-index > div').count(), 6);
 
   await page.locator('#studio-2d').click();
@@ -49,7 +49,7 @@ try {
     status,
     revision: expectedRevision,
     passed: true,
-    checks: ['Saturn landing', 'feature/deployment/extension sections', 'real 2D scene', 'base-path-safe PWA', 'mobile layout', 'no page errors'],
+    checks: ['Saturn landing', 'model/release/extension/distribution sections', 'real 2D scene', 'base-path-safe PWA', 'mobile layout', 'no page errors'],
   };
   await writeFile('live-check/result.json', JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));

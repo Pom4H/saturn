@@ -107,65 +107,59 @@
     </div>
   </section>
   <section class="product-summary" aria-labelledby="capabilities-title">
-    <div class="section-kicker">SATURN / PROJECT MODEL</div>
     <div class="section-split">
       <div class="section-heading">
-        <h2 id="capabilities-title">Один проект описывает объект целиком.</h2>
-        <p>Исходник не заканчивается на мнемосхеме. Та же модель живёт в редакторе, runtime, HMI, истории, отчётах и deployment.</p>
+        <h2 id="capabilities-title">Проект — это модель объекта, а не файл мнемосхемы.</h2>
+        <p>Оборудование, topology, сигналы и поведение остаются в обычном TypeScript. Saturn строит из этой модели разные рабочие представления, не создавая параллельный формат.</p>
       </div>
-      <div class="capability-index" aria-label="Возможности Saturn">
-        <div class="capability-row"><span>01</span><strong>Model</strong><p>TypeScript DSL · оборудование · типизированные сигналы и единицы · 2D / 3D · visual ↔ source</p></div>
-        <div class="capability-row"><span>02</span><strong>Runtime</strong><p>live telemetry · controls · alarms · historian · replay · simulation · fail-closed</p></div>
-        <div class="capability-row"><span>03</span><strong>Presentation</strong><p>operator HMI · reports · A4 · charts · canonical Presentation IR · PLC 320×240 projection</p></div>
-        <div class="capability-row"><span>04</span><strong>Delivery</strong><p>Git revisions · PWA · standalone · VS Code · signed update protocol</p></div>
+      <div class="projection-tree" aria-label="Проекции одного Saturn проекта">
+        <div class="projection-source"><span>source</span><strong>plant.ts</strong><code>@saturn/core</code></div>
+        <div class="projection-branches" aria-hidden="true"></div>
+        <div class="capability-row"><span>01</span><strong>Diagram</strong><p>2D / 3D · visual ↔ source · equipment · topology</p></div>
+        <div class="capability-row"><span>02</span><strong>Runtime</strong><p>telemetry · controls · alarms · historian · replay</p></div>
+        <div class="capability-row"><span>03</span><strong>Operator HMI</strong><p>live state · commands · navigation · Presentation IR</p></div>
+        <div class="capability-row"><span>04</span><strong>Reports</strong><p>history queries · tables · charts · A4 · schedules</p></div>
+        <div class="capability-row"><span>05</span><strong>PLC targets</strong><p>bindings · 320×240 projection · target providers</p></div>
       </div>
     </div>
   </section>
 
-  <section class="deploy-section" aria-labelledby="deploy-title">
-    <div class="section-kicker">RUN ANYWHERE</div>
-    <div class="section-split deploy-split">
-      <div class="section-heading">
-        <h2 id="deploy-title">Один формат проекта.<br>Разные роли Saturn.</h2>
-        <p>Редактор на ноутбуке инженера, runtime на объекте, HMI у оператора или сервер — без конвертации проекта и параллельных моделей.</p>
-      </div>
-      <div class="deploy-console">
-        <div class="deploy-console-head"><span>surface</span><span>runtime</span></div>
-        <div class="deploy-row"><code>browser</code><div><strong>Browser / PWA</strong><span>installable · offline</span></div><span>web</span></div>
-        <div class="deploy-row"><code>standalone</code><div><strong>Portable Saturn</strong><span>Windows · Linux · macOS</span></div><span>binary</span></div>
-        <div class="deploy-row"><code>operator</code><div><strong>Operator / kiosk</strong><span>saturn run ./plant --kiosk</span></div><span>HMI</span></div>
-        <div class="deploy-row"><code>server</code><div><strong>Server</strong><span>Bun · SQLite · auth · SSE · history · reports</span></div><span>runtime</span></div>
-        <div class="deploy-row"><code>vscode</code><div><strong>VS Code</strong><span>editor · Problems · Git SCM · visual view</span></div><span>host</span></div>
-        <div class="deploy-row"><code>production</code><div><strong>Git-managed production</strong><span>main → production → applied</span></div><span>deploy</span></div>
-        <div class="deploy-actions">
-          <a href="https://github.com/Pom4H/saturn/releases/latest" target="_blank" rel="noopener">Download binaries ↗</a>
-          <code>npm run saturn -- pack --target windows-x64</code>
-        </div>
-      </div>
+  <section class="lifecycle-section" aria-labelledby="lifecycle-title">
+    <div class="section-heading lifecycle-heading">
+      <h2 id="lifecycle-title">Source, published и applied — разные состояния.</h2>
+      <p>Новая инженерная ревизия не должна незаметно стать работающей конфигурацией. Saturn показывает переход до runtime явно.</p>
     </div>
+    <div class="release-flow" aria-label="Жизненный цикл Saturn проекта">
+      <article><span>01</span><small>SOURCE</small><strong>HEAD</strong><p>Инженер редактирует обычные файлы. Git хранит историю и review.</p></article>
+      <i>→</i>
+      <article><span>02</span><small>PUBLISHED</small><strong>production</strong><p>Ревизия выбрана для установки после validation / CI.</p></article>
+      <i>→</i>
+      <article><span>03</span><small>APPLIED</small><strong>Plant-01</strong><p>Runtime работает на конкретной проверенной ревизии.</p></article>
+    </div>
+    <div class="release-invariant"><code>invalid published ≠ applied</code><p>Если новая ревизия невалидна, последняя рабочая конфигурация продолжает работать.</p></div>
   </section>
 
   <section class="extensions-section" aria-labelledby="extensions-title">
-    <div class="section-kicker">EXTENSION API</div>
     <div class="section-heading extensions-heading">
-      <h2 id="extensions-title">Если Saturn не знает ваше оборудование — научите его.</h2>
-      <p>Расширение добавляет предметную семантику в существующую модель, а не создаёт второй продукт рядом.</p>
+      <h2 id="extensions-title">Если Saturn не знает ваше оборудование — расширьте его доменную модель.</h2>
+      <p>Extension — обычный self-contained npm package с явным Saturn manifest. Installer проверяет sha512 и не запускает lifecycle scripts.</p>
     </div>
     <div class="extensions-layout">
-      <div class="extension-code" aria-label="Пример расширения Saturn">
-        <div class="code-window-head"><span>factory-extension.ts</span><span>@factory/equipment</span></div>
-        <pre><code><span class="code-muted">import</span> { defineExtension } <span class="code-muted">from</span> "@saturn/core"
-
-<span class="code-muted">export default</span> defineExtension({
-  capabilities: [
-    <b>"elements"</b>,
-    <b>"protocol"</b>,
-    <b>"datasource"</b>,
-    <b>"panel"</b>,
-    <b>"report"</b>,
-    <b>"command"</b>
-  ]
-})</code></pre>
+      <div class="extension-code" aria-label="Реальный контракт расширения Saturn">
+        <div class="code-window-head"><span>package.json</span><span>@factory/equipment</span></div>
+        <pre><code>{
+  <span class="code-muted">"name"</span>: "@factory/equipment",
+  <span class="code-muted">"version"</span>: "1.0.0",
+  <b>"saturn"</b>: {
+    <span class="code-muted">"api"</span>: 1,
+    <span class="code-muted">"entry"</span>: "dist/index.js",
+    <span class="code-muted">"capabilities"</span>: [
+      "elements", "protocol",
+      "datasource", "panel",
+      "report", "command"
+    ]
+  }
+}</code></pre>
         <div class="extension-install-line"><span>$</span><code>saturn extension add @factory/equipment</code></div>
       </div>
       <div class="extension-index">
@@ -186,6 +180,22 @@
       <p>TIA / CODESYS / WinCC import · Timescale / Influx · MQTT / webhooks · commissioning packs · simulation packs · OIDC / LDAP</p>
       <a href="https://github.com/Pom4H/saturn/blob/main/docs/adr/0002-extension-packages.md" target="_blank" rel="noopener">API ↗</a>
     </div>
+  </section>
+
+  <section class="distribution-section" aria-labelledby="distribution-title">
+    <div class="distribution-head">
+      <div><h2 id="distribution-title">Один Saturn. Нужная роль на нужной машине.</h2><p>Формат проекта не меняется между инженерной и эксплуатационной средой.</p></div>
+      <a href="https://github.com/Pom4H/saturn/releases/latest" target="_blank" rel="noopener">Download ↗</a>
+    </div>
+    <div class="distribution-list">
+      <span class="distribution-item"><strong>Browser / PWA</strong><small>installable · offline</small></span>
+      <span class="distribution-item"><strong>Standalone</strong><small>Windows · Linux · macOS</small></span>
+      <span class="distribution-item"><strong>Operator</strong><small>kiosk HMI</small></span>
+      <span class="distribution-item"><strong>Server</strong><small>Bun · SQLite · SSE</small></span>
+      <span class="distribution-item"><strong>VS Code</strong><small>native host</small></span>
+      <span class="distribution-item"><strong>Production</strong><small>Git-managed</small></span>
+    </div>
+    <div class="distribution-command"><span>$</span><code>npm run saturn -- pack --target windows-x64</code></div>
   </section>
 
   <footer class="site-footer">
