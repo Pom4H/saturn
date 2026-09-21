@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { panel, label, readout, view, pin, block, functionBlock, dataTable, commandButton } from '../dsl';
 import { bindPresentation, renderPresentation, validatePresentation } from '../presentation';
-import { presentationHmi } from '../presentation-hmi';
+import { projectPresentation, presentationTargets } from '../presentation-target';
 import { ControllerVM, compileController } from '../controller';
 import { Kernel } from '../kernel';
 import { compileProject, validateProject } from '../compiler';
@@ -15,6 +15,16 @@ test('one DSL tree is shared by live HMI, report and the compiled controller scr
  const p=project(),v=p.views![0];assert.deepEqual(v.body,p.reports.find(r=>r.id==='bench-state')!.view!.body);
  assert.deepEqual(v.body,p.controllers![0].hmi.view!.body);
  const vm=new ControllerVM(p.controllers![0]),result=vm.scan({AI1:700},100);assert.equal(result.outputs.DO1,1);assert.ok(result.hmi.some(c=>c.type==='text'&&c.text==='700'));
+});
+test('one canonical Presentation IR projects to web and the physical Saturn target',()=>{
+ const p=project(),v=p.views![0];
+ const values=bindPresentation(v,Object.fromEntries(Object.values(v.bindings).flatMap(expr=>'ref' in expr?[[expr.ref,{value:700,quality:'good' as const,time:0}]]:[])),0);
+ const web=projectPresentation(v,{target:'web',context:{values,interactive:true}});
+ assert.equal(web.target,'web');assert.ok('html' in web);assert.match(web.html,/presentation/);
+ const bindings=Object.fromEntries(Object.keys(v.bindings).map((name,index)=>[name,'projection_'+index]));
+ const physical=projectPresentation(v,{target:'saturn-plc-320',bindings});
+ assert.equal(physical.target,'saturn-plc-320');assert.ok('screen' in physical);assert.equal(physical.screen.id,v.id);
+ assert.deepEqual(presentationTargets['saturn-plc-320'],{width:320,height:240,interactive:true});
 });
 test('presentation escapes content, preserves bad quality and disables commands in report mode',()=>{
  const v=view('escape',{title:'Example',bindings:{a:pin('value')},body:panel([label('<script>x</script>'),readout('X','a'),commandButton('Start','control',1)])});
@@ -31,8 +41,8 @@ test('report presentation binds only the frozen data capsule, excluding samples 
  const result=executeReport(task,new NodeSql());assert.match(result.html,/>321</);assert.ok(!result.html.includes('>999<'));
 });
 test('target-specific unsupported widgets and display overflow fail explicitly',()=>{
- const v=view('small',{title:'Small',bindings:{},body:dataTable([{key:'x',title:'X'}])});assert.throws(()=>presentationHmi(v,{}),/does not support/);
- v.body=panel(Array.from({length:12},()=>label('A')));assert.throws(()=>presentationHmi(v,{}),/320x240/);
+ const v=view('small',{title:'Small',bindings:{},body:dataTable([{key:'x',title:'X'}])});assert.throws(()=>projectPresentation(v,{target:'saturn-plc-320',bindings:{}}),/does not support/);
+ v.body=panel(Array.from({length:12},()=>label('A')));assert.throws(()=>projectPresentation(v,{target:'saturn-plc-320',bindings:{}}),/320x240/);
 });
 test('view reference errors and unauthorized command ranges are compile-time errors',()=>{
  const p=project();p.views![0].bindings.input=pin('missing.signal');assert.throws(()=>validateProject(p),/Unknown signal/);
