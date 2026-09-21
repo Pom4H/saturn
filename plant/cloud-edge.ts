@@ -68,11 +68,13 @@ function endpoint(options: CloudEdgeOptions): string {
     if (options.token.length < 32 || options.token.length > 512)
         throw new Error('SATURN_CLOUD_TOKEN is invalid');
     const url = new URL(options.url);
-    if (!['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol) || url.username || url.password || url.hash)
+    if (!['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol) || url.username || url.password || url.hash || url.search || (url.pathname && url.pathname !== '/'))
         throw new Error('SATURN_CLOUD_URL must be an HTTP(S) or WS(S) origin');
+    const loopback = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1';
+    if ((url.protocol === 'http:' || url.protocol === 'ws:') && !loopback)
+        throw new Error('SATURN_CLOUD_URL must use HTTPS/WSS outside loopback development');
     url.protocol = url.protocol === 'http:' || url.protocol === 'ws:' ? 'ws:' : 'wss:';
     url.pathname = '/api/edge';
-    url.search = '';
     return url.toString();
 }
 
@@ -94,7 +96,7 @@ export class CloudEdge {
     private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
     private unsubscribe: (() => void) | undefined;
     private latestFrame: Frame | null = null;
-    private sentSeq = -1;
+    private sentFrameKey = '';
     private sentProjectRevision = '';
     private readonly target: string;
 
@@ -202,17 +204,18 @@ export class CloudEdge {
             project: this.service.project,
             frame,
         })) {
-            this.sentSeq = frame.seq;
+            this.sentFrameKey = `${frame.runId}:${frame.seq}`;
             this.sentProjectRevision = frame.revision;
         }
     }
 
     private flushFrame(): void {
         const frame = this.latestFrame;
-        if (!frame || frame.seq === this.sentSeq) return;
-        if (this.send({ type: 'frame', frame })) {
-            this.sentSeq = frame.seq;
-        }
+        if (!frame) return;
+        const key = `${frame.runId}:${frame.seq}`;
+        if (key === this.sentFrameKey) return;
+        if (this.send({ type: 'frame', frame }))
+            this.sentFrameKey = key;
     }
 
     private async heartbeat(): Promise<void> {

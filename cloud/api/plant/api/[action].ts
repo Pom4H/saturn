@@ -51,6 +51,10 @@ export default async function handler(request: IncomingMessage, response: Server
         if (action === 'login' && request.method === 'POST') {
             const input = await readJson(request);
             const mode = input.mode === 'bearer';
+            const transport = requestUrl(request);
+            const loopback = transport.hostname === 'localhost' || transport.hostname === '127.0.0.1' || transport.hostname === '::1';
+            if (mode && transport.protocol !== 'https:' && !loopback)
+                throw httpError(400, 'Bearer login requires HTTPS');
             const session = await login(
                 site,
                 stringValue(input.user, 'user'),
@@ -69,7 +73,7 @@ export default async function handler(request: IncomingMessage, response: Server
                     actor: session.actor,
                     csrf: session.csrf,
                 }, {
-                    'Set-Cookie': `saturn_cloud_session=${encodeURIComponent(session.token)}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=28800`,
+                    'Set-Cookie': `saturn_cloud_session=${encodeURIComponent(session.token)}; HttpOnly${transport.protocol === 'https:' ? '; Secure' : ''}; SameSite=Strict; Path=/; Max-Age=28800`,
                 });
             }
             return;
@@ -149,7 +153,7 @@ export default async function handler(request: IncomingMessage, response: Server
             if (action === 'logout') {
                 await logout(session);
                 sendJson(response, 200, { ok: true }, {
-                    'Set-Cookie': 'saturn_cloud_session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0',
+                    'Set-Cookie': `saturn_cloud_session=; HttpOnly${requestUrl(request).protocol === 'https:' ? '; Secure' : ''}; SameSite=Strict; Path=/; Max-Age=0`,
                 });
                 return;
             }

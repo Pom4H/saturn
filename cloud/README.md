@@ -109,7 +109,8 @@ saturn run ./project
 ```
 
 The connection is outbound only. No public plant IP, inbound port forwarding or
-plant TLS certificate is required for Cloud connectivity.
+plant TLS certificate is required for Cloud connectivity. Edge requires HTTPS/WSS
+for non-loopback Cloud URLs; plaintext WebSocket is accepted only for local development.
 
 When Cloud is absent or unreachable, Saturn keeps running locally and reconnects
 with exponential backoff.
