@@ -122,19 +122,25 @@ export async function checkTelemetry(browser) {
     await page.waitForFunction(seq => Number(document.getElementById('studio-shell')?.dataset.runtimeSeq) === seq, frame.seq);
     await assertSignal(frame.samples[direct.expression.ref]);
 
-    // Stop the actual server: the browser must invalidate values, not keep stale green readings.
+    // Stop the actual server: retain the last confirmed frame as stale,
+    // but fail closed for every operator command until authoritative telemetry returns.
+    const beforeLoss = await readSignal();
     const port = Number(new URL(app.origin).port);
     await app.close(); app = undefined;
-    await page.waitForFunction(() => document.getElementById('studio-shell')?.dataset.telemetry === 'offline', undefined, { timeout: 15000 });
-    assert.equal(await page.locator('#studio-svg [data-node][data-mode="simulation"]').count(), 0);
-    assert.equal((await readSignal())?.text?.trim(), '—', 'Server loss removes valid numeric values');
+    await page.waitForFunction(() => document.getElementById('studio-shell')?.dataset.telemetry === 'stale', undefined, { timeout: 15000 });
+    assert.equal(await page.locator('#studio-svg [data-node][data-mode="stale"]').count(), initial.project.devices.length);
+    const stale = await readSignal();
+    assert.equal(stale?.text?.trim(), beforeLoss?.text?.trim(), 'Server loss preserves the last confirmed numeric value');
+    assert.match(stale?.source ?? '', /stale/i, 'The retained value must be visibly marked stale');
+    await page.locator('[data-shell-view="controls"]').first().click();
+    assert.equal(await page.locator('.runtime-control-edit button:not([disabled])').count(), 0, 'Commands are disabled while telemetry is stale');
     app = await startPlantServer({ port, data: join(directory, 'db.sqlite'), repository: join(directory, 'project.git'), password, autoTick: false });
     await page.waitForFunction(() => document.getElementById('studio-shell')?.dataset.telemetry === 'live', undefined, { timeout: 15000 });
     frame = app.service.tick();
     await page.waitForFunction(seq => Number(document.getElementById('studio-shell')?.dataset.runtimeSeq) === seq, frame.seq);
     await assertSignal(frame.samples[direct.expression.ref]);
     assert.deepEqual(errors, [], 'Telemetry lifecycle must not produce unhandled browser errors');
-    console.log('PASS: real authenticated SSE, deterministic simulation ticks, shared 2D/3D sequence, real signal values, pause/resume, draft and revision isolation, server-loss invalidation.');
+    console.log('PASS: real authenticated SSE, deterministic ticks, shared 2D/3D sequence, pause/resume, draft/revision isolation, stale last-known values, fail-closed controls and reconnect.');
   } finally {
     await context?.close();
     await app?.close();
