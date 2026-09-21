@@ -28,6 +28,7 @@ export function compileProject(files: Record<string, string>, entry = 'plant.ts'
     const cache = new Map<string, Record<string, unknown>>(), visiting = new Set<string>();
     let steps = 0;
     const builtins = Object.fromEntries(Object.entries(dsl).filter(([, v]) => typeof v === 'function'));
+    const builtinFunctions = new Set<unknown>(Object.values(builtins));
     function module(path: string): Record<string, unknown> {
         if (cache.has(path))
             return cache.get(path)!;
@@ -117,7 +118,7 @@ export function compileProject(files: Record<string, string>, entry = 'plant.ts'
                 return result;
             }
             if (ts.isObjectLiteralExpression(n)) {
-                const out = Object.create(null);
+                const out: Record<string, unknown> = Object.create(null);
                 for (const p of n.properties) {
                     if (ts.isPropertyAssignment(p)) {
                         const k = key(p.name);
@@ -146,7 +147,7 @@ export function compileProject(files: Record<string, string>, entry = 'plant.ts'
                 const o = ev(n.expression), k = n.name.text;
                 if (!o || typeof o !== 'object' || reserved.has(k) || !own(o, k))
                     return fail(n,'unknown',{field:k});
-                return o[k];
+                return (o as Record<string, unknown>)[k];
             }
             if (ts.isElementAccessExpression(n)) {
                 if (!n.argumentExpression || !ts.isStringLiteral(n.argumentExpression))
@@ -154,14 +155,14 @@ export function compileProject(files: Record<string, string>, entry = 'plant.ts'
                 const o = ev(n.expression), k = n.argumentExpression.text;
                 if (!o || typeof o !== 'object' || reserved.has(k) || !own(o, k))
                     return fail(n,'unknown',{field:k});
-                return o[k];
+                return (o as Record<string, unknown>)[k];
             }
             if (ts.isCallExpression(n) && ts.isIdentifier(n.expression)) {
                 const fn = scope[n.expression.text];
-                if (typeof fn !== 'function' || !Object.values(builtins).includes(fn))
+                if (typeof fn !== 'function' || !builtinFunctions.has(fn))
                     return fail(n,'installedDslOnly');
                 try {
-                    return fn(...n.arguments.map(ev));
+                    return Reflect.apply(fn, undefined, n.arguments.map(ev));
                 } catch (error) {
                     if (error instanceof SaturnDiagnosticError) {
                         const start = n.getStart(file), end = n.getEnd();
