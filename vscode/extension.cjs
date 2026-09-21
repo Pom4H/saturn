@@ -11,6 +11,7 @@ const {
 
 const execFileAsync = promisify(execFile);
 const diagramPanels = new Set();
+const reportPanels = new Set();
 
 function workspaceRoot() {
   return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null;
@@ -153,6 +154,72 @@ class CatalogTreeProvider extends RefreshableTree {
       });
     }
     return [];
+  }
+}
+
+class ReportsTreeProvider extends RefreshableTree {
+  constructor() {
+    super();
+    this.reports = [];
+    this.error = null;
+  }
+
+  async reload() {
+    const root = workspaceRoot();
+    if (!root) {
+      this.reports = [];
+      this.error = null;
+      this.refresh();
+      return;
+    }
+    try {
+      const document = await runCliJson(['ide', 'reports', '--project', root, '--json']);
+      this.reports = Array.isArray(document?.reports) ? document.reports : [];
+      this.error = null;
+    } catch (error) {
+      this.reports = [];
+      this.error = error instanceof Error ? error.message : String(error);
+    }
+    this.refresh();
+  }
+
+  getTreeItem(item) { return item; }
+
+  async getChildren(element) {
+    if (element) return [];
+    if (!this.reports.length && !this.error) await this.reload();
+    if (this.error) {
+      const problem = new vscode.TreeItem('Reports unavailable');
+      problem.description = this.error;
+      problem.iconPath = new vscode.ThemeIcon('warning');
+      return [problem];
+    }
+    if (!this.reports.length) {
+      const empty = new vscode.TreeItem('No reports in project');
+      empty.iconPath = new vscode.ThemeIcon('info');
+      return [empty];
+    }
+    return this.reports.map(report => {
+      const item = new vscode.TreeItem(report.title);
+      item.contextValue = 'saturnReport';
+      item.description = report.manual
+        ? (report.schedule.length ? 'manual · scheduled' : 'manual')
+        : (report.schedule.length ? 'scheduled' : 'report');
+      item.tooltip = [
+        report.id,
+        `window: ${Math.round(report.window / 60000)} min`,
+        report.signals.join(', '),
+        ...report.schedule.map(value => `cron: ${value} UTC`),
+      ].join('\n');
+      item.iconPath = new vscode.ThemeIcon(report.schedule.length ? 'calendar' : 'graph');
+      item.command = {
+        command: 'saturn.openReport',
+        title: 'Open report preview',
+        arguments: [report],
+      };
+      item._saturnReport = report;
+      return item;
+    });
   }
 }
 
@@ -348,6 +415,53 @@ async function revealEquipment(id) {
   void vscode.window.showInformationMessage(`Saturn: source for ${id} was not found.`);
 }
 
+async function revealSourceToken(token) {
+  const files = await vscode.workspace.findFiles('**/*.ts', '**/{node_modules,dist,.git}/**', 256);
+  for (const uri of files) {
+    const document = await vscode.workspace.openTextDocument(uri);
+    const source = document.getText();
+    const index = source.indexOf(token);
+    if (index < 0) continue;
+    const editor = await vscode.window.showTextDocument(document, { viewColumn: vscode.ViewColumn.One, preserveFocus: false });
+    const start = document.positionAt(index), end = document.positionAt(index + token.length);
+    editor.selection = new vscode.Selection(start, end);
+    editor.revealRange(new vscode.Range(start, end), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+    return true;
+  }
+  return false;
+}
+
+async function refreshReportPreview(entry) {
+  const root = workspaceRoot();
+  if (!root) {
+    entry.panel.webview.html = diagramErrorHtml('Open a Saturn project folder first.');
+    return;
+  }
+  try {
+    const preview = await runCliJson(['ide', 'report', '--project', root, '--id', entry.id, '--json']);
+    entry.panel.title = `Report · ${preview.report.title}`;
+    entry.panel.webview.html = preview.html;
+  } catch (error) {
+    entry.panel.webview.html = diagramErrorHtml(error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function openReportPreview(report) {
+  const item = report?._saturnReport ?? report;
+  if (!item?.id) return;
+  await revealSourceToken(item.id);
+  const panel = vscode.window.createWebviewPanel(
+    'saturn.report',
+    `Report · ${item.title ?? item.id}`,
+    vscode.ViewColumn.Beside,
+    { enableScripts: false, retainContextWhenHidden: true, enableForms: false }
+  );
+  const entry = { panel, id: item.id };
+  reportPanels.add(entry);
+  panel.onDidDispose(() => reportPanels.delete(entry));
+  await refreshReportPreview(entry);
+}
+
 async function insertEquipment(equipment, forcedId) {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
@@ -466,6 +580,7 @@ function activate(context) {
   const terminal = new SaturnTerminal(statusBar);
   const project = new ProjectTreeProvider();
   const catalog = new CatalogTreeProvider();
+  const reports = new ReportsTreeProvider();
   const targets = new TargetsTreeProvider();
 
   context.subscriptions.push(
@@ -473,26 +588,32 @@ function activate(context) {
     terminal,
     project,
     catalog,
+    reports,
     targets,
     vscode.window.registerTreeDataProvider('saturn.project', project),
     vscode.window.registerTreeDataProvider('saturn.catalog', catalog),
+    vscode.window.registerTreeDataProvider('saturn.reports', reports),
     vscode.window.registerTreeDataProvider('saturn.targets', targets),
     vscode.window.onDidCloseTerminal(value => terminal.handleClosed(value)),
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
       project.refresh();
       void catalog.reload();
+      void reports.reload();
       targets.reload();
     }),
     vscode.workspace.onDidSaveTextDocument(document => {
       if (document.fileName.endsWith('.ts')) {
         project.refresh();
         for (const panel of diagramPanels) void refreshDiagram(panel, context);
+        void reports.reload();
+        for (const entry of reportPanels) void refreshReportPreview(entry);
       }
       if (document.fileName.endsWith(path.join('.saturn', 'targets.json'))) targets.reload();
     }),
     vscode.commands.registerCommand('saturn.refresh', async () => {
       project.refresh();
       await catalog.reload();
+      await reports.reload();
       targets.reload();
     }),
     vscode.commands.registerCommand('saturn.runServer', () => terminal.runServer()),
@@ -516,6 +637,7 @@ function activate(context) {
       });
       await refreshDiagram(panel, context);
     }),
+    vscode.commands.registerCommand('saturn.openReport', report => openReportPreview(report)),
     vscode.commands.registerCommand('saturn.openHmi', async () => {
       const uri = vscode.Uri.parse(`${serverOrigin()}/plant/app/`);
       await vscode.env.openExternal(uri);
@@ -550,6 +672,7 @@ function activate(context) {
   );
 
   void catalog.reload();
+  void reports.reload();
   targets.reload();
 
   if (process.env.SATURN_VSCODE_TOUR === '1') {
