@@ -10,17 +10,19 @@ import { Store } from './store';
 import { Service } from './service';
 import { AppError, requireRole, type Repository, type SqlDatabase, type ReportTask, type ReportArtifact } from './types';
 import { diagnosticLocale, errorPayload, failCode } from './diagnostics';
+import { commandValue, nullableStringValue, numberMapValue, objectValue, stringMapValue, stringValue, type JsonObject } from './http-input';
 const prefix = '/plant';
-async function body<T = Record<string, unknown>>(req: IncomingMessage): Promise<T> { if (!req.headers['content-type']?.startsWith('application/json'))
+async function body(req: IncomingMessage): Promise<JsonObject> { if (!req.headers['content-type']?.startsWith('application/json'))
     failCode('SATURN_HTTP_INVALID',{reason:'malformed'},{field:'content-type'},{status:415}); let size = 0; const chunks: Buffer[] = []; for await (const chunk of req) {
     size += chunk.length;
     if (size > 2100000)
         failCode('SATURN_LIMIT',{resource:'http.request',reason:'tooLarge'},{limitBytes:2100000},{status:413});
     chunks.push(chunk);
 } try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8')) as T;
+    return objectValue(JSON.parse(Buffer.concat(chunks).toString('utf8')));
 }
-catch {
+catch (error) {
+    if (error instanceof AppError) throw error;
     failCode('SATURN_HTTP_INVALID',{reason:'malformed'},{field:'json'});
 } }
 export async function startPlantHttpServer(options: {
@@ -112,7 +114,7 @@ export async function startPlantHttpServer(options: {
                 return;
             }
             if (path === `${prefix}/api/login` && req.method === 'POST') {
-                const input = await body(req), session = auth.login(input.user, input.password, req.socket.remoteAddress ?? 'unknown');
+                const input = await body(req), session = auth.login(stringValue(input,'user'), stringValue(input,'password'), req.socket.remoteAddress ?? 'unknown');
                 if (input.mode === 'bearer') {
                     const remote = req.socket.remoteAddress ?? '';
                     const loopback = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1';
@@ -352,9 +354,9 @@ export async function startPlantHttpServer(options: {
                         json(200, { ok: true });
                         return;
                     }
-                    if (action === 'firmware') { json(200, service.firmware(input.controllerId,input.revision,actor)); return; }
+                    if (action === 'firmware') { json(200, service.firmware(stringValue(input,'controllerId'),stringValue(input,'revision'),actor)); return; }
                     if (action === 'command') {
-                        json(200, service.command(input, actor));
+                        json(200, service.command(commandValue(input), actor));
                         return;
                     }
                     if (action === 'restart') {
@@ -362,19 +364,19 @@ export async function startPlantHttpServer(options: {
                         return;
                     }
                     if (action === 'save') {
-                        json(200, await service.save(input.files, input.expected, input.message, actor));
+                        json(200, await service.save(stringMapValue(input.files,'files'), nullableStringValue(input,'expected'), stringValue(input,'message'), actor));
                         return;
                     }
                     if (action === 'publish') {
-                        json(200, await service.publish(input.revision, input.expected, actor));
+                        json(200, await service.publish(stringValue(input,'revision'), nullableStringValue(input,'expected'), actor));
                         return;
                     }
                     if (action === 'rollback') {
-                        json(200, await service.rollback(input.revision, input.expected, actor));
+                        json(200, await service.rollback(stringValue(input,'revision'), nullableStringValue(input,'expected'), actor));
                         return;
                     }
                     if (action === 'report') {
-                        json(202, service.dispatch(input.reportId, input.inputs ?? {}, actor));
+                        json(202, service.dispatch(stringValue(input,'reportId'), numberMapValue(input.inputs,'inputs'), actor));
                         return;
                     }
                     if (action === 'subscribe') {
@@ -384,7 +386,7 @@ export async function startPlantHttpServer(options: {
                         return;
                     }
                     if (action === 'unsubscribe') {
-                        push?.unsubscribe(input.endpoint, actor);
+                        push?.unsubscribe(stringValue(input,'endpoint'), actor);
                         json(200, { ok: true });
                         return;
                     }
