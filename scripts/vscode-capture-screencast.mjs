@@ -101,3 +101,4 @@ writeFileSync(resolve(out, 'timeline.json'), JSON.stringify({
 }, null, 2));
 
 console.log(`Captured ${normalized.length} composited VS Code screencast frames over ${seconds}s`);
+await browser.close();
