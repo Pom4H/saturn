@@ -9,19 +9,19 @@ import { Push } from './adapters/push';
 import { Store } from './store';
 import { Service } from './service';
 import { AppError, requireRole, type Repository, type SqlDatabase, type ReportTask, type ReportArtifact } from './types';
-import { diagnosticLocale, errorPayload } from './diagnostics';
+import { diagnosticLocale, errorPayload, failCode } from './diagnostics';
 const prefix = '/plant';
-async function body(req: IncomingMessage): Promise<any> { if (!req.headers['content-type']?.startsWith('application/json'))
-    throw new AppError('JSON body required', 415); let size = 0; const chunks: Buffer[] = []; for await (const chunk of req) {
+async function body<T = Record<string, unknown>>(req: IncomingMessage): Promise<T> { if (!req.headers['content-type']?.startsWith('application/json'))
+    failCode('SATURN_HTTP_INVALID',{reason:'malformed'},{field:'content-type'},{status:415}); let size = 0; const chunks: Buffer[] = []; for await (const chunk of req) {
     size += chunk.length;
     if (size > 2100000)
-        throw new AppError('Request too large', 413);
+        failCode('SATURN_LIMIT',{resource:'http.request',reason:'tooLarge'},{limitBytes:2100000},{status:413});
     chunks.push(chunk);
 } try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    return JSON.parse(Buffer.concat(chunks).toString('utf8')) as T;
 }
 catch {
-    throw new AppError('Invalid JSON');
+    failCode('SATURN_HTTP_INVALID',{reason:'malformed'},{field:'json'});
 } }
 export async function startPlantHttpServer(options: {
     port?: number;
@@ -66,7 +66,7 @@ export async function startPlantHttpServer(options: {
     const staticFile = async (relativePath: string) => {
         const candidate = resolve(root, relativePath);
         if (candidate !== root && !candidate.startsWith(root + sep))
-            throw new AppError('Path rejected', 403);
+            failCode('SATURN_PERMISSION',{role:'static-path'},{path:relativePath},{status:403});
         if (options.embeddedStatic)
             return candidate;
         const file = await realpath(candidate);
@@ -132,7 +132,7 @@ export async function startPlantHttpServer(options: {
             }
             if (path === `${prefix}/app/`) {
                 if (req.method !== 'GET')
-                    throw new AppError('Method not allowed', 405);
+                    failCode('SATURN_HTTP_INVALID',{reason:'disabled'},{method:req.method,path},{status:405});
                 try {
                     auth.session(req.headers.cookie, req.headers.authorization);
                 }
@@ -147,7 +147,7 @@ export async function startPlantHttpServer(options: {
                 auth.session(req.headers.cookie, req.headers.authorization);
                 const host = options.application?.extensions;
                 if (!host)
-                    throw new AppError('Extensions are not available in this Saturn composition', 404);
+                    failCode('SATURN_NOT_FOUND',{resource:'extensions',id:'host'},{path},{status:404});
                 const parts = path.slice(`${prefix}/extensions/`.length).split('/').filter(Boolean);
                 const id = parts.shift() ?? '';
                 const relative = parts.join('/');
@@ -158,14 +158,14 @@ export async function startPlantHttpServer(options: {
                     res.end(data);
                 }
                 catch (error) {
-                    throw new AppError(error instanceof Error ? error.message : String(error), 404);
+                    failCode('SATURN_NOT_FOUND',{resource:'extensionAsset',id:relative},{extension:id,detail:error instanceof Error?error.message:String(error)},{status:404});
                 }
                 return;
             }
             if (path.startsWith(`${prefix}/api/`)) {
                 const session = auth.session(req.headers.cookie, req.headers.authorization), actor = session.actor;
                 if (req.method === 'POST' && !session.bearer && req.headers['x-csrf-token'] !== session.csrf)
-                    throw new AppError('Invalid CSRF token', 403);
+                    failCode('SATURN_PERMISSION',{role:'csrf'},{action:path},{status:403});
                 const action = path.slice(`${prefix}/api/`.length);
 
                 if (action === 'environment/connect' && req.method === 'POST') {
@@ -186,7 +186,7 @@ export async function startPlantHttpServer(options: {
                     const remote = await environments.stream(session.sessionId);
                     if (!remote.ok || !remote.body) {
                         const message = await remote.text().catch(() => '');
-                        throw new AppError(message || `Remote stream failed (${remote.status})`, remote.status || 502);
+                        failCode('SATURN_HTTP_INVALID',{reason:'stateChanged'},{remoteStatus:remote.status,...(message?{remoteMessage:message}:{})},{status:remote.status||502});
                     }
                     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
                     const reader = remote.body.getReader();
@@ -207,10 +207,15 @@ export async function startPlantHttpServer(options: {
                     const input = req.method === 'POST' ? await body(req) : undefined;
                     const remote = await environments.request(session.sessionId, remoteAction, { method: req.method === 'POST' ? 'POST' : 'GET', query, body: input });
                     if (remoteAction === 'session' && req.method === 'GET') {
-                        const value = await remote.json().catch(() => null) as any;
-                        if (!remote.ok)
-                            throw new AppError(value?.error ?? `Remote Saturn returned HTTP ${remote.status}`, remote.status);
-                        json(200, { ...value, csrf: session.csrf });
+                        const value: unknown = await remote.json().catch(() => null);
+                        if (!remote.ok) {
+                            const remoteMessage=value&&typeof value==='object'&&'error' in value&&typeof (value as {error?:unknown}).error==='string'
+                                ? (value as {error:string}).error : undefined;
+                            failCode('SATURN_HTTP_INVALID',{reason:'stateChanged'},{remoteStatus:remote.status,...(remoteMessage?{remoteMessage}:{})},{status:remote.status||502});
+                        }
+                        if (!value || typeof value !== 'object' || Array.isArray(value))
+                            failCode('SATURN_HTTP_INVALID',{reason:'malformed'},{field:'remote.session'},{status:502});
+                        json(200, { ...(value as Record<string,unknown>), csrf: session.csrf });
                         return;
                     }
                     const contentType = remote.headers.get('content-type') ?? 'application/json; charset=utf-8';
@@ -283,7 +288,7 @@ export async function startPlantHttpServer(options: {
                     }
                     if (action === 'stream') {
                         if (streams.size >= 32)
-                            throw new AppError('Too many streams', 429);
+                            failCode('SATURN_LIMIT',{resource:'streams',reason:'tooMany'},{max:32},{status:429});
                         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
                         streams.add(res);
                         const write = (frame: unknown) => { try {
@@ -316,16 +321,16 @@ export async function startPlantHttpServer(options: {
                     if (action === 'application/update') {
                         requireRole(actor, 'engineer');
                         if (!options.application?.update)
-                            throw new AppError('Application self-update is not available in this Saturn composition', 503);
+                            failCode('SATURN_UPDATE_INVALID',{reason:'disabled'},{resource:'self-update'},{status:503});
                         json(202, await options.application.update.install());
                         return;
                     }
                     if (action === 'extensions/install') {
                         requireRole(actor, 'engineer');
                         if (!options.application?.extensions)
-                            throw new AppError('Extension installation is not available in this Saturn composition', 503);
+                            failCode('SATURN_EXTENSION_INVALID',{reason:'disabled'},{resource:'extension-host'},{status:503});
                         if (typeof input.specifier !== 'string')
-                            throw new AppError('Extension package specifier required');
+                            failCode('SATURN_EXTENSION_INVALID',{reason:'missing'},{field:'specifier'});
                         const extension = await options.application.extensions.install(input.specifier);
                         json(200, { ...extension, entryUrl: `${prefix}/extensions/${extension.id}/${extension.entry.split('/').map(encodeURIComponent).join('/')}` });
                         return;
@@ -335,7 +340,7 @@ export async function startPlantHttpServer(options: {
                         if (!options.application?.extensions)
                             throw new AppError('Extension installation is not available in this Saturn composition', 503);
                         if (typeof input.name !== 'string')
-                            throw new AppError('Extension package name required');
+                            failCode('SATURN_EXTENSION_INVALID',{reason:'missing'},{field:'name'});
                         await options.application.extensions.remove(input.name);
                         json(200, { ok: true });
                         return;
@@ -374,7 +379,7 @@ export async function startPlantHttpServer(options: {
                     }
                     if (action === 'subscribe') {
                         if (!push)
-                            throw new AppError('Configure SCADA_PUSH_SUBJECT to enable Web Push', 503);
+                            failCode('SATURN_RUNTIME_INVALID',{reason:'disabled'},{resource:'push'},{status:503});
                         json(200, push.subscribe(input, actor, session.sessionId));
                         return;
                     }
@@ -384,10 +389,10 @@ export async function startPlantHttpServer(options: {
                         return;
                     }
                 }
-                throw new AppError('Endpoint not found', 404);
+                failCode('SATURN_NOT_FOUND',{resource:'endpoint',id:action},{path},{status:404});
             }
             if (!['GET', 'HEAD'].includes(req.method ?? ''))
-                throw new AppError('Method not allowed', 405);
+                failCode('SATURN_HTTP_INVALID',{reason:'disabled'},{method:req.method,path},{status:405});
             if (path === '/saturn-sw.js') {
                 res.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/' });
                 res.end(req.method === 'HEAD' ? undefined : await readStatic('site/saturn-sw.js'));
@@ -415,7 +420,7 @@ export async function startPlantHttpServer(options: {
                 return;
             }
             if (!path.startsWith(`${prefix}/assets/`) && path !== `${prefix}/sw.js`)
-                throw new AppError('File not found', 404);
+                failCode('SATURN_NOT_FOUND',{resource:'file',id:path},{path},{status:404});
             const file = await staticFile('.' + path.slice(prefix.length));
             const mime: Record<string, string> = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.wasm': 'application/wasm', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png' };
             res.writeHead(200, { 'Content-Type': mime[extname(file)] ?? 'application/octet-stream', 'Cache-Control': 'no-cache' });
