@@ -1,4 +1,4 @@
-import { presentationHmi } from './presentation-hmi';
+import { projectPresentation } from './presentation-target';
 import type { Presentation } from './presentation';
 import type { Expr, Layout } from './types';
 import { failCode } from './diagnostics';
@@ -57,7 +57,8 @@ export function compileController(c: Controller) {
     let screenModels: import('./vendor/saturn/src/types').HmiScreenModel[];
     if(c.hmi.view) {
         const viewBindings=Object.fromEntries(Object.entries(c.hmi.view.bindings).map(([key,value])=>[key,expr(value)]));
-        screenModels=[presentationHmi(c.hmi.view,viewBindings)];
+        const projection=projectPresentation(c.hmi.view,{target:'saturn-plc-320',bindings:viewBindings});
+        screenModels=[projection.screen];
     } else screenModels=[{id:'main',title:c.hmi.title,screenType:'main',period:0,elements:[
         {id:'title',primitive:'text',label:c.hmi.title,position:{x:10,y:8}},
         ...c.hmi.rows.map((r,i)=>({id:'row'+i,primitive:'value' as const,label:r.label+' ',position:{x:10,y:40+i*29},binding:{source:'wp' as const,ref:bindings[r.pin],format:'int' as const}})),
