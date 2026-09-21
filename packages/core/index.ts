@@ -17,6 +17,10 @@ export type {
   Quality,
   Report,
   Sample,
+  SignalId,
+  SignalRef,
+  SignalUnitOf,
+  SignalValueOf,
   System,
 } from '../../plant/types';
 export type {
