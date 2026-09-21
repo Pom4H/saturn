@@ -70,21 +70,21 @@ const reportCss = `
 :root{color-scheme:light;--report-ink:#152129;--report-muted:#68757e;--report-line:#dde4e7;--report-soft:#f4f6f7;--report-accent:#087f8c;--report-paper:#fff}
 *{box-sizing:border-box}
 html{background:#eef1f2}
-body{margin:0;color:var(--report-ink);background:#eef1f2;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;line-height:1.5;text-rendering:optimizeLegibility}
-.report-sheet{width:min(1120px,calc(100% - 48px));margin:32px auto;padding:58px 64px 46px;background:var(--report-paper);box-shadow:0 20px 65px rgba(26,42,51,.08);border-radius:2px}
+body{margin:0;color:var(--report-ink);background:#eef1f2;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;line-height:1.5;text-rendering:optimizeLegibility;overflow-x:hidden}
+.report-sheet{width:min(210mm,calc(100% - 24px));max-width:100%;margin:24px auto;padding:15mm 14mm 12mm;background:var(--report-paper);box-shadow:0 20px 65px rgba(26,42,51,.08);border-radius:2px;overflow:hidden}
 .report-masthead{display:flex;align-items:center;justify-content:space-between;padding-bottom:18px;border-bottom:1px solid var(--report-line)}
 .report-brand{font-size:13px;font-weight:760;letter-spacing:.2em;text-transform:uppercase}
 .report-kind{font-size:11px;color:var(--report-muted);letter-spacing:.12em;text-transform:uppercase}
 .report-header{padding:38px 0 30px}
-.report-header h1{max-width:820px;margin:0;font-size:38px;line-height:1.08;letter-spacing:-.035em;font-weight:660}
-.report-description{max-width:720px;margin:14px 0 0;color:var(--report-muted);font-size:15px}
+.report-header h1{max-width:100%;margin:0;font-size:clamp(30px,5.1vw,38px);line-height:1.08;letter-spacing:-.035em;font-weight:660;overflow-wrap:anywhere}
+.report-description{max-width:100%;margin:14px 0 0;color:var(--report-muted);font-size:15px;overflow-wrap:anywhere}
 .report-period{margin-top:22px;color:var(--report-muted);font-size:13px;font-variant-numeric:tabular-nums}
-.report-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0;border-top:1px solid var(--report-line);border-bottom:1px solid var(--report-line);margin:0 0 38px}
+.report-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:0;border-top:1px solid var(--report-line);border-bottom:1px solid var(--report-line);margin:0 0 34px;min-width:0}
 .report-metric{min-width:0;padding:22px 22px 22px 0}
 .report-metric+.report-metric{padding-left:22px;border-left:1px solid var(--report-line)}
 .report-metric-label{display:block;margin-bottom:8px;color:var(--report-muted);font-size:12px}
-.report-metric-value{display:inline;font-size:28px;line-height:1;font-weight:620;letter-spacing:-.035em;font-variant-numeric:tabular-nums}
-.report-metric-primary .report-metric-value{font-size:42px;font-weight:650}
+.report-metric-value{display:inline;font-size:clamp(20px,3.4vw,28px);line-height:1;font-weight:620;letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.report-metric-primary .report-metric-value{font-size:clamp(28px,5vw,40px);font-weight:650}
 .report-metric-unit{margin-left:7px;color:var(--report-muted);font-size:13px}
 .report-body{min-width:0}
 .report-sheet .presentation{color:var(--report-ink)}
@@ -96,10 +96,10 @@ body{margin:0;color:var(--report-ink);background:#eef1f2;font-family:Inter,ui-sa
 .report-sheet figure{width:100%}
 .report-sheet figcaption{margin:0 0 14px;font-size:18px;font-weight:620;letter-spacing:-.018em}
 .report-sheet svg{display:block;width:100%;max-height:320px}
-.report-sheet .pv-scroll{width:100%;overflow:auto}
-.report-sheet table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-.report-sheet th{padding:11px 10px 11px 0;border-bottom:1px solid #bcc8ce;color:var(--report-muted);font-size:11px;font-weight:650;text-align:left;white-space:nowrap}
-.report-sheet td{padding:11px 10px 11px 0;border-bottom:1px solid #e5eaed;font-size:13px}
+.report-sheet .pv-scroll{width:100%;max-width:100%;overflow:hidden}
+.report-sheet table{width:100%;max-width:100%;table-layout:fixed;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.report-sheet th{padding:10px 8px 10px 0;border-bottom:1px solid #bcc8ce;color:var(--report-muted);font-size:10.5px;font-weight:650;text-align:left;white-space:normal;overflow-wrap:anywhere;line-height:1.25}
+.report-sheet td{padding:9px 8px 9px 0;border-bottom:1px solid #e5eaed;font-size:12.5px;overflow-wrap:anywhere}
 .report-sheet th:last-child,.report-sheet td:last-child{padding-right:0}
 .report-sheet .pv-number{text-align:right}
 .report-sheet .pv-unit{font-weight:450;color:#849098}
@@ -108,14 +108,18 @@ body{margin:0;color:var(--report-ink);background:#eef1f2;font-family:Inter,ui-sa
 .report-footer{display:grid;grid-template-columns:1fr auto;gap:8px 24px;margin-top:44px;padding-top:18px;border-top:1px solid var(--report-line);color:var(--report-muted);font-size:10px;line-height:1.5}
 .report-footer .report-note{grid-column:1/-1;max-width:760px}
 @media(max-width:720px){
- html,body{background:#fff}.report-sheet{width:100%;margin:0;padding:32px 22px;box-shadow:none}
- .report-header{padding:30px 0 24px}.report-header h1{font-size:31px}
- .report-metrics{grid-template-columns:1fr 1fr}.report-metric:nth-child(odd){padding-left:0;border-left:0}.report-metric:nth-child(even){padding-left:18px;border-left:1px solid var(--report-line)}
+ html,body{background:#fff}.report-sheet{width:100%;margin:0;padding:28px 18px;box-shadow:none}
+ .report-masthead{gap:12px}.report-kind{text-align:right}
+ .report-header{padding:28px 0 22px}.report-header h1{font-size:30px}
+ .report-metrics{grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:28px}
+ .report-metric{padding:17px 10px 17px 0}.report-metric+.report-metric{padding-left:10px}
+ .report-metric-label{font-size:10px}.report-metric-unit{display:block;margin:6px 0 0;font-size:10px}
+ .report-sheet figcaption{font-size:16px}.report-sheet th{font-size:9px}.report-sheet td{font-size:11px}
  .report-footer{grid-template-columns:1fr}
 }
-@page{size:A4;margin:13mm}
+@page{size:A4 portrait;margin:12mm}
 @media print{
- html,body{background:#fff}.report-sheet{width:auto;margin:0;padding:0;box-shadow:none}
+ html,body{background:#fff;overflow:visible}.report-sheet{width:auto;max-width:none;margin:0;padding:0;box-shadow:none;overflow:visible}
  .report-masthead{padding-top:0}.report-header{padding-top:28px}
  .report-metrics,.pv-chart,.pv-value{break-inside:avoid}
  table{break-inside:auto}thead{display:table-header-group}tr{break-inside:avoid;break-after:auto}
