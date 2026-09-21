@@ -8,7 +8,7 @@ Saturn elements separate engineering semantics from their visual projections. Us
 import {
   defineElementPack,
   type ElementDefinition,
-} from '@saturn/core'
+} from '@saturn/core/elements'
 
 const pump: ElementDefinition = {
   type: 'acme.pump.mx',
@@ -61,7 +61,7 @@ visual: {
 Only register a new glyph when the semantic class is genuinely new.
 
 ~~~ts
-import { registerGlyph } from '@saturn/core'
+import { registerGlyph } from '@saturn/core/elements'
 
 registerGlyph({
   id: 'factory.special-separator',
@@ -79,7 +79,7 @@ Do not put raw SVG in the extension manifest. The manifest may advertise a glyph
 Do not manually maintain a second physical port map.
 
 ~~~ts
-import { deriveSchematicProjection } from '@saturn/core'
+import { deriveSchematicProjection } from '@saturn/core/elements'
 
 const projection = deriveSchematicProjection(pump, {}, {
   width: 180,
@@ -95,7 +95,7 @@ The result maps canonical metre-space port positions/normals onto 2D boundary an
 Use the shared semantic identities:
 
 ~~~ts
-import { materialPresets, mediumPresets } from '@saturn/core'
+import { materialPresets, mediumPresets } from '@saturn/core/elements'
 
 materialPresets.paintedIndustrial
 mediumPresets.water

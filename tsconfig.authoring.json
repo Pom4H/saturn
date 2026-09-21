@@ -15,13 +15,17 @@
     "paths": {
       "@saturn/core": [
         "./packages/core/index.ts"
+      ],
+      "@saturn/core/elements": [
+        "./packages/core/elements.ts"
       ]
     }
   },
   "include": [
     "plant/demo/**/*.ts",
     "plant/tests/sdk-types.ts",
-    "packages/core/index.ts"
+    "packages/core/index.ts",
+    "packages/core/elements.ts"
   ],
   "exclude": [
     "plant/demo/files.ts"

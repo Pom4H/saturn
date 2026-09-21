@@ -1,4 +1,5 @@
 import { cable, pipe, project, simulation, system } from '@saturn/core';
+import { coreElementRegistry, deriveSchematicProjection, getGlyph, mediumPresets } from '@saturn/core/elements';
 
 const water = system('water', 'Water');
 const tank = simulation('T-101', 'reservoir', {
@@ -71,3 +72,15 @@ if (false) {
 }
 
 console.log('@saturn/core consumer passed');
+
+
+const canonicalPump = coreElementRegistry.get('process.pump.centrifugal');
+const pumpProjection = deriveSchematicProjection(canonicalPump, {}, { width: 220, height: 170, padding: 12 });
+if (
+  pumpProjection.ports.IN.direction !== 'left'
+  || pumpProjection.ports.OUT.direction !== 'up'
+  || getGlyph(canonicalPump.visual.glyph).id !== 'process.pump.centrifugal'
+  || mediumPresets.water.ior !== 1.333
+) {
+  throw new Error('@saturn/core/elements public contract failed');
+}
