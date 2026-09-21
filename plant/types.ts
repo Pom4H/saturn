@@ -3,6 +3,7 @@ import type { Controller, ControllerState } from './controller';
 import type { Connection, Attachment } from './ports';
 import type { HmiDrawCommand } from './vendor/saturn/src/runtime';
 import { failCode } from './diagnostics';
+export { AppError } from './diagnostics';
 /** Portable contracts. No DOM, Node, filesystem, SQL driver or network imports. */
 export type Scalar = number | boolean | string;
 export type Quality = 'good' | 'bad' | 'stale' | 'offline';
@@ -334,9 +335,6 @@ export interface ReportArtifact {
 export interface Actor {
     id: string;
     role: 'viewer' | 'operator' | 'engineer';
-}
-export class AppError extends Error {
-    constructor(message: string, public status = 400) { super(message); }
 }
 export const clone = <T>(v: T): T => structuredClone(v);
 export function finite(v: unknown, name: string, min = -1e12, max = 1e12): number {
