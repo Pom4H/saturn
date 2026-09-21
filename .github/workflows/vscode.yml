@@ -1,28 +1,10 @@
 name: VS Code host
 
 on:
-  pull_request:
-    paths:
-      - 'vscode/**'
-      - 'plant/**'
-      - 'packages/core/**'
-      - 'examples/consumer/**'
-      - 'standalone/ide.ts'
-      - 'standalone/entry.ts'
-      - 'standalone/extensions.ts'
-      - 'scripts/saturn.mjs'
-      - 'scripts/vscode-check.mjs'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/vscode.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
-
-concurrency:
-  group: vscode-host-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   check:

@@ -1,24 +1,20 @@
 name: Standalone Windows
 
 on:
-  workflow_dispatch:
-  pull_request:
-    branches:
-      - main
   push:
-    branches:
-      - feat/standalone-pack
+    tags:
+      - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: standalone-windows-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   windows:
-    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'release/')
     runs-on: [self-hosted, windows]
     timeout-minutes: 20
     defaults:
@@ -28,43 +24,26 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-
       - uses: actions/setup-node@v7.0.0
         with:
           node-version-file: .nvmrc
           cache: npm
-
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.2
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Typecheck plant runtime
-        run: npm run plant:typecheck
-
-      - name: Build web assets
-        run: npm run plant:build
-
-      - name: Test plant runtime
-        run: npm run plant:test
-
+          bun-version-file: .bun-version
+      - run: npm ci
       - name: Test standalone trust contracts
         run: bun test standalone/update-extension.test.ts
-
       - name: Generate update smoke key
         run: node scripts/update-test-key.mjs "${{ runner.temp }}\saturn-update-key"
-
+      - name: Build web assets
+        run: npm run plant:build
       - name: Pack Windows executable
         run: npm run saturn -- pack --target windows-x64 --outfile dist/standalone/saturn.exe --skip-web-build --update-public-key-file "${{ runner.temp }}\saturn-update-key\public.pem"
-
       - name: Pack next Windows executable
         run: npm run saturn -- pack --target windows-x64 --outfile dist/standalone/saturn-next.exe --skip-web-build --version 0.1.1 --update-public-key-file "${{ runner.temp }}\saturn-update-key\public.pem"
-
-      - name: Smoke test executable
+      - name: Smoke test executable and updater
         run: node scripts/standalone-smoke.mjs dist/standalone/saturn.exe dist/standalone/saturn-next.exe "${{ runner.temp }}\saturn-update-key\private.pem"
-
       - uses: actions/upload-artifact@v7.0.1
         if: always()
         with:

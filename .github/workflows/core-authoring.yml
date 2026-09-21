@@ -1,22 +1,10 @@
 name: Saturn core authoring
 
 on:
-  pull_request:
-    paths:
-      - 'plant/**'
-      - 'packages/core/**'
-      - 'examples/consumer/**'
-      - 'tsconfig.plant.json'
-      - 'scripts/consumer-test.mjs'
-      - '.github/workflows/core-authoring.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
-
-concurrency:
-  group: core-authoring-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   verify:

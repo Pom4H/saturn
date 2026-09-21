@@ -1,39 +1,56 @@
 name: Check and deploy
 on:
+  pull_request:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
+
 permissions:
   contents: read
+
 concurrency:
   group: pages-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
+
       - uses: actions/setup-node@v7.0.0
         with:
           node-version-file: .nvmrc
           cache: npm
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
+
       - run: npm ci
-      - run: npm run check
-      - run: npm run site:check
-      - run: npx playwright install --with-deps chromium webkit
-      - run: npm run site:test:browser
-      - run: npm run test:e2e
-      - run: npm run challenge:browser
+
+      # One canonical PR gate. This already covers build, TypeScript, unit/core
+      # tests, plant tests, Bun smoke, authoring, consumer and VS Code checks.
+      - name: Core release checks
+        run: npm run check
+
+      - name: Landing static checks
+        run: npm run site:check
+
+      # The release shell integration suite uses Chromium only. WebKit,
+      # adversarial browser suites and full plant browser evidence are manual
+      # diagnostics rather than duplicate per-commit gates.
+      - run: npx playwright install --with-deps chromium
+      - name: Saturn shell integration
+        run: npm run site:test:browser
+
       - run: npm audit --audit-level=high
+
       - uses: actions/upload-artifact@v7.0.1
-        if: always()
+        if: failure()
         with:
           name: browser-tests
           path: |
@@ -43,16 +60,22 @@ jobs:
             runtime-test-results/
             challenge-results/
           retention-days: 7
-      - run: npm run pages:build
+          if-no-files-found: ignore
+
+      - name: Build Pages artifact
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        run: npm run pages:build
+
       - uses: actions/upload-pages-artifact@v5.0.0
         if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         with:
           path: dist/pages
+
   deploy:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs: check
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 10
     permissions:
       pages: write
       id-token: write
@@ -67,10 +90,11 @@ jobs:
           enablement: true
       - uses: actions/deploy-pages@v5.0.1
         id: deployment
+
   verify-live:
     needs: deploy
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -81,13 +105,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - name: Verify the published Pages URL in a real browser
+      - name: Verify the published Saturn URL
         run: node scripts/verify-live.mjs
         env:
           SATURN_URL: ${{ needs.deploy.outputs.page_url }}
       - uses: actions/upload-artifact@v7.0.1
-        if: always()
+        if: failure()
         with:
           name: live-pages-check
           path: live-check/
           retention-days: 7
+          if-no-files-found: ignore
