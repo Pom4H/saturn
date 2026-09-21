@@ -81,7 +81,7 @@ export class LocalClient implements Connection {
     private worker: Worker;
     private counter = 0;
     private pending = new Map<number, {
-        resolve: (v: any) => void;
+        resolve: (v: unknown) => void;
         reject: (e: Error) => void;
         timer: ReturnType<typeof setTimeout>;
     }>();
@@ -112,7 +112,7 @@ export class LocalClient implements Connection {
         }
     } }; this.worker.onerror = e => { this.rejectReady(new Error(e.message)); this.onFailure(e.message); }; }
     start(memory = false): Promise<Status> { return new Promise((resolve, reject) => { this.resolveReady = resolve; this.rejectReady = reject; this.worker.postMessage({ action: 'initialize', input: { memory } }); }); }
-    request<T>(action: string, input?: unknown): Promise<T> { return new Promise((resolve, reject) => { const id = ++this.counter, timer = setTimeout(() => { this.pending.delete(id); reject(new Error('Worker request timed out')); }, 15000); this.pending.set(id, { resolve, reject, timer }); this.worker.postMessage({ id, action, input }); }); }
+    request<T>(action: string, input?: unknown): Promise<T> { return new Promise((resolve, reject) => { const id = ++this.counter, timer = setTimeout(() => { this.pending.delete(id); reject(new Error('Worker request timed out')); }, 15000); this.pending.set(id, { resolve: value => resolve(value as T), reject, timer }); this.worker.postMessage({ id, action, input }); }); }
     close() { this.worker.terminate(); for (const p of this.pending.values()) {
         clearTimeout(p.timer);
         p.reject(new Error('Connection closed'));
