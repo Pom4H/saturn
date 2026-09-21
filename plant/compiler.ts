@@ -1,7 +1,7 @@
 import { validatePresentation, presentationActions } from './presentation';
 import { compileController, inputPins } from './controller';
 import { validateConnections, terminals, connectionExpression } from './ports';
-import ts from 'typescript';
+import ts from '@typescript/typescript6';
 import * as dsl from './dsl';
 import { model, models } from './models';
 import { finite, id, type Project, type Expr } from './types';
