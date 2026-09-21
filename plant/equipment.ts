@@ -10,6 +10,8 @@ import type { RuntimeFrame } from '../src/runtime/protocol';
 import { models, outputType } from './models';
 import { evaluate } from './kernel';
 import type { Project, Frame, Expr, ModelSpec } from './types';
+import { modelTitle } from './i18n';
+import type { SaturnLocale } from './diagnostics';
 const metalStroke = '#526f7a', water = '#10a6b5', fuel = '#d39b51';
 type Draw = (c: SvgRendererContext) => void;
 const body = (c: SvgRendererContext, x = 15, y = 10, w = 120, h = 66) => el(c.root, 'rect', { x, y, width: w, height: h, rx: 8, fill: c.paint('metal'), stroke: metalStroke, 'stroke-width': 2 });
@@ -98,12 +100,13 @@ Object.assign(shapes, {
  saturn:(c:SvgRendererContext)=>{const shell=el(c.root,'g',{});shell.innerHTML=renderSaturnPlcSvg({defsPrefix:'saturn-'+c.equipment.id});const svg=shell.querySelector('svg')!;svg.setAttribute('width','310');svg.setAttribute('height','170');const screen=svg.querySelector<SVGSVGElement>('.runtime-hmi')!;c.onUpdate(()=>drawHmiSvg(screen,c.equipment.id));},
 });
 const installed = new Set<string>();
-export function installEquipment() {
-    const specs: Pick<ModelSpec,'visual'|'title'|'outputs'|'outputTypes'>[] = [
+export function installEquipment(locale: SaturnLocale = 'en') {
+    const specs: Array<Pick<ModelSpec,'kind'|'visual'|'titleKey'|'outputs'|'outputTypes'>> = [
         ...models(),
         {
+            kind:'saturn-plc',
             visual:'saturn',
-            title:'Saturn PLC · FBD',
+            titleKey:'model.saturn-plc',
             outputs:{healthy:'лог.',powered:'лог.'},
             outputTypes:{healthy:'boolean',powered:'boolean'},
         },
@@ -115,7 +118,7 @@ export function installEquipment() {
             continue;
         installed.add(kind);
         if (!catalog[kind])
-            registerComponent(kind, { version: '1.0.0', label: spec.title, ...footprint(spec.visual), fields: { x: { label: 'X', scope: 'layout', default: 0 }, y: { label: 'Y', scope: 'layout', default: 0 } }, ports: Object.fromEntries(Object.entries(terminals(spec.visual)).map(([name,t])=>[name,{x:t.x,y:t.y,direction:t.side,role:t.role==='source'?'out':'in'}])), signals: Object.fromEntries(Object.entries(spec.outputs).map(([k, unit]) => [k, { label: k, unit, type: outputType(spec, k) }])) });
+            registerComponent(kind, { version: '1.0.0', label: modelTitle(spec.kind, locale), ...footprint(spec.visual), fields: { x: { label: 'X', scope: 'layout', default: 0 }, y: { label: 'Y', scope: 'layout', default: 0 } }, ports: Object.fromEntries(Object.entries(terminals(spec.visual)).map(([name,t])=>[name,{x:t.x,y:t.y,direction:t.side,role:t.role==='source'?'out':'in'}])), signals: Object.fromEntries(Object.entries(spec.outputs).map(([k, unit]) => [k, { label: k, unit, type: outputType(spec, k) }])) });
         registerSvgRenderer(kind, c => { shapes[spec.visual](c); if(spec.visual==='saturn')return; const key = Object.keys(spec.outputs)[0]; const text = el(c.root, 'text', { x: 75, y: 111, 'text-anchor': 'middle', 'font-family': 'ui-monospace,monospace', 'font-size': 15, fill: '#214d5f' }); c.onUpdate(dt => { const value = c.number(key, dt); text.textContent = value === null ? '—' : `${value.toFixed(2)} ${spec.outputs[key]}`; }); });
         register3dRenderer(kind, c => createPlantModel(c, spec.visual, Object.keys(spec.outputs)[0]));
     }
