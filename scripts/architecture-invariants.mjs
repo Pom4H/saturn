@@ -5,6 +5,7 @@ import ts from '@typescript/typescript6';
 const root = process.cwd();
 const excluded = new Set(['node_modules','.git','dist','.plant','.authoring','playwright-report','test-results','runtime-test-results','vscode-video']);
 const allowedDiagnosticFiles = new Set(['plant/diagnostics.ts']);
+const forbiddenParallelHmiTypes = new Set(['HmiApplication','HmiScreen','HmiDialog','HmiNode','HmiAction']);
 const violations = [];
 
 async function walk(dir) {
@@ -32,6 +33,13 @@ async function inspect(file) {
   const rel = relative(root,file).replaceAll('\\','/');
 
   function visit(node) {
+    if ((ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node))
+      && node.name && forbiddenParallelHmiTypes.has(node.name.text)
+      && !rel.startsWith('plant/vendor/')) {
+      report(source,file,node,'single-presentation-ir',
+        `${node.name.text} would create a parallel HMI authoring model. Extend canonical Presentation IR and add a target projection instead.`);
+    }
+
     if (node.kind === ts.SyntaxKind.AnyKeyword)
       report(source,file,node,'no-explicit-any','Use unknown plus narrowing or a concrete domain type.');
 
