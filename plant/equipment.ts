@@ -138,7 +138,11 @@ export function visualFrame(project: Project, frame: Frame): RuntimeFrame {
         const signals: RuntimeFrame['equipment'][string]['signals'] = {};
         for (const [key, expr] of Object.entries(n.signals)) {
             const s = evaluate(expr, id => frame.samples[id] ?? { value: null, time: frame.time, quality: 'bad' }, frame.time);
-            signals[key] = { type: 'number', value: s.value, quality: s.quality, timestamp: s.time, unit: catalog[`plant_${n.type}`]?.signals?.[key]?.unit ?? 'отн.' };
+            const definition = catalog[`plant_${n.type}`]?.signals?.[key];
+            const common = { quality: s.quality, timestamp: s.time, unit: definition?.unit ?? 'отн.' };
+            signals[key] = definition?.type === 'boolean'
+                ? { type: 'boolean', value: s.value === null ? null : Boolean(s.value), ...common }
+                : { type: 'number', value: s.value, ...common };
         }
         const own = new Set(Object.values(n.signals).flatMap(expand));
         const relevant = active.filter(rule => expand(rule.signal).some(ref => own.has(ref)));
