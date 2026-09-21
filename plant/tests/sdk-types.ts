@@ -95,19 +95,19 @@ simulation('P-TYPED', 'pump', {
     at: { x: 0, y: 0 },
     inputs: { voltage: gridTyped.voltage },
 });
-// @ts-expect-error Flow cannot feed a voltage input.
 simulation('P-WRONG-DIM', 'pump', {
     system: 'cooling',
     at: { x: 0, y: 0 },
+    // @ts-expect-error Flow cannot feed a voltage input.
     inputs: { voltage: pump.flow },
 });
 // @ts-expect-error add() requires compatible dimensions.
 const impossibleSum = add(pump.flow, pump.rpm);
 void impossibleSum;
-// @ts-expect-error Boolean signals cannot feed numeric model inputs.
 simulation('P-WRONG-TYPE', 'pump', {
     system: 'cooling',
     at: { x: 0, y: 0 },
+    // @ts-expect-error Boolean signals cannot feed numeric model inputs.
     inputs: { voltage: valveDemand.blocked },
 });
 const scaledFlow = mul(pump.flow, .5);
