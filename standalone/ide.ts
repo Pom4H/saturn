@@ -2,6 +2,9 @@ import { resolve } from 'node:path';
 import { models } from '../plant/models';
 import { compileProject } from '../plant/compiler';
 import { installEquipment, sceneFor } from '../plant/equipment';
+import { executeReport } from '../plant/workflows';
+import type { Report, ReportData } from '../plant/types';
+import { BunSql } from './bun-sql';
 import { catalog } from '../src/core';
 import { ExtensionManager } from './extensions';
 import { loadProjectDirectory } from './project-loader';
@@ -24,6 +27,29 @@ export interface IdeCatalogGroup {
 export interface IdeCatalogDocument {
     schema: 1;
     catalogs: IdeCatalogGroup[];
+}
+
+export interface IdeReportSummary {
+    id: string;
+    title: string;
+    window: number;
+    signals: string[];
+    schedule: string[];
+    manual: boolean;
+}
+
+export interface IdeReportsDocument {
+    schema: 1;
+    project: { id: string; title: string; directory: string };
+    reports: IdeReportSummary[];
+}
+
+export interface IdeReportPreviewDocument {
+    schema: 1;
+    project: { id: string; title: string; directory: string };
+    report: IdeReportSummary;
+    html: string;
+    rows: Record<string, unknown>[];
 }
 
 export interface IdeDiagramDocument {
@@ -85,6 +111,79 @@ export async function ideDiagram(projectPath: string): Promise<IdeDiagramDocumen
     };
 }
 
+function reportSummary(report: Report): IdeReportSummary {
+    return {
+        id: report.id,
+        title: report.title,
+        window: report.window,
+        signals: [...report.signals],
+        schedule: report.on.schedule?.map(item => item.cron) ?? [],
+        manual: !!report.on.workflow_dispatch,
+    };
+}
+
+export async function ideReports(projectPath: string): Promise<IdeReportsDocument> {
+    const loaded = await loadProjectDirectory(projectPath);
+    const project = compileProject(loaded.files);
+    return {
+        schema: 1,
+        project: { id: loaded.id, title: loaded.title, directory: loaded.directory },
+        reports: project.reports.map(reportSummary),
+    };
+}
+
+function previewData(report: Report, from: number, to: number): ReportData {
+    const samples: ReportData['samples'] = [];
+    const segments: ReportData['segments'] = [];
+    const steps = 24;
+    const span = Math.max(1000, to - from);
+    for (let signalIndex = 0; signalIndex < report.signals.length; signalIndex++) {
+        const signal = report.signals[signalIndex];
+        for (let i = 0; i < steps; i++) {
+            const start = from + Math.floor(span * i / steps);
+            const end = from + Math.floor(span * (i + 1) / steps);
+            const quality = i === 8 || i === 9 ? 'offline' : 'good';
+            const wave = Math.sin((i / steps) * Math.PI * 3 + signalIndex * .7);
+            const trend = i / Math.max(1, steps - 1);
+            const value = quality === 'good' ? 10 + signalIndex * 7 + wave * 3 + trend * 4 : null;
+            segments.push({ signal, start, end, value, quality });
+            samples.push({ signal, time: start, value, quality });
+        }
+    }
+    return { samples, segments };
+}
+
+export async function ideReportPreview(projectPath: string, reportId: string): Promise<IdeReportPreviewDocument> {
+    const loaded = await loadProjectDirectory(projectPath);
+    const project = compileProject(loaded.files);
+    const report = project.reports.find(item => item.id === reportId);
+    if (!report)
+        throw new Error(`Unknown report: ${reportId}`);
+    const to = Date.UTC(2026, 8, 21, 9, 0, 0);
+    const from = to - report.window;
+    const inputs = Object.fromEntries(Object.entries(report.on.workflow_dispatch?.inputs ?? {}).map(([name, value]) => [name, value.default]));
+    const artifact = executeReport({
+        id: `preview-${report.id}`,
+        report,
+        revision: 'preview',
+        runId: 'preview',
+        trigger: 'vscode-preview',
+        actor: 'engineer',
+        createdAt: to,
+        from,
+        to,
+        inputs,
+        data: previewData(report, from, to),
+    }, new BunSql());
+    return {
+        schema: 1,
+        project: { id: loaded.id, title: loaded.title, directory: loaded.directory },
+        report: reportSummary(report),
+        html: artifact.html,
+        rows: artifact.rows,
+    };
+}
+
 function option(args: string[], name: string): string | undefined {
     const index = args.indexOf(name);
     return index >= 0 ? args[index + 1] : undefined;
@@ -104,5 +203,20 @@ export async function runIdeCommand(args: string[], appData: string): Promise<vo
         console.log(JSON.stringify(await ideDiagram(project)));
         return;
     }
-    throw new Error('Usage: saturn ide <catalog|diagram> [--project PATH] --json');
+    if (action === 'reports') {
+        const project = option(args, '--project');
+        if (!project)
+            throw new Error('Usage: saturn ide reports --project PATH --json');
+        console.log(JSON.stringify(await ideReports(project)));
+        return;
+    }
+    if (action === 'report') {
+        const project = option(args, '--project');
+        const id = option(args, '--id');
+        if (!project || !id)
+            throw new Error('Usage: saturn ide report --project PATH --id REPORT --json');
+        console.log(JSON.stringify(await ideReportPreview(project, id)));
+        return;
+    }
+    throw new Error('Usage: saturn ide <catalog|diagram|reports|report> [--project PATH] [--id REPORT] --json');
 }
