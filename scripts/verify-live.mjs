@@ -27,9 +27,9 @@ try {
 
   await page.waitForSelector('#studio-spatial canvas', { state: 'attached' });
   assert.equal(await page.locator('h1').innerText(), 'Saturn');
-  assert.equal(await page.locator('.feature-matrix article').count(), 4);
-  assert.equal(await page.locator('.deploy-card').count(), 6);
-  assert.equal(await page.locator('.extension-grid article').count(), 6);
+  assert.equal(await page.locator('.capability-row').count(), 4);
+  assert.equal(await page.locator('.deploy-row').count(), 6);
+  assert.equal(await page.locator('.extension-index > div').count(), 6);
 
   await page.locator('#studio-2d').click();
   assert((await page.locator('#studio-svg [data-node]').count()) > 0, 'Published landing renders the real Saturn scene');

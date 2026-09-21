@@ -79,65 +79,84 @@
     </div>
   </section>
   <section class="product-summary" aria-labelledby="capabilities-title">
-    <div class="section-heading">
-      <h2 id="capabilities-title">Что уже входит</h2>
-      <p>Один типизированный проект описывает объект и остаётся источником правды для инженерной работы, runtime и эксплуатации.</p>
-    </div>
-    <div class="feature-matrix">
-      <article><h3>Инженерия</h3><div class="feature-tags"><span>TypeScript DSL</span><span>2D / 3D</span><span>visual ↔ source</span><span>типы сигналов и единиц</span><span>каталог оборудования</span></div></article>
-      <article><h3>Runtime</h3><div class="feature-tags"><span>live telemetry</span><span>controls + alarms</span><span>historian + replay</span><span>simulation / adapters</span><span>stale + fail-closed</span></div></article>
-      <article><h3>HMI и отчёты</h3><div class="feature-tags"><span>operator HMI</span><span>единый Presentation IR</span><span>PLC HMI projection 320×240</span><span>графики + таблицы</span><span>A4 + расписание</span></div></article>
-      <article><h3>Доставка</h3><div class="feature-tags"><span>Git revisions</span><span>PWA / offline</span><span>standalone</span><span>VS Code host</span><span>signed update protocol</span></div></article>
+    <div class="section-kicker">SATURN / PROJECT MODEL</div>
+    <div class="section-split">
+      <div class="section-heading">
+        <h2 id="capabilities-title">Один проект описывает объект целиком.</h2>
+        <p>Исходник не заканчивается на мнемосхеме. Та же модель живёт в редакторе, runtime, HMI, истории, отчётах и deployment.</p>
+      </div>
+      <div class="capability-index" aria-label="Возможности Saturn">
+        <div class="capability-row"><span>01</span><strong>Model</strong><p>TypeScript DSL · оборудование · типизированные сигналы и единицы · 2D / 3D · visual ↔ source</p></div>
+        <div class="capability-row"><span>02</span><strong>Runtime</strong><p>live telemetry · controls · alarms · historian · replay · simulation · fail-closed</p></div>
+        <div class="capability-row"><span>03</span><strong>Presentation</strong><p>operator HMI · reports · A4 · charts · canonical Presentation IR · PLC 320×240 projection</p></div>
+        <div class="capability-row"><span>04</span><strong>Delivery</strong><p>Git revisions · PWA · standalone · VS Code · signed update protocol</p></div>
+      </div>
     </div>
   </section>
 
   <section class="deploy-section" aria-labelledby="deploy-title">
-    <div class="section-heading">
-      <h2 id="deploy-title">Запускайте Saturn в нужной форме</h2>
-      <p>Проект остаётся обычными файлами. Меняется оболочка и роль экземпляра, а не формат проекта.</p>
+    <div class="section-kicker">RUN ANYWHERE</div>
+    <div class="section-split deploy-split">
+      <div class="section-heading">
+        <h2 id="deploy-title">Один формат проекта.<br>Разные роли Saturn.</h2>
+        <p>Редактор на ноутбуке инженера, runtime на объекте, HMI у оператора или сервер — без конвертации проекта и параллельных моделей.</p>
+      </div>
+      <div class="deploy-console">
+        <div class="deploy-console-head"><span>surface</span><span>runtime</span></div>
+        <div class="deploy-row"><code>browser</code><div><strong>Browser / PWA</strong><span>installable · offline</span></div><span>web</span></div>
+        <div class="deploy-row"><code>standalone</code><div><strong>Portable Saturn</strong><span>Windows · Linux · macOS</span></div><span>binary</span></div>
+        <div class="deploy-row"><code>operator</code><div><strong>Operator / kiosk</strong><span>saturn run ./plant --kiosk</span></div><span>HMI</span></div>
+        <div class="deploy-row"><code>server</code><div><strong>Server</strong><span>Bun · SQLite · auth · SSE · history · reports</span></div><span>runtime</span></div>
+        <div class="deploy-row"><code>vscode</code><div><strong>VS Code</strong><span>editor · Problems · Git SCM · visual view</span></div><span>host</span></div>
+        <div class="deploy-row"><code>production</code><div><strong>Git-managed production</strong><span>main → production → applied</span></div><span>deploy</span></div>
+        <div class="deploy-actions">
+          <a href="https://github.com/Pom4H/saturn/releases/latest" target="_blank" rel="noopener">Download binaries ↗</a>
+          <code>npm run saturn -- pack --target windows-x64</code>
+        </div>
+      </div>
     </div>
-    <div class="deploy-grid">
-      <article class="deploy-card"><div><h3>Browser / PWA</h3><p>Редактор и операторский интерфейс в браузере, установка как PWA, offline-сценарии.</p></div><code>static web · installable</code></article>
-      <article class="deploy-card"><div><h3>Standalone</h3><p>Один Saturn открывает разные проекты без Node/npm на целевой машине.</p></div><code>Windows x64 · Linux x64/arm64 · macOS x64/arm64</code></article>
-      <article class="deploy-card"><div><h3>Operator / kiosk</h3><p>Та же runtime-модель без инженерных элементов управления.</p></div><code>saturn run ./plant --kiosk</code></article>
-      <article class="deploy-card"><div><h3>Server</h3><p>Bun runtime, SQLite, аутентификация, SSE, история, отчёты и граница промышленных адаптеров.</p></div><code>npm run plant</code></article>
-      <article class="deploy-card"><div><h3>VS Code</h3><p>Нативные TreeView, Problems, Git SCM, TypeScript editor и отдельная мнемосхема.</p></div><code>Saturn extension host</code></article>
-      <article class="deploy-card"><div><h3>Git-managed production</h3><p>Инженерная ревизия и применённая ревизия различаются; невалидный релиз не заменяет работающий.</p></div><code>main → production → applied</code></article>
-    </div>
-    <div class="deploy-command"><span>Готовые portable binaries</span><a href="https://github.com/Pom4H/saturn/releases/latest" target="_blank" rel="noopener">Windows · Linux · macOS ↗</a></div><div class="deploy-command"><span>Собрать из исходников</span><code>npm run saturn -- pack --target windows-x64</code></div>
   </section>
 
   <section class="extensions-section" aria-labelledby="extensions-title">
-    <div class="extensions-intro">
-      <div class="section-heading">
-        <h2 id="extensions-title">Расширяйте предметную область без форка Saturn</h2>
-        <p>Расширение — self-contained пакет с явными capabilities. Saturn проверяет sha512, не запускает npm lifecycle scripts и устанавливает точную версию сам.</p>
+    <div class="section-kicker">EXTENSION API</div>
+    <div class="section-heading extensions-heading">
+      <h2 id="extensions-title">Если Saturn не знает ваше оборудование — научите его.</h2>
+      <p>Расширение добавляет предметную семантику в существующую модель, а не создаёт второй продукт рядом.</p>
+    </div>
+    <div class="extensions-layout">
+      <div class="extension-code" aria-label="Пример расширения Saturn">
+        <div class="code-window-head"><span>factory-extension.ts</span><span>@factory/equipment</span></div>
+        <pre><code><span class="code-muted">import</span> { defineExtension } <span class="code-muted">from</span> "@saturn/core"
+
+<span class="code-muted">export default</span> defineExtension({
+  capabilities: [
+    <b>"elements"</b>,
+    <b>"protocol"</b>,
+    <b>"datasource"</b>,
+    <b>"panel"</b>,
+    <b>"report"</b>,
+    <b>"command"</b>
+  ]
+})</code></pre>
+        <div class="extension-install-line"><span>$</span><code>saturn extension add @factory/equipment</code></div>
       </div>
-      <div class="extension-install"><code>saturn extension add @factory/equipment</code><span>npm-compatible registry · public или private</span></div>
-    </div>
-    <div class="extension-grid">
-      <article><code>elements</code><h3>Оборудование</h3><p>Новые типы устройств, порты, сигналы, SVG/3D представление и доменная семантика.</p></article>
-      <article><code>protocol</code><h3>Протоколы</h3><p>Драйверы промышленных и vendor-specific протоколов через ограниченную границу интеграции.</p></article>
-      <article><code>datasource</code><h3>Источники данных</h3><p>Историки, внешние БД, облачные телеметрические сервисы и другие источники наблюдений.</p></article>
-      <article><code>panel</code><h3>Панели</h3><p>Пусконаладка, диагностика, сервисные инструменты и специализированные рабочие места.</p></article>
-      <article><code>report</code><h3>Отчёты</h3><p>Отраслевые шаблоны, расчёты, формы и экспорт поверх общей модели сигналов и истории.</p></article>
-      <article><code>command</code><h3>Команды и workflow</h3><p>Калибровка, обслуживание, резервное копирование и другие ограниченные действия.</p></article>
-    </div>
-    <div class="target-provider">
-      <div><code>target provider</code><h3>PLC compiler / deploy / flash</h3></div>
-      <p>Контроллер-специфичная часть живёт за provider boundary: компиляция проекта в target artifact, прошивка, мониторинг и deployment не требуют отдельного Saturn IDE.</p>
-    </div>
-    <div class="extension-ecosystem" aria-label="Направления экосистемы расширений">
-      <div><span>Дальше через extensions</span><a href="https://github.com/Pom4H/saturn/blob/main/docs/adr/0002-extension-packages.md" target="_blank" rel="noopener">Extension API ↗</a></div>
-      <div class="ecosystem-tags">
-        <span>импорт TIA / CODESYS / WinCC</span>
-        <span>historian / Timescale / Influx</span>
-        <span>MQTT / webhook / notifications</span>
-        <span>commissioning & test packs</span>
-        <span>simulation / domain packs</span>
-        <span>OIDC / LDAP providers</span>
+      <div class="extension-index">
+        <div><code>elements</code><p>Оборудование, порты, сигналы, SVG / 3D и доменная семантика.</p></div>
+        <div><code>protocol</code><p>Промышленные и vendor-specific протоколы.</p></div>
+        <div><code>datasource</code><p>Историки, БД и внешняя телеметрия.</p></div>
+        <div><code>panel</code><p>Пусконаладка, диагностика и сервисные рабочие места.</p></div>
+        <div><code>report</code><p>Отраслевые формы, расчёты и экспорт.</p></div>
+        <div><code>command</code><p>Калибровка, обслуживание и ограниченные workflow.</p></div>
       </div>
-      <p>Это направления для следующих capability API, а не обещание v0.1: доступ к сети, процессам и файловой системе потребует отдельных явных permissions.</p>
+    </div>
+    <div class="target-flow">
+      <div><span class="flow-label">TARGET PROVIDER</span><strong>PLC compiler / deploy / flash</strong></div>
+      <div class="flow-path"><span>project</span><i>→</i><span>compile</span><i>→</i><span>artifact</span><i>→</i><span>flash</span><i>→</i><span>monitor</span></div>
+    </div>
+    <div class="ecosystem-line">
+      <span>Следующие точки расширения</span>
+      <p>TIA / CODESYS / WinCC import · Timescale / Influx · MQTT / webhooks · commissioning packs · simulation packs · OIDC / LDAP</p>
+      <a href="https://github.com/Pom4H/saturn/blob/main/docs/adr/0002-extension-packages.md" target="_blank" rel="noopener">API ↗</a>
     </div>
   </section>
 
