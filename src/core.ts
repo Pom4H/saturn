@@ -74,24 +74,24 @@ type Base = { x: number; y: number; quality?: Quality; alarm?: Alarm };
 type InPort = Endpoint & { readonly role: 'in' };
 type OutPort = Endpoint & { readonly role: 'out' };
 type Inline = Equipment & { inlet: InPort; outlet: OutPort };
-function create(kind: Kind, id: string, props: object): Equipment & Record<string, unknown> {
+function create<T extends Equipment = Equipment>(kind: Kind, id: string, props: object): T {
   if (!Object.prototype.hasOwnProperty.call(catalog, kind)) throw new Error(`Unknown component: ${kind}`);
   const node: Equipment & Record<string, unknown> = { kind, id, variable: '', props: { ...defaults(kind), ...props } };
   for (const [name, port] of Object.entries(catalog[kind].ports)) node[name] = { node: id, port: name, role: port.role };
-  return node;
+  return node as unknown as T;
 }
 /** Generic factory for any installed component, including independent packages. */
 export const component = (kind: string, id: string, props: Record<string, Value>) => create(kind, id, props);
 /** Declarative data only. Connecting is an explicit browser operation. */
 export const runtime = (configuration: RuntimeConfig): RuntimeConfig => ({ ...configuration });
-export const tank = (id: string, props: Base & { level?: number }) => create('tank', id, props) as Equipment & { outlet: OutPort };
-export const pump = (id: string, props: Base & { rpm?: number; temperature?: number; vibration?: number; nominalFlow?: number; degradationRate?: number; startDelay?: number; maintenanceSeconds?: number }) => create('pump', id, props) as Inline;
-export const valve = (id: string, props: Base & { opening?: number }) => create('valve', id, props) as Inline;
-export const flowmeter = (id: string, props: Base) => create('flowmeter', id, props) as Inline;
-export const exchanger = (id: string, props: Base & { temperature?: number }) => create('exchanger', id, props) as Inline;
-export const outlet = (id: string, props: Base) => create('outlet', id, props) as Equipment & { inlet: InPort };
-export const pressure = (id: string, props: { value?: number; at?: number; offset?: number; quality?: Quality; alarm?: Alarm }) => create('pressure', id, props) as Equipment;
-export const temperature = (id: string, props: { value?: number; at?: number; offset?: number; quality?: Quality; alarm?: Alarm }) => create('temperature', id, props) as Equipment;
+export const tank = (id: string, props: Base & { level?: number }) => create<Equipment & { outlet: OutPort }>('tank', id, props);
+export const pump = (id: string, props: Base & { rpm?: number; temperature?: number; vibration?: number; nominalFlow?: number; degradationRate?: number; startDelay?: number; maintenanceSeconds?: number }) => create<Inline>('pump', id, props);
+export const valve = (id: string, props: Base & { opening?: number }) => create<Inline>('valve', id, props);
+export const flowmeter = (id: string, props: Base) => create<Inline>('flowmeter', id, props);
+export const exchanger = (id: string, props: Base & { temperature?: number }) => create<Inline>('exchanger', id, props);
+export const outlet = (id: string, props: Base) => create<Equipment & { inlet: InPort }>('outlet', id, props);
+export const pressure = (id: string, props: { value?: number; at?: number; offset?: number; quality?: Quality; alarm?: Alarm }) => create<Equipment>('pressure', id, props);
+export const temperature = (id: string, props: { value?: number; at?: number; offset?: number; quality?: Quality; alarm?: Alarm }) => create<Equipment>('temperature', id, props);
 export const connect = (from: OutPort, to: InPort): Link => ({ id: `${from.node}.${from.port}:${to.node}.${to.port}`, from, to });
 export const tap = (line: Link, instrument: Equipment): Equipment => ({ ...instrument, tap: line.id });
 
