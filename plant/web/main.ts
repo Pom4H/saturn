@@ -14,8 +14,9 @@ import { compileProject, validateFiles } from '../compiler';
 import { chartSVG, escape } from '../workflows';
 import { LocalClient, RemoteClient, LinkedClient, type Connection, type Status, type Revision, type Frame, type ReportArtifact, type ReportData, type EnvironmentDescriptor } from './client';
 import type { Event as SaturnEvent } from '../types';
+import { localeFromLanguage, modelTitle } from '../i18n';
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
-const base = new URL('../', location.href), demo = location.pathname.endsWith('/demo/');
+const base = new URL('../', location.href), demo = location.pathname.endsWith('/demo/'), uiLocale = localeFromLanguage(navigator.language);
 let client: Connection, status: Status, frame: Frame, scene: SceneView, system = '', selected: string | null = null, tab = 'scheme', file = 'plant.ts', files: Record<string, string> = {}, head: string | null = null, dirty = false, validDraft = true, editor: EditorView, loadingEditor = false, failed = false;
 let scene3d: SceneView3D | undefined, viewMode: '2d' | '3d' = '2d', changingView = false;
 type BeforeInstallPromptEvent = Event & { prompt(): Promise<void> };
@@ -297,7 +298,7 @@ function renderInspector() {
     const n = status.project.simulations.find(n => n.id === selected);
     if (!n) { renderPlcInspector(); return; }
     const spec = model(n.model);
-    $('inspector').innerHTML = `<p class="eyebrow">${escape(n.model)} / ${escape(spec.version)}</p><h2>${escape(n.id)}</h2><p>${escape(spec.title)}</p><div class="signals">${Object.entries(spec.outputs).map(([key, unit]) => `<div class="signal-row" data-signal="${escape(n.id + '.' + key)}"><span title="${escape(unit)}">${escape(key)}</span><b>—</b></div>`).join('')}</div><svg id="small-trend" class="trend" viewBox="0 0 400 130"></svg><div class="parameters"><h3>Параметры модели</h3><p>Изменения — команды текущего прогона; исходник проекта не меняется.</p>${Object.entries(spec.parameters).map(([key, d]) => `<label class="parameter"><span>${escape(key)}</span><input type="number" data-param="${escape(key)}" value="${status.overrides[`${n.id}.${key}`] ?? n.parameters[key]}" min="${d.min}" max="${d.max}" step="any"><button data-set="${escape(key)}" ${status.actor.role !== 'engineer' ? 'disabled' : ''} title="Применить">↵</button></label>`).join('')}</div><p class="model-limit">Условная модель. Числа не являются настройками реального оборудования.</p>`;
+    $('inspector').innerHTML = `<p class="eyebrow">${escape(n.model)} / ${escape(spec.version)}</p><h2>${escape(n.id)}</h2><p>${escape(modelTitle(spec.kind, uiLocale))}</p><div class="signals">${Object.entries(spec.outputs).map(([key, unit]) => `<div class="signal-row" data-signal="${escape(n.id + '.' + key)}"><span title="${escape(unit)}">${escape(key)}</span><b>—</b></div>`).join('')}</div><svg id="small-trend" class="trend" viewBox="0 0 400 130"></svg><div class="parameters"><h3>Параметры модели</h3><p>Изменения — команды текущего прогона; исходник проекта не меняется.</p>${Object.entries(spec.parameters).map(([key, d]) => `<label class="parameter"><span>${escape(key)}</span><input type="number" data-param="${escape(key)}" value="${status.overrides[`${n.id}.${key}`] ?? n.parameters[key]}" min="${d.min}" max="${d.max}" step="any"><button data-set="${escape(key)}" ${status.actor.role !== 'engineer' ? 'disabled' : ''} title="Применить">↵</button></label>`).join('')}</div><p class="model-limit">Условная модель. Числа не являются настройками реального оборудования.</p>`;
     appendTerminalPanel();
     renderFrame(frame);
     void updateTrend();
@@ -443,7 +444,7 @@ async function start(memory = false) {
         $('storage').textContent = demo ? memory ? 'SQLite WASM · память, без сохранения' : 'SQLite WASM · OPFS · одна вкладка-владелец' : 'Node.js · SQLite · Git · авторизованная сессия';
         $('logout').hidden = demo;
         renderEnvironmentStatus();
-        installEquipment();
+        installEquipment(uiLocale);
         if (!demo) {
             await refreshApplicationExtensions(true);
             void checkShellUpdate();
@@ -707,7 +708,7 @@ function renderInventory() {
     const entries=status.project.devices.map(d=>{
         const n=status.project.simulations.find(n=>n.id===d.id),m=n&&model(n.model);
         const c=status.project.controllers?.find(c=>c.id===d.id);
-        return {device:d,title:m?.title??'Saturn PLC · FBD/WASM',version:m?`${n!.model} / ${m.version}`:'saturn-fbd/combinational-v1',inputs:n?Object.keys(n.inputs).length:Object.keys(terminals('saturn')).filter(k=>/^DI|^AI/.test(k)).length,outputs:m?Object.keys(m.outputs).length:Object.keys(c?.outputs??{}).length};
+        return {device:d,title:m?modelTitle(m.kind,uiLocale):modelTitle('saturn-plc',uiLocale)+' / WASM',version:m?`${n!.model} / ${m.version}`:'saturn-fbd/combinational-v1',inputs:n?Object.keys(n.inputs).length:Object.keys(terminals('saturn')).filter(k=>/^DI|^AI/.test(k)).length,outputs:m?Object.keys(m.outputs).length:Object.keys(c?.outputs??{}).length};
     }).filter(e=>`${e.device.id} ${e.title} ${e.device.system}`.toLocaleLowerCase('ru').includes(q));
     $('coverage').textContent = `${status.project.devices.length} приборов · ${status.project.controllers?.length??0} PLC · ${status.project.systems.length} подсистем · ${status.project.connections?.length??0} физических соединений. Учебная комплектация, не проверенная ведомость АЭС.`;
     $('inventory-list').innerHTML = `<div class="table-scroll"><table><thead><tr><th>Прибор</th><th>Подсистема</th><th>Модель / версия</th><th>Входы → выходы</th><th>Представления</th></tr></thead><tbody>${entries.map(e=>`<tr><td><button data-inspect="${escape(e.device.id)}">${escape(e.device.id)}</button></td><td>${escape(status.project.systems.find(s=>s.id===e.device.system)?.title??e.device.system)}</td><td>${escape(e.title)}<br><small>${escape(e.version)}</small></td><td>${e.inputs} → ${e.outputs}</td><td>2D / 3D · ${e.device.type==='saturn'?'SVG/HMI + WASM':'схема'}</td></tr>`).join('')}</tbody></table></div>`;
