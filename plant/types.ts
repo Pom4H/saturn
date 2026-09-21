@@ -7,31 +7,42 @@ export type Scalar = number | boolean | string;
 export type Quality = 'good' | 'bad' | 'stale' | 'offline';
 
 declare const signalValueType: unique symbol;
+declare const expressionValueType: unique symbol;
 export type SignalRuntimeType = 'number' | 'boolean' | 'string';
+export type SignalDimension = 'unknown' | 'scalar' | 'boolean' | 'voltage' | 'current' | 'power' | 'energy' | 'flow' | 'volume' | 'pressure' | 'temperature' | 'resistance' | 'rotational-speed' | 'ratio' | 'frequency' | 'time' | (string & {});
 export type SignalValueForRuntime<Type extends SignalRuntimeType> = Type extends 'boolean' ? boolean : Type extends 'string' ? string : number;
 export interface RefExpr { readonly ref: string }
-export interface SignalRef<ID extends string = string, Value extends Scalar = number, Unit extends string = string> extends RefExpr {
+export interface SignalRef<ID extends string = string, Value extends Scalar = number, Unit extends string = string, Dimension extends SignalDimension = 'unknown'> extends RefExpr {
     readonly ref: ID;
-    readonly [signalValueType]: { value: Value; unit: Unit };
+    readonly [signalValueType]: { value: Value; unit: Unit; dimension: Dimension };
 }
-export type SignalId<S> = S extends SignalRef<infer ID, Scalar, string> ? ID : never;
-export type SignalValueOf<S> = S extends SignalRef<string, infer Value, string> ? Value : never;
-export type SignalUnitOf<S> = S extends SignalRef<string, Scalar, infer Unit> ? Unit : never;
-export interface SignalMetadata { type: SignalRuntimeType; unit: string }
+export interface OperationExpr<Value extends Scalar = number, Dimension extends SignalDimension = 'unknown'> {
+    readonly op: 'add' | 'mul' | 'sub' | 'div' | 'min' | 'max' | 'gt' | 'lt' | 'not' | 'and';
+    readonly args: Expr[];
+    readonly [expressionValueType]: { value: Value; dimension: Dimension };
+}
+export type SignalId<S> = S extends SignalRef<infer ID, Scalar, string, SignalDimension> ? ID : never;
+export type SignalValueOf<S> = S extends SignalRef<string, infer Value, string, SignalDimension> ? Value : never;
+export type SignalUnitOf<S> = S extends SignalRef<string, Scalar, infer Unit, SignalDimension> ? Unit : never;
+export type SignalDimensionOf<S> = S extends SignalRef<string, Scalar, string, infer Dimension> ? Dimension : never;
+export type ExpressionDimensionOf<E> = E extends SignalRef<string, Scalar, string, infer Dimension> ? Dimension : E extends OperationExpr<Scalar, infer Dimension> ? Dimension : 'unknown';
+export type ExpressionValueOf<E> = E extends SignalRef<string, infer Value, string, SignalDimension> ? Value : E extends OperationExpr<infer Value, SignalDimension> ? Value : E extends number ? number : E extends boolean ? boolean : never;
+export interface SignalMetadata { type: SignalRuntimeType; unit: string; dimension: SignalDimension }
 export const signalMetadata = Symbol('saturn.signal.metadata');
-export function signalRef<const ID extends string, const Type extends SignalRuntimeType, const Unit extends string>(ref: ID, type: Type, unit: Unit): SignalRef<ID, SignalValueForRuntime<Type>, Unit> {
+export function signalRef<const ID extends string, const Type extends SignalRuntimeType, const Unit extends string, const Dimension extends SignalDimension = 'unknown'>(ref: ID, type: Type, unit: Unit, dimension?: Dimension): SignalRef<ID, SignalValueForRuntime<Type>, Unit, Dimension> {
     const value = { ref };
-    Object.defineProperty(value, signalMetadata, { value: { type, unit }, enumerable: false, configurable: false, writable: false });
-    return value as unknown as SignalRef<ID, SignalValueForRuntime<Type>, Unit>;
+    Object.defineProperty(value, signalMetadata, { value: { type, unit, dimension: dimension ?? 'unknown' }, enumerable: false, configurable: false, writable: false });
+    return value as unknown as SignalRef<ID, SignalValueForRuntime<Type>, Unit, Dimension>;
 }
-export function signalInfo(ref: SignalRef<string, Scalar, string>): SignalMetadata {
-    return (ref as SignalRef<string, Scalar, string> & { [signalMetadata]?: SignalMetadata })[signalMetadata] ?? { type: 'number', unit: '' };
+export function signalInfo(ref: SignalRef<string, Scalar, string, SignalDimension>): SignalMetadata {
+    return (ref as SignalRef<string, Scalar, string, SignalDimension> & { [signalMetadata]?: SignalMetadata })[signalMetadata] ?? { type: 'number', unit: '', dimension: 'unknown' };
 }
 
-export type Expr = number | boolean | RefExpr | {
-    op: 'add' | 'mul' | 'sub' | 'div' | 'min' | 'max' | 'gt' | 'lt' | 'not' | 'and';
-    args: Expr[];
-};
+export type Expr<Value extends Scalar = Scalar, Dimension extends SignalDimension = 'unknown'> =
+    | number
+    | boolean
+    | RefExpr
+    | OperationExpr<Value, Dimension>;
 export interface Sample {
     value: number | null;
     quality: Quality;
@@ -207,7 +218,10 @@ export interface ModelSpec {
         max: number;
     }>;
     outputs: Record<string, string>;
+    inputTypes?: Record<string, SignalRuntimeType>;
+    inputDimensions?: Record<string, SignalDimension>;
     outputTypes?: Record<string, SignalRuntimeType>;
+    outputDimensions?: Record<string, SignalDimension>;
     initialize(p: Readonly<Record<string, number>>): Record<string, number>;
     advance(s: Readonly<Record<string, number>>, inputs: Readonly<Record<string, number>>, p: Readonly<Record<string, number>>, dt: number): Record<string, number>;
     observe(s: Readonly<Record<string, number>>, p: Readonly<Record<string, number>>): Record<string, number>;
