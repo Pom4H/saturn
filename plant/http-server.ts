@@ -8,7 +8,8 @@ import { EnvironmentBroker } from './environment';
 import { Push } from './adapters/push';
 import { Store } from './store';
 import { Service } from './service';
-import { AppError, requireRole, type Repository, type SqlDatabase, type ReportTask, type ReportArtifact } from './types';
+import { AppError, requireRole, type SqlDatabase, type ReportTask, type ReportArtifact } from './types';
+import type { BuildArtifact } from './artifact';
 import { diagnosticLocale, errorPayload, failCode } from './diagnostics';
 import { commandValue, nullableStringValue, numberMapValue, objectValue, stringMapValue, stringValue, type JsonObject } from './http-input';
 const prefix = '/plant';
@@ -45,14 +46,17 @@ export async function startPlantHttpServer(options: {
     embeddedStatic?: boolean;
     staticReader?: (relativePath: string) => Promise<Uint8Array>;
     database: SqlDatabase;
-    projectRepository: Repository;
+    workspace?: {
+        snapshot(): Promise<{ id:string; sourceRevision:string|null; time:number; actor:string; message:string; files:Record<string,string> }>;
+        save(files: Record<string,string>, expected: string | null): Promise<{ id:string; sourceRevision:string|null; time:number; actor:string; message:string; files:Record<string,string> }>;
+        build(): Promise<BuildArtifact>;
+    };
     reportRunner: (task: ReportTask) => Promise<ReportArtifact>;
-    seed: Record<string, string>;
+    seed: BuildArtifact;
 }) {
     const database = options.database;
     const store = new Store(database);
-    const repository = options.projectRepository;
-    const service = new Service(store, repository, { reportRunner: options.reportRunner });
+    const service = new Service(store, { reportRunner: options.reportRunner });
     await service.start(options.seed);
     const auth = new Auth(store), environments = new EnvironmentBroker(), password = options.password ?? randomBytes(18).toString('base64url'), username = options.user ?? 'engineer';
     const created = auth.seed(username, password);
@@ -229,13 +233,14 @@ export async function startPlantHttpServer(options: {
                         json(200, await service.instance(actor));
                         return;
                     }
-                    if (action === 'project') {
-                        json(200, await service.files(actor));
+                    if (action === 'workspace') {
+                        requireRole(actor, 'engineer');
+                        if (!options.workspace) failCode('SATURN_RUNTIME_INVALID',{reason:'disabled'},{resource:'workspace'},{status:404});
+                        json(200, await options.workspace.snapshot());
                         return;
                     }
-                    if (action === 'revisions') {
-                        requireRole(actor, 'engineer');
-                        json(200, (await repository.log()).map(({ files, ...meta }) => meta));
+                    if (action === 'artifact') {
+                        json(200, service.artifactInfo(actor));
                         return;
                     }
                     if (action === 'events') {
@@ -311,12 +316,17 @@ export async function startPlantHttpServer(options: {
                         json(200, await service.restart(actor));
                         return;
                     }
-                    if (action === 'save') {
-                        json(200, await service.save(stringMapValue(input.files,'files'), nullableStringValue(input,'expected'), stringValue(input,'message'), actor));
+                    if (action === 'workspace/save') {
+                        requireRole(actor, 'engineer');
+                        if (!options.workspace) failCode('SATURN_RUNTIME_INVALID',{reason:'disabled'},{resource:'workspace'},{status:404});
+                        json(200, await options.workspace.save(stringMapValue(input.files,'files'), nullableStringValue(input,'expected')));
                         return;
                     }
-                    if (action === 'publish') {
-                        json(200, await service.publish(stringValue(input,'revision'), nullableStringValue(input,'expected'), actor));
+                    if (action === 'deploy') {
+                        requireRole(actor, 'engineer');
+                        const candidate: unknown = input.artifact ?? (options.workspace ? await options.workspace.build() : undefined);
+                        if (!candidate) failCode('SATURN_VALUE_INVALID',{field:'artifact',reason:'missing'});
+                        json(200, await service.deploy(candidate, nullableStringValue(input,'expected'), actor));
                         return;
                     }
                     if (action === 'rollback') {
