@@ -31,6 +31,19 @@ await build({
   format: 'esm',
   target: 'node24',
   packages: 'external',
+  plugins: [{
+    name: 'raw',
+    setup(build) {
+      build.onResolve({ filter: /\\?raw$/ }, args => ({
+        path: new URL(args.path.slice(0, -4), 'file://' + args.resolveDir.replace(/\\\\/g, '/') + '/').pathname,
+        namespace: 'raw',
+      }));
+      build.onLoad({ filter: /.*/, namespace: 'raw' }, async args => ({
+        contents: await (await import('node:fs/promises')).readFile(args.path, 'utf8'),
+        loader: 'text',
+      }));
+    },
+  }],
 });
 const { spawnSync } = await import('node:child_process');
 const result = spawnSync(process.execPath, ['.authoring/check.mjs'], { stdio: 'inherit' });
