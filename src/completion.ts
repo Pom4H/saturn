@@ -1,4 +1,4 @@
-import ts from 'typescript';
+import ts from '@typescript/typescript6';
 import type { Completion } from '@codemirror/autocomplete';
 import { catalog, type Scene } from './core';
 
