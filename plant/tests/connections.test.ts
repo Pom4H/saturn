@@ -22,7 +22,7 @@ test('compiler rejects wrong medium, opposite polarity, unknown terminals and oc
  const q=project();q.connections!.find(w=>w.id==='dc-positive')!.to.port='DC-';assert.throws(()=>validateProject(q),/Incompatible/);
 });
 test('reference Saturn terminal centers are shared with the vendor SVG, including DC and bus contacts',()=>{
- const ports=terminals('saturn');for(const p of [...SATURN_TERMINAL_ANCHORS,...SATURN_SERVICE_ANCHORS]){assert.equal(ports[p.id].x,p.x*.5);assert.equal(ports[p.id].y,p.y*.5);}
+ const saturnType:string='saturn',ports=terminals(saturnType);for(const p of [...SATURN_TERMINAL_ANCHORS,...SATURN_SERVICE_ANCHORS]){assert.equal(ports[p.id].x,p.x*.5);assert.equal(ports[p.id].y,p.y*.5);}
  assert.equal(ports['DC+'].family,'dc24');assert.equal(ports['DC-'].family,'dc0');
 });
 test('all installed visual terminal anchors match the 3D connection points',()=>{
