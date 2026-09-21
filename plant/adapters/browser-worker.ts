@@ -4,7 +4,7 @@ import { Service } from '../service';
 import { demoFiles } from '../demo/files';
 import { compileProject } from '../compiler';
 import { AppError, type Actor, type ReportTask, type ReportArtifact } from '../types';
-import { diagnosticLocale, errorPayload } from '../diagnostics';
+import { diagnosticLocale, errorPayload, failCode } from '../diagnostics';
 const actor: Actor = { id: 'demo-engineer', role: 'engineer' };
 let service: Service | null = null, initializing = false, ready = false, ticks = 0;
 const scope = self;
@@ -53,9 +53,9 @@ async function initialize(memory: boolean) {
     if (memory)
         return open();
     if (!navigator.locks)
-        throw new AppError('Persistent demo requires Web Locks. Use an explicit in-memory session.');
+        failCode('SATURN_RUNTIME_INVALID',{reason:'disabled'},{resource:'web-locks'});
     await navigator.locks.request('scada-plant-database', { ifAvailable: true }, async (lock) => { if (!lock)
-        throw new AppError('This demo database is open in another tab. Close that tab first.', 409); await open(); });
+        failCode('SATURN_CONFLICT',{resource:'browser.database',reason:'stateChanged'},{lock:'scada-plant-database'},{status:409}); await open(); });
 }
 scope.onmessage = async (e) => {
     const { id, action, input } = e.data ?? {};
@@ -68,7 +68,7 @@ scope.onmessage = async (e) => {
     }
     try {
         if (!ready || !service)
-            throw new AppError('Runtime is not ready', 503);
+            failCode('SATURN_RUNTIME_INVALID',{reason:'disabled'},{resource:'browser-runtime'},{status:503});
         let result: unknown;
         switch (action) {
             case 'firmware': result=service.firmware(input.controllerId,input.revision,actor);break;
@@ -114,7 +114,7 @@ scope.onmessage = async (e) => {
             case 'validate':
                 result = compileProject(input.files);
                 break;
-            default: throw new AppError('Unknown operation');
+            default: failCode('SATURN_DSL_UNKNOWN',{kind:'browserOperation',name:String(action)},{action:String(action)});
         }
         scope.postMessage({ id, result });
     }
