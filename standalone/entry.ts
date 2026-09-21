@@ -11,7 +11,7 @@ import { loadProjectDirectory } from './project-loader';
 import { WorkspaceRegistry } from './workspace';
 import { WorkspaceRepository } from './workspace-repository';
 import { applyStagedUpdate, checkApplicationUpdate, installApplicationUpdate, runUpdateCommand, type UpdateChannel } from './update';
-import { ExtensionManager, runExtensionCommand } from './extensions';
+import { addRegistryItem, runRegistryCommand } from './registry';
 import { runIdeCommand } from './ide';
 
 declare const SATURN_VERSION: string;
@@ -113,12 +113,20 @@ if (args[0] === 'update') {
     });
     process.exit(0);
 }
-if (args[0] === 'extension' || args[0] === 'extensions') {
-    await runExtensionCommand(args.slice(1), appData);
+if (args[0] === 'registry') {
+    await runRegistryCommand(args.slice(1));
+    process.exit(0);
+}
+if (args[0] === 'add') {
+    const name = args[1];
+    if (!name) throw new Error('Usage: saturn add <registry-item> [--project PATH]');
+    const projectIndex = args.indexOf('--project');
+    const project = projectIndex >= 0 ? args[projectIndex + 1] : process.cwd();
+    console.log(JSON.stringify(await addRegistryItem(project, name), null, 2));
     process.exit(0);
 }
 if (args[0] === 'ide') {
-    await runIdeCommand(args.slice(1), appData);
+    await runIdeCommand(args.slice(1));
     process.exit(0);
 }
 
@@ -129,7 +137,6 @@ if (args[0] === 'run' || args[0] === 'open')
 const kiosk = args.includes('--kiosk');
 const projectArgument = args.find(arg => !arg.startsWith('--')) ?? process.env.SATURN_PROJECT;
 const registry = new WorkspaceRegistry(resolve(appData, 'workspace.json'));
-const extensionManager = new ExtensionManager(resolve(appData, 'extensions'));
 
 let files = SATURN_DEMO_FILES;
 let projectDirectory: string | null = null;
@@ -138,7 +145,7 @@ let projectTitle = 'Saturn demo';
 
 if (projectArgument) {
     const loaded = await loadProjectDirectory(projectArgument);
-    files = loaded.files;
+    files = loaded.sources;
     projectDirectory = loaded.directory;
     projectId = loaded.id;
     projectTitle = loaded.title;
@@ -182,12 +189,6 @@ app = await startPlantHttpServer({
     uiMode: kiosk ? 'kiosk' : command === 'run' ? 'runtime' : 'ide',
     application: {
         version: SATURN_VERSION,
-        extensions: {
-            list: () => extensionManager.list(),
-            install: specifier => extensionManager.install(specifier),
-            remove: name => extensionManager.remove(name),
-            readAsset: (id, path) => extensionManager.readAsset(id, path),
-        },
         update: {
             check: () => checkApplicationUpdate(updateContext, updateChannel),
             install: async () => {
