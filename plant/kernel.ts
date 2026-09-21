@@ -1,7 +1,8 @@
 import { ControllerVM, inputPins, CONTROLLER_ABI } from './controller';
 import { connectionExpression, terminals, busConnected, type Terminal } from './ports';
 import { model } from './models';
-import { AppError, clone, finite, type Checkpoint, type Expr, type Frame, type Project, type Sample } from './types';
+import { clone, finite, type Checkpoint, type Expr, type Frame, type Project, type Sample } from './types';
+import { failCode } from './diagnostics';
 export { evaluate } from './expressions';
 import { evaluate } from './expressions';
 /** Ordered fixed-step, double-buffered state: equipment order cannot change a result. */
@@ -11,26 +12,26 @@ export class Kernel {
     private controllers = new Map<string,ControllerVM>();
     constructor(readonly project: Project, revision: string, runId: string, epoch: number, checkpoint?: Checkpoint) {
         this.state = checkpoint ? clone(checkpoint) : { runId, revision, epoch, time: epoch, seq: 0, paused: false, overrides: {}, modelVersions: Object.fromEntries(project.simulations.map(n => [n.model, model(n.model).version])), controls: Object.fromEntries((project.controls ?? []).map(c => [c.id, { requested: c.initial, value: c.initial, blocked: false }])), states: Object.fromEntries(project.simulations.map(n => [n.id, model(n.model).initialize(n.parameters)])) };
-        if(checkpoint&&(project.controllers?.length??0)>0&&checkpoint.controllerAbi!==CONTROLLER_ABI)throw new AppError('Controller checkpoint ABI mismatch');
+        if(checkpoint&&(project.controllers?.length??0)>0&&checkpoint.controllerAbi!==CONTROLLER_ABI)failCode('SATURN_RUNTIME_INVALID',{reason:'stateChanged'},{field:'controllerAbi'});
         this.state.controllerAbi=CONTROLLER_ABI;
         this.state.plc ??= {};
         for(const c of project.controllers??[]) {
             const vm=new ControllerVM(c); this.controllers.set(c.id,vm);
-            const saved=this.state.plc[c.id];if(saved?.snapshot)vm.restore(saved.snapshot);else if(checkpoint)throw new AppError('Missing controller runtime snapshot');
+            const saved=this.state.plc[c.id];if(saved?.snapshot)vm.restore(saved.snapshot);else if(checkpoint)failCode('SATURN_RUNTIME_INVALID',{reason:'missing'},{field:'controller.snapshot',controller:c.id});
             this.state.plc[c.id] ??= {inputs:{},outputs:Object.fromEntries(Object.keys(c.outputs).map(k=>[k,0])),healthy:false,powered:false,snapshot:vm.snapshot()};
         }
         this.state.controls ??= {};
         for (const c of project.controls ?? []) {
             const saved = this.state.controls[c.id];
-            if (!saved) throw new AppError(`Missing control checkpoint: ${c.id}`);
+            if (!saved) failCode('SATURN_RUNTIME_INVALID',{reason:'missing'},{field:'control.checkpoint',control:c.id});
             finite(saved.requested, c.id, c.min, c.max); finite(saved.value, c.id, c.min, c.max);
         }
         this.bad = new Set(this.state.invalidModels ?? []);
         for (const n of project.simulations)
             if (this.state.modelVersions?.[n.model] !== model(n.model).version)
-                throw new AppError(`Checkpoint model version mismatch: ${n.model}`);
+                failCode('SATURN_RUNTIME_INVALID',{reason:'stateChanged'},{field:'model.version',model:n.model});
         if (Object.keys(this.state.states).length !== project.simulations.length)
-            throw new AppError('Checkpoint topology mismatch');
+            failCode('SATURN_RUNTIME_INVALID',{reason:'stateChanged'},{field:'topology'});
     }
     private parameters(node: Project['simulations'][number]) { const p = { ...node.parameters }; for (const k of Object.keys(p)) {
         const v = this.state.overrides[`${node.id}.${k}`];
@@ -114,7 +115,7 @@ export class Kernel {
                 }
                 const result = model(n.model).advance(this.state.states[n.id], inputs, this.parameters(n), this.project.stepMs / 1000);
                 if (Object.values(result).some(v => !Number.isFinite(v) || Math.abs(v) > 1e12))
-                    throw new AppError(`Model ${n.id} left its numerical domain`);
+                    failCode('SATURN_MODEL_INVALID',{model:n.model,reason:'range'},{device:n.id});
                 next[n.id] = result;
             }
             // Controls use the same previous-step snapshot as equipment. Fail-closed gates are
@@ -160,14 +161,14 @@ export class Kernel {
         return { displays, runId: this.state.runId, revision: this.state.revision, seq: this.state.seq, time: this.state.time, paused: this.state.paused, synthetic: true, samples: this.samples(), alarms: [] }; }
     operate(target: string, value: number): void {
         const c = this.project.controls?.find(c => c.id === target);
-        if (!c) throw new AppError('Unknown operator control');
+        if (!c) failCode('SATURN_NOT_FOUND',{resource:'control',id:target},{target});
         finite(value, c.title, c.min, c.max);
         if (c.enableWhen !== undefined) {
             const samples = this.samples(), gate = evaluate(c.enableWhen, id => samples[id] ?? { value: null, quality: 'bad', time: this.state.time }, this.state.time);
-            if (gate.quality !== 'good' || !gate.value) throw new AppError(c.blockedReason!, 409);
+            if (gate.quality !== 'good' || !gate.value) failCode('SATURN_RUNTIME_INVALID',{reason:'disabled'},{control:c.id,blockedReason:c.blockedReason},{status:409});
         }
         this.state.controls![target].requested = value;
     }
     setParameter(target: string, parameter: string, value: number): void { const n = this.project.simulations.find(n => n.id === target), spec = n && model(n.model).parameters[parameter]; if (!n || !spec)
-        throw new AppError('Unknown editable parameter'); finite(value, parameter, spec.min, spec.max); this.state.overrides[`${target}.${parameter}`] = value; }
+        failCode('SATURN_NOT_FOUND',{resource:'parameter',id:`${target}.${parameter}`},{target,parameter}); finite(value, parameter, spec.min, spec.max); this.state.overrides[`${target}.${parameter}`] = value; }
 }
