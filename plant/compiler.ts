@@ -1,7 +1,7 @@
 import { validatePresentation, presentationActions } from './presentation';
 import { compileController, inputPins } from './controller';
 import { validateConnections, terminals, connectionExpression } from './ports';
-import ts from '@typescript/typescript6';
+import ts from 'typescript';
 import * as dsl from './dsl';
 import { model, models } from './models';
 import { finite, id, type Project, type Expr } from './types';
@@ -22,223 +22,112 @@ export function validateFiles(files: Record<string, string>): void {
     if (total > 2000000)
         failCode('SATURN_LIMIT',{resource:'project',reason:'tooLarge'},{limitBytes:2000000});
 }
-/** Bounded AST interpreter. Local imports read a supplied immutable file map, never the filesystem. */
-export function compileProject(files: Record<string, string>, entry = 'plant.ts'): Project {
+/** Build trusted authored TypeScript into the canonical Saturn IR.
+ *
+ * TypeScript is the language. Saturn no longer interprets a TypeScript-shaped subset.
+ * The browser/offline builder deliberately resolves only local modules + @saturn/core;
+ * native hosts may provide package resolution before this boundary.
+ */
+export function compileProject(files: Record<string, string>, entry = files['src/plant.ts'] !== undefined ? 'src/plant.ts' : 'plant.ts'): Project {
     validateFiles(files);
-    const cache = new Map<string, Record<string, unknown>>(), visiting = new Set<string>();
-    let steps = 0;
-    const builtins = Object.fromEntries(Object.entries(dsl).filter(([, v]) => typeof v === 'function'));
-    const builtinFunctions = new Set<unknown>(Object.values(builtins));
-    function module(path: string): Record<string, unknown> {
-        if (cache.has(path))
-            return cache.get(path)!;
-        if (visiting.has(path))
-            failCode('SATURN_DSL_INVALID',{reason:'cycle'},{path});
-        if (!projectPath(path) || !own(files, path) || !path.endsWith('.ts'))
+    const cache = new Map<string, Record<string, unknown>>();
+    const loading = new Set<string>();
+
+    const normalize = (path: string): string => {
+        const parts: string[] = [];
+        for (const part of path.replaceAll('\\\\','/').split('/')) {
+            if (!part || part === '.') continue;
+            if (part === '..') {
+                if (!parts.length) failCode('SATURN_DSL_INVALID',{reason:'importEscape'},{path});
+                parts.pop();
+            } else parts.push(part);
+        }
+        return parts.join('/');
+    };
+
+    const dirname = (path: string) => path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+    const resolveLocal = (from: string, specifier: string): string => {
+        const base = normalize([dirname(from), specifier].filter(Boolean).join('/'));
+        const candidates = /\.(?:ts|tsx)$/.test(base)
+            ? [base]
+            : [base + '.ts', base + '.tsx', base + '/index.ts', base + '/index.tsx'];
+        const found = candidates.find(path => Object.prototype.hasOwnProperty.call(files, path));
+        if (!found) failCode('SATURN_NOT_FOUND',{resource:'module',id:specifier},{from,specifier,candidates});
+        return found;
+    };
+
+    const diagnostic = (path: string, d: ts.Diagnostic): never => {
+        const start = d.start ?? 0;
+        const source = d.file;
+        const point = source ? source.getLineAndCharacterOfPosition(start) : { line: 0, character: 0 };
+        failCode('SATURN_DSL_INVALID',{reason:'typescript'},{
+            path,
+            typescript: ts.flattenDiagnosticMessageText(d.messageText, '\n'),
+            source: { path, from:start, to:start+(d.length ?? 1), line:point.line, character:point.character },
+        });
+    };
+
+    const load = (path: string): Record<string, unknown> => {
+        path = normalize(path);
+        const existing = cache.get(path);
+        if (existing) return existing;
+        if (loading.has(path)) failCode('SATURN_DSL_INVALID',{reason:'cycle'},{path});
+        const source = files[path];
+        if (typeof source !== 'string' || !/\.(?:ts|tsx)$/.test(path))
             failCode('SATURN_NOT_FOUND',{resource:'module',id:path},{path});
-        visiting.add(path);
-        const scanner = ts.createScanner(ts.ScriptTarget.Latest, true);
-        scanner.setText(files[path]);
-        let nesting = 0;
-        for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
-            if (++steps > 60000)
-                failCode('SATURN_LIMIT',{resource:'project',reason:'evaluationLimit'},{steps});
-            if ([ts.SyntaxKind.OpenBraceToken, ts.SyntaxKind.OpenBracketToken, ts.SyntaxKind.OpenParenToken].includes(token))
-                nesting++;
-            if ([ts.SyntaxKind.CloseBraceToken, ts.SyntaxKind.CloseBracketToken, ts.SyntaxKind.CloseParenToken].includes(token))
-                nesting--;
-            if (nesting > 64)
-                failCode('SATURN_LIMIT',{resource:'project',reason:'nestingLimit'},{nesting});
-        }
-        const file = ts.createSourceFile(path, files[path], ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-        const diagnostics = (file as ts.SourceFile & {
-            parseDiagnostics: readonly ts.Diagnostic[];
-        }).parseDiagnostics;
-        if (diagnostics.length)
-            failCode('SATURN_DSL_INVALID',{reason:'malformed'},{path,typescript:ts.flattenDiagnosticMessageText(diagnostics[0].messageText,' ')});
-        const scope: Record<string, unknown> = Object.create(null), exports: Record<string, unknown> = Object.create(null);
-        const fail = (n: ts.Node, reason: string, data: Record<string, unknown> = {}): never => {
-            const start=n.getStart(file), end=n.getEnd(), point=file.getLineAndCharacterOfPosition(start);
-            failCode('SATURN_DSL_INVALID',{reason},{...data,source:{path,from:start,to:end,line:point.line,character:point.character}});
+
+        const transpiled = ts.transpileModule(source, {
+            fileName: path,
+            reportDiagnostics: true,
+            compilerOptions: {
+                target: ts.ScriptTarget.ES2022,
+                module: ts.ModuleKind.CommonJS,
+                moduleResolution: ts.ModuleResolutionKind.Bundler,
+                jsx: ts.JsxEmit.ReactJSX,
+                esModuleInterop: true,
+                isolatedModules: true,
+                sourceMap: false,
+            },
+        });
+        const error = transpiled.diagnostics?.find(item => item.category === ts.DiagnosticCategory.Error);
+        if (error) diagnostic(path, error);
+
+        loading.add(path);
+        const module = { exports: Object.create(null) as Record<string, unknown> };
+        cache.set(path, module.exports);
+
+        const require = (specifier: string): Record<string, unknown> => {
+            if (specifier === '@saturn/core') return dsl as unknown as Record<string, unknown>;
+            if (specifier.startsWith('./') || specifier.startsWith('../')) return load(resolveLocal(path, specifier));
+            failCode('SATURN_DSL_INVALID',{reason:'externalPackageRequiresHost'},{path,specifier});
         };
-        const key = (n: ts.PropertyName): string => { if (!(ts.isIdentifier(n) || ts.isStringLiteral(n)) || reserved.has(n.text))
-            return fail(n,'unsafeName'); return n.text; };
-        function evalNode(n: ts.Expression, depth = 0): unknown {
-            if (++steps > 60000 || depth > 64)
-                return fail(n,'evaluationLimit');
-            const ev = (x: ts.Expression) => evalNode(x, depth + 1);
-            if (ts.isAsExpression(n) || ts.isSatisfiesExpression(n) || ts.isParenthesizedExpression(n))
-                return ev(n.expression);
-            if (ts.isNumericLiteral(n))
-                return Number(n.text);
-            if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n))
-                return n.text;
-            if (n.kind === ts.SyntaxKind.TrueKeyword)
-                return true;
-            if (n.kind === ts.SyntaxKind.FalseKeyword)
-                return false;
-            if (ts.isIdentifier(n)) {
-                if (!own(scope, n.text))
-                    return fail(n,'unknown',{name:n.text});
-                return scope[n.text];
+
+        try {
+            const execute = new Function(
+                'exports','module','require','__filename','__dirname',
+                'globalThis','self','window','process','Bun','Deno','fetch','WebSocket','Worker','XMLHttpRequest',
+                `"use strict";\n${transpiled.outputText}\n//# sourceURL=saturn-project://${path}`,
+            ) as (...args: unknown[]) => void;
+            execute(
+                module.exports, module, require, path, dirname(path),
+                undefined, undefined, undefined, undefined, undefined, undefined,
+                undefined, undefined, undefined, undefined,
+            );
+            cache.set(path, module.exports);
+            return module.exports;
+        } catch (error) {
+            cache.delete(path);
+            if (error instanceof SaturnDiagnosticError) {
+                error.diagnostic.data = { path, ...(error.diagnostic.data ?? {}) };
             }
-            if (ts.isPrefixUnaryExpression(n)) {
-                const v = ev(n.operand);
-                if (typeof v !== 'number')
-                    return fail(n,'numericRequired');
-                if (n.operator === ts.SyntaxKind.MinusToken)
-                    return -v;
-                if (n.operator === ts.SyntaxKind.PlusToken)
-                    return v;
-                return fail(n,'unsupportedOperator');
-            }
-            if (ts.isBinaryExpression(n)) {
-                const a = ev(n.left), b = ev(n.right);
-                if (typeof a !== 'number' || typeof b !== 'number')
-                    return fail(n,'declarativeOnly');
-                switch (n.operatorToken.kind) {
-                    case ts.SyntaxKind.PlusToken: return a + b;
-                    case ts.SyntaxKind.MinusToken: return a - b;
-                    case ts.SyntaxKind.AsteriskToken: return a * b;
-                    case ts.SyntaxKind.SlashToken:
-                        if (b === 0)
-                            return fail(n,'divisionByZero');
-                        return a / b;
-                    default: return fail(n,'unsupportedOperator');
-                }
-            }
-            if (ts.isArrayLiteralExpression(n)) {
-                const result: unknown[] = [];
-                for (const x of n.elements) {
-                    const items = ts.isSpreadElement(x) ? ev(x.expression) : [ev(x as ts.Expression)];
-                    if (!Array.isArray(items) || result.length + items.length > 2048)
-                        return fail(x,'arrayLimit');
-                    result.push(...items);
-                }
-                return result;
-            }
-            if (ts.isObjectLiteralExpression(n)) {
-                const out: Record<string, unknown> = Object.create(null);
-                for (const p of n.properties) {
-                    if (ts.isPropertyAssignment(p)) {
-                        const k = key(p.name);
-                        if (own(out, k))
-                            fail(p,'duplicate',{property:k});
-                        out[k] = ev(p.initializer);
-                    }
-                    else if (ts.isShorthandPropertyAssignment(p)) {
-                        const k = key(p.name);
-                        out[k] = ev(p.name);
-                    }
-                    else if (ts.isSpreadAssignment(p)) {
-                        const v = ev(p.expression);
-                        if (!v || typeof v !== 'object' || Array.isArray(v))
-                            return fail(p,'malformed',{field:'objectSpread'});
-                        if (Object.keys(v).length + Object.keys(out).length > 1024)
-                            return fail(p,'objectLimit');
-                        Object.assign(out, v);
-                    }
-                    else
-                        return fail(p,'methodsForbidden');
-                }
-                return out;
-            }
-            if (ts.isPropertyAccessExpression(n)) {
-                const o = ev(n.expression), k = n.name.text;
-                if (!o || typeof o !== 'object' || reserved.has(k) || !own(o, k))
-                    return fail(n,'unknown',{field:k});
-                return (o as Record<string, unknown>)[k];
-            }
-            if (ts.isElementAccessExpression(n)) {
-                if (!n.argumentExpression || !ts.isStringLiteral(n.argumentExpression))
-                    return fail(n,'literalKeyRequired');
-                const o = ev(n.expression), k = n.argumentExpression.text;
-                if (!o || typeof o !== 'object' || reserved.has(k) || !own(o, k))
-                    return fail(n,'unknown',{field:k});
-                return (o as Record<string, unknown>)[k];
-            }
-            if (ts.isCallExpression(n) && ts.isIdentifier(n.expression)) {
-                const fn = scope[n.expression.text];
-                if (typeof fn !== 'function' || !builtinFunctions.has(fn))
-                    return fail(n,'installedDslOnly');
-                try {
-                    return Reflect.apply(fn, undefined, n.arguments.map(ev));
-                } catch (error) {
-                    if (error instanceof SaturnDiagnosticError) {
-                        const start = n.getStart(file), end = n.getEnd();
-                        const point = file.getLineAndCharacterOfPosition(start);
-                        error.diagnostic.data = {
-                            ...(error.diagnostic.data ?? {}),
-                            source: { path, from: start, to: end, line: point.line, character: point.character },
-                        };
-                    }
-                    throw error;
-                }
-            }
-            return fail(n,'declarativeOnly');
+            throw error;
+        } finally {
+            loading.delete(path);
         }
-        for (const statement of file.statements) {
-            if (ts.isImportDeclaration(statement)) {
-                if (!ts.isStringLiteral(statement.moduleSpecifier) || !statement.importClause?.namedBindings || !ts.isNamedImports(statement.importClause.namedBindings))
-                    fail(statement,'namedImports');
-                const spec = (statement.moduleSpecifier as ts.StringLiteral).text;
-                let source: Record<string, unknown>;
-                if (spec === '@saturn/core')
-                    source = builtins;
-                else {
-                    if (!spec.startsWith('./') && !spec.startsWith('../'))
-                        fail(statement,'localImportsOnly');
-                    const parts = path.split('/');
-                    parts.pop();
-                    for (const part of spec.split('/')) {
-                        if (part === '.')
-                            continue;
-                        if (part === '..') {
-                            if (!parts.length)
-                                fail(statement,'importEscape');
-                            parts.pop();
-                        }
-                        else
-                            parts.push(part);
-                    }
-                    let target = parts.join('/');
-                    if (!target.endsWith('.ts'))
-                        target += '.ts';
-                    source = module(target);
-                }
-                for (const imp of (statement.importClause!.namedBindings as ts.NamedImports).elements) {
-                    const name = imp.propertyName?.text ?? imp.name.text;
-                    if (!own(source, name) || reserved.has(imp.name.text) || own(scope, imp.name.text))
-                        fail(imp,'unknown',{kind:'import'});
-                    scope[imp.name.text] = source[name];
-                }
-            }
-            else if (ts.isVariableStatement(statement)) {
-                if (!(statement.declarationList.flags & ts.NodeFlags.Const))
-                    fail(statement,'constOnly');
-                for (const declaration of statement.declarationList.declarations) {
-                    if (!ts.isIdentifier(declaration.name) || !declaration.initializer)
-                        fail(declaration,'initializedConst');
-                    const name = (declaration.name as ts.Identifier).text;
-                    if (reserved.has(name) || own(scope, name))
-                        fail(declaration,'unsafeName');
-                    scope[name] = evalNode(declaration.initializer!);
-                    if (statement.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword))
-                        exports[name] = scope[name];
-                }
-            }
-            else if (ts.isExportAssignment(statement))
-                exports.default = evalNode(statement.expression);
-            else if (ts.isEmptyStatement(statement))
-                continue;
-            else
-                fail(statement,'declarativeOnly');
-        }
-        visiting.delete(path);
-        cache.set(path, exports);
-        return exports;
-    }
-    const output = module(entry), result = output.default ?? output.plant;
+    };
+
+    const output = load(entry);
+    const result = output.default ?? output.plant;
     validateProject(result);
     return result as Project;
 }
