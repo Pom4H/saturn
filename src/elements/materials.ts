@@ -26,6 +26,7 @@ export const materialPresets = {
   paintedIndustrial: { id:'paintedIndustrial',color:0x167c88,metalness:.18,roughness:.24,clearcoat:.48,clearcoatRoughness:.19 },
   copper: { id:'copper',color:0xc78342,metalness:.72,roughness:.26 },
   warning: { id:'warning',color:0xe9ac43,metalness:.22,roughness:.28 },
+  danger: { id:'danger',color:0xc45544,metalness:.10,roughness:.32,clearcoat:.32,clearcoatRoughness:.22 },
   glass: { id:'glass',color:0xc7e4eb,metalness:0,roughness:.06,transmission:.88,thickness:.08,ior:1.45,opacity:.42,depthWrite:false },
   water: { id:'water',color:0x4ebed8,metalness:0,roughness:.055,transmission:.72,thickness:.18,ior:1.333,clearcoat:.85,clearcoatRoughness:.055,opacity:.78,depthWrite:false },
   waterSurface: { id:'waterSurface',color:0x8ee4ef,metalness:0,roughness:.035,transmission:.58,thickness:.06,ior:1.333,clearcoat:1,clearcoatRoughness:.025,opacity:.72,depthWrite:false },

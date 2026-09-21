@@ -3,6 +3,7 @@ import { drawHmiCanvas, getDisplay } from './hmi-view';
 import { renderSaturnPlcSvg } from './saturn-view';
 import type * as THREE from 'three';
 import type { EquipmentModel3D, Renderer3DContext } from '../src/view';
+import { materialPresets, type MaterialPreset } from '../src/elements/materials';
 
 /** Schematic Z-up equipment, using the host's metal/teal/dark palette.
  * No plant coordinates, real reactor geometry or behavior lives in the renderer. */
@@ -13,8 +14,11 @@ export function createPlantModel(c: Renderer3DContext, visual: string, readout: 
     const owned: THREE.Material[] = [];
     const instances: THREE.InstancedMesh[] = [];
     const update: ((dt: number) => void)[] = [];
-    const material = (color: number) => { const m = new T.MeshStandardMaterial({ color, roughness: .5, metalness: .35 }); owned.push(m); return m; };
-    const copper = material(0xd39b51), red = material(0xc45544);
+    const material = (preset: MaterialPreset) => {
+        const m = new T.MeshStandardMaterial({ color:preset.color, roughness:preset.roughness, metalness:preset.metalness, transparent:(preset.opacity??1)<1, opacity:preset.opacity??1 });
+        owned.push(m); return m;
+    };
+    const copper = material(materialPresets.copper), red = material(materialPresets.danger);
     const mesh = (g: THREE.BufferGeometry, m: THREE.Material, x = 0, y = 0, z = 0, parent: THREE.Object3D = root) => {
         geometries.add(g); const n = new T.Mesh(g, m); n.position.set(x, y, z); n.castShadow = true; n.receiveShadow = true; parent.add(n); return n;
     };

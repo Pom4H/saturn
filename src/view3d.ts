@@ -2,6 +2,7 @@ import { connectionStyles } from './connection-style';
 import { groupFill, groupStroke, groupAccent, groupTitleLines } from './group-style';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { catalog, type Equipment, type Scene, type SceneGroup } from './core';
 import { layout, tapPoint } from './geometry';
 import { numeric, type RuntimeFrame } from './runtime/protocol';
@@ -91,6 +92,7 @@ export class SceneView3D {
   onMove?: (id: string, x: number, y: number, commit: boolean) => void;
   private frame: RuntimeFrame | null = null;
   private renderer: THREE.WebGLRenderer;
+  private environmentTexture: THREE.Texture;
   private world = new THREE.Scene();
   private equipmentLayer = new THREE.Group();
   private pipeLayer = new THREE.Group();
@@ -479,5 +481,5 @@ export class SceneView3D {
     for (const layer of [this.equipmentLayer, this.pipeLayer]) { layer.traverse(object => { if (object instanceof THREE.Mesh) {object.geometry.dispose();if(object.userData.ownedConnectionMaterial)(object.material as THREE.Material).dispose();} }); layer.clear(); }
     this.objects.clear(); this.tracks = []; this.leaders.replaceChildren(); this.labels.replaceChildren(this.leaders);
   }
-  dispose() { cancelAnimationFrame(this.raf); this.resizeObserver.disconnect(); this.controls.dispose(); this.clearGroups(); this.clearGeometry(); this.world.traverse(object => { if (object instanceof THREE.Mesh) object.geometry.dispose(); }); this.signalMaterial.dispose(); this.renderer.dispose(); this.host.replaceChildren(); }
+  dispose() { cancelAnimationFrame(this.raf); this.environmentTexture.dispose(); this.resizeObserver.disconnect(); this.controls.dispose(); this.clearGroups(); this.clearGeometry(); this.world.traverse(object => { if (object instanceof THREE.Mesh) object.geometry.dispose(); }); this.signalMaterial.dispose(); this.renderer.dispose(); this.host.replaceChildren(); }
 }
