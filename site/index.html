@@ -28,7 +28,11 @@
 <a class="skip-link" href="#studio-shell">К редактору</a>
 <header class="site-header"><a class="brand" href="#top"><img src="./site/assets/saturn-icon.png" alt="" width="30" height="30">Saturn</a><div><a href="https://github.com/Pom4H/saturn" target="_blank" rel="noopener">GitHub ↗</a><button data-install-studio>Установить</button></div></header>
 <main id="top">
-  <section class="hero" aria-labelledby="hero-title"><h1 id="hero-title">Saturn</h1><p>Один TypeScript-проект — схема, runtime, HMI, история, отчёты и PLC.</p></section>
+  <section class="hero hero-v2" aria-labelledby="hero-title">
+    <span class="hero-eyebrow">SATURN</span>
+    <h1 id="hero-title">Проектируйте объект,<br>а не набор программ вокруг него.</h1>
+    <p>Схема, сигналы, HMI, история, отчёты и версии объекта — в одном инженерном проекте.</p>
+  </section>
   <section class="shell-stage" id="studio" aria-label="SCADA-редактор">
     <div class="shell-frame">
       <div class="shell" id="studio-shell" data-mode="3d" data-view="scene" style="--studio-progress:0">
@@ -106,98 +110,161 @@
       </div>
     </div>
   </section>
-  <section class="product-summary" aria-labelledby="capabilities-title">
-    <div class="section-split">
-      <div class="section-heading">
-        <h2 id="capabilities-title">Проект — это модель объекта, а не файл мнемосхемы.</h2>
-        <p>Оборудование, topology, сигналы и поведение остаются в обычном TypeScript. Saturn строит из этой модели разные рабочие представления, не создавая параллельный формат.</p>
+  <section class="buyer-section buyer-problem" aria-labelledby="one-project-title">
+    <div class="buyer-heading">
+      <span>ОДИН ОБЪЕКТ — ОДИН ПРОЕКТ</span>
+      <h2 id="one-project-title">Не переносите одно и то же изменение между пятью программами.</h2>
+      <p>Обычный проект автоматизации постепенно распадается на PLC-проект, SCADA, таблицы тегов, отчёты, документацию и папки с версиями. Saturn держит инженерную модель объекта целиком.</p>
+    </div>
+    <div class="split-world">
+      <div class="world-column world-before">
+        <div class="world-label">Обычно</div>
+        <div class="world-list">
+          <span>PLC project</span>
+          <span>SCADA project</span>
+          <span>таблица сигналов</span>
+          <span>мнемосхемы</span>
+          <span>отчёты</span>
+          <span>документация</span>
+          <span>версии на диске</span>
+        </div>
+        <p>Одни и те же сущности приходится связывать и обновлять вручную.</p>
       </div>
-      <div class="projection-tree" aria-label="Проекции одного Saturn проекта">
-        <div class="projection-source"><span>source</span><strong>plant.ts</strong><code>@saturn/core</code></div>
-        <div class="projection-branches" aria-hidden="true"></div>
-        <div class="capability-row"><span>01</span><strong>Diagram</strong><p>2D / 3D · visual ↔ source · equipment · topology</p></div>
-        <div class="capability-row"><span>02</span><strong>Runtime</strong><p>telemetry · controls · alarms · historian · replay</p></div>
-        <div class="capability-row"><span>03</span><strong>Operator HMI</strong><p>live state · commands · navigation · Presentation IR</p></div>
-        <div class="capability-row"><span>04</span><strong>Reports</strong><p>history queries · tables · charts · A4 · schedules</p></div>
-        <div class="capability-row"><span>05</span><strong>PLC targets</strong><p>bindings · 320×240 projection · target providers</p></div>
+      <div class="world-arrow" aria-hidden="true">→</div>
+      <div class="world-column world-after">
+        <div class="world-label">Saturn</div>
+        <div class="object-core">
+          <strong>Проект объекта</strong>
+          <small>оборудование · сигналы · связи · представления</small>
+        </div>
+        <div class="object-projections">
+          <span>Схема</span><span>HMI</span><span>История</span><span>Отчёты</span><span>PLC</span><span>Документация</span>
+        </div>
+        <p>Все представления опираются на одну инженерную модель.</p>
       </div>
     </div>
   </section>
 
-  <section class="lifecycle-section" aria-labelledby="lifecycle-title">
-    <div class="section-heading lifecycle-heading">
-      <h2 id="lifecycle-title">Source, published и applied — разные состояния.</h2>
-      <p>Новая инженерная ревизия не должна незаметно стать работающей конфигурацией. Saturn показывает переход до runtime явно.</p>
+  <section class="buyer-section change-section" aria-labelledby="change-once-title">
+    <div class="buyer-heading compact-heading">
+      <span>ИЗМЕНИЛИ ОДИН РАЗ</span>
+      <h2 id="change-once-title">Добавили расходомер F-102.</h2>
+      <p>Инженер описывает изменение в проекте объекта. Дальше Saturn знает, где этот прибор должен появиться и какие данные с ним связаны.</p>
     </div>
-    <div class="release-flow" aria-label="Жизненный цикл Saturn проекта">
-      <article><span>01</span><small>SOURCE</small><strong>HEAD</strong><p>Инженер редактирует обычные файлы. Git хранит историю и review.</p></article>
-      <i>→</i>
-      <article><span>02</span><small>PUBLISHED</small><strong>production</strong><p>Ревизия выбрана для установки после validation / CI.</p></article>
-      <i>→</i>
-      <article><span>03</span><small>APPLIED</small><strong>Plant-01</strong><p>Runtime работает на конкретной проверенной ревизии.</p></article>
-    </div>
-    <div class="release-invariant"><code>invalid published ≠ applied</code><p>Если новая ревизия невалидна, последняя рабочая конфигурация продолжает работать.</p></div>
-  </section>
-
-  <section class="extensions-section" aria-labelledby="extensions-title">
-    <div class="section-heading extensions-heading">
-      <h2 id="extensions-title">Если Saturn не знает ваше оборудование — расширьте его доменную модель.</h2>
-      <p>Extension — обычный self-contained npm package с явным Saturn manifest. Installer проверяет sha512 и не запускает lifecycle scripts.</p>
-    </div>
-    <div class="extensions-layout">
-      <div class="extension-code" aria-label="Реальный контракт расширения Saturn">
-        <div class="code-window-head"><span>package.json</span><span>@factory/equipment</span></div>
-        <pre><code>{
-  <span class="code-muted">"name"</span>: "@factory/equipment",
-  <span class="code-muted">"version"</span>: "1.0.0",
-  <b>"saturn"</b>: {
-    <span class="code-muted">"api"</span>: 1,
-    <span class="code-muted">"entry"</span>: "dist/index.js",
-    <span class="code-muted">"capabilities"</span>: [
-      "elements", "protocol",
-      "datasource", "panel",
-      "report", "command"
-    ]
-  }
-}</code></pre>
-        <div class="extension-install-line"><span>$</span><code>saturn extension add @factory/equipment</code></div>
+    <div class="change-demo">
+      <div class="change-object">
+        <span class="instrument-mark">F-102</span>
+        <strong>Расходомер</strong>
+        <small>flow · m³/h</small>
       </div>
-      <div class="extension-index">
-        <div><code>elements</code><p>Оборудование, порты, сигналы, SVG / 3D и доменная семантика.</p></div>
-        <div><code>protocol</code><p>Промышленные и vendor-specific протоколы.</p></div>
-        <div><code>datasource</code><p>Историки, БД и внешняя телеметрия.</p></div>
-        <div><code>panel</code><p>Пусконаладка, диагностика и сервисные рабочие места.</p></div>
-        <div><code>report</code><p>Отраслевые формы, расчёты и экспорт.</p></div>
-        <div><code>command</code><p>Калибровка, обслуживание и ограниченные workflow.</p></div>
+      <div class="change-lines" aria-hidden="true"></div>
+      <div class="change-results">
+        <div><span>01</span><strong>Схема</strong><p>Прибор появляется в инженерном представлении объекта.</p></div>
+        <div><span>02</span><strong>Сигналы</strong><p>Расход становится типизированным сигналом проекта.</p></div>
+        <div><span>03</span><strong>HMI</strong><p>Значение можно показать оператору без новой базы тегов.</p></div>
+        <div><span>04</span><strong>История</strong><p>Сигнал доступен historian и replay.</p></div>
+        <div><span>05</span><strong>Отчёты</strong><p>Тот же сигнал используется в расчётах и формах.</p></div>
       </div>
     </div>
-    <div class="target-flow">
-      <div><span class="flow-label">TARGET PROVIDER</span><strong>PLC compiler / deploy / flash</strong></div>
-      <div class="flow-path"><span>project</span><i>→</i><span>compile</span><i>→</i><span>artifact</span><i>→</i><span>flash</span><i>→</i><span>monitor</span></div>
+  </section>
+
+  <section class="buyer-section revision-section" aria-labelledby="revision-title">
+    <div class="buyer-heading">
+      <span>ВСЕГДА ИЗВЕСТНО, ЧТО РАБОТАЕТ</span>
+      <h2 id="revision-title">Версия на ноутбуке инженера и версия на объекте больше не смешиваются.</h2>
+      <p>Saturn отдельно показывает текущую разработку, опубликованную ревизию и то, что реально применено на каждом объекте.</p>
     </div>
-    <div class="ecosystem-line">
-      <span>Следующие точки расширения</span>
-      <p>TIA / CODESYS / WinCC import · Timescale / Influx · MQTT / webhooks · commissioning packs · simulation packs · OIDC / LDAP</p>
-      <a href="https://github.com/Pom4H/saturn/blob/main/docs/adr/0002-extension-packages.md" target="_blank" rel="noopener">API ↗</a>
+    <div class="revision-board">
+      <div class="revision-head"><span>Проект: Насосная станция</span><span>production</span></div>
+      <div class="revision-row"><span>Разработка</span><strong>42</strong><small>новые изменения</small><i></i></div>
+      <div class="revision-row"><span>Опубликовано</span><strong>40</strong><small>проверено и выпущено</small><i class="ok"></i></div>
+      <div class="revision-row"><span>Plant-01</span><strong>40</strong><small>работает сейчас</small><i class="ok"></i></div>
+      <div class="revision-row"><span>Plant-02</span><strong>38</strong><small>требуется обновление</small><i class="warn"></i></div>
+    </div>
+    <p class="revision-note">Новая ревизия не заменяет работающую конфигурацию, пока не прошла проверку и не была явно применена.</p>
+  </section>
+
+  <section class="buyer-section verify-section" aria-labelledby="verify-title">
+    <div class="buyer-heading">
+      <span>ПРОВЕРЯЙТЕ ДО ОБЪЕКТА</span>
+      <h2 id="verify-title">Ошибка должна обнаруживаться до выезда на площадку.</h2>
+      <p>Изменение проходит один понятный путь: от инженерной правки до работающей установки. На каждом этапе видно, что именно проверено.</p>
+    </div>
+    <div class="verify-flow">
+      <div><span>01</span><strong>Изменение</strong><small>схема · сигналы · логика</small></div><i>→</i>
+      <div><span>02</span><strong>Проверка</strong><small>структура · типы · связи</small></div><i>→</i>
+      <div><span>03</span><strong>Симуляция</strong><small>поведение · HMI · отчёты</small></div><i>→</i>
+      <div><span>04</span><strong>Публикация</strong><small>фиксированная ревизия</small></div><i>→</i>
+      <div><span>05</span><strong>Объект</strong><small>applied revision</small></div>
     </div>
   </section>
 
-  <section class="distribution-section" aria-labelledby="distribution-title">
-    <div class="distribution-head">
-      <div><h2 id="distribution-title">Один Saturn. Нужная роль на нужной машине.</h2><p>Формат проекта не меняется между инженерной и эксплуатационной средой.</p></div>
-      <a href="https://github.com/Pom4H/saturn/releases/latest" target="_blank" rel="noopener">Download ↗</a>
+  <section class="buyer-section fleet-section" aria-labelledby="fleet-title">
+    <div class="buyer-heading">
+      <span>НЕСКОЛЬКО ПРОЕКТОВ И ОБЪЕКТОВ</span>
+      <h2 id="fleet-title">Один Saturn Server может сопровождать несколько инженерных проектов.</h2>
+      <p>У каждого проекта свой Git-репозиторий и свой жизненный цикл. Один проект может быть развёрнут на нескольких установках.</p>
     </div>
-    <div class="distribution-list">
-      <span class="distribution-item"><strong>Browser / PWA</strong><small>installable · offline</small></span>
-      <span class="distribution-item"><strong>Standalone</strong><small>Windows · Linux · macOS</small></span>
-      <span class="distribution-item"><strong>Operator</strong><small>kiosk HMI</small></span>
-      <span class="distribution-item"><strong>Server</strong><small>Bun · SQLite · SSE</small></span>
-      <span class="distribution-item"><strong>VS Code</strong><small>native host</small></span>
-      <span class="distribution-item"><strong>Production</strong><small>Git-managed</small></span>
+    <div class="fleet-board">
+      <div class="fleet-project">
+        <header><strong>Насосная станция</strong><small>repo / pumping-station</small></header>
+        <div><span class="state-dot live"></span><strong>Plant-01</strong><small>v40 · online</small></div>
+        <div><span class="state-dot live"></span><strong>Plant-02</strong><small>v38 · update available</small></div>
+        <div><span class="state-dot test"></span><strong>Test bench</strong><small>v42 · preview</small></div>
+      </div>
+      <div class="fleet-project">
+        <header><strong>Котельная</strong><small>repo / boiler-room</small></header>
+        <div><span class="state-dot live"></span><strong>Boiler-01</strong><small>v17 · online</small></div>
+      </div>
+      <div class="fleet-project">
+        <header><strong>Вентиляция</strong><small>repo / ventilation</small></header>
+        <div><span class="state-dot live"></span><strong>Vent-01</strong><small>v9 · online</small></div>
+      </div>
     </div>
-    <div class="distribution-command"><span>$</span><code>npm run saturn -- pack --target windows-x64</code></div>
+    <p class="fleet-note">Cloud добавляет общую аутентификацию, совместную работу и управление парком установок. Локальный Saturn Server остаётся полноценным и автономным.</p>
   </section>
 
+  <section class="buyer-section extension-section-v2" aria-labelledby="equipment-title">
+    <div class="buyer-heading">
+      <span>ВАШЕ ОБОРУДОВАНИЕ</span>
+      <h2 id="equipment-title">Saturn можно научить работать с вашим оборудованием.</h2>
+      <p>Не нужно ждать, пока конкретный прибор или контроллер появится в ядре. Производитель или интегратор может добавить поддержку как расширение Saturn.</p>
+    </div>
+    <div class="extension-simple">
+      <div><strong>Новый тип оборудования</strong><span>описание портов, сигналов, SVG / 3D и инженерной семантики</span></div>
+      <div><strong>Собственный протокол</strong><span>драйвер подключения к устройству или внешней системе</span></div>
+      <div><strong>Контроллер</strong><span>компиляция, прошивка, deployment и мониторинг через target provider</span></div>
+      <div><strong>Фирменный отчёт</strong><span>готовая форма и расчёты поверх общей истории сигналов</span></div>
+    </div>
+  </section>
+
+  <section class="buyer-section roles-section" aria-labelledby="roles-title">
+    <div class="buyer-heading">
+      <span>ОДИН SATURN — РАЗНЫЕ РОЛИ</span>
+      <h2 id="roles-title">Инженер проектирует. Оператор работает. Сервер хранит историю.</h2>
+      <p>Это не три независимых продукта. Они используют один проект и одни идентификаторы оборудования.</p>
+    </div>
+    <div class="role-grid">
+      <div><strong>Инженер</strong><p>Проектирует объект, проверяет изменения и выпускает ревизии.</p></div>
+      <div><strong>Оператор</strong><p>Видит HMI, сигналы, аварии и доступные команды.</p></div>
+      <div><strong>Saturn Server</strong><p>Исполняет runtime, пишет историю, формирует отчёты и обслуживает несколько проектов.</p></div>
+      <div><strong>Руководитель</strong><p>Видит состояние установок, версии и историю изменений.</p></div>
+    </div>
+  </section>
+
+  <section class="buyer-section proof-section" aria-labelledby="proof-title">
+    <div class="proof-copy">
+      <span>КАК ЭТО УСТРОЕНО</span>
+      <h2 id="proof-title">Открытый проект. Обычный Git. Автономная работа на объекте.</h2>
+      <p>Под капотом Saturn использует TypeScript, Git, SQLite и открытые расширения. Но инженеру не нужно становиться web-разработчиком, чтобы пользоваться системой.</p>
+    </div>
+    <div class="proof-list">
+      <span>Open source · MIT</span>
+      <span>Windows · Linux · macOS</span>
+      <span>Browser / PWA · standalone · server · kiosk · VS Code</span>
+      <span>Git repositories · signed updates · extension packages</span>
+    </div>
+  </section>
   <footer class="site-footer">
     <div><img src="./site/assets/saturn-icon.png" alt="" width="28" height="28"><strong>Saturn</strong><span>MIT</span></div>
     <nav aria-label="Документация"><a href="https://github.com/Pom4H/saturn" target="_blank" rel="noopener">GitHub ↗</a><a href="https://github.com/Pom4H/saturn/blob/main/docs/adr/0001-saturn-system-architecture.md" target="_blank" rel="noopener">Architecture</a><a href="https://github.com/Pom4H/saturn/blob/main/docs/developer/README.md" target="_blank" rel="noopener">Develop extensions</a><a href="https://github.com/Pom4H/saturn/blob/main/SECURITY.md" target="_blank" rel="noopener">Security</a></nav>
