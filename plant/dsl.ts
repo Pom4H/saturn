@@ -199,13 +199,13 @@ type NumericSignalKey<T> = {
 export function aggregate<T extends SimRef, K extends NumericSignalKey<T>>(
     items: T[],
     output: K,
-    operation: 'mean' | 'sum' | 'min' | 'max' = 'mean',
+    method: 'mean' | 'sum' | 'min' | 'max' = 'mean',
 ): OperationExpr<number, SignalDimensionOf<T[K]>> {
     if (!Array.isArray(items) || !items.length || items.length > 256)
         throw new AppError('Aggregate needs a bounded non-empty equipment list');
     const args = items.map(item => { const node = item[simulationValue]; if (!model(node.model).outputs[output])
         throw new AppError(`Unknown aggregate output: ${output}`); return signal(`${node.id}.${output}`); });
-    return operation(operation === 'mean' ? 'div' : operation === 'sum' ? 'add' : operation, operation === 'mean' ? [operationNode('add', args), args.length] : args) as OperationExpr<number, SignalDimensionOf<T[K]>>;
+    return operation(method === 'mean' ? 'div' : method === 'sum' ? 'add' : method, method === 'mean' ? [operationNode('add', args), args.length] : args) as OperationExpr<number, SignalDimensionOf<T[K]>>;
 }
 const operationNode = (op: OperationExpr<number, SignalDimension>['op'], args: Expr[]): OperationExpr<number, SignalDimension> => operation(op, args);
 
