@@ -57,6 +57,15 @@ export function executeReport(task: ReportTask, db: SqlDatabase): ReportArtifact
         if (rows.length > 2000 || JSON.stringify(rows).length > 1000000)
             throw new AppError('Report result exceeds budget');
         const report = task.report;
+        for (const field of report.schema ?? []) for (const row of rows) {
+            const value = row[field.key];
+            if (value === null || value === undefined) continue;
+            const valid = field.type === 'number' ? typeof value === 'number' && Number.isFinite(value)
+                : field.type === 'boolean' ? typeof value === 'boolean' || value === 0 || value === 1
+                : field.type === 'datetime' ? typeof value === 'number' || typeof value === 'string'
+                : typeof value === 'string';
+            if (!valid) throw new AppError(`Report field ${field.key} does not match ${field.type}`);
+        }
         const defaultNodes:ViewNode[]=[{kind:'table',columns:report.columns}];
         if(report.chart)defaultNodes.push({kind:'chart',...report.chart});
         const view:Presentation=report.view??{id:report.id,title:report.title,bindings:{},body:{kind:'group',direction:'column',children:defaultNodes}};
