@@ -24,11 +24,13 @@ import { SaturnDiagnosticError, formatDiagnostic } from '../plant/diagnostics';
 import { localizedDslEntity } from '../plant/dsl-i18n';
 
 const invalidDimension = {
-  'plant.ts': `import { project, system, simulation } from '@saturn/core';
-const root = system('root','Root');
-const tank = simulation('TANK','reservoir',{system:'root',at:{x:0,y:0}});
-const pump = simulation('PUMP','pump',{system:'root',at:{x:100,y:0},inputs:{voltage:tank.flow}});
-export default project('bad',{title:'Bad',description:'',systems:[root],simulations:[tank,pump],signals:[],alarms:[],reports:[]});`,
+  'plant.ts': [
+    "import { project, system, simulation } from '@saturn/core';",
+    "const root = system('root','Root');",
+    "const tank = simulation('TANK','reservoir',{system:'root',at:{x:0,y:0}});",
+    "const pump = simulation('PUMP','pump',{system:'root',at:{x:100,y:0},inputs:{voltage:tank.flow}});",
+    "export default project('bad',{title:'Bad',description:'',systems:[root],simulations:[tank,pump],signals:[],alarms:[],reports:[]});",
+  ].join('\\n'),
 };
 let mismatch;
 try { compileProject(invalidDimension); } catch (error) { mismatch = error; }
