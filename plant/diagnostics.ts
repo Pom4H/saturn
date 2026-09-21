@@ -1,6 +1,7 @@
-import { AppError } from './types';
-
 export type SaturnLocale = 'en' | 'ru';
+export class AppError extends Error {
+  constructor(message: string, public status = 400) { super(message); }
+}
 export type DiagnosticSeverity = 'error' | 'warning' | 'info';
 export type DiagnosticValue = string | number | boolean | null;
 
