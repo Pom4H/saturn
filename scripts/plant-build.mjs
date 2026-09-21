@@ -8,7 +8,7 @@ const raw = { name: 'project-source', setup(b) { b.onResolve({ filter: /\?raw$/ 
 export const options = { bundle: true, format: 'esm', target: 'es2022', sourcemap: true, plugins: [raw] };
 await mkdir('.plant', { recursive: true });
 await build({ ...options, entryPoints: ['plant/cli.ts'], outfile: '.plant/server.mjs', platform: 'node', packages: 'external' });
-await build({ ...options, entryPoints: ['plant/adapters/node-report-worker.ts'], outfile: '.plant/report-worker.mjs', platform: 'node', packages: 'external' });
+await build({ ...options, entryPoints: ['plant/adapters/bun-report-worker.ts'], outfile: '.plant/report-worker.mjs', platform: 'node', packages: 'external' });
 if (process.argv.includes('--server'))
     process.exit(0);
 await rm('dist/plant/assets', { recursive: true, force: true });
@@ -39,7 +39,7 @@ for (const asset of assets)
     hash.update(await readFile('dist/plant/' + (asset === 'demo/' ? 'demo/index.html' : asset)));
 const sw = (await readFile('plant/web/sw.js', 'utf8')).replace('__VERSION__', hash.digest('hex').slice(0, 16)).replace('__ASSETS__', JSON.stringify(assets));
 await writeFile('dist/plant/sw.js', sw);
-console.log('Built Node server and installable /plant/demo/');
+console.log('Built Bun server and installable /plant/demo/');
 await buildSite('dist/plant/site');
 
 await cp('LICENSE', 'dist/plant/LICENSE');
