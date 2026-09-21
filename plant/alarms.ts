@@ -1,5 +1,6 @@
 import { evaluate } from './kernel';
-import { type AlarmRule, type AlarmState, type Frame, type Event, type Actor, AppError } from './types';
+import type { AlarmRule, AlarmState, Frame, Event, Actor } from './types';
+import { failCode } from './diagnostics';
 export const newAlarm = (id: string): AlarmState => ({ id, active: false, acknowledged: true, pendingSince: null, raisedAt: null, clearedAt: null, acknowledgedAt: null, actor: null, quality: 'good', episode: 0 });
 export function updateAlarms(rules: AlarmRule[], states: Record<string, AlarmState>, frame: Frame): Event[] {
     const events: Event[] = [];
@@ -42,7 +43,7 @@ export function updateAlarms(rules: AlarmRule[], states: Record<string, AlarmSta
     return events;
 }
 export function acknowledge(states: Record<string, AlarmState>, id: string, actor: Actor, time: number): AlarmState { const s = states[id]; if (!s || s.raisedAt === null)
-    throw new AppError('Alarm has not occurred'); if (!s.acknowledged) {
+    failCode('SATURN_RUNTIME_INVALID',{reason:'stateChanged'},{resource:'alarm',id}); if (!s.acknowledged) {
     s.acknowledged = true;
     s.actor = actor.id;
     s.acknowledgedAt = time;
