@@ -1,4 +1,5 @@
-import { AppError, type SqlDatabase, type Checkpoint, type Frame, type Event, type AlarmState, type HistoryPolicy, type Revision, type Repository, type ReportData, type Project } from './types';
+import type { SqlDatabase, Checkpoint, Frame, Event, AlarmState, HistoryPolicy, Revision, Repository, ReportData, Project } from './types';
+import { failCode } from './diagnostics';
 export class Store {
     private last = new Map<string, {
         time: number;
@@ -73,7 +74,7 @@ export class Store {
         this.db.exec('DELETE FROM samples WHERE run_id=? AND signal=? AND time<? AND time < COALESCE((SELECT MAX(time) FROM samples WHERE run_id=? AND signal=? AND time<?),-1)', [frame.runId, name, before, frame.runId, name, before]);
     } }); }
     restore(): {
-        project: any;
+        project: Project;
         state: Checkpoint;
         alarms: Record<string, AlarmState>;
     } | null { const runId = this.meta<string | null>('activeRun', null); if (!runId)
@@ -85,7 +86,7 @@ export class Store {
     events(runId: string, limit = 200): Event[] { return this.db.all('SELECT id,run_id AS runId,time,type,subject,actor,detail FROM events WHERE run_id=? ORDER BY time DESC,id DESC LIMIT ?', [runId, limit]); }
     history(runId: string, signals: string[], from: number, to: number, limit = 20000): ReportData {
         if (signals.length > 64 || to < from || to - from > 7 * 86400000)
-            throw new AppError('History range too large');
+            failCode('SATURN_HISTORY_INVALID',{reason:'range'},{signals:signals.length,from,to});
         const samples: ReportData['samples'] = [], segments: ReportData['segments'] = [];
         for (const signal of signals) {
             const previous = this.db.all<{
@@ -96,7 +97,7 @@ export class Store {
             }>('SELECT signal,time,value,quality FROM samples WHERE run_id=? AND signal=? AND time<? ORDER BY time DESC LIMIT 1', [runId, signal, from]);
             const points = this.db.all<ReportData['samples'][number]>('SELECT signal,time,value,quality FROM samples WHERE run_id=? AND signal=? AND time>=? AND time<=? ORDER BY time LIMIT ?', [runId, signal, from, to, limit + 1]);
             if (samples.length + points.length > limit)
-                throw new AppError('History exceeds row budget; shorten the window');
+                failCode('SATURN_LIMIT',{resource:'history.rows',reason:'rowBudget'},{limit});
             samples.push(...points);
             const all = [...previous, ...points];
             for (let i = 0; i < all.length; i++) {
@@ -114,11 +115,11 @@ export class LocalRepository implements Repository {
     async head() { return this.store.meta<string | null>('head', null); }
     async desired() { return this.store.meta<string | null>('desired', null); }
     async publish(id: string, expected: string | null) { this.store.db.transaction(() => { if (this.store.meta('desired', null) !== expected)
-        throw new AppError('Release changed', 409); if (!this.store.db.all('SELECT id FROM commits WHERE id=?', [id]).length)
-        throw new AppError('Unknown revision'); this.store.set('desired', id); }); }
-    async read(id: string): Promise<Revision> { const row = this.store.db.all<any>('SELECT * FROM commits WHERE id=?', [id])[0]; if (!row)
-        throw new AppError('Unknown revision', 404); return { ...row, files: JSON.parse(row.files) }; }
-    async log(limit = 100) { return this.store.db.all<any>('SELECT * FROM commits ORDER BY time DESC,rowid DESC LIMIT ?', [Math.min(limit, 100)]).map(r => ({ ...r, files: JSON.parse(r.files) })); }
+        failCode('SATURN_CONFLICT',{resource:'release',reason:'stateChanged'},{expected}); if (!this.store.db.all('SELECT id FROM commits WHERE id=?', [id]).length)
+        failCode('SATURN_NOT_FOUND',{resource:'revision',id},{id}); this.store.set('desired', id); }); }
+    async read(id: string): Promise<Revision> { const row = this.store.db.all<{ id:string; parent:string|null; time:number; actor:string; message:string; files:string }>('SELECT * FROM commits WHERE id=?', [id])[0]; if (!row)
+        failCode('SATURN_NOT_FOUND',{resource:'revision',id},{id}); return { ...row, files: JSON.parse(row.files) }; }
+    async log(limit = 100) { return this.store.db.all<{ id:string; parent:string|null; time:number; actor:string; message:string; files:string }>('SELECT * FROM commits ORDER BY time DESC,rowid DESC LIMIT ?', [Math.min(limit, 100)]).map(r => ({ ...r, files: JSON.parse(r.files) })); }
     async commit(files: Record<string, string>, expected: string | null, message: string, actor: string): Promise<Revision> { return this.store.db.transaction(() => { if (this.store.meta('head', null) !== expected)
-        throw new AppError('Revision changed; preserve your draft and refresh', 409); const revision: Revision = { id: this.makeId(), parent: expected, time: Date.now(), actor, message, files }; this.store.db.exec('INSERT INTO commits VALUES(?,?,?,?,?,?)', [revision.id, expected, revision.time, actor, message, JSON.stringify(files)]); this.store.set('head', revision.id); return revision; }); }
+        failCode('SATURN_CONFLICT',{resource:'revision',reason:'stateChanged'},{expected}); const revision: Revision = { id: this.makeId(), parent: expected, time: Date.now(), actor, message, files }; this.store.db.exec('INSERT INTO commits VALUES(?,?,?,?,?,?)', [revision.id, expected, revision.time, actor, message, JSON.stringify(files)]); this.store.set('head', revision.id); return revision; }); }
 }
