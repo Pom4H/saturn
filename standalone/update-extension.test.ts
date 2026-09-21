@@ -41,9 +41,10 @@ describe('extension package contract', () => {
     });
 
     test('accepts a bundled custom element pack and rejects transitive runtime deps', () => {
-        const pkg: any = {
+        const pkg: Parameters<typeof validateExtensionPackage>[0] = {
             name: '@factory/equipment',
             version: '1.4.2',
+            dist: { tarball: 'https://registry.example/equipment.tgz' },
             saturn: {
                 api: 1,
                 entry: 'dist/index.js',
