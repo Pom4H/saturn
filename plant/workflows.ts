@@ -1,17 +1,18 @@
 import { bindPresentation, renderPresentation, presentationCss, type Presentation, type ViewNode } from './presentation';
 import type { Sample } from './types';
-import { AppError, type ReportTask, type ReportArtifact, type SqlDatabase } from './types';
+import type { ReportTask, ReportArtifact, SqlDatabase } from './types';
+import { failCode } from './diagnostics';
 const limits = [[0, 59], [0, 23], [1, 31], [1, 12], [0, 7]];
 function fields(cron: string): Set<number>[] {
     if (typeof cron !== 'string' || cron.length > 120)
-        throw new AppError('Invalid cron');
+        failCode('SATURN_CRON_INVALID',{reason:'malformed'});
     const parts = cron.trim().split(/\s+/);
     if (parts.length !== 5)
-        throw new AppError('Cron needs five fields (UTC)');
+        failCode('SATURN_CRON_INVALID',{reason:'malformed'},{expectedFields:5});
     return parts.map((part, i) => { const [min, max] = limits[i], out = new Set<number>(); for (const item of part.split(',')) {
         const m = /^(\*|\d+(?:-\d+)?)(?:\/(\d+))?$/.exec(item);
         if (!m)
-            throw new AppError(`Invalid cron field: ${part}`);
+            failCode('SATURN_CRON_INVALID',{reason:'invalid'},{field:part});
         let from = min, to = max;
         if (m[1] !== '*') {
             const range = m[1].split('-').map(Number);
@@ -20,7 +21,7 @@ function fields(cron: string): Set<number>[] {
         }
         const step = Number(m[2] ?? 1);
         if (from < min || to > max || to < from || step < 1 || step > max - min + 1)
-            throw new AppError(`Invalid cron range: ${part}`);
+            failCode('SATURN_CRON_INVALID',{reason:'range'},{field:part,min,max,from,to,step});
         for (let v = from; v <= to; v += step)
             out.add(i === 4 && v === 7 ? 0 : v);
     } return out; });
@@ -41,7 +42,7 @@ export function executeReport(task: ReportTask, db: SqlDatabase): ReportArtifact
     try {
         const sql = task.report.sql.trim().replace(/;\s*$/, '');
         if (!/^SELECT\b/i.test(sql) || sql.includes(';') || /\b(attach|detach|pragma|insert|delete|update|create|drop|alter|vacuum|replace|recursive|load_extension|readfile|writefile|randomblob|zeroblob|printf|format)\b/i.test(sql))
-            throw new AppError('Reports support one read-only SELECT');
+            failCode('SATURN_SQL_INVALID',{reason:'readOnlySelect'},{report:task.report.id});
         db.exec('CREATE TABLE samples(signal TEXT,time INTEGER,value REAL,quality TEXT); CREATE TABLE segments(signal TEXT,start INTEGER,end INTEGER,value REAL,quality TEXT);');
         db.transaction(() => { for (const s of task.data.samples)
             db.exec('INSERT INTO samples VALUES(?,?,?,?)', [s.signal, s.time, s.value, s.quality]); for (const s of task.data.segments)
@@ -50,12 +51,12 @@ export function executeReport(task: ReportTask, db: SqlDatabase): ReportArtifact
         const named: Record<string, number> = { from: task.from, to: task.to, ...task.inputs }, params: Record<string, number> = {};
         for (const match of sql.matchAll(/:([A-Za-z][A-Za-z0-9_]*)/g)) {
             if (!(match[1] in named))
-                throw new AppError(`Unknown report parameter: ${match[1]}`);
+                failCode('SATURN_REPORT_INVALID',{report:task.report.id,reason:'unknown'},{parameter:match[1]});
             params[`:${match[1]}`] = named[match[1]];
         }
         const rows = db.all<Record<string, unknown>>(`SELECT * FROM (${sql}) LIMIT 2001`, params);
         if (rows.length > 2000 || JSON.stringify(rows).length > 1000000)
-            throw new AppError('Report result exceeds budget');
+            failCode('SATURN_LIMIT',{resource:'report.rows',reason:'rowBudget'},{report:task.report.id,maxRows:2000,maxBytes:1000000});
         const report = task.report;
         for (const field of report.schema ?? []) for (const row of rows) {
             const value = row[field.key];
@@ -64,7 +65,7 @@ export function executeReport(task: ReportTask, db: SqlDatabase): ReportArtifact
                 : field.type === 'boolean' ? typeof value === 'boolean' || value === 0 || value === 1
                 : field.type === 'datetime' ? typeof value === 'number' || typeof value === 'string'
                 : typeof value === 'string';
-            if (!valid) throw new AppError(`Report field ${field.key} does not match ${field.type}`);
+            if (!valid) failCode('SATURN_REPORT_INVALID',{report:task.report.id,reason:'schema'},{field:field.key,expectedType:field.type,actualType:typeof value});
         }
         const defaultNodes:ViewNode[]=[{kind:'table',columns:report.columns}];
         if(report.chart)defaultNodes.push({kind:'chart',...report.chart});
