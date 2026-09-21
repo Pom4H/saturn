@@ -1,4 +1,4 @@
-import { AppError, type ModelOutput, type ModelOutputSpec, type ModelSpec, type SignalRuntimeType } from './types';
+import { AppError, type ModelSpec, type SignalRuntimeType } from './types';
 /** Models are trusted installed modules. All plant-specific wiring lives in DSL files. */
 const registry = new Map<string, ModelSpec>();
 export function registerModel(model: ModelSpec): void {
@@ -9,20 +9,13 @@ export function registerModel(model: ModelSpec): void {
 export function model(kind: string): ModelSpec { const m = registry.get(kind); if (!m)
     throw new AppError(`Unknown installed model: ${kind}`); return m; }
 export const models = () => [...registry.values()];
-export const output = {
-    number: <const Unit extends string>(unit: Unit): { readonly type: 'number'; readonly unit: Unit } => ({ type: 'number', unit }),
-    boolean: <const Unit extends string = 'лог.'>(unit?: Unit): { readonly type: 'boolean'; readonly unit: Unit } => ({ type: 'boolean', unit: (unit ?? 'лог.') as Unit }),
-    string: <const Unit extends string = ''>(unit?: Unit): { readonly type: 'string'; readonly unit: Unit } => ({ type: 'string', unit: (unit ?? '') as Unit }),
-};
-export const outputUnit = (value: ModelOutput): string => typeof value === 'string' ? value : value.unit;
-export const outputType = (value: ModelOutput): SignalRuntimeType => typeof value === 'string' ? 'number' : value.type;
+export const outputType = (spec: Pick<ModelSpec,'outputTypes'>, key: string): SignalRuntimeType => spec.outputTypes?.[key] ?? 'number';
 const p = (value: number, min = 0, max = 100) => ({ default: value, min, max });
 const clamp = (x: number, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const approach = (x: number, to: number, dt: number, tau: number) => x + (to - x) * (1 - Math.exp(-dt / Math.max(.02, tau)));
-type ValidInstalledModel<M> = M extends Omit<ModelSpec, 'version'> ? unknown : never;
-const installed = <const M>(m: M & ValidInstalledModel<M>): M & { version: string } => {
-    const definition = { ...m, version: '1.0.0' } as M & { version: string };
-    registerModel(definition as unknown as ModelSpec);
+const installed = <const M extends Omit<ModelSpec, 'version'>>(m: M): M & { version: string } => {
+    const definition = { ...m, version: '1.0.0' };
+    registerModel(definition);
     return definition;
 };
 const supply = installed({ kind: 'supply', title: 'Электропитание', visual: 'generator', inputs: {}, parameters: { voltage: p(1, 0, 1.5) }, outputs: { voltage: 'отн.' },
@@ -46,7 +39,7 @@ const turbine = installed({ kind: 'turbine', title: 'Турбина', visual: 't
 const exchanger = installed({ kind: 'heat-exchanger', title: 'Конденсатор', visual: 'exchanger', inputs: { heat: .1, cooling: 1 }, parameters: { capacity: p(12, .1, 100), ambient: p(.2, 0, 1) }, outputs: { temperature: 'отн.', rejected: 'отн.' },
     initialize: q => ({ temperature: q.ambient, rejected: 0 }), advance: (s, i, q, dt) => { const rejected = Math.max(0, i.cooling) * (s.temperature - q.ambient); return { temperature: Math.max(q.ambient, s.temperature + dt * (i.heat - rejected) / q.capacity), rejected }; }, observe: s => ({ ...s }) });
 const sensor = installed({ kind: 'sensor', title: 'Измерительный канал', visual: 'sensor', inputs: { value: 0 }, parameters: { lag: p(.2, .02, 30), bias: p(0, -100, 100) }, outputs: { value: 'отн.' }, initialize: () => ({ value: 0 }), advance: (s, i, q, dt) => ({ value: approach(s.value, i.value + q.bias, dt, q.lag) }), observe: s => ({ ...s }) });
-const protection = installed({ kind: 'protection', title: 'Защита и поглотитель', visual: 'control', inputs: { temperature: 1, power: 1, demand: 0 }, parameters: { temperatureLimit: p(1.7, 1, 5), powerLimit: p(2, 1, 10), actuation: p(1, .05, 60) }, outputs: { insertion: 'доля', trip: output.boolean() },
+const protection = installed({ kind: 'protection', title: 'Защита и поглотитель', visual: 'control', inputs: { temperature: 1, power: 1, demand: 0 }, parameters: { temperatureLimit: p(1.7, 1, 5), powerLimit: p(2, 1, 10), actuation: p(1, .05, 60) }, outputs: { insertion: 'доля', trip: 'лог.' }, outputTypes: { trip: 'boolean' } as const,
     initialize: () => ({ insertion: 0, trip: 0 }), advance: (s, i, q, dt) => { const trip = s.trip || i.temperature > q.temperatureLimit || i.power > q.powerLimit || i.demand > .5 ? 1 : 0; return { trip, insertion: approach(s.insertion, trip, dt, q.actuation) }; }, observe: s => ({ ...s }) });
 const structure = installed({ kind: 'structure', title: 'Реакторное здание', visual: 'structure', inputs: { release: 0 }, parameters: { capacity: p(12, .1, 100), vent: p(.3, 0, 10), strength: p(1.4, .1, 10) }, outputs: { pressure: 'отн.', damage: 'доля' },
     initialize: () => ({ pressure: 0, damage: 0 }), advance: (s, i, q, dt) => { const pressure = Math.max(0, s.pressure + dt * (Math.max(0, i.release) - q.vent * s.pressure) / q.capacity); return { pressure, damage: clamp(s.damage + dt * .08 * Math.max(0, pressure - q.strength) ** 2) }; }, observe: s => ({ ...s }) });
@@ -74,7 +67,7 @@ const ups = installed({ kind: 'ups', title: 'Резервное питание',
     advance: (s, i, q, dt) => { const grid = i.grid >= .8, load = Math.max(0, i.demand); const energy = clamp(s.energy + dt * (grid ? q.charging : -load), 0, q.capacity); return { energy, voltage: grid || energy > 0 ? 1 : 0, load }; },
     observe: (s, q) => ({ voltage: s.voltage, charge: 100 * s.energy / q.capacity, load: s.load }) });
 const switchgear = installed({ kind: 'switchgear', title: 'Щит питания', visual: 'switchgear', inputs: { voltage: 1, demand: 1, load: .1 },
-    parameters: { limit: p(1.5, .1, 10) }, outputs: { voltage: 'отн.', closed: output.boolean(), trip: output.boolean() },
+    parameters: { limit: p(1.5, .1, 10) }, outputs: { voltage: 'отн.', closed: 'лог.', trip: 'лог.' }, outputTypes: { closed: 'boolean', trip: 'boolean' } as const,
     initialize: () => ({ voltage: 1, closed: 1, trip: 0 }),
     advance: (s, i, q) => { const trip = s.trip || i.load > q.limit ? 1 : 0, closed = i.demand > .5 && !trip ? 1 : 0; return { voltage: Math.max(0, i.voltage) * closed, closed, trip }; }, observe: s => ({ ...s }) });
 const fan = installed({ kind: 'fan', title: 'Вентиляция и теплоотвод', visual: 'fan', inputs: { voltage: 1, demand: .8 },
