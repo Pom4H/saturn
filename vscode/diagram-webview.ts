@@ -41,5 +41,15 @@ svg.addEventListener('dblclick', event => {
     view.fitGroup(id);
 });
 
+svg.addEventListener('wheel', event => {
+  event.preventDefault();
+  view.zoom(event.deltaY < 0 ? 0.88 : 1.14);
+}, { passive: false });
+
+window.addEventListener('keydown', event => {
+  if (event.key === '+' || event.key === '=') view.zoom(0.82);
+  else if (event.key === '-') view.zoom(1.22);
+  else if (event.key === '0') view.fit();
+});
 window.addEventListener('resize', () => view.fit());
 window.addEventListener('unload', () => view.dispose());
