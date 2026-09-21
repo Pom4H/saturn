@@ -92,7 +92,7 @@ export class SceneView3D {
   onMove?: (id: string, x: number, y: number, commit: boolean) => void;
   private frame: RuntimeFrame | null = null;
   private renderer: THREE.WebGLRenderer;
-  private environmentTexture: THREE.Texture;
+  private environmentTexture!: THREE.Texture;
   private world = new THREE.Scene();
   private equipmentLayer = new THREE.Group();
   private pipeLayer = new THREE.Group();
