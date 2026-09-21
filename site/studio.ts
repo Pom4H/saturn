@@ -565,9 +565,9 @@ export async function mountStudio() {
     if (plant) {
       for (const device of plant.project.devices) for (const name of Object.keys(device.signals)) {
         const signal = observedRuntime?.equipment[device.id]?.signals[name];
-        const good = signal?.quality === 'good' && signal.value !== null;
-        const value = good ? `${typeof signal.value === 'number' ? Number(signal.value.toFixed(3)) : signal.value} ${signal.unit}` : '—';
-        const source = ['live', 'paused'].includes(shell.dataset.telemetry ?? '') ? `Симуляция · ${signal?.quality ?? 'offline'}` : $('studio-context').textContent ?? 'Нет данных';
+        const retained = signal?.value !== null && signal?.value !== undefined && (signal.quality === 'good' || signal.quality === 'stale');
+        const value = retained ? `${typeof signal.value === 'number' ? Number(signal.value.toFixed(3)) : signal.value} ${signal.unit}` : '—';
+        const source = shell.dataset.telemetry === 'stale' ? 'STALE · последнее подтверждённое значение' : ['live', 'paused'].includes(shell.dataset.telemetry ?? '') ? `Симуляция · ${signal?.quality ?? 'offline'}` : $('studio-context').textContent ?? 'Нет данных';
         const row = document.createElement('tr'); row.dataset.signal = `${device.id}.${name}`; row.dataset.quality = signal?.quality ?? 'offline';
         for (const cell of [device.id, name, value, source]) { const td = document.createElement('td'); td.textContent = cell; row.append(td); } rows.append(row);
       }
