@@ -310,11 +310,11 @@ export class SceneView3D {
       const points = [start, startLead, v(startLead.x, startLead.y, high), v(middleX, startLead.y, high), v(middleX, endLead.y, high), v(endLead.x, endLead.y, high), endLead, end], body: THREE.Mesh[] = [];
       for (let i = 1; i < points.length; i++) if (points[i].distanceTo(points[i - 1]) > .001) {
         curve.add(new THREE.LineCurve3(points[i - 1], points[i]));
-        const shell = tubeBetween(this.pipeLayer, points[i - 1], points[i], .12, materials.pipeShell); shell.renderOrder = 1;
+        const shell = tubeBetween(this.pipeLayer, points[i - 1], points[i], .12, materials.pipeShell ?? materials.steel); shell.renderOrder = 1;
         const liquid = tubeBetween(this.pipeLayer, points[i - 1], points[i], .078, materials.fluid); liquid.renderOrder = 2; body.push(liquid);
       }
       if (!curve.curves.length) continue;
-      const particles = [0, 1, 2, 3].map(() => { const arrow=addMesh(this.pipeLayer, new THREE.ConeGeometry(.105, .23, 12), materials.fluidHighlight); arrow.renderOrder=3; return arrow; });
+      const particles = [0, 1, 2, 3].map(() => { const arrow=addMesh(this.pipeLayer, new THREE.ConeGeometry(.105, .23, 12), materials.fluidHighlight ?? materials.dark); arrow.renderOrder=3; return arrow; });
       this.tracks.push({ id: edge.id, curve, particles, body, phase: trackPhases.get(edge.id) ?? 0, value: null });
     }
     for (const { equipment, model } of this.objects.values()) {
@@ -352,7 +352,7 @@ export class SceneView3D {
     for (const track of this.tracks) {
       track.value = this.flows.get(track.id) ?? null;
       track.phase = ((track.phase + (track.value ?? 0) / 24 * .2 * dt) % 1 + 1) % 1;
-      track.body.forEach(mesh => { mesh.material = track.value === null ? materials.greyFluid : materials.fluid; });
+      track.body.forEach(mesh => { mesh.material = track.value === null ? (materials.greyFluid ?? materials.dark) : materials.fluid; });
       track.particles.forEach((arrow, i) => {
         arrow.visible = track.value !== null && track.value !== 0;
         const position = (track.phase + i / 4) % 1; arrow.position.copy(track.curve.getPointAt(position));
