@@ -77,3 +77,12 @@ void typedReport;
 report('bad-signals', { title:'Bad', on:{workflow_dispatch:{}}, signals:['P.flow'], window:1000, sql:'SELECT 1 AS x', columns:[{key:'x',title:'x'}] });
 // @ts-expect-error Boolean fields do not accept numeric Excel formats.
 excelColumn('Blocked', typedRows.blocked, { format: '0.00' });
+
+const guard = simulation('GUARD', 'protection', {
+    system: 'lab',
+    at: { x: 0, y: 0 },
+    inputs: { temperature: 1, power: 1, demand: 0 },
+});
+type _TripId = Assert<Equal<SignalId<typeof guard.trip>, 'GUARD.trip'>>;
+type _TripValue = Assert<Equal<SignalValueOf<typeof guard.trip>, boolean>>;
+type _TripUnit = Assert<Equal<SignalUnitOf<typeof guard.trip>, 'лог.'>>;
