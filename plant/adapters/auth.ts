@@ -1,6 +1,7 @@
 import { scryptSync, randomBytes, timingSafeEqual, createHash } from 'node:crypto';
 import type { Store } from '../store';
-import { AppError, type Actor } from '../types';
+import type { Actor } from '../types';
+import { failCode } from '../diagnostics';
 const hash = (v: string) => createHash('sha256').update(v).digest('hex');
 export class Auth {
     private attempts = new Map<string, {
@@ -9,11 +10,11 @@ export class Auth {
     }>();
     constructor(readonly store: Store) { store.db.exec('CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,role TEXT NOT NULL,salt TEXT NOT NULL,hash TEXT NOT NULL); CREATE TABLE IF NOT EXISTS sessions(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,csrf TEXT NOT NULL,expires INTEGER NOT NULL);'); }
     seed(id: string, password: string, role: Actor['role'] = 'engineer') { if (!/^[A-Za-z0-9_.@-]{1,100}$/.test(id) || password.length < 12)
-        throw new AppError('Use a named user and a password of at least 12 characters'); if (this.store.db.all('SELECT id FROM users WHERE id=?', [id]).length)
+        failCode('SATURN_VALUE_INVALID',{field:'credentials',reason:'invalid'},{user:id,minPasswordLength:12}); if (this.store.db.all('SELECT id FROM users WHERE id=?', [id]).length)
         return false; const salt = randomBytes(16).toString('hex'); this.store.db.exec('INSERT INTO users VALUES(?,?,?,?)', [id, role, salt, scryptSync(password, salt, 32).toString('hex')]); return true; }
     login(user: string, password: string, remote: string) {
         if (typeof user !== 'string' || typeof password !== 'string' || user.length > 100 || password.length > 1024)
-            throw new AppError('Invalid credentials', 401);
+            failCode('SATURN_PERMISSION',{role:'authenticated'},{user},{status:401});
         const now = Date.now();
         let attempts = this.attempts.get(remote);
         if (!attempts || attempts.until < now) {
@@ -23,7 +24,7 @@ export class Auth {
             this.attempts.set(remote, attempts);
         }
         if (++attempts.count > 10)
-            throw new AppError('Too many login attempts', 429);
+            failCode('SATURN_LIMIT',{resource:'login.attempts',reason:'tooMany'},{remote,max:10},{status:429});
         const row = this.store.db.all<{
             id: string;
             role: Actor['role'];
@@ -43,12 +44,12 @@ export class Auth {
         const bearer = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(authorization ?? '')?.[1];
         const token = bearer ?? /(?:^|;\s*)scada_session=([A-Za-z0-9_-]{43})(?:;|$)/.exec(cookie ?? '')?.[1];
         if (!token)
-            throw new AppError('Sign in required', 401);
+            failCode('SATURN_PERMISSION',{role:'authenticated'},{resource:'session'},{status:401});
         const sessionId = hash(token); const row = this.store.db.all<{
         user_id: string;
         role: Actor['role'];
         csrf: string;
     }>('SELECT s.user_id,u.role,s.csrf FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=? AND s.expires>?', [sessionId, Date.now()])[0]; if (!row)
-        throw new AppError('Session expired', 401); return { actor: { id: row.user_id, role: row.role }, csrf: row.csrf, sessionId, bearer: !!bearer }; }
+        failCode('SATURN_PERMISSION',{role:'authenticated'},{resource:'session',reason:'expired'},{status:401}); return { actor: { id: row.user_id, role: row.role }, csrf: row.csrf, sessionId, bearer: !!bearer }; }
     logout(sessionId: string) { this.store.db.transaction(() => { this.store.db.exec('DELETE FROM sessions WHERE id=?', [sessionId]); this.store.db.exec('DELETE FROM subscriptions WHERE session_id=?', [sessionId]); }); }
 }
