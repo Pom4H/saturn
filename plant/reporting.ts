@@ -11,6 +11,7 @@ import {
     type SignalUnitOf,
     type SignalValueOf,
 } from './types';
+import { failCode } from './diagnostics';
 
 declare const fieldValue: unique symbol;
 export interface ReportFieldRef<Key extends string = string, Value = unknown, Unit extends string = string> {
@@ -20,7 +21,7 @@ export interface ReportFieldRef<Key extends string = string, Value = unknown, Un
     readonly [fieldValue]?: Value;
 }
 
-type UnkeyedField = ReportFieldRef<'', any, string>;
+type UnkeyedField = ReportFieldRef<'', unknown, string>;
 type Keyed<F, K extends string> = F extends ReportFieldRef<string, infer Value, infer Unit>
     ? ReportFieldRef<K, Value, Unit>
     : never;
@@ -63,8 +64,8 @@ export function reportSchema<const Definition extends Record<string, UnkeyedFiel
     return result as ReportSchema<Definition>;
 }
 
-export function reportSchemaFields(schema: ReportSchema<any>): ReportField[] {
-    return (schema as ReportSchema<any> & { [schemaMetadata]?: ReportField[] })[schemaMetadata]
+export function reportSchemaFields(schema: ReportSchema<Record<string, UnkeyedField>>): ReportField[] {
+    return (schema as ReportSchema<Record<string, UnkeyedField>> & { [schemaMetadata]?: ReportField[] })[schemaMetadata]
         ?? Object.entries(schema).map(([key, field]) => ({ key, type: field.type, ...(field.unit ? { unit: field.unit } : {}) }));
 }
 
@@ -91,14 +92,14 @@ export function desc<F extends ReportFieldRef>(field: F): ExcelSortSpec {
 
 export function excelSheet(
     name: string,
-    schema: ReportSchema<any>,
+    schema: ReportSchema<Record<string, UnkeyedField>>,
     options: { columns: ExcelColumnSpec[]; sort?: ExcelSortSpec[]; freezeRows?: number; autoFilter?: boolean },
 ): ExcelSheetSpec {
     const keys = new Set(reportSchemaFields(schema).map(field => field.key));
     for (const column of options.columns)
-        if (!keys.has(column.key)) throw new Error(`Unknown Excel column: ${column.key}`);
+        if (!keys.has(column.key)) failCode('SATURN_REPORT_INVALID',{report:'workbook',reason:'unknown'},{field:'excel.column',key:column.key});
     for (const sort of options.sort ?? [])
-        if (!keys.has(sort.key)) throw new Error(`Unknown Excel sort key: ${sort.key}`);
+        if (!keys.has(sort.key)) failCode('SATURN_REPORT_INVALID',{report:'workbook',reason:'unknown'},{field:'excel.sort',key:sort.key});
     return { name, ...options };
 }
 
