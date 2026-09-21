@@ -143,7 +143,7 @@ export async function ideCatalog(appData: string, locale: SaturnLocale = 'en'): 
     return { schema: 1, catalogs };
 }
 
-export async function ideDiagram(projectPath: string): Promise<IdeDiagramDocument> {
+export async function ideDiagram(projectPath: string, locale: SaturnLocale = 'en'): Promise<IdeDiagramDocument> {
     const loaded = await loadProjectDirectory(projectPath);
     const project = compileProject(loaded.files);
     installEquipment(locale);
@@ -266,7 +266,7 @@ export async function runIdeCommand(args: string[], appData: string): Promise<vo
         const project = option(args, '--project');
         if (!project)
             throw new Error('Usage: saturn ide diagram --project PATH --json');
-        console.log(JSON.stringify(await ideDiagram(project)));
+        console.log(JSON.stringify(await ideDiagram(project, locale)));
         return;
     }
     if (action === 'reports') {
