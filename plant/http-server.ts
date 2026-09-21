@@ -77,7 +77,7 @@ export async function startPlantHttpServer(options: {
     const readStatic = async (relativePath: string): Promise<Buffer> => {
         const normalized = relativePath.replaceAll('\\', '/').replace(/^\.\//, '').replace(/^\//, '');
         if (!normalized || normalized.split('/').some(part => part === '..' || part === '.'))
-            throw new AppError('Path rejected', 403);
+            failCode('SATURN_PERMISSION',{role:'static-path'},{path:normalized},{status:403});
         if (options.staticReader)
             return Buffer.from(await options.staticReader(normalized));
         return readFile(await staticFile(normalized));
