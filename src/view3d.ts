@@ -117,7 +117,7 @@ export class SceneView3D {
   private motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
   private raycaster = new THREE.Raycaster();
   private ground = new THREE.Plane(v(0, 0, 1), 0);
-  private down: { x: number; y: number; id: string | null; moved: boolean; offset?: THREE.Vector3; orbitEnabled?: boolean } | null = null;
+  private down: { x: number; y: number; id: string | null; moved: boolean; offset?: THREE.Vector3; orbitEnabled?: boolean; originalX?: number; originalY?: number } | null = null;
   constructor(public host: HTMLElement, options: { landing?: boolean } = {}) {
     host.classList.add('scene3d');
     this.canvas = document.createElement('canvas'); this.canvas.tabIndex = 0;
@@ -162,6 +162,8 @@ export class SceneView3D {
       const point = this.groundPoint(e.clientX, e.clientY), object = this.objects.get(id);
       if (!point || !object) return;
       this.down.offset = object.model.root.position.clone().sub(point);
+      this.down.originalX = Number(object.equipment.props.x);
+      this.down.originalY = Number(object.equipment.props.y);
       this.down.orbitEnabled = this.controls.enabled;
       this.controls.enabled = false;
       this.canvas.setPointerCapture(e.pointerId);
@@ -205,7 +207,7 @@ export class SceneView3D {
       const drag = this.down; this.down = null;
       if (drag?.orbitEnabled !== undefined) this.controls.enabled = drag.orbitEnabled;
       if (this.canvas.hasPointerCapture(e.pointerId)) this.canvas.releasePointerCapture(e.pointerId);
-      if (drag?.moved && drag.id) this.onMove?.(drag.id, 0, 0, false);
+      if (drag?.moved && drag.id && Number.isFinite(drag.originalX) && Number.isFinite(drag.originalY)) this.onMove?.(drag.id, drag.originalX!, drag.originalY!, false);
     });
     const animate = (now: number) => {
       const dt = Math.min(.1, this.last ? (now - this.last) / 1000 : 0); this.last = now;
