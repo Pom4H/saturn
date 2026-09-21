@@ -195,11 +195,6 @@ export interface Project {
         alarmAbove?: number;
     }[];
 }
-export interface ModelOutputSpec {
-    type: SignalRuntimeType;
-    unit: string;
-}
-export type ModelOutput = string | ModelOutputSpec;
 export interface ModelSpec {
     kind: string;
     version: string;
@@ -211,7 +206,8 @@ export interface ModelSpec {
         min: number;
         max: number;
     }>;
-    outputs: Record<string, ModelOutput>;
+    outputs: Record<string, string>;
+    outputTypes?: Record<string, SignalRuntimeType>;
     initialize(p: Readonly<Record<string, number>>): Record<string, number>;
     advance(s: Readonly<Record<string, number>>, inputs: Readonly<Record<string, number>>, p: Readonly<Record<string, number>>, dt: number): Record<string, number>;
     observe(s: Readonly<Record<string, number>>, p: Readonly<Record<string, number>>): Record<string, number>;
