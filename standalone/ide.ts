@@ -6,6 +6,7 @@ import { executeReport } from '../plant/workflows';
 import type { Report, ReportData } from '../plant/types';
 import { BunSql } from './bun-sql';
 import { localizedDslEntities, localizedDslOperators } from '../plant/dsl-i18n';
+import { modelTitle } from '../plant/i18n';
 import { formatDiagnostic, SaturnDiagnosticError, type SaturnLocale } from '../plant/diagnostics';
 import { catalog } from '../src/core';
 import { ExtensionManager } from './extensions';
@@ -112,13 +113,13 @@ export async function ideCheck(projectPath: string, locale: SaturnLocale): Promi
     }
 }
 
-export async function ideCatalog(appData: string): Promise<IdeCatalogDocument> {
+export async function ideCatalog(appData: string, locale: SaturnLocale = 'en'): Promise<IdeCatalogDocument> {
     const core: IdeCatalogGroup = {
         id: 'core',
         title: 'Saturn Core',
         source: '@saturn/core',
         items: models()
-            .map(item => ({ type: item.kind, title: item.title, source: '@saturn/core', visual: item.visual }))
+            .map(item => ({ type: item.kind, title: modelTitle(item.kind, locale), source: '@saturn/core', visual: item.visual }))
             .sort((a, b) => a.title.localeCompare(b.title)),
     };
 
@@ -145,7 +146,7 @@ export async function ideCatalog(appData: string): Promise<IdeCatalogDocument> {
 export async function ideDiagram(projectPath: string): Promise<IdeDiagramDocument> {
     const loaded = await loadProjectDirectory(projectPath);
     const project = compileProject(loaded.files);
-    installEquipment();
+    installEquipment(locale);
     const scene = sceneFor(project);
     const definitions = Object.fromEntries(
         [...new Set(scene.nodes.map(node => node.kind))]
@@ -247,7 +248,7 @@ export async function runIdeCommand(args: string[], appData: string): Promise<vo
     const [action = 'catalog'] = positional;
     const locale = (option(args, '--locale') === 'ru' ? 'ru' : 'en') as SaturnLocale;
     if (action === 'catalog') {
-        console.log(JSON.stringify(await ideCatalog(appData)));
+        console.log(JSON.stringify(await ideCatalog(appData, locale)));
         return;
     }
     if (action === 'docs') {
