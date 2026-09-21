@@ -393,6 +393,31 @@ export function validateProject(value: unknown): asserts value is Project {
             if (typeof column.title !== 'string' || column.title.length > 150)
                 throw new AppError('Invalid report column');
         }
+        if (r.schema) {
+            if (!Array.isArray(r.schema) || !r.schema.length || r.schema.length > 64)
+                throw new AppError('Invalid report schema');
+            const schemaKeys = unique(r.schema.map(field => field.key));
+            for (const field of r.schema) {
+                if (!['number', 'boolean', 'string', 'datetime'].includes(field.type) || (field.unit !== undefined && (typeof field.unit !== 'string' || field.unit.length > 32)))
+                    throw new AppError('Invalid report field');
+            }
+            if (r.columns.some(column => !schemaKeys.has(column.key)))
+                throw new AppError('Report column is absent from schema');
+            for (const sheet of r.excel?.sheets ?? []) {
+                if (typeof sheet.name !== 'string' || !sheet.name || sheet.name.length > 31 || !Array.isArray(sheet.columns) || !sheet.columns.length || sheet.columns.length > 64)
+                    throw new AppError('Invalid Excel sheet');
+                for (const column of sheet.columns)
+                    if (!schemaKeys.has(column.key) || typeof column.title !== 'string' || (column.width !== undefined && (!Number.isFinite(column.width) || column.width <= 0 || column.width > 200)))
+                        throw new AppError('Invalid Excel column');
+                for (const sort of sheet.sort ?? [])
+                    if (!schemaKeys.has(sort.key) || !['asc', 'desc'].includes(sort.direction))
+                        throw new AppError('Invalid Excel sort');
+                if (sheet.freezeRows !== undefined && (!Number.isInteger(sheet.freezeRows) || sheet.freezeRows < 0 || sheet.freezeRows > 100))
+                    throw new AppError('Invalid Excel freeze rows');
+            }
+        } else if (r.excel) {
+            throw new AppError('Excel report requires a typed schema');
+        }
         for (const s of r.on.schedule ?? [])
             validateCron(s.cron);
         finite(r.window, 'report window', 1000, 7 * 86400000);
