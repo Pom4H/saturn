@@ -143,5 +143,15 @@
         }
       }
     }
-  }
+  },
+  "scripts": {
+    "vscode:prepublish": "cd .. && npm run vscode:build"
+  },
+  "files": [
+    "extension.cjs",
+    "lib/**",
+    "media/**",
+    "dist/**",
+    "README.md"
+  ]
 }
