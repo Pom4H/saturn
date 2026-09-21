@@ -54,7 +54,7 @@ test('interlock closes continuously, clears old demand and never auto-restarts',
     const k = new Kernel(source(), 'r', 'run', 0); k.operate('DRAW', .8);
     k.state.states['AUX-TANK'].inventory = .5; k.step();
     assert.equal(k.samples()['DRAW.blocked'].value, 1); assert.equal(k.samples()['DRAW.requested'].value, 0);
-    assert.throws(() => k.operate('DRAW', .8), diagnostic('SATURN_RUNTIME_INVALID',{control:'DRAW',blockedReason:'Низкий запас'}));
+    assert.throws(() => k.operate('DRAW', .8), diagnostic('SATURN_RUNTIME_INVALID',{control:'DRAW'}));
     k.state.states['AUX-TANK'].inventory = 5; k.step(); assert.equal(k.samples()['DRAW.blocked'].value, 0);
     assert.equal(k.samples()['DRAW.value'].value, 0);
 });

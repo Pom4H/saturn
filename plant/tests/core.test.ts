@@ -39,12 +39,12 @@ const project = () => compileProject(demoFiles);
 const makeService = async (files = demoFiles) => { const store = new Store(new NodeSql()); let serial = 0; const repo = new LocalRepository(store, () => `local:${++serial}`); const service = new Service(store, repo, { now: () => 1000000, uuid: () => `id-${++serial}`, reportRunner: async (task) => executeReport(task, new NodeSql()) }); await service.start(files); return service; };
 test('multi-file DSL compiles hierarchy and typed signal sources', () => { const p = project(); assert.equal(p.simulations.length, 46); assert.equal(p.systems.length, 18); assert.equal(p.reports.length, 4); assert.deepEqual(p.simulations.find(n => n.id === 'PUMP-A')!.inputs.voltage, { ref: 'GRID.voltage' }); });
 test('canonical @saturn/core import compiles and legacy DSL namespaces are rejected', () => {
-    const source = `import { project, system } from '@saturn/core';
+    const source = `import { project, system, simulation } from '@saturn/core';
 export default project('minimal', {
   title: 'Minimal',
   description: 'Minimal project',
   systems: [system('root', 'Root')],
-  simulations: [],
+  simulations: [simulation('GRID', 'supply', { system: 'root', at: { x: 0, y: 0 } })],
   signals: [],
   alarms: [],
   reports: [],
