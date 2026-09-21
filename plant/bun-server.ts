@@ -10,6 +10,7 @@ import { Store } from './store';
 import { Service } from './service';
 import { requireRole } from './types';
 import { AppError, failCode } from './diagnostics';
+import { commandValue, nullableStringValue, numberMapValue, objectValue, stringMapValue, stringValue, type JsonObject } from './http-input';
 import { demoFiles } from './demo/files';
 
 const prefix = '/plant';
@@ -63,66 +64,6 @@ const json = (status: number, value: unknown, headers: HeadersInit = {}) =>
 const html = (status: number, value: string) =>
     response(value, status, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
 
-type JsonObject = Record<string, unknown>;
-
-function objectValue(value: unknown, field = 'body'): JsonObject {
-    if (!value || typeof value !== 'object' || Array.isArray(value))
-        failCode('SATURN_HTTP_INVALID', { reason:'malformed' }, { field });
-    return value as JsonObject;
-}
-function stringValue(input: JsonObject, field: string): string {
-    const value = input[field];
-    if (typeof value !== 'string')
-        failCode('SATURN_VALUE_INVALID', { field, reason:'invalid' }, { value });
-    return value;
-}
-function optionalStringValue(input: JsonObject, field: string): string | undefined {
-    const value = input[field];
-    if (value === undefined) return undefined;
-    if (typeof value !== 'string')
-        failCode('SATURN_VALUE_INVALID', { field, reason:'invalid' }, { value });
-    return value;
-}
-function nullableStringValue(input: JsonObject, field: string): string | null {
-    const value = input[field];
-    if (value === null || value === undefined) return null;
-    if (typeof value !== 'string')
-        failCode('SATURN_VALUE_INVALID', { field, reason:'invalid' }, { value });
-    return value;
-}
-function finiteNumberValue(input: JsonObject, field: string): number | undefined {
-    const value = input[field];
-    if (value === undefined) return undefined;
-    if (typeof value !== 'number' || !Number.isFinite(value))
-        failCode('SATURN_VALUE_INVALID', { field, reason:'invalid' }, { value });
-    return value;
-}
-function stringMapValue(value: unknown, field: string): Record<string,string> {
-    const object = objectValue(value, field);
-    for (const [key, item] of Object.entries(object))
-        if (typeof item !== 'string')
-            failCode('SATURN_VALUE_INVALID', { field: `${field}.${key}`, reason:'invalid' }, { value:item });
-    return object as Record<string,string>;
-}
-function numberMapValue(value: unknown, field: string): Record<string,number> {
-    if (value === undefined) return {};
-    const object = objectValue(value, field);
-    for (const [key, item] of Object.entries(object))
-        if (typeof item !== 'number' || !Number.isFinite(item))
-            failCode('SATURN_VALUE_INVALID', { field: `${field}.${key}`, reason:'invalid' }, { value:item });
-    return object as Record<string,number>;
-}
-function commandValue(input: JsonObject) {
-    return {
-        id: stringValue(input,'id'),
-        revision: stringValue(input,'revision'),
-        action: stringValue(input,'action'),
-        ...(optionalStringValue(input,'runId') !== undefined ? { runId: optionalStringValue(input,'runId') } : {}),
-        ...(optionalStringValue(input,'target') !== undefined ? { target: optionalStringValue(input,'target') } : {}),
-        ...(optionalStringValue(input,'parameter') !== undefined ? { parameter: optionalStringValue(input,'parameter') } : {}),
-        ...(finiteNumberValue(input,'value') !== undefined ? { value: finiteNumberValue(input,'value') } : {}),
-    };
-}
 async function body(request: Request): Promise<JsonObject> {
     if (!request.headers.get('content-type')?.toLowerCase().startsWith('application/json'))
         failCode('SATURN_HTTP_INVALID', { reason:'missing' }, { field:'content-type' }, { status:415 });
