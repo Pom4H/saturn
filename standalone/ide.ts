@@ -5,6 +5,8 @@ import { installEquipment, sceneFor } from '../plant/equipment';
 import { executeReport } from '../plant/workflows';
 import type { Report, ReportData } from '../plant/types';
 import { BunSql } from './bun-sql';
+import { localizedDslEntities, localizedDslOperators } from '../plant/dsl-i18n';
+import { formatDiagnostic, SaturnDiagnosticError, type SaturnLocale } from '../plant/diagnostics';
 import { catalog } from '../src/core';
 import { ExtensionManager } from './extensions';
 import { loadProjectDirectory } from './project-loader';
@@ -52,11 +54,62 @@ export interface IdeReportPreviewDocument {
     rows: Record<string, unknown>[];
 }
 
+export interface IdeDocsDocument {
+    schema: 1;
+    locale: SaturnLocale;
+    entities: ReturnType<typeof localizedDslEntities>;
+    operators: ReturnType<typeof localizedDslOperators>;
+}
+
+export interface IdeCheckDiagnostic {
+    code: string;
+    severity: 'error' | 'warning' | 'info';
+    message: string;
+    messageKey: string;
+    data?: Record<string, unknown>;
+    source?: { path: string; from: number; to: number; line: number; character: number };
+}
+
+export interface IdeCheckDocument {
+    schema: 1;
+    locale: SaturnLocale;
+    diagnostics: IdeCheckDiagnostic[];
+}
+
 export interface IdeDiagramDocument {
     schema: 1;
     project: { id: string; title: string; directory: string };
     scene: ReturnType<typeof sceneFor>;
     definitions: Record<string, { label: string; width: number; height: number }>;
+}
+
+export function ideDocs(locale: SaturnLocale): IdeDocsDocument {
+    return { schema: 1, locale, entities: localizedDslEntities(locale), operators: localizedDslOperators() };
+}
+
+export async function ideCheck(projectPath: string, locale: SaturnLocale): Promise<IdeCheckDocument> {
+    const loaded = await loadProjectDirectory(projectPath);
+    try {
+        compileProject(loaded.files);
+        return { schema: 1, locale, diagnostics: [] };
+    } catch (error) {
+        if (error instanceof SaturnDiagnosticError) {
+            const source = error.diagnostic.data?.source as IdeCheckDiagnostic['source'] | undefined;
+            return {
+                schema: 1,
+                locale,
+                diagnostics: [{
+                    code: error.diagnostic.code,
+                    severity: error.diagnostic.severity,
+                    message: formatDiagnostic(error.diagnostic, locale),
+                    messageKey: error.diagnostic.message.key,
+                    ...(error.diagnostic.data ? { data: error.diagnostic.data } : {}),
+                    ...(source ? { source } : {}),
+                }],
+            };
+        }
+        throw error;
+    }
 }
 
 export async function ideCatalog(appData: string): Promise<IdeCatalogDocument> {
@@ -192,8 +245,20 @@ function option(args: string[], name: string): string | undefined {
 export async function runIdeCommand(args: string[], appData: string): Promise<void> {
     const positional = args.filter((arg, index) => arg !== '--json' && args[index - 1] !== '--project');
     const [action = 'catalog'] = positional;
+    const locale = (option(args, '--locale') === 'ru' ? 'ru' : 'en') as SaturnLocale;
     if (action === 'catalog') {
         console.log(JSON.stringify(await ideCatalog(appData)));
+        return;
+    }
+    if (action === 'docs') {
+        console.log(JSON.stringify(ideDocs(locale)));
+        return;
+    }
+    if (action === 'check') {
+        const project = option(args, '--project');
+        if (!project)
+            throw new Error('Usage: saturn ide check --project PATH --locale en|ru --json');
+        console.log(JSON.stringify(await ideCheck(project, locale)));
         return;
     }
     if (action === 'diagram') {
@@ -218,5 +283,5 @@ export async function runIdeCommand(args: string[], appData: string): Promise<vo
         console.log(JSON.stringify(await ideReportPreview(project, id)));
         return;
     }
-    throw new Error('Usage: saturn ide <catalog|diagram|reports|report> [--project PATH] [--id REPORT] --json');
+    throw new Error('Usage: saturn ide <catalog|docs|check|diagram|reports|report> [--project PATH] [--id REPORT] [--locale en|ru] --json');
 }
