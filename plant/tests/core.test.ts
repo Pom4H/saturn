@@ -159,9 +159,9 @@ test('HTTP auth, CSRF, private HTML, SQL reports, SSE and revocation', async () 
     const landingHTML = await landing.text();
     assert.ok(landingHTML.includes('hero-title'));
     assert.equal((await fetch(app.origin + '/', { method: 'HEAD' })).status, 200);
-    const scriptPath = landingHTML.match(/<script[^>]+src="(\/site\/assets\/site-[^"]+\.js)"/)?.[1];
-    assert.ok(scriptPath, 'Landing references its built module');
-    const landingScript = await fetch(app.origin + scriptPath);
+    const scriptRef = landingHTML.match(/<script[^>]+src="([^"]*site\/assets\/site-[^"]+\.js)"/)?.[1];
+    assert.ok(scriptRef, 'Landing references its built module');
+    const landingScript = await fetch(new URL(scriptRef, app.origin + '/'));
     assert.equal(landingScript.status, 200);
     assert.equal(landingScript.headers.get('content-type'), 'text/javascript');
     const starter = await fetch(app.origin + '/site/assets/first-pump.json');
