@@ -10,6 +10,7 @@ export interface IdeCatalogItem {
     type: string;
     title: string;
     source: string;
+    visual?: string;
     tag?: string;
 }
 
@@ -38,7 +39,7 @@ export async function ideCatalog(appData: string): Promise<IdeCatalogDocument> {
         title: 'Saturn Core',
         source: '@saturn/core',
         items: models()
-            .map(item => ({ type: item.kind, title: item.title, source: '@saturn/core' }))
+            .map(item => ({ type: item.kind, title: item.title, source: '@saturn/core', visual: item.visual }))
             .sort((a, b) => a.title.localeCompare(b.title)),
     };
 
