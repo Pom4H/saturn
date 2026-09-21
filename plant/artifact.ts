@@ -49,6 +49,18 @@ export async function buildArtifact(
   return { ...payload, hash };
 }
 
+export async function verifyBuildArtifact(value: unknown): Promise<BuildArtifact> {
+  validateBuildArtifact(value);
+  const artifact = value as BuildArtifact;
+  const expected = 'sha256:' + await digest(canonical({
+    schema: artifact.schema,
+    project: artifact.project,
+    provenance: artifact.provenance,
+  }));
+  if (artifact.hash !== expected) throw new Error('Saturn build artifact hash mismatch');
+  return artifact;
+}
+
 export function validateBuildArtifact(value: unknown): asserts value is BuildArtifact {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid Saturn build artifact');
   const artifact = value as BuildArtifact;
