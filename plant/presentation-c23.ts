@@ -20,7 +20,8 @@ export interface SaturnC23PresentationSource {
     files: { 'hmi.c': string };
 }
 
-const cString=(value:string):string=>JSON.stringify(value);\nconst symbol=(value:string):string=>value.replace(/[^A-Za-z0-9_]/g,'_').replace(/^[0-9]/,'_$&');
+const cString=(value:string):string=>JSON.stringify(value);
+const symbol=(value:string):string=>value.replace(/[^A-Za-z0-9_]/g,'_').replace(/^[0-9]/,'_$&');
 
 function refs(expr:Expr,result:Set<string>):void {
     if(typeof expr==='number'||typeof expr==='boolean')return;
