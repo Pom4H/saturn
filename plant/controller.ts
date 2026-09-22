@@ -52,17 +52,9 @@ export function compileController(c: Controller) {
     for(const row of c.hmi.rows){ if(typeof row.label!=='string'||row.label.length>24)failCode('SATURN_LIMIT',{resource:'hmi.label',reason:'tooLarge'},{max:24});
         if(!bindings[row.pin]) { if(!Object.hasOwn(inputPins,row.pin))failCode('SATURN_PLC_INVALID',{reason:'unknown'},{field:'hmi.pin',pin:row.pin});bindings[row.pin]=expr({ref:row.pin}); }
     }
-    let screenModels: import('./vendor/saturn/src/types').HmiScreenModel[];
-    if(c.hmi.view) {
-        const viewBindings=Object.fromEntries(Object.entries(c.hmi.view.bindings).map(([key,value])=>[key,expr(value)]));
-        const projection=projectPresentation(c.hmi.view,{target:'saturn-plc-320',bindings:viewBindings});
-        screenModels=[projection.screen];
-    } else screenModels=[{id:'main',title:c.hmi.title,screenType:'main',period:0,elements:[
-        {id:'title',primitive:'text',label:c.hmi.title,position:{x:10,y:8}},
-        ...c.hmi.rows.map((r,i)=>({id:'row'+i,primitive:'value' as const,label:r.label+' ',position:{x:10,y:40+i*29},binding:{source:'wp' as const,ref:bindings[r.pin],format:'int' as const}})),
-    ]}];
-    const screens=compileHmiScreens(screenModels,{elementIndex:new Map(elements.map((e,i)=>[e.id,i]))});
-    const compiled=buildSchema(elements,{projectName:c.id,projectVersion:'1.0',buildTime:'reproducible',screens});
+    // FBD remains a bounded simulation/legacy logic backend only. Rich physical HMI
+    // is compiled separately from canonical Presentation to C23/satgui.
+    const compiled=buildSchema(elements,{projectName:c.id,projectVersion:'1.0',buildTime:'reproducible'});
     return {...compiled, inputs:[...used].sort(), runtimeHash:wasmSha256, profile:'saturn-fbd/state-v1', hardwareVerified:false};
 }
 export class ControllerVM {

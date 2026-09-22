@@ -45,7 +45,7 @@ jobs:
     timeout-minutes: 10
     defaults:
       run:
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File "{0}"
     steps:
       - uses: actions/checkout@v7.0.1
         with:
