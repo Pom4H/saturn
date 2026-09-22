@@ -1,7 +1,8 @@
 import type { Presentation } from './presentation';
 import type { Expr, Layout } from './types';
 import { failCode } from './diagnostics';
-import { FbdRuntime, type HmiDrawCommand } from './vendor/saturn/src/runtime';
+import { FbdRuntime } from './vendor/saturn/src/runtime';
+import { renderSaturnHmi, type SaturnHmiCommand, type SaturnHmiScene } from './hmi-frame';
 import { buildSchema, type ElementSpec } from './vendor/saturn/src/builder';
 import { ELEM } from './vendor/saturn/src/format';
 import { runtimeHash as wasmSha256, STATE_ABI, type RuntimeSnapshot } from './vendor/firmverse/index';
@@ -11,10 +12,10 @@ export interface Controller {
     id: string; profile: 'saturn-fbd'; system: string; layout: Layout;
     blocks?: Record<string, PlcBlock>;
     setpoints?: Record<string, PlcSetpoint>;
-    outputs: Record<string, Expr>; hmi: { title: string; rows: { label: string; pin: string }[]; view?: Presentation };
+    outputs: Record<string, Expr>; hmi: { title: string; rows: { label: string; pin: string }[]; view?: Presentation; scene?: SaturnHmiScene };
 }
 export interface PlcBlock { type: 'TON'|'TP'|'RSTRG'|'DTRG'|'COUNTER'|'PID'|'SUM'|'SUMM'|'LIM'|'EQ'|'OR'|'XOR'; inputs: Expr[]; params?: number[] }
-export interface ControllerState { inputs: Record<string, number>; outputs: Record<string, number>; healthy: boolean; powered: boolean; display?: HmiDrawCommand[]; snapshot?: RuntimeSnapshot }
+export interface ControllerState { inputs: Record<string, number>; outputs: Record<string, number>; healthy: boolean; powered: boolean; display?: SaturnHmiCommand[]; snapshot?: RuntimeSnapshot }
 export const inputPins: Record<string, number> = Object.fromEntries([...Array.from({length:10},(_,i)=>[`DI${i+1}`,i+1]), ['AI1',11], ['AI2',12]]);
 export const outputPins: Record<string, number> = Object.fromEntries([...Array.from({length:11},(_,i)=>[`DO${i+1}`,i+1]), ['AO1',12], ['AO2',13]]);
 /** Named blocks compile once; stateful execution is checkpointed by Firmverse. */
@@ -81,9 +82,21 @@ export class ControllerVM {
         this.runtime.setSetpoint(index,next);
     }
     getSetpoint(name:string){const index=this.artifact.setpointOrder.indexOf(name);if(index<0)failCode('SATURN_NOT_FOUND',{resource:'setpoint',id:name},{name});return this.runtime.getSetpoint(index);}
-    scan(inputs:Record<string,number>, dt:number):{outputs:Record<string,number>;hmi:HmiDrawCommand[]} {
+    scan(inputs:Record<string,number>, dt:number, timeMs:number):{outputs:Record<string,number>;hmi:SaturnHmiCommand[]} {
         for(const [pin,index] of Object.entries(inputPins)) { const value=inputs[pin]??0;if(!Number.isSafeInteger(value)||value< -2147483648||value>2147483647)failCode('SATURN_PLC_INVALID',{reason:'range'},{field:'input',pin,value,min:-2147483648,max:2147483647});this.runtime.setInput(index,value); }
         this.runtime.step(dt);
-        return {outputs:Object.fromEntries(Object.keys(this.controller.outputs).map(pin=>[pin,Number(this.runtime.getOutput(outputPins[pin]))])),hmi:[]};
+        const outputs=Object.fromEntries(Object.keys(this.controller.outputs).map(pin=>[pin,Number(this.runtime.getOutput(outputPins[pin]))]));
+        const signals={...inputs,...outputs};
+        const scene=this.controller.hmi.scene??{
+            background:0x0024,
+            nodes:[
+                {kind:'text' as const,x:10,y:10,text:this.controller.hmi.title,color:0xffff,size:14,weight:700},
+                ...this.controller.hmi.rows.flatMap((row,index)=>[
+                    {kind:'text' as const,x:10,y:42+index*30,text:row.label,color:0xbdf7,size:11,weight:600},
+                    {kind:'text' as const,x:300,y:42+index*30,text:{value:{signal:row.pin},digits:0},color:0xffff,size:14,weight:700,align:'end' as const,mono:true},
+                ]),
+            ],
+        } satisfies SaturnHmiScene;
+        return {outputs,hmi:renderSaturnHmi(scene,signals,timeMs).commands};
     }
 }
