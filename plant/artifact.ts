@@ -25,7 +25,9 @@ function canonical(value: unknown): string {
 
 async function digest(value: string | Uint8Array): Promise<string> {
   const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value;
-  const hash = await crypto.subtle.digest('SHA-256', bytes);
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  const hash = await crypto.subtle.digest('SHA-256', copy.buffer);
   return [...new Uint8Array(hash)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
