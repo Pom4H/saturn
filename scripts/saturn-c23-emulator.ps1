@@ -82,7 +82,8 @@ try {
   # consent dialog on a fresh runner. Network access is not needed for this test:
   # explicitly dismiss it instead of accidentally capturing it as HMI evidence.
   Start-Sleep -Seconds 1
-  $firewall = Find-DesktopButton @('Отменить','Cancel')
+  $cancelRu = -join ([char[]](0x41e,0x442,0x43c,0x435,0x43d,0x438,0x442,0x44c))
+  $firewall = Find-DesktopButton @($cancelRu,'Cancel')
   if ($null -ne $firewall) {
     if (-not (Invoke-AutomationButton $firewall)) { throw 'Could not dismiss Windows Firewall dialog' }
     Start-Sleep -Milliseconds 500
@@ -93,7 +94,7 @@ try {
   Start-Sleep -Seconds 1
 
   # SatPlcImit paints its toolbar as native/custom controls, so UI Automation
-  # does not expose the "Имитатор" button. Click its stable relative toolbar slot.
+  # does not expose the emulator toolbar button. Click its stable relative toolbar slot.
   $mainRect = New-Object Win32Saturn+RECT
   [Win32Saturn]::GetWindowRect($proc.MainWindowHandle,[ref]$mainRect) | Out-Null
   $mainWidth=$mainRect.Right-$mainRect.Left
