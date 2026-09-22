@@ -32,6 +32,12 @@ jobs:
 
       - run: npm ci
 
+      # Capture the focused product evidence first: it is a short, objective
+      # browser oracle and should not wait behind the broader release suite.
+      - run: npx playwright install --with-deps chromium
+      - name: Capture PLC HMI video
+        run: PWA_HMI_VIDEO=1 npm run plant:test:browser
+
       # One canonical PR gate. This already covers build, TypeScript, unit/core
       # tests, plant tests, Bun smoke, authoring, consumer and VS Code checks.
       - name: Core release checks
@@ -39,13 +45,6 @@ jobs:
 
       - name: Landing static checks
         run: npm run site:check
-
-      # The release shell integration suite uses Chromium only. WebKit,
-      # adversarial browser suites and full plant browser evidence are manual
-      # diagnostics rather than duplicate per-commit gates.
-      - run: npx playwright install --with-deps chromium
-      - name: Capture PLC HMI video
-        run: PWA_HMI_VIDEO=1 npm run plant:test:browser
 
       - name: Convert HMI video to MP4
         run: |
