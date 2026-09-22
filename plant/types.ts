@@ -270,6 +270,8 @@ export interface Checkpoint {
 }
 export interface Frame {
     displays?: Record<string,HmiDrawCommand[]>;
+    /** Active physical TFT page per controller; target state, not authored UI state. */
+    controllerScreens?: Record<string,number>;
     runId: string;
     revision: string;
     seq: number;
