@@ -671,7 +671,7 @@ export async function mountStudio() {
   function setSurface(next: Surface) {
     if (next === 'source') { codeVisible = true; mobilePane = 'source'; next = 'scene'; }
     if (next === 'equipment') { toggleEquipment(true); next = 'scene'; }
-    surface = next; shell.dataset.view = next;
+    surface = next; shell.dataset.surface = next;
     $('scene-panel').hidden = next !== 'scene';
     $('signals-panel').hidden = next !== 'signals'; $('controls-panel').hidden = next !== 'controls'; $('alarms-panel').hidden = next !== 'alarms'; $('projects-panel').hidden = next !== 'projects';
     document.querySelectorAll<HTMLDetailsElement>('.export-options').forEach(menu => menu.open = false);

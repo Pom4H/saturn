@@ -93,6 +93,11 @@ await assertText('scripts/saturn.mjs', {
   forbidden: ['saturn extension', "'extension'", "'extensions'"],
 });
 
+await assertText('site/index.html', {
+  required: ['data-surface="scene"', 'Source, build, published и applied', 'saturn add pump', 'project-owned source', 'artifact runtime'],
+  forbidden: ['data-view="scene"', 'saturn extension add', 'self-contained npm package', 'Git-managed'],
+});
+
 if (violations.length) {
   console.error('Saturn architecture invariants failed:\n' + violations.join('\n'));
   process.exit(1);

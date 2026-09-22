@@ -11,7 +11,7 @@ export async function checkInteractions(browser, origin) {
     await page.locator(selector).click();
   };
   const assertScene = async () => {
-    assert.equal(await page.locator('#studio-shell').getAttribute('data-view'), 'scene');
+    assert.equal(await page.locator('#studio-shell').getAttribute('data-surface'), 'scene');
     assert(await page.locator('#scene-panel').isVisible());
   };
   const signals = async () => { await page.locator('.shell-topbar [data-shell-view="signals"]').click(); assert(await page.locator('#signals-panel').isVisible()); };
