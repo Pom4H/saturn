@@ -48,6 +48,7 @@ jobs:
         run: npm run site:test:browser
 
       - name: Capture PLC HMI evidence
+        if: always()
         run: PWA_ONLY_PLC=1 npm run plant:test:browser
 
       - uses: actions/upload-artifact@v7.0.1
