@@ -1,0 +1,77 @@
+name: Issue 29 C23 target evidence
+
+on:
+  push:
+    branches:
+      - issue/29-c23-satgui
+    paths:
+      - 'plant/presentation-c23.ts'
+      - 'plant/presentation-target.ts'
+      - 'plant/targets/saturn-plc-c23.ts'
+      - 'plant/controller.ts'
+      - 'plant/tests/presentation.test.ts'
+      - 'scripts/architecture-invariants.mjs'
+      - '.github/workflows/issue-29-c23.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: issue-29-c23
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: npm ci
+      - run: npm run plant:typecheck
+      - run: npm run plant:test
+      - run: npm run architecture:check
+
+  sdk-probe:
+    runs-on: [self-hosted, windows]
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Locate existing Saturn C23 SDK
+        run: |
+          $roots = @(
+            'C:\Program Files',
+            'C:\Program Files (x86)',
+            $env:LOCALAPPDATA,
+            $env:USERPROFILE
+          ) | Where-Object { $_ -and (Test-Path $_) }
+          Get-Command *riscv*gcc* -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
+          foreach ($root in $roots) {
+            Get-ChildItem -Path $root -File -Recurse -ErrorAction SilentlyContinue |
+              Where-Object { $_.Name -match '^(satgui.*\.h|.*satstd.*\.h|.*riscv.*gcc.*\.exe)$' } |
+              Select-Object -First 100 -ExpandProperty FullName
+          }
+      - name: Fetch official C23 API manual
+        run: |
+          New-Item -ItemType Directory -Force issue29-evidence | Out-Null
+          curl.exe -fL --retry 3 https://www.mnppsaturn.ru/update/satsdk/SatPlcImit.pdf -o issue29-evidence\SatPlcImit.pdf
+          Get-FileHash issue29-evidence\SatPlcImit.pdf -Algorithm SHA256
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: issue29-saturn-c23-sdk-evidence
+          path: issue29-evidence/
+          retention-days: 7
