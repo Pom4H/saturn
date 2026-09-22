@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { readFile, stat } from 'node:fs/promises';
 import { build } from 'esbuild';
+import { rawText } from './esbuild-raw-text.mjs';
 
 for (const file of ['scripts/saturn.mjs', 'vscode/extension.cjs', 'vscode/lib/model.cjs']) {
     const result = spawnSync(process.execPath, ['--check', file], { stdio: 'inherit' });
@@ -16,6 +17,7 @@ await build({
     write: false,
     logLevel: 'warning',
     external: ['bun:*'],
+    plugins: [rawText],
 });
 
 const source = await readFile('vscode/diagram-webview.ts', 'utf8');
