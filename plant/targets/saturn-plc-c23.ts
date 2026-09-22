@@ -52,7 +52,7 @@ export function saturnPlcC23Source(parent:BuildArtifact,controllerId:string):Sat
     const controller=parent.project.controllers?.find(item=>item.id===controllerId);
     if(!controller)failCode('SATURN_NOT_FOUND',{resource:'plc',id:controllerId},{controllerId});
     if(!controller.hmi.view)failCode('SATURN_PRESENTATION_INVALID',{reason:'missing'},{target:'saturn-plc-320',controllerId,field:'hmi.view'});
-    const presentation=compileSaturnC23Presentation(controller.hmi.view);
+    const presentation=compileSaturnC23Presentation(controller.hmi.view,controller.hmi.scene);
     const inputScales=Object.fromEntries(
         (parent.project.connections??[])
             .filter(w=>w.to.device===controllerId && /^(AI[12]|DI(?:[1-9]|10))$/.test(w.to.port))
