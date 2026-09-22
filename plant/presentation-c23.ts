@@ -159,7 +159,7 @@ export function compileSaturnC23Presentation(view:Presentation,scene?:SaturnHmiS
             for(let i=0;i<count;i++)sceneInit.push(`    ${id}_b${i}=gui_line_create(${Math.round(node.cx)},${Math.round(node.cy)},${Math.round(node.cx+radius)},${Math.round(node.cy)},2,${color(i%2===0?node.bladeA:(node.bladeB??node.bladeA))}); gui_screen_add(saturn_main_screen,${id}_b${i});`);
             const rpm=bindingValue(node.rpm);
             const table=[[-1,0],[-1,-1],[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1]];
-            sceneUpdate.push(`    { int phase=((int)(saturn_hmi_time_ms * saturn_hmi_max(0.0,${rpm}) / 7500.0)) & 7); static const int8_t dx[8]={-1,-1,0,1,1,1,0,-1}; static const int8_t dy[8]={0,-1,-1,-1,0,1,1,1};`);
+            sceneUpdate.push(`    { int phase=((int)(saturn_hmi_time_ms * saturn_hmi_max(0.0,${rpm}) / 7500.0)) & 7; static const int8_t dx[8]={-1,-1,0,1,1,1,0,-1}; static const int8_t dy[8]={0,-1,-1,-1,0,1,1,1};`);
             for(let i=0;i<count;i++)sceneUpdate.push(`      { int p=(phase+${Math.round(i*8/count)})&7; ${id}_b${i}->x2=(uint16_t)(${Math.round(node.cx)}+dx[p]*${radius}); ${id}_b${i}->y2=(uint16_t)(${Math.round(node.cy)}+dy[p]*${radius}); }`);
             sceneUpdate.push('    }');
         } else if(node.kind==='flow'){
