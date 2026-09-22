@@ -6,9 +6,11 @@ import { buildSchema, type ElementSpec } from './vendor/saturn/src/builder';
 import { ELEM } from './vendor/saturn/src/format';
 import { runtimeHash as wasmSha256, STATE_ABI, type RuntimeSnapshot } from './vendor/firmverse/index';
 export const CONTROLLER_ABI=STATE_ABI;
+export interface PlcSetpoint { caption:string; min:number; max:number; initial:number; divider?:number; step?:number }
 export interface Controller {
     id: string; profile: 'saturn-fbd'; system: string; layout: Layout;
     blocks?: Record<string, PlcBlock>;
+    setpoints?: Record<string, PlcSetpoint>;
     outputs: Record<string, Expr>; hmi: { title: string; rows: { label: string; pin: string }[]; view?: Presentation };
 }
 export interface PlcBlock { type: 'TON'|'TP'|'RSTRG'|'DTRG'|'COUNTER'|'PID'|'SUM'|'SUMM'|'LIM'|'EQ'|'OR'|'XOR'; inputs: Expr[]; params?: number[] }
@@ -18,8 +20,12 @@ export const outputPins: Record<string, number> = Object.fromEntries([...Array.f
 /** Named blocks compile once; stateful execution is checkpointed by Firmverse. */
 export function compileController(c: Controller) {
     if(c.profile !== 'saturn-fbd' || !c.outputs || Object.keys(c.outputs).length<1 || Object.keys(c.outputs).length>13) failCode('SATURN_PLC_INVALID',{reason:'malformed'},{field:'profile'});
-    const elements: ElementSpec[] = []; const used = new Set<string>(); const built=new Map<string,string>(),active=new Set<string>();let serial=0;
-    for(const name of Object.keys(c.blocks??{})){if(!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(name)||Object.hasOwn(inputPins,name))failCode('SATURN_PLC_INVALID',{reason:'unsafeName'},{field:'block.id',name});}
+    const elements: ElementSpec[] = []; const used = new Set<string>(); const built=new Map<string,string>(),spBuilt=new Map<string,string>(),active=new Set<string>();const setpointOrder:string[]=[];let serial=0;
+    for(const name of Object.keys(c.blocks??{})){if(!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(name)||Object.hasOwn(inputPins,name)||Object.hasOwn(c.setpoints??{},name))failCode('SATURN_PLC_INVALID',{reason:'unsafeName'},{field:'block.id',name});}
+    for(const [name,sp] of Object.entries(c.setpoints??{})){
+        if(!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(name)||Object.hasOwn(inputPins,name)||Object.hasOwn(c.blocks??{},name))failCode('SATURN_PLC_INVALID',{reason:'unsafeName'},{field:'setpoint.id',name});
+        if(!sp||typeof sp.caption!=='string'||sp.caption.length>24||![sp.min,sp.max,sp.initial,sp.divider??0,sp.step??1].every(Number.isSafeInteger)||sp.min>sp.max||sp.initial<sp.min||sp.initial>sp.max||(sp.step??1)<=0)failCode('SATURN_PLC_INVALID',{reason:'range'},{field:'setpoint',name});
+    }
     const blockKinds=new Set(['TON','TP','RSTRG','DTRG','COUNTER','PID','SUM','SUMM','LIM','EQ','OR','XOR']);
     const push = (spec: Omit<ElementSpec,'id'>, name='e'+serial++):string => { elements.push({id:name,...spec}); if(elements.length>256)failCode('SATURN_LIMIT',{resource:'plc.blocks',reason:'tooMany'},{max:256});return name; };
     const expr = (v: Expr, depth=0):string => {
@@ -27,6 +33,12 @@ export function compileController(c: Controller) {
         if(typeof v==='number'||typeof v==='boolean') { const n=Number(v); if(!Number.isSafeInteger(n)||n< -2147483648||n>2147483647) failCode('SATURN_PLC_INVALID',{reason:'range'},{field:'constant',value:n,min:-2147483648,max:2147483647});return push({type:ELEM.CONST,params:[n]}); }
         if(!v||typeof v!=='object')failCode('SATURN_PLC_INVALID',{reason:'malformed'},{field:'expression'});
         if('ref' in v) {
+            if(Object.hasOwn(c.setpoints??{},v.ref)){
+                if(spBuilt.has(v.ref))return spBuilt.get(v.ref)!;
+                const sp=c.setpoints![v.ref],name='setpoint_'+v.ref;
+                push({type:ELEM.SP,params:[sp.min,sp.max,sp.initial,sp.divider??0,sp.step??1],caption:sp.caption},name);
+                spBuilt.set(v.ref,name);setpointOrder.push(v.ref);return name;
+            }
             if(Object.hasOwn(c.blocks??{},v.ref)){
                 if(built.has(v.ref))return built.get(v.ref)!;
                 if(active.has(v.ref))failCode('SATURN_PLC_INVALID',{reason:'cycle'},{block:v.ref});
@@ -55,7 +67,7 @@ export function compileController(c: Controller) {
     // FBD remains a bounded simulation/legacy logic backend only. Rich physical HMI
     // is compiled separately from canonical Presentation to C23/satgui.
     const compiled=buildSchema(elements,{projectName:c.id,projectVersion:'1.0',buildTime:'reproducible'});
-    return {...compiled, inputs:[...used].sort(), runtimeHash:wasmSha256, profile:'saturn-fbd/state-v1', hardwareVerified:false};
+    return {...compiled, inputs:[...used].sort(), setpointOrder, runtimeHash:wasmSha256, profile:'saturn-fbd/state-v1', hardwareVerified:false};
 }
 export class ControllerVM {
     readonly artifact: ReturnType<typeof compileController>; private runtime:FbdRuntime;
@@ -63,6 +75,12 @@ export class ControllerVM {
     snapshot():RuntimeSnapshot {return this.runtime.snapshot();}
     restore(snapshot:RuntimeSnapshot):void {this.runtime.restore(snapshot);}
     reset():void {this.runtime.reset();}
+    setSetpoint(name:string,value?:number,deltaSteps?:number):void {
+        const index=this.artifact.setpointOrder.indexOf(name);if(index<0)failCode('SATURN_NOT_FOUND',{resource:'setpoint',id:name},{name});
+        const point=this.runtime.getSetpoint(index),next=value??Math.max(point.lowLimit,Math.min(point.upperLimit,point.value+(deltaSteps??0)*point.step));
+        this.runtime.setSetpoint(index,next);
+    }
+    getSetpoint(name:string){const index=this.artifact.setpointOrder.indexOf(name);if(index<0)failCode('SATURN_NOT_FOUND',{resource:'setpoint',id:name},{name});return this.runtime.getSetpoint(index);}
     scan(inputs:Record<string,number>, dt:number):{outputs:Record<string,number>;hmi:HmiDrawCommand[]} {
         for(const [pin,index] of Object.entries(inputPins)) { const value=inputs[pin]??0;if(!Number.isSafeInteger(value)||value< -2147483648||value>2147483647)failCode('SATURN_PLC_INVALID',{reason:'range'},{field:'input',pin,value,min:-2147483648,max:2147483647});this.runtime.setInput(index,value); }
         this.runtime.step(dt);

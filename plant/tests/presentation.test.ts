@@ -47,12 +47,27 @@ test('Saturn physical Presentation codegen is deterministic and keeps stable sig
 test('physical Saturn target is one C23 program containing control I/O and satgui HMI',async()=>{
  const artifact=await buildArtifact(demoFiles,{packageName:'@saturn/test'});
  const source=saturnPlcC23Source(artifact,'SATURN-1');
- assert.deepEqual(Object.keys(source.files).sort(),['controller.c','hmi.c','main.c','saturn_program.h']);
+ assert.deepEqual(Object.keys(source.files).sort(),['controller.c','hmi.c','main.c','saturn_program.h','shell.c']);
  assert.match(source.files['controller.c'],/GetAI\(0\) \* 100\.0/);
  assert.match(source.files['controller.c'],/SetDO\(0,/);
  assert.match(source.files['hmi.c'],/#include <satgui\.h>/);
  assert.match(source.files['main.c'],/gui_process\(50\)/);
+ assert.match(source.files['shell.c'],/linkdown=shell_io/);
+ assert.match(source.files['shell.c'],/linkright=shell_device_0/);
+ assert.match(source.files['shell.c'],/onkeypress=shell_key_/);
+ assert.match(source.files['shell.c'],/KEY_UP/);
+ assert.match(source.files['shell.c'],/saturn_program_setpoint_adjust/);
  assert.doesNotMatch(Object.values(source.files).join('\n'),/HmiScreenModel|compileHmiScreens|fbd_render/);
+});
+
+test('controller setpoint has identical bounded semantics in legacy simulation and C23 target source',()=>{
+ const p=project(),c=p.controllers![0],vm=new ControllerVM(c);
+ assert.equal(vm.scan({AI1:100},100).outputs.DO1,0);
+ vm.setSetpoint('MANUAL',1);
+ assert.equal(vm.scan({AI1:100},100).outputs.DO1,1);
+ const source=saturnPlcC23Source({schema:'saturn.build@1',hash:'sha256:'+('0'.repeat(64)),project:p,provenance:{files:[]}},c.id);
+ assert.match(source.files['controller.c'],/saturn_sp_MANUAL/);
+ assert.match(source.files['shell.c'],/saturn_program_setpoint_adjust/);
 });
 
 test('presentation escapes content, preserves bad quality and disables commands in report mode',()=>{

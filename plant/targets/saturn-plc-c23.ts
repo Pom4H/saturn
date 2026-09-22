@@ -1,6 +1,7 @@
 import type { BuildArtifact } from '../artifact';
 import { compileSaturnC23Presentation, SATURN_C23_HMI_ABI, type SaturnC23PresentationSource } from '../presentation-c23';
 import { compileSaturnC23Controller, type SaturnC23ControllerSource } from '../controller-c23';
+import { compileSaturnC23Shell, type SaturnC23ShellSource } from '../saturn-shell-c23';
 import { failCode } from '../diagnostics';
 
 export interface SaturnC23ToolchainIdentity {
@@ -18,6 +19,7 @@ export interface SaturnPlcC23Source {
     controllerId:string;
     presentation:SaturnC23PresentationSource;
     controller:SaturnC23ControllerSource;
+    shell:SaturnC23ShellSource;
     files:Readonly<Record<string,string>>;
 }
 export interface SaturnPlcC23TargetArtifact {
@@ -52,7 +54,8 @@ export function saturnPlcC23Source(parent:BuildArtifact,controllerId:string):Sat
     if(!controller.hmi.view)failCode('SATURN_PRESENTATION_INVALID',{reason:'missing'},{target:'saturn-plc-320',controllerId,field:'hmi.view'});
     const presentation=compileSaturnC23Presentation(controller.hmi.view);
     const control=compileSaturnC23Controller(controller,presentation.signals);
-    return {schema:'saturn.c23.project@1',controllerId,presentation,controller:control,files:{...control.files,...presentation.files}};
+    const shell=compileSaturnC23Shell(parent.project,controllerId);
+    return {schema:'saturn.c23.project@1',controllerId,presentation,controller:control,shell,files:{...control.files,...presentation.files,...shell.files}};
 }
 export async function compileSaturnPlcC23Target(parent:BuildArtifact,controllerId:string,compiler:SaturnC23Compiler):Promise<SaturnPlcC23TargetArtifact>{
     const source=saturnPlcC23Source(parent,controllerId);
