@@ -1,11 +1,11 @@
 import './plant-toolchain-check.mjs';
 import { build } from 'esbuild';
+import { rawText } from './esbuild-raw-text.mjs';
 import { readFile, writeFile, mkdir, cp, readdir, rm } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { buildSite } from './site-build.mjs';
-const raw = { name: 'project-source', setup(b) { b.onResolve({ filter: /\?raw$/ }, a => ({ path: resolve(a.resolveDir, a.path.slice(0, -4)), namespace: 'raw' })); b.onLoad({ filter: /.*/, namespace: 'raw' }, async (a) => ({ contents: await readFile(a.path, 'utf8'), loader: 'text' })); } };
-export const options = { bundle: true, format: 'esm', target: 'es2022', sourcemap: true, plugins: [raw] };
+export const options = { bundle: true, format: 'esm', target: 'es2022', sourcemap: true, plugins: [rawText] };
 await mkdir('.plant', { recursive: true });
 await build({ ...options, entryPoints: ['plant/cli.ts'], outfile: '.plant/server.mjs', platform: 'node', packages: 'external' });
 await build({ ...options, entryPoints: ['plant/adapters/node-report-worker.ts'], outfile: '.plant/node-report-worker.mjs', platform: 'node', packages: 'external' });
