@@ -91,6 +91,7 @@ export async function checkShell(browser, origin) {
     await page.keyboard.press('Enter');
     assert.match((await downloaded).suggestedFilename(), /\.(ts|json)$/);
     assert.equal(await page.locator('.export-options').getAttribute('open'), null, 'Palette export does not need to open the menu');
+    await page.locator('#shell-command-dialog').waitFor({ state: 'hidden' });
 
     await page.locator('#shell-help').focus();
     await page.keyboard.press('F1');
