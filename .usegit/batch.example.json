@@ -1,0 +1,32 @@
+{
+  "id": "BATCH-example",
+  "experiment": "EXP-0001",
+  "defaults": {
+    "uncertainty": "low",
+    "oracle": "objective",
+    "evidencePlan": "deterministic CI evidence"
+  },
+  "work": [
+    {
+      "id": "WORK-example-a",
+      "goal": "improve component A",
+      "hypothesis": "change A improves its objective metric",
+      "scopes": [
+        "src/a/**",
+        "test/a/**"
+      ],
+      "resources": [
+        {
+          "name": "system.a",
+          "access": "write"
+        },
+        {
+          "name": "metric.quality",
+          "access": "read"
+        }
+      ],
+      "success": "A metric improves without regression",
+      "priority": 20
+    }
+  ]
+}
