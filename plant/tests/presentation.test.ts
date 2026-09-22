@@ -15,7 +15,7 @@ const project=()=>compileProject(demoFiles);
 test('one DSL tree is shared by live HMI, report and the compiled controller screen',()=>{
  const p=project(),v=p.views![0];assert.deepEqual(v.body,p.reports.find(r=>r.id==='bench-state')!.view!.body);
  assert.deepEqual(v.body,p.controllers![0].hmi.view!.body);
- const vm=new ControllerVM(p.controllers![0]),result=vm.scan({AI1:700},100);assert.equal(result.outputs.DO1,1);assert.ok(result.hmi.some(c=>c.type==='text'&&c.text==='700'));
+ const vm=new ControllerVM(p.controllers![0]),result=vm.scan({AI1:700},100);assert.equal(result.outputs.DO1,1);assert.deepEqual(result.hmi,[]);
 });
 test('one canonical Presentation IR projects to web and the physical Saturn target',()=>{
  const p=project(),v=p.views![0];
@@ -23,10 +23,23 @@ test('one canonical Presentation IR projects to web and the physical Saturn targ
  const web=projectPresentation(v,{target:'web',context:{values,interactive:true}});
  assert.equal(web.target,'web');assert.ok('html' in web);assert.match(web.html,/presentation/);
  const bindings=Object.fromEntries(Object.keys(v.bindings).map((name,index)=>[name,'projection_'+index]));
- const physical=projectPresentation(v,{target:'saturn-plc-320',bindings});
- assert.equal(physical.target,'saturn-plc-320');assert.ok('screen' in physical);assert.equal(physical.screen.id,v.id);
+ void bindings;
+ const physical=projectPresentation(v,{target:'saturn-plc-320'});
+ assert.equal(physical.target,'saturn-plc-320');assert.ok('c23' in physical);assert.equal(physical.c23.viewId,v.id);
+ assert.match(physical.c23.files['hmi.c'],/saturn_satgui_begin/);
+ assert.match(physical.c23.files['saturn_hmi_port.h'],/SATURN_HMI_PORT_ABI 1/);
+ assert.doesNotMatch(physical.c23.files['hmi.c'],/FBD|HmiScreenModel/);
  assert.deepEqual(presentationTargets['saturn-plc-320'],{width:320,height:240,interactive:true});
 });
+
+test('Saturn physical Presentation codegen is deterministic and keeps stable signal slots',()=>{
+ const p=project(),v=p.views![0];
+ const a=projectPresentation(v,{target:'saturn-plc-320'}),b=projectPresentation(v,{target:'saturn-plc-320'});
+ assert.ok('c23' in a&&'c23' in b);assert.deepEqual(a.c23,b.c23);
+ assert.deepEqual(a.c23.signals,[...a.c23.signals].sort((x,y)=>x.signal.localeCompare(y.signal)).map((item,slot)=>({...item,slot})));
+ assert.match(a.c23.files['hmi.c'],/void saturn_hmi_render\(const SaturnHmiFrame \*frame\)/);
+});
+
 test('presentation escapes content, preserves bad quality and disables commands in report mode',()=>{
  const v=view('escape',{title:'Example',bindings:{a:pin('value')},body:panel([label('<script>x</script>'),readout('X','a'),commandButton('Start','control',1)])});
  const html=renderPresentation(v,{values:bindPresentation(v,{value:{value:7,quality:'bad',time:0}},0)});
@@ -58,8 +71,8 @@ test('modern report renders summary metrics, bar chart and printable Saturn typo
 });
 
 test('target-specific unsupported widgets and display overflow fail explicitly',()=>{
- const v=view('small',{title:'Small',bindings:{},body:dataTable([{key:'x',title:'X'}])});assert.throws(()=>projectPresentation(v,{target:'saturn-plc-320',bindings:{}}),diagnostic('SATURN_PRESENTATION_INVALID',{target:'plc',nodeKind:'table'}));
- v.body=panel(Array.from({length:12},()=>label('A')));assert.throws(()=>projectPresentation(v,{target:'saturn-plc-320',bindings:{}}),diagnostic('SATURN_LIMIT'));
+ const v=view('small',{title:'Small',bindings:{},body:dataTable([{key:'x',title:'X'}])});assert.throws(()=>projectPresentation(v,{target:'saturn-plc-320'}),diagnostic('SATURN_PRESENTATION_INVALID',{target:'plc',nodeKind:'table'}));
+ v.body=panel(Array.from({length:12},()=>label('A')));assert.throws(()=>projectPresentation(v,{target:'saturn-plc-320'}),diagnostic('SATURN_LIMIT'));
 });
 test('view reference errors and unauthorized command ranges are compile-time errors',()=>{
  const p=project();p.views![0].bindings.input=pin('missing.signal');assert.throws(()=>validateProject(p),diagnostic('SATURN_DSL_UNKNOWN',{signal:'missing.signal'}));

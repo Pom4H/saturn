@@ -93,6 +93,15 @@ await assertText('scripts/saturn.mjs', {
   forbidden: ['saturn extension', "'extension'", "'extensions'"],
 });
 
+await assertText('plant/presentation-target.ts', {
+  required: ['compileSaturnC23Presentation', 'c23: SaturnC23PresentationSource'],
+  forbidden: ['HmiScreenModel', 'compileSaturnPlcPresentation'],
+});
+await assertText('plant/controller.ts', {
+  required: ['Rich physical HMI', 'C23/satgui'],
+  forbidden: ['compileHmiScreens', 'projectPresentation(c.hmi.view'],
+});
+
 await assertText('site/index.html', {
   required: ['data-surface="scene"', 'Source, build, published и applied', 'saturn add pump', 'project-owned source', 'artifact runtime'],
   forbidden: ['data-view="scene"', 'saturn extension add', 'self-contained npm package', 'Git-managed'],

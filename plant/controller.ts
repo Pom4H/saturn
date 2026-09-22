@@ -1,11 +1,9 @@
-import { projectPresentation } from './presentation-target';
 import type { Presentation } from './presentation';
 import type { Expr, Layout } from './types';
 import { failCode } from './diagnostics';
 import { FbdRuntime, type HmiDrawCommand } from './vendor/saturn/src/runtime';
 import { buildSchema, type ElementSpec } from './vendor/saturn/src/builder';
 import { ELEM } from './vendor/saturn/src/format';
-import { compileHmiScreens } from './vendor/saturn/src/hmi-compile';
 import { runtimeHash as wasmSha256, STATE_ABI, type RuntimeSnapshot } from './vendor/firmverse/index';
 export const CONTROLLER_ABI=STATE_ABI;
 export interface Controller {
@@ -75,7 +73,7 @@ export class ControllerVM {
     reset():void {this.runtime.reset();}
     scan(inputs:Record<string,number>, dt:number):{outputs:Record<string,number>;hmi:HmiDrawCommand[]} {
         for(const [pin,index] of Object.entries(inputPins)) { const value=inputs[pin]??0;if(!Number.isSafeInteger(value)||value< -2147483648||value>2147483647)failCode('SATURN_PLC_INVALID',{reason:'range'},{field:'input',pin,value,min:-2147483648,max:2147483647});this.runtime.setInput(index,value); }
-        const hmi=this.runtime.stepAndRenderScreen(dt);
-        return {outputs:Object.fromEntries(Object.keys(this.controller.outputs).map(pin=>[pin,Number(this.runtime.getOutput(outputPins[pin]))])),hmi};
+        this.runtime.step(dt);
+        return {outputs:Object.fromEntries(Object.keys(this.controller.outputs).map(pin=>[pin,Number(this.runtime.getOutput(outputPins[pin]))])),hmi:[]};
     }
 }
