@@ -80,7 +80,7 @@ export async function checkFiles(browser, origin) {
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('saturn.shell.workspace.v1')));
   assert(saved.projects.at(-1).files['systems/pumping.ts'].includes('inertia: 5.6'));
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator('#mobile-scene').click();
+  await page.locator('[data-shell-view="scene"]:visible').click();
   if (!await page.locator('#file-browser').isVisible()) await page.locator('#files-toggle').click();
   await page.locator('[data-file="views.ts"]').click();
   assert(!await page.locator('#file-browser').isVisible()); assert(await source.isVisible());
