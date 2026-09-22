@@ -1,6 +1,6 @@
 import React from 'react';
-import { createRoot } from 'react-dom/client';
-import { renderToStaticMarkup } from 'react-dom/server';
+import { flushSync } from 'react-dom';
+import { createRoot, type Root } from 'react-dom/client';
 import type { SaturnHmiCommand, SaturnHmiFrame } from './hmi-frame';
 
 export const color565=(c:number)=>`rgb(${Math.round((c>>11&31)*255/31)},${Math.round((c>>5&63)*255/63)},${Math.round((c&31)*255/31)})`;
@@ -8,7 +8,7 @@ export const color565=(c:number)=>`rgb(${Math.round((c>>11&31)*255/31)},${Math.r
 const sourceProps=(command:SaturnHmiCommand)=>command.source?{'data-source':command.source}:{};
 const points=(value:{x:number;y:number}[])=>value.map(point=>`${point.x},${point.y}`).join(' ');
 
-function commandElement(command:SaturnHmiCommand,index:number):unknown {
+function commandElement(command:SaturnHmiCommand,index:number):React.ReactNode {
   const common={key:index,...sourceProps(command),opacity:command.opacity};
   switch(command.type){
     case'rect':return React.createElement('rect',{...common,x:command.x,y:command.y,width:command.width,height:command.height,rx:command.radius,fill:color565(command.fill),stroke:command.stroke===undefined?undefined:color565(command.stroke),strokeWidth:command.strokeWidth});
@@ -20,27 +20,40 @@ function commandElement(command:SaturnHmiCommand,index:number):unknown {
   }
 }
 
-export function SaturnHmi320(props:Record<string,unknown>):unknown {
-  const frame=props.frame as SaturnHmiFrame;
+export function SaturnHmi320({frame}:{frame:SaturnHmiFrame}):React.ReactElement {
   return React.createElement(React.Fragment,null,...frame.commands.map(commandElement));
 }
 
-const roots=new WeakMap<SVGSVGElement,ReturnType<typeof createRoot>>();
-export function renderHmiReact(svg:SVGSVGElement,frame:SaturnHmiFrame):void {
+function renderInto(svg:SVGSVGElement,root:Root,frame:SaturnHmiFrame):void {
   svg.setAttribute('viewBox','0 0 320 240');
   svg.setAttribute('data-time-ms',String(frame.timeMs));
+  flushSync(()=>root.render(React.createElement(SaturnHmi320,{frame})));
+}
+
+const roots=new WeakMap<SVGSVGElement,Root>();
+export function renderHmiReact(svg:SVGSVGElement,frame:SaturnHmiFrame):void {
   let root=roots.get(svg);if(!root){root=createRoot(svg);roots.set(svg,root);}
-  root.render(React.createElement(SaturnHmi320,{frame}));
+  renderInto(svg,root,frame);
 }
 
-export function hmiSvgMarkup(frame:SaturnHmiFrame):string {
-  return renderToStaticMarkup(React.createElement('svg',{xmlns:'http://www.w3.org/2000/svg',viewBox:'0 0 320 240',width:320,height:240,'data-time-ms':frame.timeMs},React.createElement(SaturnHmi320,{frame})));
-}
-
-const canvasKeys=new WeakMap<HTMLCanvasElement,string>();
-export function renderHmiReactCanvas(canvas:HTMLCanvasElement,frame:SaturnHmiFrame):void {
-  const key=JSON.stringify(frame);if(canvasKeys.get(canvas)===key)return;canvasKeys.set(canvas,key);
+interface CanvasProjection { svg:SVGSVGElement; root:Root; key:string }
+const canvasProjections=new WeakMap<HTMLCanvasElement,CanvasProjection>();
+export function renderHmiReactCanvas(canvas:HTMLCanvasElement,frame:SaturnHmiFrame,onRendered?:()=>void):void {
+  const key=JSON.stringify(frame);let projection=canvasProjections.get(canvas);
+  if(!projection){
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.setAttribute('xmlns','http://www.w3.org/2000/svg');svg.setAttribute('width','320');svg.setAttribute('height','240');
+    projection={svg,root:createRoot(svg),key:''};canvasProjections.set(canvas,projection);
+  }
+  if(projection.key===key)return;projection.key=key;
+  renderInto(projection.svg,projection.root,frame);
+  const markup=new XMLSerializer().serializeToString(projection.svg);
   const image=new Image();
-  image.onload=()=>{const context=canvas.getContext('2d');if(!context)return;context.clearRect(0,0,canvas.width,canvas.height);context.drawImage(image,0,0,canvas.width,canvas.height);};
-  image.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(hmiSvgMarkup(frame));
+  image.onload=()=>{
+    const context=canvas.getContext('2d');if(!context)return;
+    context.clearRect(0,0,canvas.width,canvas.height);
+    context.drawImage(image,0,0,canvas.width,canvas.height);
+    onRendered?.();
+  };
+  image.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(markup);
 }
