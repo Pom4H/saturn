@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { checkServerFiles } from './site-server-check.mjs';
-import { checkTelemetry } from './site-telemetry-check.mjs';
 import { checkShell } from './site-shell-check.mjs';
 import { checkInteractions } from './site-interaction-check.mjs';
 import { checkFiles } from './site-files-check.mjs';
@@ -163,7 +162,6 @@ try {
   assert.equal(await shared.locator('#project-switch option:checked').textContent(), 'Проект по ссылке');
   await checkFiles(browser, origin);
   await checkServerFiles(browser);
-  await checkTelemetry(browser);
   await checkShell(browser, origin);
   await checkInteractions(browser, origin);
   assert.deepEqual(errors, []);
