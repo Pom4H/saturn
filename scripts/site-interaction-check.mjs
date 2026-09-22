@@ -126,7 +126,7 @@ export async function checkInteractions(browser, origin) {
     await page.locator('#shell-fullscreen').click(); assert(!await page.locator('body').evaluate(el => el.classList.contains('shell-fullscreen')));
     await page.locator('#shell-fullscreen').click(); assert(await page.locator('body').evaluate(el => el.classList.contains('shell-fullscreen')));
     await page.setViewportSize({ width: 390, height: 600 });
-    await signals(); await page.locator('#mobile-scene').click(); await assertScene();
+    await signals(); await page.locator('[data-shell-view="scene"]:visible').click(); await assertScene();
     await page.locator('.export-options summary').click();
     const menuBounds = await page.locator('.export-options > div').boundingBox();
     assert(menuBounds && menuBounds.y >= 0 && menuBounds.y + menuBounds.height <= 600, 'Menu fits a short mobile viewport');
