@@ -13,6 +13,61 @@ $config = Get-ChildItem $env:SDK_DIR -Directory -Recurse -Filter .vscode |
   Select-Object -First 1 -ExpandProperty FullName
 if (-not $config) { throw 'SatSDK template .vscode directory not found' }
 
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class Win32Saturn {
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int maxCount);
+  [DllImport("user32.dll")] public static extern void mouse_event(uint flags,uint dx,uint dy,uint data,UIntPtr extraInfo);
+  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x,int y);
+  public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+  public struct RECT { public int Left, Top, Right, Bottom; }
+}
+"@
+
+function Find-DesktopButton([string[]]$names) {
+  $desktop = [System.Windows.Automation.AutomationElement]::RootElement
+  foreach ($name in $names) {
+    $condition = New-Object System.Windows.Automation.PropertyCondition ([System.Windows.Automation.AutomationElement]::NameProperty),$name
+    $button = $desktop.FindFirst([System.Windows.Automation.TreeScope]::Descendants,$condition)
+    if ($null -ne $button) { return $button }
+  }
+  return $null
+}
+
+function Invoke-AutomationButton($button) {
+  try {
+    $pattern = $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
+    $pattern.Invoke()
+    return $true
+  } catch { return $false }
+}
+
+function Click-Point([int]$x,[int]$y) {
+  [Win32Saturn]::SetCursorPos($x,$y) | Out-Null
+  Start-Sleep -Milliseconds 100
+  [Win32Saturn]::mouse_event(0x0002,0,0,0,[UIntPtr]::Zero)
+  [Win32Saturn]::mouse_event(0x0004,0,0,0,[UIntPtr]::Zero)
+}
+
+function Capture-Window([IntPtr]$handle,[string]$file) {
+  $rect = New-Object Win32Saturn+RECT
+  if (-not [Win32Saturn]::GetWindowRect($handle,[ref]$rect)) { throw "GetWindowRect failed: $handle" }
+  $width=$rect.Right-$rect.Left; $height=$rect.Bottom-$rect.Top
+  if ($width -lt 20 -or $height -lt 20) { throw "Window too small: $width x $height" }
+  $shot = New-Object System.Drawing.Bitmap $width,$height
+  $g = [System.Drawing.Graphics]::FromImage($shot)
+  try { $g.CopyFromScreen($rect.Left,$rect.Top,0,0,$shot.Size) }
+  finally { $g.Dispose() }
+  $shot.Save((Join-Path $PWD $file),[System.Drawing.Imaging.ImageFormat]::Png)
+  $shot.Dispose()
+}
+
 $proc = Start-Process -FilePath $emu -ArgumentList @('-b"' + $binary + '"','-c"' + $config + '"') -PassThru
 try {
   $deadline = [DateTime]::UtcNow.AddSeconds(20)
@@ -23,7 +78,55 @@ try {
   }
   if ($proc.MainWindowHandle -eq 0) { throw 'SatPlcImit did not create a main window' }
 
-  $root = [System.Windows.Automation.AutomationElement]::FromHandle($proc.MainWindowHandle)
+  # The emulator opens a listening socket and Windows can display a firewall
+  # consent dialog on a fresh runner. Network access is not needed for this test:
+  # explicitly dismiss it instead of accidentally capturing it as HMI evidence.
+  Start-Sleep -Seconds 1
+  $firewall = Find-DesktopButton @('Отменить','Cancel')
+  if ($null -ne $firewall) {
+    if (-not (Invoke-AutomationButton $firewall)) { throw 'Could not dismiss Windows Firewall dialog' }
+    Start-Sleep -Milliseconds 500
+  }
+
+  [Win32Saturn]::SetForegroundWindow($proc.MainWindowHandle) | Out-Null
+  [System.Windows.Forms.SendKeys]::SendWait('{F9}')
+  Start-Sleep -Seconds 1
+
+  # SatPlcImit paints its toolbar as native/custom controls, so UI Automation
+  # does not expose the "Имитатор" button. Click its stable relative toolbar slot.
+  $mainRect = New-Object Win32Saturn+RECT
+  [Win32Saturn]::GetWindowRect($proc.MainWindowHandle,[ref]$mainRect) | Out-Null
+  $mainWidth=$mainRect.Right-$mainRect.Left
+  $mainHeight=$mainRect.Bottom-$mainRect.Top
+  Click-Point ($mainRect.Left + [int]($mainWidth*0.17)) ($mainRect.Top + [int]($mainHeight*0.09))
+  Start-Sleep -Seconds 2
+
+  # Enumerate every visible top-level window owned by SatPlcImit. A real
+  # controller-emulator/HMI window must exist in addition to the main IDE window.
+  $windows = New-Object System.Collections.Generic.List[object]
+  $callback = [Win32Saturn+EnumWindowsProc]{
+    param([IntPtr]$h,[IntPtr]$l)
+    $pidValue=0
+    [Win32Saturn]::GetWindowThreadProcessId($h,[ref]$pidValue) | Out-Null
+    if ($pidValue -eq $proc.Id -and [Win32Saturn]::IsWindowVisible($h)) {
+      $sb=New-Object System.Text.StringBuilder 512
+      [Win32Saturn]::GetWindowText($h,$sb,$sb.Capacity) | Out-Null
+      $r=New-Object Win32Saturn+RECT
+      [Win32Saturn]::GetWindowRect($h,[ref]$r) | Out-Null
+      $windows.Add([pscustomobject]@{Handle=$h;Title=$sb.ToString();X=$r.Left;Y=$r.Top;Width=$r.Right-$r.Left;Height=$r.Bottom-$r.Top})
+    }
+    return $true
+  }
+  [Win32Saturn]::EnumWindows($callback,[IntPtr]::Zero) | Out-Null
+  $windows | Sort-Object Width | Format-Table -AutoSize | Out-String -Width 400 | Out-File issue29-evidence\emulator-windows.txt -Encoding utf8
+  if ($windows.Count -lt 2) { throw 'SatPlcImit HMI window did not open' }
+
+  $hmi = $windows | Where-Object { $_.Handle -ne $proc.MainWindowHandle } | Sort-Object @{Expression={$_.Width*$_.Height};Descending=$true} | Select-Object -First 1
+  if ($null -eq $hmi -or $hmi.Width -lt 320 -or $hmi.Height -lt 240) { throw 'No plausible Saturn controller emulator window found' }
+  Capture-Window $hmi.Handle 'issue29-evidence\emulator-hmi.png'
+  Capture-Window $proc.MainWindowHandle 'issue29-evidence\emulator-main.png'
+
+  $root = [System.Windows.Automation.AutomationElement]::FromHandle($hmi.Handle)
   $walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
   $lines = New-Object System.Collections.Generic.List[string]
   function Walk-Ui([System.Windows.Automation.AutomationElement]$node,[int]$depth) {
@@ -33,39 +136,16 @@ try {
       $lines.Add(("{0}{1} | {2} | auto={3} | x={4} y={5} w={6} h={7}" -f ('  '*$depth),$node.Current.Name,$node.Current.ControlType.ProgrammaticName,$node.Current.AutomationId,[int]$r.X,[int]$r.Y,[int]$r.Width,[int]$r.Height))
     } catch {}
     $child = $walker.GetFirstChild($node)
-    while ($null -ne $child) {
-      Walk-Ui $child ($depth+1)
-      $child = $walker.GetNextSibling($child)
-    }
+    while ($null -ne $child) { Walk-Ui $child ($depth+1); $child = $walker.GetNextSibling($child) }
   }
   Walk-Ui $root 0
   $lines | Out-File issue29-evidence\emulator-ui.txt -Encoding utf8
 
-  [System.Windows.Forms.SendKeys]::SendWait('{F9}')
-  Start-Sleep -Seconds 2
-
-  $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-  $bmp = New-Object System.Drawing.Bitmap $bounds.Width,$bounds.Height
-  $graphics = [System.Drawing.Graphics]::FromImage($bmp)
-  try { $graphics.CopyFromScreen($bounds.Location,[System.Drawing.Point]::Empty,$bounds.Size) }
-  finally { $graphics.Dispose() }
-  $bmp.Save((Join-Path $PWD 'issue29-evidence\emulator-desktop.png'),[System.Drawing.Imaging.ImageFormat]::Png)
-  $bmp.Dispose()
-
-  $window = $root.Current.BoundingRectangle
-  if ($window.Width -gt 20 -and $window.Height -gt 20) {
-    $shot = New-Object System.Drawing.Bitmap ([int]$window.Width),([int]$window.Height)
-    $g = [System.Drawing.Graphics]::FromImage($shot)
-    try { $g.CopyFromScreen(([int]$window.X),([int]$window.Y),0,0,$shot.Size) }
-    finally { $g.Dispose() }
-    $shot.Save((Join-Path $PWD 'issue29-evidence\emulator-window.png'),[System.Drawing.Imaging.ImageFormat]::Png)
-    $shot.Dispose()
-  }
-
   "EXE=$emu" | Out-File issue29-evidence\emulator.txt -Encoding utf8
   "BINARY=$binary" | Out-File issue29-evidence\emulator.txt -Encoding utf8 -Append
   "BINARY_SHA256=$((Get-FileHash $binary -Algorithm SHA256).Hash)" | Out-File issue29-evidence\emulator.txt -Encoding utf8 -Append
-  "WINDOW=$($root.Current.Name)" | Out-File issue29-evidence\emulator.txt -Encoding utf8 -Append
+  "MAIN_WINDOW=$($proc.MainWindowTitle)" | Out-File issue29-evidence\emulator.txt -Encoding utf8 -Append
+  "HMI_WINDOW=$($hmi.Title)" | Out-File issue29-evidence\emulator.txt -Encoding utf8 -Append
 } finally {
   if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
 }

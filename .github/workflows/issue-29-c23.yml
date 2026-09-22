@@ -89,7 +89,12 @@ jobs:
           $libs | Select-Object FullName,Length | Format-Table -AutoSize | Out-String -Width 500 | Tee-Object -FilePath issue29-evidence\libraries.txt
           foreach ($file in $headers) {
             "===== $($file.FullName) =====" | Out-File issue29-evidence\sdk-surface.txt -Encoding utf8 -Append
-            Get-Content $file.FullName | Select-Object -First 260 | Out-File issue29-evidence\sdk-surface.txt -Encoding utf8 -Append
+            Get-Content $file.FullName | Out-File issue29-evidence\sdk-surface.txt -Encoding utf8 -Append
+          }
+          $satguiExamples = Get-ChildItem $env:SDK_DIR -File -Recurse -Filter '*.c' | Where-Object { $_.FullName -match '\\examples\\satgui\\' } | Sort-Object FullName
+          foreach ($file in $satguiExamples) {
+            "===== $($file.FullName) =====" | Out-File issue29-evidence\satgui-examples.txt -Encoding utf8 -Append
+            Get-Content $file.FullName | Out-File issue29-evidence\satgui-examples.txt -Encoding utf8 -Append
           }
           foreach ($file in ($build | Select-Object -First 40)) {
             "===== $($file.FullName) =====" | Out-File issue29-evidence\build-surface.txt -Encoding utf8 -Append
