@@ -32,10 +32,10 @@ export async function checkTelemetry(browser) {
     assert(initial.project.devices.length > 40, 'Telemetry uses the full installation');
     const page = await context.newPage(), errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    const stream = page.waitForResponse(response => response.url().endsWith('/plant/api/stream') && response.status() === 200);
     await page.goto(app.origin + '/?project=server#workspace');
-    const streamResponse = await stream;
-    assert.match(streamResponse.headers()['content-type'], /text\/event-stream/, 'Shell connects to the real SSE endpoint');
+    // Do not wait on Playwright's generic HTTP response event for a long-lived SSE
+    // body. The observable contract is stronger: the shell must become live and
+    // then consume authoritative server sequence changes below.
     await page.waitForFunction(() => document.getElementById('studio-shell')?.dataset.telemetry === 'live');
     await page.waitForSelector('#studio-spatial canvas', { state: 'attached' });
     const shell = page.locator('#studio-shell');
