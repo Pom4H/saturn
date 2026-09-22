@@ -141,14 +141,7 @@ jobs:
           $emu = Get-ChildItem $env:SDK_DIR -File -Recurse -Filter SatPlcImit.exe | Select-Object -First 1 -ExpandProperty FullName
           if (-not $emu) { throw 'SatPlcImit.exe not found in extracted official SDK' }
           $binary = (Resolve-Path issue29-generated\main.bin).Path
-          $config = Get-ChildItem $env:SDK_DIR -Directory -Recurse -Filter .vscode | Where-Object { $_.FullName -match '\\template\\\.vscode        if: always()
-        with:
-          name: saturn-c23-sdk-evidence
-          path: |
-            issue29-evidence/
-            issue29-generated/
-          retention-days: 7
- } | Select-Object -First 1 -ExpandProperty FullName
+          $config = Get-ChildItem $env:SDK_DIR -Directory -Recurse -Filter .vscode | Where-Object { $_.FullName -match '\\template\\\.vscode$' } | Select-Object -First 1 -ExpandProperty FullName
           if (-not $config) { throw 'SatSDK template .vscode directory not found' }
           $args = @('-b"' + $binary + '"','-c"' + $config + '"')
           $proc = Start-Process -FilePath $emu -ArgumentList $args -PassThru
