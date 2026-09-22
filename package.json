@@ -57,7 +57,9 @@
     "@typescript/typescript6": "6.0.2",
     "codemirror": "6.0.2",
     "three": "0.185.1",
-    "web-push": "3.6.7"
+    "web-push": "3.6.7",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   },
   "private": true,
   "type": "module",
