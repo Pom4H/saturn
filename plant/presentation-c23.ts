@@ -20,10 +20,7 @@ export interface SaturnC23PresentationSource {
     files: { 'hmi.c': string };
 }
 
-const cString=(value:string):string=>JSON.stringify(value)
-    .replaceAll('\\\\u2028','\\\\\\\\u2028')
-    .replaceAll('\\\\u2029','\\\\\\\\u2029');
-const symbol=(value:string):string=>value.replace(/[^A-Za-z0-9_]/g,'_').replace(/^[0-9]/,'_$&');
+const cString=(value:string):string=>JSON.stringify(value);\nconst symbol=(value:string):string=>value.replace(/[^A-Za-z0-9_]/g,'_').replace(/^[0-9]/,'_$&');
 
 function refs(expr:Expr,result:Set<string>):void {
     if(typeof expr==='number'||typeof expr==='boolean')return;
@@ -37,20 +34,20 @@ function expression(expr:Expr,slots:ReadonlyMap<string,number>):string {
     if('ref' in expr){
         const slot=slots.get(expr.ref);
         if(slot===undefined)failCode('SATURN_DSL_UNKNOWN',{kind:'signal',name:expr.ref},{signal:expr.ref,target:'saturn-plc-320'});
-        return \`saturn_program_signal(\${slot})\`;
+        return `saturn_program_signal(${slot})`;
     }
     const args=expr.args.map(arg=>expression(arg,slots));
     switch(expr.op){
         case 'add':return '('+args.join(' + ')+')';
         case 'mul':return '('+args.join(' * ')+')';
         case 'sub':return '('+args[0]+' - '+args[1]+')';
-        case 'div':return \`saturn_hmi_safe_div(\${args[0]},\${args[1]})\`;
-        case 'min':return args.reduce((a,b)=>\`saturn_hmi_min(\${a},\${b})\`);
-        case 'max':return args.reduce((a,b)=>\`saturn_hmi_max(\${a},\${b})\`);
+        case 'div':return `saturn_hmi_safe_div(${args[0]},${args[1]})`;
+        case 'min':return args.reduce((a,b)=>`saturn_hmi_min(${a},${b})`);
+        case 'max':return args.reduce((a,b)=>`saturn_hmi_max(${a},${b})`);
         case 'gt':return '('+args[0]+' > '+args[1]+' ? 1.0 : 0.0)';
         case 'lt':return '('+args[0]+' < '+args[1]+' ? 1.0 : 0.0)';
         case 'not':return '('+args[0]+' == 0.0 ? 1.0 : 0.0)';
-        case 'and':return '('+args.map(arg=>\`(\${arg} != 0.0)\`).join(' && ')+' ? 1.0 : 0.0)';
+        case 'and':return '('+args.map(arg=>`(${arg} != 0.0)`).join(' && ')+' ? 1.0 : 0.0)';
     }
 }
 
@@ -68,8 +65,8 @@ export function compileSaturnC23Presentation(view:Presentation):SaturnC23Present
         const ids=[...used].sort().map(id=>slots.get(id)!);
         bindingRefs.set(name,ids);
         bindingFunctions.push(
-            \`static double bind_\${symbol(name)}(void){ return \${expression(expr,slots)}; }\`,
-            \`static uint8_t bind_\${symbol(name)}_good(void){ return \${ids.length?ids.map(slot=>\`saturn_program_signal_good(\${slot})\`).join(' && '):'1'}; }\`,
+            `static double bind_${symbol(name)}(void){ return ${expression(expr,slots)}; }`,
+            `static uint8_t bind_${symbol(name)}_good(void){ return ${ids.length?ids.map(slot=>`saturn_program_signal_good(${slot})`).join(' && '):'1'}; }`,
         );
     }
 
@@ -79,7 +76,7 @@ export function compileSaturnC23Presentation(view:Presentation):SaturnC23Present
     let serial=0;
     const addStatic=(value:string,x:number,y:number,width:number):void=>{
         if(value.length>Math.floor(width/7)||y+20>240)failCode('SATURN_LIMIT',{resource:'plc.display',reason:'tooLarge'},{width,height:y+20});
-        init.push(\`    gui_screen_add(saturn_main_screen,gui_text_create(\${x},\${y},\${Math.min(319,x+width)},\${Math.min(239,y+18)},-1,0,0,RGB(239,252,255),_FONT12x16,0,\${cString(value)}));\`);
+        init.push(`    gui_screen_add(saturn_main_screen,gui_text_create(${x},${y},${Math.min(319,x+width)},${Math.min(239,y+18)},-1,0,0,RGB(239,252,255),_FONT12x16,0,${cString(value)}));`);
     };
     const layout=(node:ViewNode,x:number,y:number,width:number):number=>{
         switch(node.kind){
@@ -98,10 +95,10 @@ export function compileSaturnC23Presentation(view:Presentation):SaturnC23Present
                 if(!bindingRefs.has(node.binding))failCode('SATURN_PRESENTATION_INVALID',{reason:'invalid'},{field:'value.binding',binding:node.binding});
                 if(y+40>240)failCode('SATURN_LIMIT',{resource:'plc.display',reason:'tooLarge'},{height:y+40});
                 const id='hmi_value_'+serial++;
-                declarations.push(\`static gui_element_t *\${id};\`);
-                init.push(\`    \${id}=gui_text_create(\${x},\${y},\${Math.min(319,x+width)},\${Math.min(239,y+34)},-1,0,0,RGB(239,252,255),_FONT12x16,0,\${cString(node.label)});\\n    gui_screen_add(saturn_main_screen,\${id});\`);
-                const format=cString(\`%s%.\${node.digits}f%s\`);
-                update.push(\`    if(bind_\${fn}_good()) gui_text_set(\${id},\${format},\${cString(node.label)},bind_\${fn}(),\${cString(node.unit)}); else gui_text_set(\${id},"%s -- %s",\${cString(node.label)},\${cString(node.unit)});\`);
+                declarations.push(`static gui_element_t *${id};`);
+                init.push(`    ${id}=gui_text_create(${x},${y},${Math.min(319,x+width)},${Math.min(239,y+34)},-1,0,0,RGB(239,252,255),_FONT12x16,0,${cString(node.label)});\\n    gui_screen_add(saturn_main_screen,${id});`);
+                const format=cString(`%s%.${node.digits}f%s`);
+                update.push(`    if(bind_${fn}_good()) gui_text_set(${id},${format},${cString(node.label)},bind_${fn}(),${cString(node.unit)}); else gui_text_set(${id},"%s -- %s",${cString(node.label)},${cString(node.unit)});`);
                 return 40;
             }
             default:
@@ -110,7 +107,7 @@ export function compileSaturnC23Presentation(view:Presentation):SaturnC23Present
     };
     layout(view.body,8,8,304);
 
-    const source=\`/* Generated by Saturn from canonical Presentation IR.
+    const source=`/* Generated by Saturn from canonical Presentation IR.
  * Uses the real Saturn C23 SDK API (<satgui.h>), not FBD screen records.
  */
 #include <stdint.h>
@@ -119,23 +116,23 @@ export function compileSaturnC23Presentation(view:Presentation):SaturnC23Present
 #include "saturn_program.h"
 
 static gui_screen_t *saturn_main_screen;
-\${declarations.join('\\n')}
+${declarations.join('\\n')}
 
 static inline double saturn_hmi_min(double a,double b){ return a < b ? a : b; }
 static inline double saturn_hmi_max(double a,double b){ return a > b ? a : b; }
 static inline double saturn_hmi_safe_div(double a,double b){ return b == 0.0 ? 0.0 : a / b; }
 
-\${bindingFunctions.join('\\n')}
+${bindingFunctions.join('\\n')}
 
 void saturn_hmi_init(void) {
     saturn_main_screen=gui_screen_create(RGB(5,18,25),0);
-\${init.join('\\n')}
+${init.join('\\n')}
 }
 
 void saturn_hmi_update(void) {
-\${update.join('\\n')}
+${update.join('\\n')}
 }
-\`;
+`;
 
     return {
         schema:'saturn.c23.presentation@1',
