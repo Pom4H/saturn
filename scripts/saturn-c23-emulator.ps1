@@ -121,10 +121,13 @@ try {
   $windows | Sort-Object Width | Format-Table -AutoSize | Out-String -Width 400 | Out-File issue29-evidence\emulator-windows.txt -Encoding utf8
   if ($windows.Count -lt 2) { throw 'SatPlcImit HMI window did not open' }
 
+  # The controller emulator title is localized by SatSDK. Identify the actual
+  # child/top-level controller window structurally instead of depending on text.
   $hmi = $windows |
-    Where-Object { $_.Handle -ne $proc.MainWindowHandle -and $_.Title -eq 'Saturn-PLC' } |
+    Where-Object { $_.Handle -ne $proc.MainWindowHandle -and $_.Width -ge 320 -and $_.Height -ge 240 } |
+    Sort-Object @{Expression={$_.Width*$_.Height};Descending=$true} |
     Select-Object -First 1
-  if ($null -eq $hmi -or $hmi.Width -lt 320 -or $hmi.Height -lt 240) { throw 'Titled Saturn-PLC controller emulator window not found' }
+  if ($null -eq $hmi) { throw 'Plausible Saturn controller emulator window not found' }
   Capture-Window $hmi.Handle 'issue29-evidence\emulator-hmi.png'
   Capture-Window $proc.MainWindowHandle 'issue29-evidence\emulator-main.png'
 
