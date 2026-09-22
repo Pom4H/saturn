@@ -98,6 +98,11 @@ await assertText('site/index.html', {
   forbidden: ['data-view="scene"', 'saturn extension add', 'self-contained npm package', 'Git-managed'],
 });
 
+await assertText('scripts/site-server-check.mjs', {
+  required: ['/plant/api/workspace', '/plant/api/artifact', 'immutable BuildArtifact', 'Saving workspace does not publish it'],
+  forbidden: ['/plant/api/project', 'project.git', 'new Git revision', 'real Node/Git installation'],
+});
+
 if (violations.length) {
   console.error('Saturn architecture invariants failed:\n' + violations.join('\n'));
   process.exit(1);
