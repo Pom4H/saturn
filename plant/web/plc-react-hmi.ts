@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { generatePlcShell, shellPage, type PlcShellPage } from '../plc-shell';
 import type { Frame, Project } from '../types';
 import {
@@ -15,7 +14,6 @@ export interface SaturnPlcHmiProps {
   controllerId: string;
 }
 
-const h=React.createElement;
 const rgb565=(r:number,g:number,b:number)=>((Math.round(r*31/255)&31)<<11)|((Math.round(g*63/255)&63)<<5)|(Math.round(b*31/255)&31);
 const C={
   bg:rgb565(5,18,25),panel:rgb565(12,37,47),panel2:rgb565(16,49,60),line:rgb565(42,78,90),
@@ -283,29 +281,51 @@ function sceneFor(project:Project,controllerId:string,page:PlcShellPage,index:nu
 function signalsFor(frame:Frame):DisplaySignals{
   return Object.fromEntries(Object.entries(frame.samples).map(([id,sample])=>[id,sample.quality==='good'&&typeof sample.value==='number'?sample.value:null]));
 }
-function renderCommand(command:DisplayDrawCommand,index:number):React.ReactNode{
-  const common={key:index,'data-firmverse-command':command.type,'data-source':command.source??''};
-  if(command.type==='rect')return h('rect',{...common,x:command.x,y:command.y,width:command.width,height:command.height,rx:command.radius??0,fill:css565(command.fill),stroke:command.stroke===undefined?'none':css565(command.stroke),strokeWidth:command.strokeWidth??0,opacity:command.opacity??1});
-  if(command.type==='circle')return h('circle',{...common,cx:command.cx,cy:command.cy,r:command.r,fill:css565(command.fill),stroke:command.stroke===undefined?'none':css565(command.stroke),strokeWidth:command.strokeWidth??0,opacity:command.opacity??1});
-  if(command.type==='line')return h('line',{...common,x1:command.x1,y1:command.y1,x2:command.x2,y2:command.y2,stroke:css565(command.color),strokeWidth:command.width,strokeLinecap:'round',opacity:command.opacity??1});
-  if(command.type==='polyline')return h('polyline',{...common,points:command.points.map(p=>`${p.x},${p.y}`).join(' '),fill:'none',stroke:css565(command.color),strokeWidth:command.width,strokeLinecap:'round',strokeLinejoin:'round',opacity:command.opacity??1});
-  if(command.type==='polygon')return h('polygon',{...common,points:command.points.map(p=>`${p.x},${p.y}`).join(' '),fill:css565(command.fill),opacity:command.opacity??1});
-  return h('text',{...common,x:command.x,y:command.y,fill:css565(command.color),fontSize:command.size,fontWeight:command.weight,textAnchor:command.align,fontFamily:command.mono?'ui-monospace,SFMono-Regular,Menlo,monospace':'Inter,system-ui,sans-serif',dominantBaseline:'alphabetic'},command.text);
+const SVG_NS='http://www.w3.org/2000/svg';
+const emulators=new WeakMap<SVGSVGElement,SaturnDisplayEmulator>();
+function svgElement(name:string,attributes:Record<string,string|number|undefined>):SVGElement{
+  const element=document.createElementNS(SVG_NS,name);
+  for(const [key,value] of Object.entries(attributes))if(value!==undefined)element.setAttribute(key,String(value));
+  return element;
+}
+function appendCommand(group:SVGGElement,command:DisplayDrawCommand,index:number):void{
+  const common={'data-firmverse-command':command.type,'data-source':command.source??'','data-index':index};
+  let node:SVGElement;
+  if(command.type==='rect')node=svgElement('rect',{...common,x:command.x,y:command.y,width:command.width,height:command.height,rx:command.radius??0,fill:css565(command.fill),stroke:command.stroke===undefined?'none':css565(command.stroke),'stroke-width':command.strokeWidth??0,opacity:command.opacity??1});
+  else if(command.type==='circle')node=svgElement('circle',{...common,cx:command.cx,cy:command.cy,r:command.r,fill:css565(command.fill),stroke:command.stroke===undefined?'none':css565(command.stroke),'stroke-width':command.strokeWidth??0,opacity:command.opacity??1});
+  else if(command.type==='line')node=svgElement('line',{...common,x1:command.x1,y1:command.y1,x2:command.x2,y2:command.y2,stroke:css565(command.color),'stroke-width':command.width,'stroke-linecap':'round',opacity:command.opacity??1});
+  else if(command.type==='polyline')node=svgElement('polyline',{...common,points:command.points.map(p=>`${p.x},${p.y}`).join(' '),fill:'none',stroke:css565(command.color),'stroke-width':command.width,'stroke-linecap':'round','stroke-linejoin':'round',opacity:command.opacity??1});
+  else if(command.type==='polygon')node=svgElement('polygon',{...common,points:command.points.map(p=>`${p.x},${p.y}`).join(' '),fill:css565(command.fill),opacity:command.opacity??1});
+  else {
+    node=svgElement('text',{...common,x:command.x,y:command.y,fill:css565(command.color),'font-size':command.size,'font-weight':command.weight,'text-anchor':command.align,'font-family':command.mono?'ui-monospace,SFMono-Regular,Menlo,monospace':'Inter,system-ui,sans-serif','dominant-baseline':'alphabetic'});
+    node.textContent=command.text;
+  }
+  group.append(node);
 }
 
-export function SaturnPlcHmi({project,frame,controllerId}:SaturnPlcHmiProps){
-  const emulatorRef=React.useRef<SaturnDisplayEmulator|null>(null);if(!emulatorRef.current)emulatorRef.current=new SaturnDisplayEmulator();
-  const model=generatePlcShell(project,controllerId),index=frame.controllerScreens?.[controllerId]??0,page=shellPage(model,index);
+/**
+ * Thin browser projector for the saturn-plc-320 target.
+ * Firmverse owns model-time animation; this function only maps the returned
+ * vector frame to SVG and owns no HMI/runtime state.
+ */
+export function drawSaturnPlcTargetSvg(svg:SVGSVGElement,project:Project,frame:Frame,controllerId:string):void{
+  let emulator=emulators.get(svg);
+  if(!emulator){emulator=new SaturnDisplayEmulator();emulators.set(svg,emulator);}
+  const model=generatePlcShell(project,controllerId);
+  const index=frame.controllerScreens?.[controllerId]??0;
+  const page=shellPage(model,index);
   const compact=controller(project,controllerId)?.hmi.shell?.mode==='compact';
   let scene=compact?compactSceneFor(project,controllerId,page,index,model.pages.length):sceneFor(project,controllerId,page,index,model.pages.length);
-  // Classic overview keeps its legacy static scene builder. Compact overview is
-  // already a full process screen and needs no duplicate Process page.
   if(!compact&&page.kind==='overview')scene=overview(project,frame,controllerId,page,index,model.pages.length);
-  const display=emulatorRef.current.render(scene,signalsFor(frame),frame.time);
-  return h(React.Fragment,null,
-    h('style',null,'@keyframes firmverseCompatMarker{from{opacity:0}to{opacity:0}}'),
-    h('g',{'data-flow':true,opacity:0,style:{animation:'firmverseCompatMarker 1s linear infinite'},'aria-hidden':'true'}),
-    h('g',{'data-rotor':true,opacity:0,style:{animation:'firmverseCompatMarker 1s linear infinite'},'aria-hidden':'true'}),
-    h('g',{'data-react-plc-hmi':true,'data-firmverse-display':true,'data-controller-id':controllerId,'data-hmi-page':page.id,'data-display-time':String(display.timeMs)},...display.commands.map(renderCommand))
-  );
+  const display=emulator.render(scene,signalsFor(frame),frame.time);
+  svg.setAttribute('viewBox','0 0 320 240');
+  svg.replaceChildren();
+  const group=svgElement('g',{
+    'data-firmverse-display':'true',
+    'data-controller-id':controllerId,
+    'data-hmi-page':page.id,
+    'data-display-time':String(display.timeMs),
+  }) as SVGGElement;
+  display.commands.forEach((command,i)=>appendCommand(group,command,i));
+  svg.append(group);
 }
