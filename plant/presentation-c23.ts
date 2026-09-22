@@ -160,7 +160,7 @@ export function compileSaturnC23Presentation(view:Presentation,scene?:SaturnHmiS
             const rpm=bindingValue(node.rpm);
             const table=[[-1,0],[-1,-1],[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1]];
             sceneUpdate.push(`    { int phase=((int)(saturn_hmi_time_ms * saturn_hmi_max(0.0,${rpm}) / 7500.0)) & 7; static const int8_t dx[8]={-1,-1,0,1,1,1,0,-1}; static const int8_t dy[8]={0,-1,-1,-1,0,1,1,1};`);
-            for(let i=0;i<count;i++)sceneUpdate.push(`      { int p=(phase+${Math.round(i*8/count)})&7; ${id}_b${i}->x2=(uint16_t)(${Math.round(node.cx)}+dx[p]*${radius}); ${id}_b${i}->y2=(uint16_t)(${Math.round(node.cy)}+dy[p]*${radius}); }`);
+            for(let i=0;i<count;i++)sceneUpdate.push(`      { int p=(phase+${Math.round(i*8/count)})&7; ${id}_b${i}->x2=(uint16_t)(${Math.round(node.cx)}+dx[p]*${radius}); ${id}_b${i}->y2=(uint16_t)(${Math.round(node.cy)}+dy[p]*${radius}); saturn_hmi_touch(${id}_b${i}); }`);
             sceneUpdate.push('    }');
         } else if(node.kind==='flow'){
             const points=node.points;
@@ -171,7 +171,7 @@ export function compileSaturnC23Presentation(view:Presentation,scene?:SaturnHmiS
                 const flat=points.flatMap(p=>[Math.round(p.x),Math.round(p.y)]);
                 sceneUpdate.push(`    { static const int16_t pts[] = {${flat.join(',')}}; const int n=${points.length}; double flow=${bindingValue(node.value)}; int step=(int)(saturn_hmi_time_ms * (flow<0?-flow:flow) / 120.0); for(int i=0;i<${packets};i++){ int p=(step+i)%n; if(flow<0)p=(n-1)-p; gui_element_t *e=${id}_p0;`);
                 for(let i=1;i<packets;i++)sceneUpdate.push(`      if(i==${i})e=${id}_p${i};`);
-                sceneUpdate.push('      e->x1=(uint16_t)(pts[p*2]-2); e->y1=(uint16_t)(pts[p*2+1]-2); e->x2=(uint16_t)(pts[p*2]+2); e->y2=(uint16_t)(pts[p*2+1]+2); e->visible=(flow>0.001||flow<-0.001); } }');
+                sceneUpdate.push('      e->x1=(uint16_t)(pts[p*2]-2); e->y1=(uint16_t)(pts[p*2+1]-2); e->x2=(uint16_t)(pts[p*2]+2); e->y2=(uint16_t)(pts[p*2+1]+2); e->visible=(flow>0.001||flow<-0.001); saturn_hmi_touch(e); } }');
             }
         }
     };
@@ -192,6 +192,7 @@ ${declarations.join('\n')}
 static inline double saturn_hmi_min(double a,double b){ return a < b ? a : b; }
 static inline double saturn_hmi_max(double a,double b){ return a > b ? a : b; }
 static inline double saturn_hmi_safe_div(double a,double b){ return b == 0.0 ? 0.0 : a / b; }
+static inline void saturn_hmi_touch(gui_element_t *elem){ if(elem && elem->owner) elem->owner->changed=true; }
 
 ${bindingFunctions.join('\n')}
 
