@@ -146,7 +146,7 @@ export function compileSaturnC23Presentation(view:Presentation,scene?:SaturnHmiS
             }
         } else if(node.kind==='tank'){
             declarations.push(`static gui_element_t *${id};`);
-            sceneInit.push(`    ${id}=gui_gauge_create(${Math.round(node.x)},${Math.round(node.y)},${Math.round(node.x+node.width)},${Math.round(node.y+node.height)},${color(node.background)},${Math.max(1,Math.round(node.strokeWidth??2))},${color(node.shell)},${color(node.water)},GUI_GAUGE_BOTTOM,1.0f); gui_screen_add(saturn_main_screen,${id});`);
+            sceneInit.push(`    ${id}=gui_gauge_create(${Math.round(node.x)},${Math.round(node.y)},${Math.round(node.x+node.width)},${Math.round(node.y+node.height)},${color(node.background)},${Math.max(1,Math.round(node.strokeWidth??2))},${color(node.shell)},${color(node.water)},GAUGE_VERTICAL,1.0f); gui_screen_add(saturn_main_screen,${id});`);
             sceneUpdate.push(`    gui_gauge_set(${id},(float)saturn_hmi_min(1.0,saturn_hmi_max(0.0,${bindingValue(node.level)})));`);
         } else if(node.kind==='lamp'){
             declarations.push(`static gui_element_t *${id};`);
