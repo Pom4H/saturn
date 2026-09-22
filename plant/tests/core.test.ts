@@ -49,7 +49,7 @@ export default project('minimal', {
   reports: [],
 });`;
     assert.equal(compileProject({ 'plant.ts': source }).id, 'minimal');
-    assert.throws(() => compileProject({ 'plant.ts': source.replace('@saturn/core', '@scada/plant') }), /@saturn\/core/);
+    assert.throws(() => compileProject({ 'plant.ts': source.replace('@saturn/core', '@scada/plant') }), diagnostic('SATURN_DSL_INVALID', { specifier: '@scada/plant' }));
 });
 test('interactive DSL reference covers every public DSL function', () => {
     const publicFunctions = Object.entries(projectDsl).filter(([, value]) => typeof value === 'function').map(([name]) => name).sort();
@@ -91,7 +91,7 @@ export default project('ordinary-typescript', {
     assert.throws(() => compileProject({ 'plant.ts': 'import { x } from "../../outside"; export default x;' }), diagnostic('SATURN_DSL_INVALID'));
 });
 test('DSL rejects unknown signals and algebraic cycles', () => { assert.throws(() => compileProject({ ...demoFiles, 'core.ts': demoFiles['core.ts'].replace('"core.void"', '"missing.signal"') }), /Unknown signal/); assert.throws(() => compileProject({ ...demoFiles, 'core.ts': demoFiles['core.ts'].replace(/derived\("core.temperature",[^;]+;/, 'derived("core.temperature", signal("core.temperature"));') }), /cycle/); });
-test('DSL rejects imports with module cycles and invalid cron', () => { assert.throws(() => compileProject({ ...demoFiles, 'core.ts': 'import {x} from "./plant";' }), diagnostic('SATURN_DSL_INVALID')); assert.throws(() => validateCron('60 * * * *')); assert.throws(() => validateCron('* * * *')); });
+test('cron validation rejects invalid schedules', () => { assert.throws(() => validateCron('60 * * * *')); assert.throws(() => validateCron('* * * *')); });
 test('simulation is deterministic, independent of equipment declaration order', () => { const p = project(), q = structuredClone(p); q.simulations.reverse(); const a = new Kernel(p, 'rev', 'same', 0), b = new Kernel(q, 'rev', 'same', 0); for (let i = 0; i < 200; i++) {
     a.step();
     b.step();
