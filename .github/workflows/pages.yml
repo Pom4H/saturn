@@ -35,10 +35,8 @@ jobs:
       # Capture the focused product evidence first: it is a short, objective
       # browser oracle and should not wait behind the broader release suite.
       - run: npx playwright install --with-deps chromium
-      - name: Build plant PWA for HMI evidence
-        run: npm run plant:build
       - name: Capture PLC HMI video
-        run: PWA_HMI_VIDEO=1 npm run plant:test:browser
+        run: node scripts/hmi-video-evidence.mjs
 
       # One canonical PR gate. This already covers build, TypeScript, unit/core
       # tests, plant tests, Bun smoke, authoring, consumer and VS Code checks.
