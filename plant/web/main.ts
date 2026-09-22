@@ -3,6 +3,7 @@ import { terminals, resolvePort, type Endpoint, type Connection as PhysicalConne
 import { appendConnection, addExpansionSource, removeConnection } from '../connection-edit';
 import { renderSaturnPlcSvg } from '../saturn-view';
 import { drawHmiSvg } from '../hmi-view';
+import { drawSaturnPlcTargetSvg } from './plc-react-hmi';
 import type { SceneView3D } from '../../src/view3d';
 import { EditorState } from '@codemirror/state';
 import { EditorView, basicSetup } from 'codemirror';
@@ -46,6 +47,11 @@ async function command(action: string, extra: object = {}) { ensureActive(); con
     renderInspector(); return result; }
 async function refreshStatus() { const previous = status?.project; status = await client.request<Status>('session'); frame = status.frame; if (previous !== status.project && JSON.stringify(previous) !== JSON.stringify(status.project))
     setupProject(); renderFrame(frame); refreshActions(); }
+function drawControllerDisplay(svg:SVGSVGElement,id:string):void {
+    const controller=status.project.controllers?.find(item=>item.id===id);
+    if(controller?.hmi.shell?.auto)drawSaturnPlcTargetSvg(svg,status.project,frame,id);
+    else drawHmiSvg(svg,id);
+}
 function renderShellUpdate() {
     const button = $<HTMLButtonElement>('shell-update');
     const visible = !demo && status?.actor?.role === 'engineer' && status?.uiMode !== 'kiosk' && !!applicationUpdate?.available && !!applicationUpdate.version;
@@ -232,7 +238,7 @@ function renderFrame(next: Frame) {
     if (scene3d) { scene3d.paused = frame.paused; scene3d.setRuntime(observation); }
     refreshControls();
     if(tab==='views')refreshView();
-    const plcScreen=document.querySelector<SVGSVGElement>('#plc-front .runtime-hmi');if(plcScreen&&selected)drawHmiSvg(plcScreen,selected);
+    const plcScreen=document.querySelector<SVGSVGElement>('#plc-front .runtime-hmi');if(plcScreen&&selected)drawControllerDisplay(plcScreen,selected);
     if (scene)
         scene.paused = frame.paused;
     if (selected)
@@ -261,6 +267,13 @@ function renderPlcInspector(){
  $('build-plc').onclick=()=>void guard(async()=>{const artifact=await client.request<{fbdbin:number[]}&Record<string,unknown>>('firmware',{controllerId:c.id,revision:frame.revision});download(c.id+'.fbdbin',new Uint8Array(artifact.fbdbin),'application/octet-stream');toast('Собраны программа и HMI. Манифест скачивается отдельно. Аппаратная загрузка не выполнялась.');});
  $('build-manifest').onclick=()=>void guard(async()=>{const {fbdbin,...manifest}=await client.request<{fbdbin:number[]}&Record<string,unknown>>('firmware',{controllerId:c.id,revision:frame.revision});download(c.id+'-build.json',JSON.stringify(manifest,null,2),'application/json');});
  $('attach-module').onclick=()=>void guard(()=>attachModule(c.id));
+ const screen=document.querySelector<SVGSVGElement>('#plc-front .runtime-hmi');if(screen)drawControllerDisplay(screen,c.id);
+ for(const button of document.querySelectorAll<SVGGElement>('#plc-front [data-plc-button]')){
+  const key=button.dataset.plcButton!;
+  const press=()=>void guard(()=>command('plc-key',{target:c.id,parameter:key}));
+  button.addEventListener('click',press);
+  button.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();press();}});
+ }
  appendTerminalPanel();renderFrame(frame);
 }
 function chooseTerminal(e:Endpoint){
@@ -688,7 +701,7 @@ function renderControls() {
     </article>`).join('')}</div></section>`;
     }).join('') || '<p>В этом проекте управляющие сигналы не объявлены.</p>';
     refreshControls();
-    const plcScreen=document.querySelector<SVGSVGElement>('#plc-front .runtime-hmi');if(plcScreen&&selected)drawHmiSvg(plcScreen,selected);
+    const plcScreen=document.querySelector<SVGSVGElement>('#plc-front .runtime-hmi');if(plcScreen&&selected)drawControllerDisplay(plcScreen,selected);
 }
 function refreshControls() {
     if (!status || !frame) return;
