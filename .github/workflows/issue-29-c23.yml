@@ -1,4 +1,5 @@
 name: Saturn C23 target gate
+# Compiles source emitted from the canonical TypeScript demo; no handwritten HMI fixture.
 
 on:
   push:
