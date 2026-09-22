@@ -94,17 +94,29 @@ export function compileHmiScreen(screen: HmiScreenModel, ctx: HmiCompileContext)
   for (const el of screen.elements) {
     const visible = resolveVisibility(ctx, el.visible);
     const withVisibility = visible === undefined ? {} : { visible };
-    if (el.primitive === "rect" || el.primitive === "line") {
-      const w = el.width ?? 100;
-      const h = el.height ?? 24;
+    if (el.primitive === "rect") {
+      const w = el.width ?? 100, h = el.height ?? 24;
+      elements.push({ kind: "rect", x1: el.position.x, y1: el.position.y, x2: el.position.x + w, y2: el.position.y + h, color: el.color ?? HMI_COLOR.HEADER, ...withVisibility });
+      continue;
+    }
+    if (el.primitive === "line") {
+      const w = el.width ?? 100, h = el.height ?? 0;
+      elements.push({ kind: "line", x1: el.position.x, y1: el.position.y, x2: el.position.x + w, y2: el.position.y + h, color: el.color ?? HMI_COLOR.ACCENT, width: el.strokeWidth ?? 1, ...withVisibility });
+      continue;
+    }
+    if (el.primitive === "indicator") {
+      const w = el.width ?? 20, h = el.height ?? w;
+      elements.push({ kind: "circle", x1: el.position.x, y1: el.position.y, x2: el.position.x + w, y2: el.position.y + h, color: el.color ?? HMI_COLOR.ACCENT, ...withVisibility });
+      continue;
+    }
+    if (el.primitive === "bar") {
+      const binding = resolveBinding(ctx, el.binding);
+      if (binding === null) throw new Error(`HMI: шкала «${el.id}» требует binding`);
+      const w = el.width ?? 100, h = el.height ?? 18;
       elements.push({
-        kind: "rect",
-        x1: el.position.x,
-        y1: el.position.y,
-        x2: el.position.x + w,
-        y2: el.position.y + h,
-        color: el.color ?? HMI_COLOR.HEADER,
-        ...withVisibility,
+        kind: "gauge", x1: el.position.x, y1: el.position.y, x2: el.position.x + w, y2: el.position.y + h,
+        color: el.color ?? HMI_COLOR.ACCENT, bkcolor: el.backgroundColor ?? HMI_COLOR.HEADER,
+        maxvalue: el.maxValue ?? 100, valueElem: binding.valueElem, orientation: el.orientation === "vertical" ? 1 : 0, ...withVisibility,
       });
       continue;
     }
