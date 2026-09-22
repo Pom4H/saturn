@@ -162,6 +162,10 @@ export class Service {
                     this.kernel.setParameter(payload.target!, payload.parameter!, payload.value!);
                     event = this.event('command.parameter', payload.target!, `${payload.parameter}=${payload.value}`, actor);
                     break;
+                case 'plc-key':
+                    this.kernel.controllerKey(payload.target!,payload.parameter!);
+                    event=this.event('controller.key',payload.target!,payload.parameter!,actor);
+                    break;
                 case 'pause':
                     this.kernel.state.paused = true;
                     event = this.event('command.pause', 'simulation', 'Simulation paused', actor);
@@ -220,7 +224,7 @@ export class Service {
     firmware(controllerId:string, revision:string, actor:Actor) {
         requireRole(actor,'engineer');if(revision!==this.kernel.state.revision)failCode('SATURN_CONFLICT',{resource:'revision',reason:'stateChanged'},{expected:revision,actual:this.kernel.state.revision},{status:409});
         const c=this.project.controllers?.find(c=>c.id===controllerId);if(!c)failCode('SATURN_NOT_FOUND',{resource:'plc',id:controllerId},{controllerId},{status:404});
-        const artifact=compileController(c);
+        const artifact=compileController(c,this.project);
         return { ...artifact,fbdbin:Array.from(artifact.fbdbin),revision,controllerId,
           connections:(this.project.connections??[]).filter(w=>w.from.device===controllerId||w.to.device===controllerId),
           expansions:(this.project.attachments??[]).filter(a=>a.controller===controllerId),
