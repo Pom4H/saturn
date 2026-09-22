@@ -7,6 +7,8 @@ on:
     paths:
       - 'plant/presentation-c23.ts'
       - 'plant/controller-c23.ts'
+      - 'plant/dsl-reference.ts'
+      - 'plant/i18n.ts'
       - 'plant/presentation-target.ts'
       - 'plant/targets/saturn-plc-c23.ts'
       - 'plant/controller.ts'
