@@ -148,7 +148,9 @@ try {
   assert(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
   await mobile.locator('#studio-code').click();
   assert(await mobile.locator('#studio-editor .cm-content').isVisible());
-  await mobile.locator('[data-shell-view="scene"]:visible').click(); await mobile.locator('#studio-2d').click();
+  await mobile.locator('[data-shell-view="scene"]:visible').click();
+  await mobile.waitForFunction(() => document.getElementById('studio-shell')?.dataset.surface === 'scene');
+  assert.equal(await mobile.locator('#studio-shell').getAttribute('data-mode'), '2d');
   await mobile.screenshot({ path: 'test-results/site-studio/mobile-shell.png' });
   const fallbackContext = await browser.newContext({ viewport: { width: 1000, height: 800 }, reducedMotion: 'reduce' });
   await fallbackContext.addInitScript(() => { const getContext = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function(type, ...args) { return /webgl/.test(type) ? null : getContext.call(this, type, ...args); }; });
