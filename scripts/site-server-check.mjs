@@ -27,6 +27,20 @@ export default project('first-pump', {
 `;
 
 export async function checkServerFiles(browser) {
+  const raw = {
+    name: 'raw',
+    setup(plugin) {
+      plugin.onResolve({ filter: /\\?raw$/ }, args => ({
+        path: resolve(args.resolveDir, args.path.slice(0, -4)),
+        namespace: 'raw',
+      }));
+      plugin.onLoad({ filter: /.*/, namespace: 'raw' }, async args => ({
+        contents: await readFile(args.path, 'utf8'),
+        loader: 'text',
+      }));
+    },
+  };
+
   await build({
     entryPoints: ['scripts/site-workspace-server.ts'],
     outfile: '.plant/site-workspace-server.mjs',
@@ -34,6 +48,7 @@ export async function checkServerFiles(browser) {
     platform: 'node',
     format: 'esm',
     packages: 'external',
+    plugins: [raw],
   });
   await buildSite('dist/plant/site');
 
