@@ -34,7 +34,7 @@ test('all installed visual terminal anchors match the 3D connection points',()=>
 });
 test('legacy FBD logic backend is byte-reproducible, CRC-valid and drives actual WASM without owning physical HMI',()=>{
  const c=project().controllers![0],a=compileController(c),b=compileController(structuredClone(c));assert.deepEqual(a.fbdbin,b.fbdbin);assert.equal(fbdCrc32(a.fbdbin),0);
- const vm=new ControllerVM(c);assert.equal(vm.scan({AI1:400},100).outputs.DO1,0);const result=vm.scan({AI1:700},100);assert.equal(result.outputs.DO1,1);assert.deepEqual(result.hmi,[]);
+ const vm=new ControllerVM(c);assert.equal(vm.scan({AI1:400},100,100).outputs.DO1,0);const result=vm.scan({AI1:700},100,200);assert.equal(result.outputs.DO1,1);assert.ok(result.hmi.length>8);assert.ok(result.hmi.some(c=>c.type==='polygon'));
 });
 test('unsafe/arbitrary/stateful PLC expressions and unmapped expansion addresses are rejected',()=>{
  const c=project().controllers![0];for(const expression of [{ref:'EXP-AI4.AI1'},{op:'div',args:[1,0]},{op:'timer',args:[10]},2147483648,.5]){c.outputs.DO1=expression as never;assert.throws(()=>compileController(c));}
