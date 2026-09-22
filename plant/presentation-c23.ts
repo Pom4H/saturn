@@ -128,6 +128,7 @@ ${bindingFunctions.join('\n')}
 void saturn_hmi_init(void) {
     saturn_main_screen=gui_screen_create(RGB(5,18,25),0);
 ${init.join('\n')}
+    gui_screen_show(saturn_main_screen);
 }
 
 void saturn_hmi_update(void) {

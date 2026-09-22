@@ -31,6 +31,7 @@ test('one canonical Presentation IR projects to web and the physical Saturn targ
  assert.match(physical.c23.files['hmi.c'],/gui_screen_create/);
  assert.match(physical.c23.files['hmi.c'],/gui_text_create/);
  assert.match(physical.c23.files['hmi.c'],/gui_text_set/);
+ assert.match(physical.c23.files['hmi.c'],/gui_screen_show\(saturn_main_screen\)/);
  assert.doesNotMatch(physical.c23.files['hmi.c'],/FBD|HmiScreenModel/);
  assert.deepEqual(presentationTargets['saturn-plc-320'],{width:320,height:240,interactive:true});
 });
