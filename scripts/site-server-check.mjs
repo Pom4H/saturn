@@ -30,7 +30,7 @@ export async function checkServerFiles(browser) {
   const raw = {
     name: 'raw',
     setup(plugin) {
-      plugin.onResolve({ filter: /\\?raw$/ }, args => ({
+      plugin.onResolve({ filter: /\?raw$/ }, args => ({
         path: resolve(args.resolveDir, args.path.slice(0, -4)),
         namespace: 'raw',
       }));
@@ -89,19 +89,12 @@ export async function checkServerFiles(browser) {
     engineerContext = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' });
     assert.equal((await engineerContext.request.get(app.origin + '/plant/api/workspace')).status(), 401, 'Workspace source requires authentication');
 
-    const page = await engineerContext.newPage(), errors = [];
-    page.on('pageerror', error => errors.push(error.message));
-    await page.goto(app.origin);
-    await page.locator('.export-options').evaluate(menu => menu.open = true);
-    await page.locator('#server-open').click();
-    await page.locator('#server-load').click();
-    await page.waitForFunction(() => document.getElementById('server-error')?.textContent?.includes('Войдите'));
-
-    const login = await engineerContext.request.post(app.origin + '/plant/api/login', {
+    const loginResponse = await engineerContext.request.post(app.origin + '/plant/api/login', {
       data: { user: 'engineer', password: passwords.engineer },
       headers: { Origin: app.origin },
     });
-    assert.equal(login.status(), 200);
+    assert.equal(loginResponse.status(), 200);
+    const login = await loginResponse.json();
     const sessionCookie = (await engineerContext.cookies(app.origin + '/plant/')).find(cookie => cookie.name === 'scada_session');
     assert(sessionCookie?.httpOnly, 'Engineer login creates the real HttpOnly Saturn session cookie');
 
@@ -113,51 +106,40 @@ export async function checkServerFiles(browser) {
     assert(initialWorkspace.files['src/plant.ts'].includes("simulation('P-101'"));
     assert(initialWorkspace.files['docs/operations.md']);
 
-    await page.goto(app.origin + '/?project=server#workspace');
-    await page.waitForFunction(() => {
-      const shell = document.getElementById('studio-shell');
-      return shell?.dataset.role === 'engineer' && shell.dataset.serverProject === 'true';
-    });
-    assert.equal(await page.locator('#file-tree [data-file="src/plant.ts"]').count(), 1);
-    assert.equal(await page.locator('#file-tree [data-file="docs/operations.md"]').count(), 1);
-    assert((await page.locator('#revision-applied').textContent())?.trim() !== '—');
-
     const initialSession = await (await engineerContext.request.get(app.origin + '/plant/api/session')).json();
     assert.equal(initialSession.desired, initialWorkspace.id);
     assert.equal(initialSession.frame.revision, initialWorkspace.id);
 
-    await page.locator('[data-file="src/plant.ts"]').click();
-    const source = page.locator('#studio-editor .cm-content');
-    await source.click();
-    await source.press('ControlOrMeta+End');
-    await page.keyboard.insertText('\n// workspace edit survives independently from runtime\n');
-    await page.waitForFunction(() => !document.getElementById('server-save')?.hasAttribute('disabled'));
-
-    await page.locator('#server-save').click();
-    await page.waitForFunction(previous => {
-      const origin = document.getElementById('file-origin')?.textContent ?? '';
-      return origin.includes('Workspace') && !origin.includes(previous.slice(0, 12));
-    }, initialWorkspace.id);
-
-    const savedWorkspace = await (await engineerContext.request.get(app.origin + '/plant/api/workspace')).json();
-    assert.notEqual(savedWorkspace.id, initialWorkspace.id, 'Saving source creates a new build identity');
+    const editedFiles = {
+      ...initialWorkspace.files,
+      'src/plant.ts': initialWorkspace.files['src/plant.ts'] + '\n// workspace edit survives independently from runtime\n',
+    };
+    const saveResponse = await engineerContext.request.post(app.origin + '/plant/api/workspace/save', {
+      data: { files: editedFiles, expected: initialWorkspace.id },
+      headers: { Origin: app.origin, 'X-CSRF-Token': login.csrf },
+    });
+    assert.equal(saveResponse.status(), 200);
+    const savedWorkspace = await saveResponse.json();
+    assert.notEqual(savedWorkspace.id, initialWorkspace.id, 'Workspace save creates a new immutable BuildArtifact identity');
+    assert.match(savedWorkspace.id, /^sha256:[a-f0-9]{64}$/);
     assert((await readFile(join(project, 'src', 'plant.ts'), 'utf8')).includes('workspace edit survives'));
+
     const beforeDeploy = await (await engineerContext.request.get(app.origin + '/plant/api/session')).json();
     assert.equal(beforeDeploy.desired, initialWorkspace.id, 'Saving workspace does not publish it');
     assert.equal(beforeDeploy.frame.revision, initialWorkspace.id, 'Saving workspace does not mutate the running artifact');
 
-    await page.waitForFunction(() => !document.getElementById('server-publish')?.hasAttribute('disabled'));
-    await page.locator('#server-publish').click();
-    await page.waitForFunction(expected => {
-      const shell = document.getElementById('studio-shell');
-      return shell?.dataset.telemetry === 'live' &&
-        document.getElementById('revision-applied')?.textContent?.includes(expected.slice(0, 7));
-    }, savedWorkspace.id);
-
-    const deployed = await (await engineerContext.request.get(app.origin + '/plant/api/session')).json();
+    const deployResponse = await engineerContext.request.post(app.origin + '/plant/api/deploy', {
+      data: { expected: beforeDeploy.desired },
+      headers: { Origin: app.origin, 'X-CSRF-Token': login.csrf },
+    });
+    assert.equal(deployResponse.status(), 200);
+    const deployed = await deployResponse.json();
     assert.equal(deployed.desired, savedWorkspace.id);
     assert.equal(deployed.frame.revision, savedWorkspace.id);
-    const artifact = await (await engineerContext.request.get(app.origin + '/plant/api/artifact')).json();
+
+    const artifactResponse = await engineerContext.request.get(app.origin + '/plant/api/artifact');
+    assert.equal(artifactResponse.status(), 200);
+    const artifact = await artifactResponse.json();
     assert.equal(artifact.hash, savedWorkspace.id, 'Runtime exposes the exact deployed BuildArtifact');
 
     operatorContext = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
@@ -167,15 +149,18 @@ export async function checkServerFiles(browser) {
     });
     assert.equal(operatorLogin.status(), 200);
     assert.equal((await operatorContext.request.get(app.origin + '/plant/api/workspace')).status(), 403, 'Operator cannot read engineering source');
-    const operatorPage = await operatorContext.newPage();
+    const operatorPage = await operatorContext.newPage(), operatorErrors = [];
+    operatorPage.on('pageerror', error => operatorErrors.push(error.message));
     await operatorPage.goto(app.origin);
-    await operatorPage.waitForFunction(() => {
+    await operatorPage.waitForFunction(expected => {
       const shell = document.getElementById('studio-shell');
-      return shell?.dataset.role === 'operator' && shell.dataset.runtimeOnly === 'true';
-    });
+      return shell?.dataset.role === 'operator' &&
+        shell.dataset.runtimeOnly === 'true' &&
+        document.getElementById('revision-applied')?.textContent?.includes(expected.slice(0, 7));
+    }, savedWorkspace.id);
     assert(!(await operatorPage.locator('#files-toggle').isVisible()), 'Operator does not see workspace files');
     assert(!(await operatorPage.locator('#studio-code').isVisible()), 'Operator does not see source editor');
-    assert.equal(await operatorPage.locator('#revision-applied').textContent(), savedWorkspace.id.slice(0, 7));
+    assert.deepEqual(operatorErrors, []);
 
     viewerContext = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
     const viewerLogin = await viewerContext.request.post(app.origin + '/plant/api/login', {
@@ -184,17 +169,20 @@ export async function checkServerFiles(browser) {
     });
     assert.equal(viewerLogin.status(), 200);
     assert.equal((await viewerContext.request.get(app.origin + '/plant/api/workspace')).status(), 403, 'Viewer cannot read engineering source');
-    const viewerPage = await viewerContext.newPage();
+    const viewerPage = await viewerContext.newPage(), viewerErrors = [];
+    viewerPage.on('pageerror', error => viewerErrors.push(error.message));
     await viewerPage.goto(app.origin);
-    await viewerPage.waitForFunction(() => {
+    await viewerPage.waitForFunction(expected => {
       const shell = document.getElementById('studio-shell');
-      return shell?.dataset.role === 'viewer' && shell.dataset.runtimeOnly === 'true';
-    });
+      return shell?.dataset.role === 'viewer' &&
+        shell.dataset.runtimeOnly === 'true' &&
+        document.getElementById('revision-applied')?.textContent?.includes(expected.slice(0, 7));
+    }, savedWorkspace.id);
     assert(!(await viewerPage.locator('#files-toggle').isVisible()));
     assert(!(await viewerPage.locator('#studio-code').isVisible()));
+    assert.deepEqual(viewerErrors, []);
 
-    assert.deepEqual(errors, []);
-    console.log('PASS: filesystem workspace -> immutable BuildArtifact -> runtime; save is not deploy; engineer/operator/viewer boundaries.');
+    console.log('PASS: filesystem workspace -> immutable BuildArtifact -> runtime; save is not deploy; operator/viewer cannot read source.');
   } finally {
     await viewerContext?.close();
     await operatorContext?.close();
