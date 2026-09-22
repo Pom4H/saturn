@@ -1,7 +1,7 @@
 import type { Presentation } from './presentation';
 import type { Controller, ControllerState } from './controller';
 import type { Connection, Attachment } from './ports';
-import type { HmiDrawCommand } from './vendor/saturn/src/runtime';
+import type { SaturnHmiCommand } from './hmi-frame';
 import type { TextKey } from './i18n';
 import { failCode } from './diagnostics';
 export { AppError } from './diagnostics';
@@ -269,7 +269,7 @@ export interface Checkpoint {
     invalidModels?: string[];
 }
 export interface Frame {
-    displays?: Record<string,HmiDrawCommand[]>;
+    displays?: Record<string,SaturnHmiCommand[]>;
     runId: string;
     revision: string;
     seq: number;
