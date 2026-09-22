@@ -13,7 +13,7 @@ const cId=(value:string)=>value.replace(/[^A-Za-z0-9_]/g,'_').replace(/^[0-9]/,'
 const ai=/^AI([12])$/,di=/^DI([1-9]|10)$/,ao=/^AO([12])$/,doPin=/^DO([1-9]|10|11)$/;
 function inputRead(ref:string,scales:Readonly<Record<string,number>>):string{
  const scale=scales[ref]??1;
- const scaled=(value:string)=>scale===1?value:`((${value}) * ${Number(scale).toPrecision(17)})`;
+ const scaled=(value:string)=>scale===1?value:`(${value} * ${Number.isInteger(scale)?`${scale}.0`:String(scale)})`;
  const a=ai.exec(ref);if(a)return scaled(`GetAI(${Number(a[1])-1})`);
  const d=di.exec(ref);if(d)return scaled(`(GetDI(${Number(d[1])-1}) ? 1.0 : 0.0)`);
  failCode('SATURN_DSL_UNKNOWN',{kind:'plcInput',name:ref},{input:ref,target:'saturn-c23'});

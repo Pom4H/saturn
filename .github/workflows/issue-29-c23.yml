@@ -116,6 +116,37 @@ jobs:
           Get-Content issue29-evidence\build-files.txt
           Get-Content issue29-evidence\libraries.txt
 
+      - name: Compile canonical demo with official Saturn toolchain
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $prefix = Join-Path $env:GCC_DIR 'app\risc-v\bin\riscv32-unknown-elf'
+          $sdk = Join-Path $env:SDK_DIR 'app'
+          $src = Resolve-Path issue29-generated
+          $include = Join-Path $sdk 'include'
+          $lib = Join-Path $sdk 'lib'
+          $cflags = @('-g','-ggdb','-nostdlib','-nostdinc','-ffreestanding','-march=rv32imaf','-mabi=ilp32f','-Wall','-Werror','-std=c2x','-fmax-errors=10',('-I'+$src),('-I'+$include))
+          Push-Location issue29-generated
+          try {
+            $objects = @()
+            foreach ($file in @('controller.c','hmi.c','shell.c','main.c')) {
+              $obj = [IO.Path]::GetFileNameWithoutExtension($file) + '.o'
+              & ($prefix + '-gcc.exe') @cflags -c $file -o $obj
+              if ($LASTEXITCODE -ne 0) { throw "compile failed: $file" }
+              $objects += $obj
+            }
+            & ($prefix + '-ld.exe') '-L' $lib '-T' 'satplc.ld' '-nostdlib' '-m' 'elf32lriscv' '-Map' 'main.map' '-o' 'main.out' @objects '-lsatstd++' '-lsatstd'
+            if ($LASTEXITCODE -ne 0) { throw 'link failed' }
+            & ($prefix + '-objcopy.exe') '-O' 'binary' 'main.out' 'main.bin'
+            if ($LASTEXITCODE -ne 0) { throw 'objcopy failed' }
+            & ($prefix + '-objdump.exe') '-drlS' 'main.out' | Out-File main.lst -Encoding ascii
+            if ($LASTEXITCODE -ne 0) { throw 'objdump failed' }
+            Get-Item main.bin,main.out,main.map,main.lst | Select-Object Name,Length | Format-Table -AutoSize
+            Get-FileHash main.bin -Algorithm SHA256 | Format-List | Out-File ..\issue29-evidence\main-bin-sha256.txt -Encoding utf8
+            & ($prefix + '-gcc.exe') --version | Select-Object -First 1 | Out-File ..\issue29-evidence\compiler-version.txt -Encoding utf8
+          } finally {
+            Pop-Location
+          }
+
       - uses: actions/upload-artifact@v7.0.1
         if: always()
         with:
