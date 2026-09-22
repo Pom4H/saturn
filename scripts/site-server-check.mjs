@@ -97,11 +97,14 @@ export async function checkServerFiles(browser) {
     await page.locator('#server-load').click();
     await page.waitForFunction(() => document.getElementById('server-error')?.textContent?.includes('Войдите'));
 
-    const login = await engineerContext.request.post(app.origin + '/plant/api/login', {
-      data: { user: 'engineer', password: passwords.engineer },
-      headers: { Origin: app.origin },
-    });
-    assert.equal(login.status(), 200);
+    await page.goto(app.origin + '/plant/login');
+    await page.locator('[name=user]').fill('engineer');
+    await page.locator('[name=password]').fill(passwords.engineer);
+    await page.locator('#login button').click();
+    await page.waitForFunction(() => document.getElementById('studio-shell')?.dataset.role === 'engineer');
+
+    const browserWorkspaceStatus = await page.evaluate(async () => (await fetch('/plant/api/workspace', { cache: 'no-store' })).status);
+    assert.equal(browserWorkspaceStatus, 200, 'The authenticated browser can read its workspace host');
 
     const workspaceResponse = await engineerContext.request.get(app.origin + '/plant/api/workspace');
     assert.equal(workspaceResponse.status(), 200);
@@ -111,6 +114,8 @@ export async function checkServerFiles(browser) {
     assert(initialWorkspace.files['src/plant.ts'].includes("simulation('P-101'"));
     assert(initialWorkspace.files['docs/operations.md']);
 
+    await page.locator('.export-options').evaluate(menu => menu.open = true);
+    await page.locator('#server-open').click();
     await page.locator('#server-load').click();
     await page.waitForFunction(() => document.getElementById('studio-shell')?.dataset.serverProject === 'true');
     assert.equal(await page.locator('#file-tree [data-file="src/plant.ts"]').count(), 1);
