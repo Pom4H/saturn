@@ -97,14 +97,13 @@ export async function checkServerFiles(browser) {
     await page.locator('#server-load').click();
     await page.waitForFunction(() => document.getElementById('server-error')?.textContent?.includes('Войдите'));
 
-    await page.goto(app.origin + '/plant/login');
-    await page.locator('[name=user]').fill('engineer');
-    await page.locator('[name=password]').fill(passwords.engineer);
-    await page.locator('#login button').click();
-    await page.waitForFunction(() => document.getElementById('studio-shell')?.dataset.role === 'engineer');
-
-    const browserWorkspaceStatus = await page.evaluate(async () => (await fetch('/plant/api/workspace', { cache: 'no-store' })).status);
-    assert.equal(browserWorkspaceStatus, 200, 'The authenticated browser can read its workspace host');
+    const login = await engineerContext.request.post(app.origin + '/plant/api/login', {
+      data: { user: 'engineer', password: passwords.engineer },
+      headers: { Origin: app.origin },
+    });
+    assert.equal(login.status(), 200);
+    const sessionCookie = (await engineerContext.cookies(app.origin + '/plant/')).find(cookie => cookie.name === 'scada_session');
+    assert(sessionCookie?.httpOnly, 'Engineer login creates the real HttpOnly Saturn session cookie');
 
     const workspaceResponse = await engineerContext.request.get(app.origin + '/plant/api/workspace');
     assert.equal(workspaceResponse.status(), 200);
@@ -114,10 +113,11 @@ export async function checkServerFiles(browser) {
     assert(initialWorkspace.files['src/plant.ts'].includes("simulation('P-101'"));
     assert(initialWorkspace.files['docs/operations.md']);
 
-    await page.locator('.export-options').evaluate(menu => menu.open = true);
-    await page.locator('#server-open').click();
-    await page.locator('#server-load').click();
-    await page.waitForFunction(() => document.getElementById('studio-shell')?.dataset.serverProject === 'true');
+    await page.goto(app.origin + '/?project=server#workspace');
+    await page.waitForFunction(() => {
+      const shell = document.getElementById('studio-shell');
+      return shell?.dataset.role === 'engineer' && shell.dataset.serverProject === 'true';
+    });
     assert.equal(await page.locator('#file-tree [data-file="src/plant.ts"]').count(), 1);
     assert.equal(await page.locator('#file-tree [data-file="docs/operations.md"]').count(), 1);
     assert((await page.locator('#revision-applied').textContent())?.trim() !== '—');
