@@ -45,7 +45,7 @@ export async function mountStudio() {
   let serverSession: ServerSession | null = null, runtimeOnly = false, runtimeRevision: string | null = null;
   let documents: Documents;
   let codeVisible = !compact.matches, propertiesVisible = false, mobilePane: 'scene' | 'source' | 'properties' = 'scene';
-  let progress = 0, explicit: '2d' | '3d' = '3d', fullscreen = false, scrollBeforeFullscreen = 0;
+  let progress = 0, explicit: '2d' | '3d' = compact.matches ? '2d' : '3d', fullscreen = false, scrollBeforeFullscreen = 0;
   let visible = false, paused = reduced.matches, toastTimer = 0;
   let connecting: Endpoint | 'choose' | null = null;
   const view = new SceneView(canvas);
