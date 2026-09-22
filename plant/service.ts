@@ -1,4 +1,3 @@
-import { compileController } from './controller';
 import { validateProject } from './compiler';
 import { Kernel } from './kernel';
 import { acknowledge, updateAlarms } from './alarms';
@@ -8,6 +7,7 @@ import { clone, finite, id, requireRole, type Actor, type AlarmState, type Event
 import type { BuildArtifact } from './artifact';
 import { verifyBuildArtifact } from './artifact';
 import { failCode, SaturnDiagnosticError } from './diagnostics';
+import { saturnPlcC23Source } from './targets/saturn-plc-c23';
 
 const engineering: Actor = { id: 'system', role: 'engineer' };
 
@@ -325,19 +325,24 @@ export class Service {
             failCode('SATURN_CONFLICT',{resource:'revision',reason:'stateChanged'},{expected:revision,actual:this.kernel.state.revision},{status:409});
         const controller = this.project.controllers?.find(item => item.id === controllerId);
         if (!controller) failCode('SATURN_NOT_FOUND',{resource:'plc',id:controllerId},{controllerId},{status:404});
-        const artifact = compileController(controller);
+        const source = saturnPlcC23Source(this.artifact, controllerId);
         return {
-            ...artifact,
-            fbdbin: Array.from(artifact.fbdbin),
+            schema: 'saturn.target-source.saturn-plc-c23@1' as const,
+            target: 'saturn-plc-320' as const,
+            compiled: false,
+            hardwareVerified: false,
             revision,
             controllerId,
+            presentationId: source.presentation.viewId,
+            abi: source.presentation.abi,
+            files: source.files,
             buildArtifact: this.artifact.hash,
             sourceRevision: this.artifact.provenance.sourceRevision ?? null,
             connections: (this.project.connections ?? []).filter(connection => connection.from.device === controllerId || connection.to.device === controllerId),
             expansions: (this.project.attachments ?? []).filter(attachment => attachment.controller === controllerId),
             limitations: [
-                'Program data for the pinned FBD runtime, not bootloader/HAL firmware',
-                'Virtual expansions are not compiled into physical Saturn addresses',
+                'Generated C23 target source requires the Saturn C23 SDK toolchain to produce a deployable binary',
+                'Virtual expansions are not yet lowered into physical Saturn module addresses',
                 'No physical device deployment or electrical qualification has been performed',
             ],
         };

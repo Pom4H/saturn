@@ -30,7 +30,7 @@ import { diagnostic } from './diagnostic';
 import { buildArtifact } from '../artifact';
 type PushSender = NonNullable<ConstructorParameters<typeof Push>[2]>;
 type LoginPayload = { csrf: string };
-type FirmwarePayload = { hardwareVerified: boolean; fbdbin: number[] };
+type FirmwarePayload = { hardwareVerified:boolean; compiled:boolean; target:'saturn-plc-320'; files:Record<string,string>; buildArtifact:string; sourceRevision:string|null };
 type RemoteSessionPayload = { project: { id: string }; instance: { instanceId: string }; frame: { revision: string; runId: string; paused: boolean }; csrf: string };
 type LocalSessionPayload = { environment: EnvironmentDescriptor; frame: { paused: boolean } };
 const engineer: Actor = { id: 'engineer', role: 'engineer' }, viewer: Actor = { id: 'reader', role: 'viewer' };
@@ -183,7 +183,7 @@ test('HTTP auth, CSRF, private HTML, SQL reports, SSE and revocation', async () 
     await app.service.idle();
     assert.equal(app.service.reports()[0].status, 'success');
     const firmware=await fetch(base+'api/firmware',{method:'POST',headers:{Cookie:cookie,Origin:app.origin,'content-type':'application/json','x-csrf-token':login.csrf},body:JSON.stringify({controllerId:'SATURN-1',revision:app.service.frame().revision})});
-    assert.equal(firmware.status,200);const program=await firmware.json() as FirmwarePayload;assert.equal(program.hardwareVerified,false);assert.ok(program.fbdbin.length>100);
+    assert.equal(firmware.status,200);const program=await firmware.json() as FirmwarePayload;assert.equal(program.hardwareVerified,false);assert.equal(program.compiled,false);assert.equal(program.target,'saturn-plc-320');assert.match(program.files['hmi.c'],/#include <satgui\.h>/);assert.match(program.files['controller.c'],/GetAI\(0\)/);
     assert.equal((await fetch(base+'api/firmware',{method:'POST',headers:{Cookie:cookie,Origin:app.origin,'content-type':'application/json'},body:'{}'})).status,403);
     const logout = await fetch(base + 'api/logout', { method: 'POST', headers: { Cookie: cookie, Origin: app.origin, 'content-type': 'application/json', 'x-csrf-token': login.csrf }, body: '{}' });
     assert.equal(logout.status, 200);
@@ -213,8 +213,8 @@ test('native SQL runaway is terminated in its isolated process without stopping 
     assert.equal((await runReport(task())).rows[0].coverage, 80);
 });
 
-test('PLC artifact export checks engineer role, revision and target, and includes a hardware qualification boundary',async()=>{
- const s=await makeService();try{assert.throws(()=>s.firmware('SATURN-1',s.frame().revision,viewer),diagnostic('SATURN_PERMISSION'));assert.throws(()=>s.firmware('SATURN-1','stale',engineer),diagnostic('SATURN_CONFLICT'));assert.throws(()=>s.firmware('absent',s.frame().revision,engineer),diagnostic('SATURN_NOT_FOUND'));const a=s.firmware('SATURN-1',s.frame().revision,engineer);assert.equal(a.hardwareVerified,false);assert.ok(a.fbdbin.length>100);assert.equal(a.expansions[0].profile,'virtual-io4');assert.match(a.runtimeHash,/^[a-f0-9]{64}$/);}finally{s.store.db.close();}
+test('C23 target source export checks engineer role, revision and target, and includes provenance',async()=>{
+ const s=await makeService();try{assert.throws(()=>s.firmware('SATURN-1',s.frame().revision,viewer),diagnostic('SATURN_PERMISSION'));assert.throws(()=>s.firmware('SATURN-1','stale',engineer),diagnostic('SATURN_CONFLICT'));assert.throws(()=>s.firmware('absent',s.frame().revision,engineer),diagnostic('SATURN_NOT_FOUND'));const a=s.firmware('SATURN-1',s.frame().revision,engineer);assert.equal(a.hardwareVerified,false);assert.equal(a.compiled,false);assert.equal(a.target,'saturn-plc-320');assert.match(a.files['hmi.c'],/#include <satgui\.h>/);assert.match(a.files['controller.c'],/SetDO\(0,/);assert.equal(a.expansions[0].profile,'virtual-io4');assert.equal(a.buildArtifact,s.artifact.hash);}finally{s.store.db.close();}
 });
 test('layout-only edits preserve the run and compiled program',async()=>{
  const s=await makeService();try{for(let i=0;i<20;i++)s.tick();const old=s.frame(),files={...demoFiles,'commissioning.ts':demoFiles['commissioning.ts'].replace('x:760,y:3100','x:765,y:3100')};const artifact=await buildArtifact(files,{packageName:'@saturn/test'});await s.deploy(artifact,s.store.published(),engineer);assert.equal(s.frame().runId,old.runId);assert.deepEqual(s.frame().displays,old.displays);}finally{s.store.db.close();}

@@ -82,9 +82,9 @@ function blockExpression(name:string,block:PlcBlock,controller:Controller,stack:
 
 function outputWrite(pin:string,value:string):string {
     const ao=analogOutput.exec(pin);
-    if(ao)return `    saturn_output_AO${ao[1]} = ${value};\\n    SetAO(${Number(ao[1])-1},(float)saturn_output_AO${ao[1]});`;
+    if(ao)return `    saturn_output_AO${ao[1]} = ${value};\n    SetAO(${Number(ao[1])-1},(float)saturn_output_AO${ao[1]});`;
     const d=digitalOutput.exec(pin);
-    if(d)return `    saturn_output_DO${d[1]} = (${value}) != 0.0 ? 1.0 : 0.0;\\n    SetDO(${Number(d[1])-1},saturn_output_DO${d[1]} != 0.0);`;
+    if(d)return `    saturn_output_DO${d[1]} = (${value}) != 0.0 ? 1.0 : 0.0;\n    SetDO(${Number(d[1])-1},saturn_output_DO${d[1]} != 0.0);`;
     failCode('SATURN_DSL_UNKNOWN',{kind:'plcOutput',name:pin},{output:pin,target:'saturn-c23'});
 }
 
@@ -124,19 +124,19 @@ static inline double saturn_min(double a,double b){ return a < b ? a : b; }
 static inline double saturn_max(double a,double b){ return a > b ? a : b; }
 static inline double saturn_safe_div(double a,double b){ return b == 0.0 ? 0.0 : a / b; }
 
-${declarations.join('\\n')}
+${declarations.join('\n')}
 
 void saturn_program_init(void) {
-${outputs.map(([pin])=>outputWrite(pin,'0.0')).join('\\n')}
+${outputs.map(([pin])=>outputWrite(pin,'0.0')).join('\n')}
 }
 
 void saturn_program_step(void) {
-${writes.join('\\n')}
+${writes.join('\n')}
 }
 
 double saturn_program_signal(uint16_t slot) {
     switch(slot) {
-${slotCases.join('\\n')}
+${slotCases.join('\n')}
         default: return 0.0;
     }
 }
@@ -147,6 +147,7 @@ uint8_t saturn_program_signal_good(uint16_t slot) {
 `;
 
     const main=`/* Saturn PLC C23 application: control + HMI share one executable target. */
+#include <satplc.h>
 #include <satkbd.h>
 #include <satgui.h>
 #include "saturn_program.h"
@@ -160,7 +161,6 @@ void main(void) {
         saturn_hmi_update();
         gui_process(50);
     }
-    return 0;
 }
 `;
 
