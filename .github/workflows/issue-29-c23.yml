@@ -1,23 +1,10 @@
 name: Saturn C23 target gate
 # Compiles source emitted from the canonical TypeScript demo; no handwritten HMI fixture.
 
+# Heavy vendor-toolchain evidence for post-v0.1 issue #29.
+# The canonical PR gate already validates generated C23 source deterministically;
+# run the official Windows SDK/emulator oracle only when explicitly requested.
 on:
-  pull_request:
-    branches:
-      - release/v0.1.0-rc1
-    paths:
-      - 'plant/presentation-c23.ts'
-      - 'plant/controller-c23.ts'
-      - 'plant/saturn-shell-c23.ts'
-      - 'plant/targets/saturn-plc-c23.ts'
-      - 'plant/presentation-target.ts'
-      - 'plant/controller.ts'
-      - 'plant/dsl.ts'
-      - 'plant/demo/**'
-      - 'plant/tests/presentation.test.ts'
-      - 'scripts/architecture-invariants.mjs'
-      - 'scripts/saturn-c23-source.mjs'
-      - '.github/workflows/issue-29-c23.yml'
   workflow_dispatch:
 
 permissions:
