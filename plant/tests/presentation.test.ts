@@ -17,7 +17,9 @@ const project=()=>compileProject(demoFiles);
 test('one DSL tree is shared by live HMI, report and the compiled controller screen',()=>{
  const p=project(),v=p.views![0];assert.deepEqual(v.body,p.reports.find(r=>r.id==='bench-state')!.view!.body);
  assert.deepEqual(v.body,p.controllers![0].hmi.view!.body);
- const vm=new ControllerVM(p.controllers![0]),result=vm.scan({AI1:700},100);assert.equal(result.outputs.DO1,1);assert.deepEqual(result.hmi,[]);
+ const vm=new ControllerVM(p.controllers![0]),result=vm.scan({AI1:700},100,1000);assert.equal(result.outputs.DO1,1);
+ assert.ok(result.hmi.some(c=>c.type==='polygon'),'WASM state drives animated pump geometry');
+ assert.ok(result.hmi.some(c=>c.type==='circle'),'WASM state drives lamp/flow geometry');
 });
 test('one canonical Presentation IR projects to web and the physical Saturn target',()=>{
  const p=project(),v=p.views![0];
@@ -64,9 +66,9 @@ test('physical Saturn target is one C23 program containing control I/O and satgu
 
 test('controller setpoint has identical bounded semantics in legacy simulation and C23 target source',()=>{
  const p=project(),c=p.controllers![0],vm=new ControllerVM(c);
- assert.equal(vm.scan({AI1:100},100).outputs.DO1,0);
+ assert.equal(vm.scan({AI1:100},100,100).outputs.DO1,0);
  vm.setSetpoint('MANUAL',1);
- assert.equal(vm.scan({AI1:100},100).outputs.DO1,1);
+ assert.equal(vm.scan({AI1:100},100,200).outputs.DO1,1);
  const source=saturnPlcC23Source({schema:'saturn.build@1',hash:'sha256:'+('0'.repeat(64)),project:p,provenance:{files:[]}},c.id);
  assert.match(source.files['controller.c'],/saturn_sp_MANUAL/);
  assert.match(source.files['shell.c'],/saturn_program_setpoint_adjust/);
