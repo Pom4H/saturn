@@ -11,6 +11,8 @@ import { executeReport } from '../workflows';
 import { NodeSql } from '../adapters/node-sql';
 import type { ReportTask } from '../types';
 import { diagnostic } from './diagnostic';
+import { buildArtifact } from '../artifact';
+import { saturnPlcC23Source } from '../targets/saturn-plc-c23';
 const project=()=>compileProject(demoFiles);
 test('one DSL tree is shared by live HMI, report and the compiled controller screen',()=>{
  const p=project(),v=p.views![0];assert.deepEqual(v.body,p.reports.find(r=>r.id==='bench-state')!.view!.body);
@@ -26,8 +28,9 @@ test('one canonical Presentation IR projects to web and the physical Saturn targ
  void bindings;
  const physical=projectPresentation(v,{target:'saturn-plc-320'});
  assert.equal(physical.target,'saturn-plc-320');assert.ok('c23' in physical);assert.equal(physical.c23.viewId,v.id);
- assert.match(physical.c23.files['hmi.c'],/saturn_satgui_begin/);
- assert.match(physical.c23.files['saturn_hmi_port.h'],/SATURN_HMI_PORT_ABI 1/);
+ assert.match(physical.c23.files['hmi.c'],/gui_screen_create/);
+ assert.match(physical.c23.files['hmi.c'],/gui_text_create/);
+ assert.match(physical.c23.files['hmi.c'],/gui_text_set/);
  assert.doesNotMatch(physical.c23.files['hmi.c'],/FBD|HmiScreenModel/);
  assert.deepEqual(presentationTargets['saturn-plc-320'],{width:320,height:240,interactive:true});
 });
@@ -37,7 +40,19 @@ test('Saturn physical Presentation codegen is deterministic and keeps stable sig
  const a=projectPresentation(v,{target:'saturn-plc-320'}),b=projectPresentation(v,{target:'saturn-plc-320'});
  assert.ok('c23' in a&&'c23' in b);assert.deepEqual(a.c23,b.c23);
  assert.deepEqual(a.c23.signals,[...a.c23.signals].sort((x,y)=>x.signal.localeCompare(y.signal)).map((item,slot)=>({...item,slot})));
- assert.match(a.c23.files['hmi.c'],/void saturn_hmi_render\(const SaturnHmiFrame \*frame\)/);
+ assert.match(a.c23.files['hmi.c'],/void saturn_hmi_init\(void\)/);
+ assert.match(a.c23.files['hmi.c'],/void saturn_hmi_update\(void\)/);
+});
+
+test('physical Saturn target is one C23 program containing control I/O and satgui HMI',async()=>{
+ const artifact=await buildArtifact(demoFiles,{packageName:'@saturn/test'});
+ const source=saturnPlcC23Source(artifact,'SATURN-1');
+ assert.deepEqual(Object.keys(source.files).sort(),['controller.c','hmi.c','main.c','saturn_program.h']);
+ assert.match(source.files['controller.c'],/GetAI\(0\) \* 100\.0/);
+ assert.match(source.files['controller.c'],/SetDO\(0,/);
+ assert.match(source.files['hmi.c'],/#include <satgui\.h>/);
+ assert.match(source.files['main.c'],/gui_process\(50\)/);
+ assert.doesNotMatch(Object.values(source.files).join('\n'),/HmiScreenModel|compileHmiScreens|fbd_render/);
 });
 
 test('presentation escapes content, preserves bad quality and disables commands in report mode',()=>{

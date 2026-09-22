@@ -101,6 +101,13 @@ await assertText('plant/controller.ts', {
   required: ['Rich physical HMI', 'C23/satgui'],
   forbidden: ['compileHmiScreens', 'projectPresentation(c.hmi.view'],
 });
+await assertText('plant/presentation-c23.ts', {
+  required: ['#include <satgui.h>', 'gui_screen_create', 'gui_text_create', 'gui_text_set'],
+  forbidden: ['saturn_satgui_begin', 'saturn_satgui_text', 'HmiScreenModel'],
+});
+await assertText('plant/targets/saturn-plc-c23.ts', {
+  required: ['compileSaturnC23Controller', "schema:'saturn.c23.project@1'"],
+});
 
 await assertText('site/index.html', {
   required: ['data-surface="scene"', 'Source, build, published и applied', 'saturn add pump', 'project-owned source', 'artifact runtime'],
