@@ -44,11 +44,7 @@ jobs:
       # adversarial browser suites and full plant browser evidence are manual
       # diagnostics rather than duplicate per-commit gates.
       - run: npx playwright install --with-deps chromium
-      - name: Saturn shell integration
-        run: npm run site:test:browser
-
       - name: Capture PLC HMI evidence
-        if: always()
         run: PWA_ONLY_PLC=1 npm run plant:test:browser
 
       - uses: actions/upload-artifact@v7.0.1
@@ -58,6 +54,9 @@ jobs:
           path: plant-test-results/
           retention-days: 7
           if-no-files-found: ignore
+
+      - name: Saturn shell integration
+        run: npm run site:test:browser
 
       - run: npm audit --audit-level=high
 
