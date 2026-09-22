@@ -19,6 +19,7 @@ using System.Runtime.InteropServices;
 public static class Win32Saturn {
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+  [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, uint nFlags);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
   [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
@@ -63,8 +64,16 @@ function Capture-Window([IntPtr]$handle,[string]$file) {
   if ($width -lt 20 -or $height -lt 20) { throw "Window too small: $width x $height" }
   $shot = New-Object System.Drawing.Bitmap $width,$height
   $g = [System.Drawing.Graphics]::FromImage($shot)
-  try { $g.CopyFromScreen($rect.Left,$rect.Top,0,0,$shot.Size) }
-  finally { $g.Dispose() }
+  $hdc = $g.GetHdc()
+  try {
+    # PrintWindow captures the owned window even when the runner has no valid
+    # interactive desktop handle. PW_RENDERFULLCONTENT asks DWM/custom controls
+    # to paint their complete client area.
+    if (-not [Win32Saturn]::PrintWindow($handle,$hdc,2)) { throw "PrintWindow failed: $handle" }
+  } finally {
+    $g.ReleaseHdc($hdc)
+    $g.Dispose()
+  }
   $shot.Save((Join-Path $PWD $file),[System.Drawing.Imaging.ImageFormat]::Png)
   $shot.Dispose()
 }
