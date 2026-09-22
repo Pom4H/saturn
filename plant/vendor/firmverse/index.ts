@@ -1,7 +1,7 @@
 /** Portable Saturn toolchain: one Rust compiler, one upstream C execution engine.
  * Each runtime gets its own WebAssembly instance; no shared process-global PLC.
  */
-import { compilerBase64, runtimeBase64, compilerHash, runtimeHash } from './binaries.ts';
+import { compilerBase64, runtimeBase64, compilerHash, runtimeHash } from './binaries';
 export { compilerHash, runtimeHash };
 export const STATE_ABI = `firmverse/saturn-state@1:${runtimeHash}`;
 export interface ElementSpec { id: string; type: string | number; inputs?: readonly string[]; params?: readonly number[]; invert?: boolean; caption?: string; comment?: string }
