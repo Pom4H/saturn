@@ -18,6 +18,7 @@ using System;
 using System.Runtime.InteropServices;
 public static class Win32Saturn {
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
   [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
@@ -89,7 +90,10 @@ try {
   Start-Sleep -Milliseconds 500
 
   [Win32Saturn]::SetForegroundWindow($proc.MainWindowHandle) | Out-Null
-  [System.Windows.Forms.SendKeys]::SendWait('{F9}')
+  # Send F9 directly to SatPlcImit. SendKeys can fail with "Access is denied" on
+  # self-hosted runners when Windows foreground/UIPI policy changes between runs.
+  [Win32Saturn]::PostMessage($proc.MainWindowHandle,0x0100,[IntPtr]0x78,[IntPtr]::Zero) | Out-Null
+  [Win32Saturn]::PostMessage($proc.MainWindowHandle,0x0101,[IntPtr]0x78,[IntPtr]::Zero) | Out-Null
   Start-Sleep -Seconds 1
 
   # SatPlcImit paints its toolbar as native/custom controls, so UI Automation
