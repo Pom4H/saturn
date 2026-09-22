@@ -73,6 +73,34 @@ jobs:
           New-Item -ItemType Directory -Force issue29-evidence | Out-Null
           curl.exe -fL --retry 3 https://www.mnppsaturn.ru/update/satsdk/SatPlcImit.pdf -o issue29-evidence\SatPlcImit.pdf
           Get-FileHash issue29-evidence\SatPlcImit.pdf -Algorithm SHA256
+      - name: Install official Saturn C23 toolchain in runner temp
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $gccDir = Join-Path $env:RUNNER_TEMP 'saturn-riscv'
+          $sdkDir = Join-Path $env:RUNNER_TEMP 'saturn-sdk'
+          $gccInstaller = Join-Path $env:RUNNER_TEMP 'risc-v-gcc13.2.0.exe'
+          $sdkInstaller = Join-Path $env:RUNNER_TEMP 'sat-sdk-setup.exe'
+          curl.exe -fL --retry 3 https://www.mnppsaturn.ru/update/satsdk/risc-v-gcc13.2.0.exe -o $gccInstaller
+          curl.exe -fL --retry 3 https://www.mnppsaturn.ru/update/satsdk/sat-sdk-setup.exe -o $sdkInstaller
+          New-Item -ItemType Directory -Force $gccDir,$sdkDir | Out-Null
+          $gcc = Start-Process -FilePath $gccInstaller -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-',('/DIR=' + $gccDir)) -Wait -PassThru
+          if ($gcc.ExitCode -ne 0) { throw "RISC-V installer exited $($gcc.ExitCode)" }
+          $sdk = Start-Process -FilePath $sdkInstaller -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-',('/DIR=' + $sdkDir)) -Wait -PassThru
+          if ($sdk.ExitCode -ne 0) { throw "SatSDK installer exited $($sdk.ExitCode)" }
+          "GCC_DIR=$gccDir" | Out-File issue29-evidence\toolchain.txt -Encoding utf8
+          "SDK_DIR=$sdkDir" | Out-File issue29-evidence\toolchain.txt -Encoding utf8 -Append
+          Get-ChildItem $gccDir,$sdkDir -File -Recurse |
+            Where-Object { $_.Name -match '(gcc|make|satgui|satmio|satkbd|\.a$|\.ld$|\.json$|\.code-workspace$|\.bat$|\.cmd$)' } |
+            Select-Object -First 400 FullName,Length |
+            Format-Table -AutoSize | Out-String -Width 500 |
+            Out-File issue29-evidence\inventory.txt -Encoding utf8
+          Get-ChildItem $gccDir -File -Recurse -Filter '*gcc*.exe' |
+            Select-Object -First 20 -ExpandProperty FullName |
+            Out-File issue29-evidence\gcc-paths.txt -Encoding utf8
+          Get-ChildItem $sdkDir -File -Recurse |
+            Where-Object { $_.Name -match '(Makefile|tasks\.json|c_cpp_properties\.json|\.bat$|\.cmd$)' } |
+            Select-Object -First 200 -ExpandProperty FullName |
+            Out-File issue29-evidence\build-files.txt -Encoding utf8
       - uses: actions/upload-artifact@v7.0.1
         if: always()
         with:
