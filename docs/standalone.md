@@ -27,7 +27,7 @@ pump-station/
 └── assets/
 ~~~
 
-There is no `scada.project.json`. `package.json` is project identity/dependency metadata and `src/plant.ts` is the conventional engineering entrypoint.
+`package.json` is project identity/dependency metadata and `src/plant.ts` is the conventional engineering entrypoint; Saturn does not require a separate project manifest.
 
 Create or verify a project with:
 
