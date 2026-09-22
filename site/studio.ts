@@ -294,7 +294,7 @@ export async function mountStudio() {
   function activateServer(snapshot: ServerWorkspaceSnapshot) {
     persist(); runtimeOnly = false; runtimeRevision = null; delete shell.dataset.runtimeOnly; shell.dataset.serverProject = 'true'; ($('project-trigger') as HTMLButtonElement).disabled = false; workspaceSnapshot = snapshot; pendingWorkspaceSnapshot = null;
     documents = new Documents(snapshot.files, editorState, snapshot.files['src/plant.ts'] !== undefined ? 'src/plant.ts' : 'plant.ts'); editor.setState(documents.state);
-    workspaceDraft = { revision, documents }; selected = null; clearConnection(); refresh(false); fitScene(); spatial?.fit();
+    workspaceDraft = { snapshot, documents }; selected = null; clearConnection(); refresh(false); fitScene(); spatial?.fit();
     filesVisible = true; renderMeta(); syncPanels();
   }
   async function loadServer() {
@@ -319,10 +319,10 @@ export async function mountStudio() {
       if (workspaceSnapshot && documents.dirty()) {
         if (snapshot.id !== workspaceSnapshot.id) pendingWorkspaceSnapshot = snapshot;
         renderFiles(); toast(snapshot.id === workspaceSnapshot.id ? 'Workspace snapshot не изменилась' : 'Workspace изменён снаружи. Черновик сохранён.');
-      } else if (workspaceSnapshot?.id === revision.id) toast('Workspace snapshot не изменилась');
+      } else if (workspaceSnapshot?.id === snapshot.id) toast('Workspace snapshot не изменилась');
       else if (!workspaceSnapshot && workspaceDraft?.documents.dirty()) {
         persist(); workspaceSnapshot = workspaceDraft.snapshot; documents = workspaceDraft.documents; editor.setState(documents.state);
-        pendingWorkspaceSnapshot = snapshot.id !== workspaceSnapshot.id ? revision : null; refresh(false); renderMeta(); filesVisible = true; syncPanels();
+        pendingWorkspaceSnapshot = snapshot.id !== workspaceSnapshot.id ? snapshot : null; refresh(false); renderMeta(); filesVisible = true; syncPanels();
       } else activateServer(snapshot);
       serverState.dataset.state = 'ready'; serverState.textContent = `Проверено ${new Date().toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}`;
       $('server-error').textContent = ''; $<HTMLDialogElement>('server-dialog').close();
@@ -719,7 +719,7 @@ export async function mountStudio() {
       }
       if (!fromFiles && (source !== editor.state.doc.toString() || isPlant())) { selected = null; documents = new Documents({ 'station.ts': source }, editorState, 'station.ts'); editor.setState(documents.state); refresh(false); fitScene(); }
       const saved = persist();
-      if (copiedServer) workspaceDraft = { revision: copiedServer, documents: saved && fromFiles ? new Documents(copiedServer.files, editorState, 'plant.ts') : previousServerDocuments };
+      if (copiedServer) workspaceDraft = { snapshot: copiedServer, documents: saved && fromFiles ? new Documents(copiedServer.files, editorState, 'plant.ts') : previousServerDocuments };
       renderFiles(); renderMeta(); setSurface('scene'); setFullscreen(true);
       $<HTMLDialogElement>('project-dialog').close(); toast(saved ? 'Проект создан' : 'Проект открыт в памяти. Хранилище недоступно — скачайте .ts.');
     } catch (e) { $('project-error').textContent = e instanceof Error ? e.message : String(e); }
@@ -839,7 +839,7 @@ export async function mountStudio() {
   $('studio-file').onchange = async () => {
     const input = $<HTMLInputElement>('studio-file'), file = input.files?.[0]; if (!file) return;
     try {
-      if (/\.json$/i.test(file.name)) { await ensurePlant(); const files = JSON.parse(await file.text()); plantTools!.validateFiles(files); plantTools!.plantProjection(files); persist(); const oldServer = workspaceSnapshot; createProject(workspace, file.name.replace(/\.json$/i, '').slice(0,80), files['plant.ts']); if (oldServer) workspaceDraft = { revision: oldServer, documents }; workspaceSnapshot = null; pendingWorkspaceSnapshot = null; updateFiles(workspace, files); switchDocument(workspace.active, false); filesVisible = true; syncPanels(); input.value = ''; return; }
+      if (/\.json$/i.test(file.name)) { await ensurePlant(); const files = JSON.parse(await file.text()); plantTools!.validateFiles(files); plantTools!.plantProjection(files); persist(); const oldServer = workspaceSnapshot; createProject(workspace, file.name.replace(/\.json$/i, '').slice(0,80), files['plant.ts']); if (oldServer) workspaceDraft = { snapshot: oldServer, documents }; workspaceSnapshot = null; pendingWorkspaceSnapshot = null; updateFiles(workspace, files); switchDocument(workspace.active, false); filesVisible = true; syncPanels(); input.value = ''; return; }
       if (file.size > 120000) throw new Error('Размер файла должен быть меньше 120 КБ');
       const source = await file.text(); compile(source); persist(); if (workspaceSnapshot) workspaceDraft = { snapshot: workspaceSnapshot, documents }; createProject(workspace, file.name.replace(/\.ts$/i, '').slice(0, 80) || 'Импорт', source);
       workspaceSnapshot = null; pendingWorkspaceSnapshot = null; documents = new Documents({ 'station.ts': source }, editorState, 'station.ts'); editor.setState(documents.state); selected = null; refresh(false); fitScene(); persist(); renderMeta(); setSurface('scene'); setMode('2d'); toast('Исходник импортирован в новый проект');
