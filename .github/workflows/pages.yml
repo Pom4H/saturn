@@ -44,8 +44,16 @@ jobs:
       # adversarial browser suites and full plant browser evidence are manual
       # diagnostics rather than duplicate per-commit gates.
       - run: npx playwright install --with-deps chromium
-      - name: Capture PLC HMI evidence
-        run: PWA_ONLY_PLC=1 npm run plant:test:browser
+      - name: Capture PLC HMI video
+        run: PWA_HMI_VIDEO=1 npm run plant:test:browser
+
+      - name: Convert HMI video to MP4
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+          ffmpeg -y -i plant-test-results/saturn-wasm-hmi.webm -an -c:v libx264 -pix_fmt yuv420p -movflags +faststart plant-test-results/saturn-wasm-hmi.mp4
 
       - uses: actions/upload-artifact@v7.0.1
         if: always()
