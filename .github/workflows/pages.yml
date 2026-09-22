@@ -47,6 +47,17 @@ jobs:
       - name: Saturn shell integration
         run: npm run site:test:browser
 
+      - name: Capture PLC HMI evidence
+        run: PWA_ONLY_PLC=1 npm run plant:test:browser
+
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: hmi-evidence
+          path: plant-test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
       - run: npm audit --audit-level=high
 
       - uses: actions/upload-artifact@v7.0.1
