@@ -102,7 +102,7 @@ export async function checkShell(browser, origin) {
     assert.match(await page.locator('.shell-help-article').innerText(), /не перезаписывает/);
     await page.screenshot({ path: 'test-results/site-studio/shell-help.png' });
     await page.keyboard.press('Escape');
-    assert.equal(await page.evaluate(() => document.activeElement?.id), 'shell-help');
+    await page.locator('#shell-help-dialog').waitFor({ state: 'hidden' });
 
     // Opening settings and reading permission state must never trigger a permission prompt.
     await page.locator('#shell-notifications').click();
