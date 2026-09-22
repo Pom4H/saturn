@@ -11,25 +11,31 @@ export interface SaturnC23ControllerSource {
 }
 const cId=(value:string)=>value.replace(/[^A-Za-z0-9_]/g,'_').replace(/^[0-9]/,'_$&');
 const ai=/^AI([12])$/,di=/^DI([1-9]|10)$/,ao=/^AO([12])$/,doPin=/^DO([1-9]|10|11)$/;
-function inputRead(ref:string):string{const a=ai.exec(ref);if(a)return `(GetAI(${Number(a[1])-1}) * 100.0)`;const d=di.exec(ref);if(d)return `(GetDI(${Number(d[1])-1}) ? 1.0 : 0.0)`;failCode('SATURN_DSL_UNKNOWN',{kind:'plcInput',name:ref},{input:ref,target:'saturn-c23'});}
+function inputRead(ref:string,scales:Readonly<Record<string,number>>):string{
+ const scale=scales[ref]??1;
+ const scaled=(value:string)=>scale===1?value:`((${value}) * ${Number(scale).toPrecision(17)})`;
+ const a=ai.exec(ref);if(a)return scaled(`GetAI(${Number(a[1])-1})`);
+ const d=di.exec(ref);if(d)return scaled(`(GetDI(${Number(d[1])-1}) ? 1.0 : 0.0)`);
+ failCode('SATURN_DSL_UNKNOWN',{kind:'plcInput',name:ref},{input:ref,target:'saturn-c23'});
+}
 function outputRead(ref:string):string{const a=ao.exec(ref);if(a)return `GetAO(${Number(a[1])-1})`;const d=doPin.exec(ref);if(d)return `(GetDO(${Number(d[1])-1}) ? 1.0 : 0.0)`;failCode('SATURN_DSL_UNKNOWN',{kind:'plcOutput',name:ref},{output:ref,target:'saturn-c23'});}
-function blockExpression(name:string,block:PlcBlock,c:Controller,stack:Set<string>):string{
- const args=block.inputs.map(arg=>expression(arg,c,new Set(stack)));
+function blockExpression(name:string,block:PlcBlock,c:Controller,stack:Set<string>,scales:Readonly<Record<string,number>>):string{
+ const args=block.inputs.map(arg=>expression(arg,c,new Set(stack),scales));
  switch(block.type){case'OR':return '('+args.map(arg=>`(${arg} != 0.0)`).join(' || ')+' ? 1.0 : 0.0)';case'XOR':return '(('+args.map(arg=>`(${arg} != 0.0)`).join(' != ')+') ? 1.0 : 0.0)';case'EQ':return '('+args[0]+' == '+args[1]+' ? 1.0 : 0.0)';case'LIM':return `saturn_min(saturn_max(${args[0]},${args[1]}),${args[2]})`;case'SUM':case'SUMM':return '('+args.join(' + ')+')';default:failCode('SATURN_PLC_INVALID',{reason:'unsupportedOperator'},{target:'saturn-c23',block:name,blockType:block.type});}
 }
-function expression(expr:Expr,c:Controller,stack=new Set<string>()):string{
+function expression(expr:Expr,c:Controller,stack=new Set<string>(),scales:Readonly<Record<string,number>>={}):string{
  if(typeof expr==='number')return Number.isInteger(expr)?String(expr):Number(expr).toPrecision(17);if(typeof expr==='boolean')return expr?'1.0':'0.0';
- if('ref'in expr){if(Object.hasOwn(c.setpoints??{},expr.ref))return `saturn_sp_${cId(expr.ref)}`;if(ai.test(expr.ref)||di.test(expr.ref))return inputRead(expr.ref);if(ao.test(expr.ref)||doPin.test(expr.ref))return outputRead(expr.ref);const block=c.blocks?.[expr.ref];if(block){if(stack.has(expr.ref))failCode('SATURN_PLC_INVALID',{reason:'cycle'},{block:expr.ref,target:'saturn-c23'});stack.add(expr.ref);const value=blockExpression(expr.ref,block,c,stack);stack.delete(expr.ref);return value;}failCode('SATURN_DSL_UNKNOWN',{kind:'plcReference',name:expr.ref},{ref:expr.ref,target:'saturn-c23'});}
- const args=expr.args.map(arg=>expression(arg,c,new Set(stack)));switch(expr.op){case'add':return '('+args.join(' + ')+')';case'mul':return '('+args.join(' * ')+')';case'sub':return '('+args[0]+' - '+args[1]+')';case'div':return `saturn_safe_div(${args[0]},${args[1]})`;case'min':return args.reduce((a,b)=>`saturn_min(${a},${b})`);case'max':return args.reduce((a,b)=>`saturn_max(${a},${b})`);case'gt':return '('+args[0]+' > '+args[1]+' ? 1.0 : 0.0)';case'lt':return '('+args[0]+' < '+args[1]+' ? 1.0 : 0.0)';case'not':return '('+args[0]+' == 0.0 ? 1.0 : 0.0)';case'and':return '('+args.map(arg=>`(${arg} != 0.0)`).join(' && ')+' ? 1.0 : 0.0)';}
+ if('ref'in expr){if(Object.hasOwn(c.setpoints??{},expr.ref))return `saturn_sp_${cId(expr.ref)}`;if(ai.test(expr.ref)||di.test(expr.ref))return inputRead(expr.ref,scales);if(ao.test(expr.ref)||doPin.test(expr.ref))return outputRead(expr.ref);const block=c.blocks?.[expr.ref];if(block){if(stack.has(expr.ref))failCode('SATURN_PLC_INVALID',{reason:'cycle'},{block:expr.ref,target:'saturn-c23'});stack.add(expr.ref);const value=blockExpression(expr.ref,block,c,stack,scales);stack.delete(expr.ref);return value;}failCode('SATURN_DSL_UNKNOWN',{kind:'plcReference',name:expr.ref},{ref:expr.ref,target:'saturn-c23'});}
+ const args=expr.args.map(arg=>expression(arg,c,new Set(stack),scales));switch(expr.op){case'add':return '('+args.join(' + ')+')';case'mul':return '('+args.join(' * ')+')';case'sub':return '('+args[0]+' - '+args[1]+')';case'div':return `saturn_safe_div(${args[0]},${args[1]})`;case'min':return args.reduce((a,b)=>`saturn_min(${a},${b})`);case'max':return args.reduce((a,b)=>`saturn_max(${a},${b})`);case'gt':return '('+args[0]+' > '+args[1]+' ? 1.0 : 0.0)';case'lt':return '('+args[0]+' < '+args[1]+' ? 1.0 : 0.0)';case'not':return '('+args[0]+' == 0.0 ? 1.0 : 0.0)';case'and':return '('+args.map(arg=>`(${arg} != 0.0)`).join(' && ')+' ? 1.0 : 0.0)';}
 }
 function outputWrite(pin:string,value:string):string{const a=ao.exec(pin);if(a)return `    SetAO(${Number(a[1])-1},(float)(${value}));`;const d=doPin.exec(pin);if(d)return `    SetDO(${Number(d[1])-1},(${value}) != 0.0);`;failCode('SATURN_DSL_UNKNOWN',{kind:'plcOutput',name:pin},{output:pin,target:'saturn-c23'});}
-function signalExpression(signal:string,c:Controller):string{const local=signal.startsWith(c.id+'.')?signal.slice(c.id.length+1):signal;if(Object.hasOwn(c.setpoints??{},local))return `saturn_sp_${cId(local)}`;if(ai.test(local)||di.test(local))return inputRead(local);if(ao.test(local)||doPin.test(local))return outputRead(local);const block=c.blocks?.[local];if(block)return blockExpression(local,block,c,new Set([local]));failCode('SATURN_DSL_UNKNOWN',{kind:'targetSignal',name:signal},{signal,target:'saturn-c23',controllerId:c.id});}
-export function compileSaturnC23Controller(c:Controller,signals:readonly SaturnC23SignalSlot[]):SaturnC23ControllerSource{
+function signalExpression(signal:string,c:Controller,scales:Readonly<Record<string,number>>):string{const local=signal.startsWith(c.id+'.')?signal.slice(c.id.length+1):signal;if(Object.hasOwn(c.setpoints??{},local))return `saturn_sp_${cId(local)}`;if(ai.test(local)||di.test(local))return inputRead(local,scales);if(ao.test(local)||doPin.test(local))return outputRead(local);const block=c.blocks?.[local];if(block)return blockExpression(local,block,c,new Set([local]),scales);failCode('SATURN_DSL_UNKNOWN',{kind:'targetSignal',name:signal},{signal,target:'saturn-c23',controllerId:c.id});}
+export function compileSaturnC23Controller(c:Controller,signals:readonly SaturnC23SignalSlot[],inputScales:Readonly<Record<string,number>>={}):SaturnC23ControllerSource{
  const outputs=Object.entries(c.outputs).sort(([a],[b])=>a.localeCompare(b));
  const setpoints=Object.entries(c.setpoints??{}).sort(([a],[b])=>a.localeCompare(b)).map(([name,sp],index)=>({name,index,min:sp.min,max:sp.max,step:sp.step??1,initial:sp.initial}));
  const spDecl=setpoints.map(sp=>`static double saturn_sp_${cId(sp.name)} = ${sp.initial};`);
- const writes=outputs.map(([pin,expr])=>outputWrite(pin,expression(expr,c)));
- const slotCases=signals.map(({slot,signal})=>`        case ${slot}: return ${signalExpression(signal,c)};`);
+ const writes=outputs.map(([pin,expr])=>outputWrite(pin,expression(expr,c,new Set(),inputScales)));
+ const slotCases=signals.map(({slot,signal})=>`        case ${slot}: return ${signalExpression(signal,c,inputScales)};`);
  const spGet=setpoints.map(sp=>`        case ${sp.index}: return saturn_sp_${cId(sp.name)};`);
  const spSet=setpoints.map(sp=>`        case ${sp.index}: saturn_sp_${cId(sp.name)}=saturn_min(${sp.max},saturn_max(${sp.min},value)); return;`);
  const spAdjust=setpoints.map(sp=>`        case ${sp.index}: saturn_program_setpoint_set(${sp.index},saturn_sp_${cId(sp.name)} + steps * ${sp.step}); return;`);

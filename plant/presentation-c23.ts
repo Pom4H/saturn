@@ -133,6 +133,10 @@ ${init.join('\n')}
 void saturn_hmi_update(void) {
 ${update.join('\n')}
 }
+
+gui_screen_t *saturn_hmi_screen(void) {
+    return saturn_main_screen;
+}
 `;
 
     return {

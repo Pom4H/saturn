@@ -51,6 +51,7 @@ test('physical Saturn target is one C23 program containing control I/O and satgu
  assert.match(source.files['controller.c'],/GetAI\(0\) \* 100\.0/);
  assert.match(source.files['controller.c'],/SetDO\(0,/);
  assert.match(source.files['hmi.c'],/#include <satgui\.h>/);
+ assert.match(source.files['hmi.c'],/gui_screen_t \*saturn_hmi_screen\(void\)/);
  assert.match(source.files['main.c'],/gui_process\(50\)/);
  assert.match(source.files['shell.c'],/linkdown=shell_io/);
  assert.match(source.files['shell.c'],/linkright=shell_device_0/);

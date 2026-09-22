@@ -65,36 +65,34 @@ jobs:
           Get-ChildItem issue29-generated -File | Sort-Object Name | Format-Table Name,Length -AutoSize
           Get-Content issue29-generated\manifest.json
 
-      - name: Inspect official Saturn C23 installers
+      - name: Extract official Saturn toolchain without installer UI
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force issue29-evidence | Out-Null
           $gccInstaller = Join-Path $env:RUNNER_TEMP 'risc-v-gcc13.2.0.exe'
           $sdkInstaller = Join-Path $env:RUNNER_TEMP 'sat-sdk-setup.exe'
+          $innoZip = Join-Path $env:RUNNER_TEMP 'innoextract.zip'
+          $innoDir = Join-Path $env:RUNNER_TEMP 'innoextract'
+          $gccDir = Join-Path $env:RUNNER_TEMP 'saturn-riscv'
+          $sdkDir = Join-Path $env:RUNNER_TEMP 'saturn-sdk'
           curl.exe -fL --retry 3 https://www.mnppsaturn.ru/update/satsdk/risc-v-gcc13.2.0.exe -o $gccInstaller
           curl.exe -fL --retry 3 https://www.mnppsaturn.ru/update/satsdk/sat-sdk-setup.exe -o $sdkInstaller
-          Get-FileHash $gccInstaller,$sdkInstaller -Algorithm SHA256 | Format-Table -AutoSize | Out-String -Width 500 | Tee-Object -FilePath issue29-evidence\installer-sha256.txt
-          Get-Item $gccInstaller,$sdkInstaller | Select-Object FullName,Length,@{N='ProductName';E={$_.VersionInfo.ProductName}},@{N='FileDescription';E={$_.VersionInfo.FileDescription}},@{N='CompanyName';E={$_.VersionInfo.CompanyName}},@{N='FileVersion';E={$_.VersionInfo.FileVersion}} | Format-Table -AutoSize | Out-String -Width 500 | Tee-Object -FilePath issue29-evidence\installer-version-info.txt
-          $seven = (Get-Command 7z.exe -ErrorAction SilentlyContinue).Source
-          if (-not $seven -and (Test-Path 'C:\Program Files\7-Zip\7z.exe')) { $seven = 'C:\Program Files\7-Zip\7z.exe' }
-          if ($seven) {
-            "7Z=$seven" | Out-File issue29-evidence\extractor.txt -Encoding utf8
-            & $seven l -slt $gccInstaller | Out-File issue29-evidence\gcc-archive.txt -Encoding utf8
-            & $seven l -slt $sdkInstaller | Out-File issue29-evidence\sdk-archive.txt -Encoding utf8
-            Get-Content issue29-evidence\gcc-archive.txt | Select-Object -First 180
-            Get-Content issue29-evidence\sdk-archive.txt | Select-Object -First 180
-          } else {
-            '7-Zip not found' | Tee-Object -FilePath issue29-evidence\extractor.txt
-          }
-          $ascii = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($gccInstaller))
-          [regex]::Matches($ascii, '[ -~]{8,}') | ForEach-Object Value | Where-Object { $_ -match 'Inno|NSIS|Nullsoft|7-Zip|SFX|silent|install|gcc|riscv' } | Select-Object -Unique -First 100 | Out-File issue29-evidence\gcc-strings.txt -Encoding utf8
-          $ascii = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($sdkInstaller))
-          [regex]::Matches($ascii, '[ -~]{8,}') | ForEach-Object Value | Where-Object { $_ -match 'Inno|NSIS|Nullsoft|7-Zip|SFX|silent|install|sat|sdk' } | Select-Object -Unique -First 100 | Out-File issue29-evidence\sdk-strings.txt -Encoding utf8
-          Get-Content issue29-evidence\installer-version-info.txt
-          Get-Content issue29-evidence\extractor.txt
+          curl.exe -fL --retry 3 https://github.com/dscharrer/innoextract/releases/download/1.9/innoextract-1.9-windows.zip -o $innoZip
+          Remove-Item $innoDir,$gccDir,$sdkDir -Recurse -Force -ErrorAction SilentlyContinue
+          Expand-Archive $innoZip -DestinationPath $innoDir
+          $inno = Get-ChildItem $innoDir -File -Recurse -Filter innoextract.exe | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $inno) { throw 'innoextract.exe not found' }
+          & $inno -d $gccDir $gccInstaller
+          if ($LASTEXITCODE -ne 0) { throw "innoextract GCC exited $LASTEXITCODE" }
+          & $inno -d $sdkDir $sdkInstaller
+          if ($LASTEXITCODE -ne 0) { throw "innoextract SDK exited $LASTEXITCODE" }
+          "GCC_DIR=$gccDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "SDK_DIR=$sdkDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "GCC_DIR=$gccDir" | Out-File issue29-evidence\toolchain.txt -Encoding utf8
+          "SDK_DIR=$sdkDir" | Out-File issue29-evidence\toolchain.txt -Encoding utf8 -Append
+          Get-FileHash $gccInstaller,$sdkInstaller,$inno -Algorithm SHA256 | Format-Table -AutoSize | Out-String -Width 500 | Out-File issue29-evidence\toolchain-sha256.txt -Encoding utf8
 
       - name: Inventory exact SDK build surface
-        if: ${{ env.SDK_DIR != '' && env.GCC_DIR != '' }}
         run: |
           $ErrorActionPreference = 'Stop'
           $gcc = Get-ChildItem $env:GCC_DIR -File -Recurse -Filter '*gcc*.exe' | Sort-Object FullName
