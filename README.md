@@ -6,7 +6,7 @@ Saturn is an open-source engineering IDE and runtime for physical systems. Descr
 
 ![Saturn turns one typed engineering model into HMI, signals, history, reports, PLC bindings and deployment](docs/assets/saturn-domain-model.svg)
 
-[Open browser editor](https://pom4h.github.io/saturn/) · [DSL reference](docs/plant/dsl.md) · [Architecture](docs/adr/0001-saturn-system-architecture.md) · [Product & interface system](docs/design-system.md) · [Element packs](docs/developer/element-packs.md) · [Developer guide](docs/developer/language-tooling.md) · [Changelog](CHANGELOG.md)
+[Open browser editor](https://pom4h.github.io/saturn/) · [DSL reference](docs/plant/dsl.md) · [Architecture](docs/adr/0008-conventions-first-artifact-runtime.md) · [Product & interface system](docs/design-system.md) · [Element packs](docs/developer/element-packs.md) · [Developer guide](docs/developer/language-tooling.md) · [Changelog](CHANGELOG.md)
 
 ## The project is the model
 
@@ -105,7 +105,7 @@ Git is source history for the engineering workspace. A content-addressed BuildAr
 
 An engineering Saturn can connect to an operator Saturn while keeping source, Git and package tooling local. The UI shows source SHA, build hash, published artifact and applied artifact independently.
 
-See [Standalone Saturn](docs/standalone.md) and [ADR-0001](docs/adr/0001-saturn-system-architecture.md).
+See [Standalone Saturn](docs/standalone.md) and [ADR-0008](docs/adr/0008-conventions-first-artifact-runtime.md).
 
 ## Use Saturn where you engineer
 
@@ -194,7 +194,7 @@ npm run saturn -- pack --target windows-x64
 
 Useful documentation:
 
-- [Saturn system architecture](docs/adr/0001-saturn-system-architecture.md)
+- [Saturn system architecture](docs/adr/0008-conventions-first-artifact-runtime.md)
 - [Package and DSL names](docs/adr/0004-package-and-dsl-names.md)
 - [TypeScript DSL and language tooling](docs/developer/language-tooling.md)
 - [Standalone application](docs/standalone.md)

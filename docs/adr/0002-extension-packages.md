@@ -1,8 +1,12 @@
 # ADR-0002: Extension packages and trust model
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0008](0008-conventions-first-artifact-runtime.md)
 - **Date:** 2026-09-20
 - **Depends on:** ADR-0001
+
+## Supersession
+
+The installation-scoped extension store/installer described below was removed. Saturn now prefers source copied into the project through the registry; ordinary package dependencies are used only when code is intentionally external and shared. This ADR remains as negative knowledge.
 
 ## Context
 

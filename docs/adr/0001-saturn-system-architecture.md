@@ -1,9 +1,13 @@
 # ADR-0001: Saturn system architecture
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0008](0008-conventions-first-artifact-runtime.md)
 - **Date:** 2026-09-20
 - **Decision owners:** Saturn maintainers
 - **Scope:** application, projects, Git/release flow, runtime authority, instance-to-instance communication, persistence, extensions and updates
+
+## Supersession
+
+ADR-0008 replaces the runtime-owned Git/release tracking and installed-extension assumptions below with a conventions-first project, immutable BuildArtifact deployment boundary, and project-owned registry. This document remains as negative knowledge: do not reintroduce these discarded ownership boundaries without new evidence.
 
 ## Context
 
