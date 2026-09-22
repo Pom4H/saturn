@@ -242,7 +242,7 @@ export type ControllerRef<ID extends string = string, O extends Record<string, E
 
 /** Installed PLC profile. Program refs are terminal names, not arbitrary signal expressions. */
 export function plc<const ID extends string, const O extends Record<string,Expr>>(name:ID, options:Omit<Controller,'id'|'layout'|'profile'|'outputs'> & {at:Layout;outputs:O}): ControllerRef<ID,O> {
- const controller:Controller={id:id(name),profile:'saturn-fbd',system:options.system,layout:options.at,outputs:options.outputs,blocks:options.blocks,hmi:options.hmi};
+ const controller:Controller={id:id(name),profile:'saturn-fbd',system:options.system,layout:options.at,outputs:options.outputs,blocks:options.blocks,setpoints:options.setpoints,hmi:options.hmi};
  return Object.assign({
    id:controller.id as ID,
    profile:controller.profile,
@@ -254,6 +254,8 @@ export function plc<const ID extends string, const O extends Record<string,Expr>
  },Object.fromEntries(Object.keys(options.outputs).map(k=>[k,createSignalRef(`${name}.${k}`,'number','')]))) as ControllerRef<ID,O>;
 }
 export const pin=<const ID extends string>(name:ID):SignalRef<ID,number,'','unknown'>=>createSignalRef(id(name) as ID,'number','','unknown');
+/** PLC-local physical setpoint reference. Lowered to a Firmverse SP element at target compile time. */
+export const setpoint=<const ID extends string>(name:ID):SignalRef<ID,number,'','unknown'>=>createSignalRef(id(name) as ID,'number','','unknown');
 export function port<M,ID extends string,Kind extends string,P extends keyof PortsOf<M,ID>&string>(device:SimRef<M,ID,Kind>,name:P):PortsOf<M,ID>[P];
 export function port<ID extends string,O extends Record<string,Expr>,P extends keyof PortRefs<'saturn',ID>&string>(device:ControllerRef<ID,O>,name:P):PortRefs<'saturn',ID>[P];
 export function port(device:string|Device,name:string):DynamicEndpoint;
