@@ -83,11 +83,10 @@ try {
   # explicitly dismiss it instead of accidentally capturing it as HMI evidence.
   Start-Sleep -Seconds 1
   $cancelRu = -join ([char[]](0x41e,0x442,0x43c,0x435,0x43d,0x438,0x442,0x44c))
-  $firewall = Find-DesktopButton @($cancelRu,'Cancel')
-  if ($null -ne $firewall) {
-    if (-not (Invoke-AutomationButton $firewall)) { throw 'Could not dismiss Windows Firewall dialog' }
-    Start-Sleep -Milliseconds 500
-  }
+  # Escape maps to Cancel on the Windows Firewall consent dialog. If no
+  # consent dialog is present it is harmless to the emulator main window.
+  [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+  Start-Sleep -Milliseconds 500
 
   [Win32Saturn]::SetForegroundWindow($proc.MainWindowHandle) | Out-Null
   [System.Windows.Forms.SendKeys]::SendWait('{F9}')
