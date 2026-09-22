@@ -21,6 +21,8 @@ let client: Connection, status: Status, frame: Frame, scene: SceneView, system =
 let scene3d: SceneView3D | undefined, viewMode: '2d' | '3d' = '2d', changingView = false;
 type BeforeInstallPromptEvent = Event & { prompt(): Promise<void> };
 let registration: ServiceWorkerRegistration | undefined, pendingInstall: BeforeInstallPromptEvent | undefined, noticeEnabled = false, closed = false;
+type ApplicationUpdateStatus = { configured: boolean; available: boolean; currentVersion: string | null; version?: string; channel?: string; publishedAt?: string; target?: string };
+let applicationUpdate: ApplicationUpdateStatus | null = null;
 const fmt = (v: number | null | undefined, digits = 2) => typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—';
 const runtimeRole = () => status?.runtimeActor?.role ?? status?.actor?.role ?? 'viewer';
 const time = (v: number | null | undefined) => v ? new Date(v).toLocaleString('ru-RU') : '—';
