@@ -42,7 +42,7 @@ export async function checkFiles(browser, origin) {
   await page.locator('[data-file="systems/pumping.ts"]').click();
   assert((await source.innerText()).includes('inertia: 2.4'), 'Local multi-file source survives reload');
   // The real server contract, including authentication errors and changing immutable revisions.
-  let revision = { id: 'revision-one', parent: null, actor: 'engineer', time: 1, message: 'Initial', files: fixture }, denied = true;
+  let revision = { id: 'artifact-one', sourceRevision: 'source-one', actor: 'engineer', time: 1, message: 'Initial', files: fixture }, denied = true;
   await page.route('**/plant/api/session', async route => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
       actor: { id: 'engineer', role: 'engineer' }, mode: 'simulation',
@@ -51,7 +51,7 @@ export async function checkFiles(browser, origin) {
       head: revision.id, desired: revision.id, healthy: true, releaseError: '', overrides: {}, csrf: 'fixture-csrf',
     }) });
   });
-  await page.route('**/plant/api/project', async route => {
+  await page.route('**/plant/api/workspace', async route => {
     assert.equal(route.request().method(), 'GET');
     await route.fulfill({ status: denied ? 403 : 200, contentType: 'application/json', body: JSON.stringify(denied ? { error: 'permission' } : revision) });
   });
@@ -66,7 +66,7 @@ export async function checkFiles(browser, origin) {
   await inertia.fill('3.2'); await inertia.press('Tab');
   assert.equal(await page.evaluate(() => window.dispatchEvent(new Event('saturn-before-update', { cancelable: true }))), false, 'Update must not discard dirty server source');
   assert.equal(await page.evaluate(() => localStorage.getItem('saturn.shell.workspace.v1')), before, 'Server sources must not silently persist to public local workspace');
-  revision = { ...revision, id: 'revision-two', parent: 'revision-one', files: { ...fixture, 'systems/pumping.ts': fixture['systems/pumping.ts'].replace('inertia: 2.4', 'inertia: 4.8') } };
+  revision = { ...revision, id: 'artifact-two', sourceRevision: 'source-two', files: { ...fixture, 'systems/pumping.ts': fixture['systems/pumping.ts'].replace('inertia: 2.4', 'inertia: 4.8') } };
   await page.locator('#server-refresh').click();
   await page.waitForSelector('#server-update', { state: 'visible' });
   assert(await page.locator('#server-apply').isDisabled()); assert.equal(await inertia.inputValue(), '3.2');
