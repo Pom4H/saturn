@@ -15,6 +15,7 @@ on:
       - 'plant/demo/**'
       - 'plant/tests/presentation.test.ts'
       - 'scripts/architecture-invariants.mjs'
+      - 'scripts/saturn-c23-source.mjs'
       - '.github/workflows/issue-29-c23.yml'
   workflow_dispatch:
 
@@ -36,6 +37,16 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Generate C23 target from canonical demo project
+        run: |
+          node scripts/saturn-c23-source.mjs issue29-generated SATURN-1
+          Get-ChildItem issue29-generated -File | Sort-Object Name | Format-Table Name,Length -AutoSize
+          Get-Content issue29-generated\manifest.json
 
       - name: Install official Saturn C23 toolchain
         run: |
@@ -87,5 +98,7 @@ jobs:
         if: always()
         with:
           name: saturn-c23-sdk-evidence
-          path: issue29-evidence/
+          path: |
+            issue29-evidence/
+            issue29-generated/
           retention-days: 7
