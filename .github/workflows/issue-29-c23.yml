@@ -1,52 +1,34 @@
-name: Issue 29 C23 target evidence
+name: Saturn C23 target gate
 
 on:
   push:
     branches:
-      - issue/29-c23-satgui
+      - refactor/conventions-first
     paths:
       - 'plant/presentation-c23.ts'
       - 'plant/controller-c23.ts'
-      - 'plant/dsl-reference.ts'
-      - 'plant/i18n.ts'
-      - 'plant/presentation-target.ts'
+      - 'plant/saturn-shell-c23.ts'
       - 'plant/targets/saturn-plc-c23.ts'
+      - 'plant/presentation-target.ts'
       - 'plant/controller.ts'
+      - 'plant/dsl.ts'
+      - 'plant/demo/**'
       - 'plant/tests/presentation.test.ts'
       - 'scripts/architecture-invariants.mjs'
       - '.github/workflows/issue-29-c23.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: issue-29-c23
+  group: saturn-c23-target-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  verify:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@v7.0.0
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: .bun-version
-      - run: npm ci
-      - run: npm run plant:typecheck
-      - run: npm run plant:build
-      - run: npm run plant:test
-      - run: npm run architecture:check
-
-  sdk-probe:
+  vendor-sdk:
     runs-on: [self-hosted, windows]
-    timeout-minutes: 10
+    timeout-minutes: 15
     defaults:
       run:
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File "{0}"
@@ -54,28 +36,11 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-      - name: Locate existing Saturn C23 SDK
-        run: |
-          $roots = @(
-            'C:\Program Files',
-            'C:\Program Files (x86)',
-            $env:LOCALAPPDATA,
-            $env:USERPROFILE
-          ) | Where-Object { $_ -and (Test-Path $_) }
-          Get-Command *riscv*gcc* -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
-          foreach ($root in $roots) {
-            Get-ChildItem -Path $root -File -Recurse -ErrorAction SilentlyContinue |
-              Where-Object { $_.Name -match '^(satgui.*\.h|.*satstd.*\.h|.*riscv.*gcc.*\.exe)$' } |
-              Select-Object -First 100 -ExpandProperty FullName
-          }
-      - name: Fetch official C23 API manual
-        run: |
-          New-Item -ItemType Directory -Force issue29-evidence | Out-Null
-          curl.exe -fL --retry 3 https://www.mnppsaturn.ru/update/satsdk/SatPlcImit.pdf -o issue29-evidence\SatPlcImit.pdf
-          Get-FileHash issue29-evidence\SatPlcImit.pdf -Algorithm SHA256
-      - name: Install official Saturn C23 toolchain in runner temp
+
+      - name: Install official Saturn C23 toolchain
         run: |
           $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force issue29-evidence | Out-Null
           $gccDir = Join-Path $env:RUNNER_TEMP 'saturn-riscv'
           $sdkDir = Join-Path $env:RUNNER_TEMP 'saturn-sdk'
           $gccInstaller = Join-Path $env:RUNNER_TEMP 'risc-v-gcc13.2.0.exe'
@@ -87,23 +52,40 @@ jobs:
           if ($gcc.ExitCode -ne 0) { throw "RISC-V installer exited $($gcc.ExitCode)" }
           $sdk = Start-Process -FilePath $sdkInstaller -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-',('/DIR=' + $sdkDir)) -Wait -PassThru
           if ($sdk.ExitCode -ne 0) { throw "SatSDK installer exited $($sdk.ExitCode)" }
+          "GCC_DIR=$gccDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "SDK_DIR=$sdkDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           "GCC_DIR=$gccDir" | Out-File issue29-evidence\toolchain.txt -Encoding utf8
           "SDK_DIR=$sdkDir" | Out-File issue29-evidence\toolchain.txt -Encoding utf8 -Append
-          Get-ChildItem $gccDir,$sdkDir -File -Recurse |
-            Where-Object { $_.Name -match '(gcc|make|satgui|satmio|satkbd|\.a$|\.ld$|\.json$|\.code-workspace$|\.bat$|\.cmd$)' } |
-            Select-Object -First 400 FullName,Length |
-            Format-Table -AutoSize | Out-String -Width 500 |
-            Out-File issue29-evidence\inventory.txt -Encoding utf8
-          Get-ChildItem $gccDir -File -Recurse -Filter '*gcc*.exe' |
-            Select-Object -First 20 -ExpandProperty FullName |
-            Out-File issue29-evidence\gcc-paths.txt -Encoding utf8
-          Get-ChildItem $sdkDir -File -Recurse |
-            Where-Object { $_.Name -match '(Makefile|tasks\.json|c_cpp_properties\.json|\.bat$|\.cmd$)' } |
-            Select-Object -First 200 -ExpandProperty FullName |
-            Out-File issue29-evidence\build-files.txt -Encoding utf8
+          curl.exe -fL --retry 3 https://www.mnppsaturn.ru/update/satsdk/SatPlcImit.pdf -o issue29-evidence\SatPlcImit.pdf
+          Get-FileHash issue29-evidence\SatPlcImit.pdf -Algorithm SHA256 | Format-List | Out-String | Tee-Object -FilePath issue29-evidence\manual-sha256.txt
+
+      - name: Inventory exact SDK build surface
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $gcc = Get-ChildItem $env:GCC_DIR -File -Recurse -Filter '*gcc*.exe' | Sort-Object FullName
+          $headers = Get-ChildItem $env:SDK_DIR -File -Recurse | Where-Object { $_.Name -match '^(satgui|satmio|satkbd|satplc|satscr).*\.h$' } | Sort-Object FullName
+          $build = Get-ChildItem $env:SDK_DIR -File -Recurse | Where-Object { $_.Name -match '^(Makefile|tasks\.json|c_cpp_properties\.json|.*\.bat|.*\.cmd)$' } | Sort-Object FullName
+          $libs = Get-ChildItem $env:SDK_DIR -File -Recurse | Where-Object { $_.Extension -in '.a','.ld' } | Sort-Object FullName
+          $gcc | Select-Object FullName,Length | Format-Table -AutoSize | Out-String -Width 500 | Tee-Object -FilePath issue29-evidence\gcc-paths.txt
+          $headers | Select-Object FullName,Length | Format-Table -AutoSize | Out-String -Width 500 | Tee-Object -FilePath issue29-evidence\headers.txt
+          $build | Select-Object FullName,Length | Format-Table -AutoSize | Out-String -Width 500 | Tee-Object -FilePath issue29-evidence\build-files.txt
+          $libs | Select-Object FullName,Length | Format-Table -AutoSize | Out-String -Width 500 | Tee-Object -FilePath issue29-evidence\libraries.txt
+          foreach ($file in $headers) {
+            "===== $($file.FullName) =====" | Out-File issue29-evidence\sdk-surface.txt -Encoding utf8 -Append
+            Get-Content $file.FullName | Select-Object -First 260 | Out-File issue29-evidence\sdk-surface.txt -Encoding utf8 -Append
+          }
+          foreach ($file in ($build | Select-Object -First 40)) {
+            "===== $($file.FullName) =====" | Out-File issue29-evidence\build-surface.txt -Encoding utf8 -Append
+            Get-Content $file.FullName -ErrorAction SilentlyContinue | Select-Object -First 260 | Out-File issue29-evidence\build-surface.txt -Encoding utf8 -Append
+          }
+          Get-Content issue29-evidence\gcc-paths.txt
+          Get-Content issue29-evidence\headers.txt
+          Get-Content issue29-evidence\build-files.txt
+          Get-Content issue29-evidence\libraries.txt
+
       - uses: actions/upload-artifact@v7.0.1
         if: always()
         with:
-          name: issue29-saturn-c23-sdk-evidence
+          name: saturn-c23-sdk-evidence
           path: issue29-evidence/
           retention-days: 7
