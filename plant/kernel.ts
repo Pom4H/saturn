@@ -1,4 +1,5 @@
-import { ControllerVM, inputPins, CONTROLLER_ABI } from './controller';
+import { ControllerVM, inputPins, CONTROLLER_ABI, initialControllerScreen, type ControllerKey } from './controller';
+import { shellKey } from './plc-shell';
 import { connectionExpression, terminals, busConnected, type Terminal } from './ports';
 import { model } from './models';
 import { clone, finite, type Checkpoint, type Expr, type Frame, type Project, type Sample } from './types';
@@ -16,9 +17,10 @@ export class Kernel {
         this.state.controllerAbi=CONTROLLER_ABI;
         this.state.plc ??= {};
         for(const c of project.controllers??[]) {
-            const vm=new ControllerVM(c); this.controllers.set(c.id,vm);
+            const vm=new ControllerVM(c,project); this.controllers.set(c.id,vm);
             const saved=this.state.plc[c.id];if(saved?.snapshot)vm.restore(saved.snapshot);else if(checkpoint)failCode('SATURN_RUNTIME_INVALID',{reason:'missing'},{field:'controller.snapshot',controller:c.id});
-            this.state.plc[c.id] ??= {inputs:{},outputs:Object.fromEntries(Object.keys(c.outputs).map(k=>[k,0])),healthy:false,powered:false,snapshot:vm.snapshot()};
+            this.state.plc[c.id] ??= {inputs:{},outputs:Object.fromEntries(Object.keys(c.outputs).map(k=>[k,0])),healthy:false,powered:false,screen:initialControllerScreen(c,project),snapshot:vm.snapshot()};
+            if(!Number.isInteger(this.state.plc[c.id].screen))this.state.plc[c.id].screen=initialControllerScreen(c,project);
         }
         this.state.controls ??= {};
         for (const c of project.controls ?? []) {
@@ -143,8 +145,9 @@ export class Kernel {
                 let healthy=powered&&common!==null&&minus!==null&&Math.abs(common-minus)<.001;
                 for(const name of vm.artifact.inputs){const v=read(name);if(v===null||!Number.isFinite(v)||v< -2147483648||v>2147483647)healthy=false;else inputs[name]=Math.round(v);}
                 if(!powered&&this.state.plc![c.id].powered)vm.reset();
-                const scan=healthy?vm.scan(inputs,this.project.stepMs):{outputs:Object.fromEntries(Object.keys(c.outputs).map(k=>[k,0])),hmi:[]};
-                this.state.plc![c.id]={inputs,outputs:scan.outputs,display:scan.hmi,healthy,powered,snapshot:vm.snapshot()};
+                const screen=this.state.plc![c.id].screen;
+                const scan=healthy?vm.scan(inputs,this.project.stepMs,screen):{outputs:Object.fromEntries(Object.keys(c.outputs).map(k=>[k,0])),hmi:[]};
+                this.state.plc![c.id]={inputs,outputs:scan.outputs,display:scan.hmi,healthy,powered,screen,snapshot:vm.snapshot()};
             }
             this.bad = bad;
             this.state.invalidModels = [...bad];
@@ -158,7 +161,16 @@ export class Kernel {
         // Observation must never advance the PLC. Every consumer sees the image
         // produced by the last scan, including while paused or after restoration.
         for(const id of this.controllers.keys()){const saved=this.state.plc![id];displays[id]=saved.healthy?clone(saved.display??[]):[];}
-        return { displays, runId: this.state.runId, revision: this.state.revision, seq: this.state.seq, time: this.state.time, paused: this.state.paused, synthetic: true, samples: this.samples(), alarms: [] }; }
+        return { displays, controllerScreens:Object.fromEntries([...this.controllers.keys()].map(id=>[id,this.state.plc![id].screen])), runId: this.state.runId, revision: this.state.revision, seq: this.state.seq, time: this.state.time, paused: this.state.paused, synthetic: true, samples: this.samples(), alarms: [] }; }
+    controllerKey(target:string,key:string):void {
+        const controller=this.project.controllers?.find(c=>c.id===target),state=this.state.plc?.[target];
+        if(!controller||!state)failCode('SATURN_NOT_FOUND',{resource:'plc',id:target},{target});
+        if(!['up','down','left','right'].includes(key))failCode('SATURN_PLC_INVALID',{reason:'invalid'},{field:'hmi.key',key});
+        if(!controller.hmi.shell?.auto)return;
+        const action=shellKey(this.project,target,state.screen,key as ControllerKey);
+        state.screen=action.screen;
+        if(action.setpoint){const vm=this.controllers.get(target)!;vm.setSetpoint(action.setpoint,action.value);state.snapshot=vm.snapshot();}
+    }
     operate(target: string, value: number): void {
         const c = this.project.controls?.find(c => c.id === target);
         if (!c) failCode('SATURN_NOT_FOUND',{resource:'control',id:target},{target});
