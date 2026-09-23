@@ -19,7 +19,7 @@ test('C01 deleting a nested instrument preserves the process pipe', () => {
   assert.deepEqual(after.links.map(l => l.id), before.links.map(l => l.id), 'Deleting PT must not delete its pipe');
 });
 
-test('C02 a nested connect can receive a second instrument', () => {
+test('C02 a nested pipe can receive a second instrument', () => {
   const before = compile(nestedTap).scene;
   const after = compile(appendTap(nestedTap, before.links[0].id, 'temperature')).scene;
   assert.equal(after.links.length, 1);
@@ -120,6 +120,6 @@ test('C13 48 elements route without collisions, and element 49 is rejected', () 
 });
 
 test('C14 arbitrary code and prototype access are rejected without execution', () => {
-  for (const source of ['while (true) {}', 'globalThis.challengeSideEffect = true;', 'fetch("https://example.invalid");', 'import {pump} from "@scada/core"; const p=pump("P",{}); const x=p.constructor;']) assert.throws(() => compile(source), SourceError);
+  for (const source of ['while (true) {}', 'globalThis.challengeSideEffect = true;', 'fetch("https://example.invalid");', 'import {pump} from "@saturn/core"; const p=pump("P",{}); const x=p.constructor;']) assert.throws(() => compile(source), SourceError);
   assert.equal(globalThis.challengeSideEffect, undefined);
 });
