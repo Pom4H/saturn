@@ -85,7 +85,16 @@ test('B04 resuming after a long preview pause leaves a gap in the sampled trend'
   expect((path!.match(/M/g) ?? []).length).toBeGreaterThanOrEqual(2);
 });
 
-test('B05 120 parameter updates keep DOM identity and signed water movement', async ({ page }) => {
+test('B05 120 parameter updates keep DOM identity and signed seamless water movement', async ({ page }) => {
+  const dashPeriod = await page.locator('[data-flow]').first().evaluate(node =>
+    (node.getAttribute('stroke-dasharray') ?? '').trim().split(/[ ,]+/).reduce((sum, value) => sum + Number(value), 0)
+  );
+  expect(dashPeriod).toBeGreaterThan(0);
+  // A renderer modulus longer than the dash pattern creates a visible jump at wrap.
+  await page.clock.runFor(Math.ceil(dashPeriod * 1.2 / (9.12 * 4.5) * 1000));
+  for (const offset of await page.locator('[data-flow]').evaluateAll(nodes => nodes.map(n => Math.abs(Number(n.getAttribute('stroke-dashoffset')))))) {
+    expect(offset).toBeLessThan(dashPeriod);
+  }
   await page.clock.runFor(1000);
   await page.evaluate(source => {
     window.__challengeRotor = document.querySelector('[data-part="rotor"]');
@@ -98,7 +107,7 @@ test('B05 120 parameter updates keep DOM identity and signed water movement', as
   const before = await page.locator('[data-flow]').evaluateAll(nodes => nodes.map(n => Number(n.getAttribute('stroke-dashoffset'))));
   await page.clock.runFor(96);
   const after = await page.locator('[data-flow]').evaluateAll(nodes => nodes.map(n => Number(n.getAttribute('stroke-dashoffset'))));
-  for (let i = 0; i < before.length; i++) expect((after[i] - before[i] + 66) % 66).toBeCloseTo(9.12 * 4.5 * .096, 1);
+  for (let i = 0; i < before.length; i++) expect((after[i] - before[i] + dashPeriod) % dashPeriod).toBeCloseTo(9.12 * 4.5 * .096, 1);
 });
 
 test('B06 loss of quality stops animation and creates a real trend gap', async ({ page }) => {
