@@ -49,6 +49,13 @@ export function runtimeProjection(project: Project, frame: Frame) {
   installEquipment();
   return { project, scene: sceneFor(project), runtime: visualFrame(project, frame), objects: new Map<string, SourceObject>() };
 }
+export function previewPlantScene(project: Project, id: string, x: number, y: number) {
+  const preview: Project = {
+    ...project,
+    devices: project.devices.map(device => device.id === id ? { ...device, layout: { x, y } } : device),
+  };
+  return sceneFor(preview);
+}
 export function nestedStarter() {
   const files = { ...starter };
   files['systems/pumping.ts'] = files['equipment.ts']; delete files['equipment.ts'];
