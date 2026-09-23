@@ -1,37 +1,42 @@
-/** Disposable landing experience. Uses the production compiler, glyphs and routes;
- * never mounts project, server, command or 3D tools and never writes workspace storage. */
+/** Disposable landing experience over the canonical @saturn/core project model.
+ * No legacy scene compiler, connect() abstraction, workspace, server, command or 3D tools. */
 import { EditorState } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers, drawSelection, highlightActiveLine } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, undo, redo, undoDepth, indentWithTab, isolateHistory } from '@codemirror/commands';
 import { javascript } from '@codemirror/lang-javascript';
 import { bracketMatching, syntaxHighlighting, HighlightStyle } from '@codemirror/language';
-import { autocompletion, closeBrackets } from '@codemirror/autocomplete';
+import { closeBrackets } from '@codemirror/autocomplete';
 import { tags } from '@lezer/highlight';
 import { setDiagnostics } from '@codemirror/lint';
-import { compile, patchFields, editable, SourceError } from '../src/source';
-import { dslCompletions } from '../src/completion';
 import { SceneView } from '../src/view';
-import '../src/visual-components';
-import { examples } from './shell-projects';
+import { installEquipment, sceneFor } from '../plant/equipment';
+import { compileProject } from '../plant/compiler';
+import { sourceObjects } from './plant-project';
+import { landingProjectFiles, landingProjectSource } from './landing-project';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+const projectScene = (source: string) => {
+  const project = compileProject(landingProjectFiles(source));
+  installEquipment();
+  return { project, scene: sceneFor(project), objects: sourceObjects(landingProjectFiles(source)) };
+};
 export function mountLandingDemo(): void {
   const shell = $('studio-shell');
   shell.dataset.demo = 'true'; shell.dataset.mode = '2d'; shell.dataset.mobilePane = 'scene';
   shell.style.setProperty('--studio-progress', '1');
   $('studio-flat').inert = false; $('studio-spatial').inert = true;
   const header = document.createElement('header'); header.className = 'demo-header';
-  header.innerHTML = `<div class="demo-heading"><strong>Насосная станция</strong><span>Интерактивный пример</span></div>
+  header.innerHTML = `<div class="demo-heading"><strong>Насосная станция</strong><span>@saturn/core · pipe + cable</span></div>
     <nav class="demo-tabs" aria-label="Представление примера"><button data-demo-pane="scene" aria-pressed="true">Схема</button><button data-demo-pane="source" aria-pressed="false">Код</button></nav>
     <a class="demo-open" href="?mode=ide#workspace">Открыть IDE ↗</a>`;
   shell.prepend(header);
   const hint = document.createElement('p'); hint.className = 'demo-hint';
-  hint.textContent = 'Перетащите насос — координаты в коде изменятся.'; shell.append(hint);
+  hint.textContent = 'Перетащите насос — TypeScript изменится, pipe перестроится. Ниже силовой cable использует ту же модель.'; shell.append(hint);
   const reset = document.createElement('button'); reset.id = 'demo-reset'; reset.textContent = 'Сбросить'; reset.title = 'Вернуть исходный пример';
   $('studio-undo').parentElement!.append(reset, $('studio-play'), $('studio-fit'));
   const canvas = document.getElementById('studio-svg') as unknown as SVGSVGElement;
   const view = new SceneView(canvas), compact = matchMedia('(max-width:760px)'), reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  let compiled = compile(examples.pump.source), error = false, paused = reduced.matches, visible = true;
+  let compiled = projectScene(landingProjectSource), error = false, paused = reduced.matches, visible = true;
   let selected: string | null = null, pane = 'scene';
   const theme = EditorView.theme({
     '&': { height: '100%', background: 'var(--bg)', color: 'var(--text)', fontSize: '13px' },
@@ -42,7 +47,7 @@ export function mountLandingDemo(): void {
     '.cm-activeLine': { background: 'var(--shell-panel)' },
   });
   function state() {
-    return EditorState.create({ doc: examples.pump.source, extensions: [
+    return EditorState.create({ doc: landingProjectSource, extensions: [
       lineNumbers(), drawSelection(), history(), highlightActiveLine(), EditorView.lineWrapping,
       javascript({ typescript: true }), bracketMatching(), closeBrackets(), theme,
       syntaxHighlighting(HighlightStyle.define([
@@ -51,11 +56,6 @@ export function mountLandingDemo(): void {
         { tag: [tags.function(tags.variableName), tags.definition(tags.variableName)], color: 'var(--code-function)' },
         { tag: tags.propertyName, color: 'var(--code-property)' },
       ])),
-      autocompletion({ override: [context => {
-        const word = context.matchBefore(/[\w-]*/);
-        return !word || word.from === word.to && !context.explicit ? null
-          : { from: word.from, options: dslCompletions(context.state.doc.toString(), context.pos, compiled.scene) };
-      }] }),
       keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
       EditorView.contentAttributes.of({ 'aria-label': 'Исходник установки TypeScript', spellcheck: 'false' }),
       EditorView.updateListener.of(update => {
@@ -68,7 +68,7 @@ export function mountLandingDemo(): void {
   function render() {
     const diagnostics = $('studio-diagnostics');
     try {
-      compiled = compile(editor.state.doc.toString()); error = false;
+      compiled = projectScene(editor.state.doc.toString()); error = false;
       view.render(compiled.scene); view.select(selected);
       diagnostics.dataset.error = 'false'; diagnostics.textContent = '';
       editor.dispatch(setDiagnostics(editor.state, []));
@@ -76,49 +76,57 @@ export function mountLandingDemo(): void {
       error = true;
       const message = cause instanceof Error ? cause.message : String(cause);
       diagnostics.dataset.error = 'true'; diagnostics.textContent = message;
-      const length = editor.state.doc.length;
-      const from = Math.max(0, Math.min(length, cause instanceof SourceError ? cause.from : 0));
-      const to = Math.max(from, Math.min(length, cause instanceof SourceError ? cause.to : from));
-      editor.dispatch(setDiagnostics(editor.state, [{ from, to, severity: 'error', message }]));
+      editor.dispatch(setDiagnostics(editor.state, [{ from: 0, to: 0, severity: 'error', message }]));
     }
   }
   function select(id: string | null) {
     selected = id; view.select(id);
     const object = id ? compiled.objects.get(id) : null;
-    if (object && !error) editor.dispatch({ selection: { anchor: object.span.from }, scrollIntoView: true });
+    if (object && !error) editor.dispatch({ selection: { anchor: object.from }, scrollIntoView: true });
   }
   view.onSelect = select;
   function move(id: string, x: number, y: number) {
     if (error) return;
-    editor.dispatch({ changes: patchFields(editor.state.doc.toString(), id, { x, y }),
-      annotations: isolateHistory.of('full'), userEvent: 'input.visual' });
+    const object = compiled.objects.get(id); if (!object) return;
+    const fields = { x: object.fields.find(field => field.key === 'x'), y: object.fields.find(field => field.key === 'y') };
+    if (!fields.x || !fields.y) return;
+    editor.dispatch({ changes: [
+      { from: fields.x.from, to: fields.x.to, insert: String(x) },
+      { from: fields.y.from, to: fields.y.to, insert: String(y) },
+    ].sort((a, b) => a.from - b.from), annotations: isolateHistory.of('full'), userEvent: 'input.visual' });
   }
-  let drag: { id: string; pointer: number; x: number; y: number; startX: number; startY: number; dx: number; dy: number; element: SVGGElement; transform: string } | null = null;
-  function cancelDrag() {
-    if (!drag) return;
-    drag.element.setAttribute('transform', drag.transform); view.previewMove(drag.id, drag.x, drag.y); drag = null;
+  const movable = (id: string) => {
+    const object = compiled.objects.get(id);
+    return Boolean(object?.fields.some(field => field.key === 'x') && object.fields.some(field => field.key === 'y'));
+  };
+  let drag: { id: string; pointer: number; x: number; y: number; startX: number; startY: number; dx: number; dy: number } | null = null;
+  function preview(id: string, x: number, y: number) {
+    const simulations = compiled.project.simulations.map(item => item.id === id ? { ...item, at: { x, y } } : item);
+    const devices = compiled.project.devices.map(item => item.id === id ? { ...item, layout: { x, y } } : item);
+    const project = { ...compiled.project, simulations, devices };
+    const scene = sceneFor(project);
+    view.render(scene); view.select(selected);
   }
+  function cancelDrag() { if (!drag) return; const current = drag; drag = null; preview(current.id, current.x, current.y); }
   canvas.addEventListener('pointerdown', event => {
     if (event.button !== 0 || !event.isPrimary || drag || error) return;
     const element = (event.target as Element).closest<SVGGElement>('[data-node]');
     const node = compiled.scene.nodes.find(item => item.id === element?.dataset.node);
-    if (!node || !element || node.tap || !editable(compiled, node.id, 'x') || !editable(compiled, node.id, 'y')) return;
+    if (!node || !element || node.tap || !movable(node.id)) return;
     const point = view.point(event.clientX, event.clientY);
-    drag = { id: node.id, pointer: event.pointerId, x: Number(node.props.x), y: Number(node.props.y), startX: point.x, startY: point.y,
-      dx: 0, dy: 0, element, transform: element.getAttribute('transform') ?? '' };
+    drag = { id: node.id, pointer: event.pointerId, x: Number(node.props.x), y: Number(node.props.y), startX: point.x, startY: point.y, dx: 0, dy: 0 };
     canvas.setPointerCapture(event.pointerId); select(node.id);
   });
   canvas.addEventListener('pointermove', event => {
     if (!drag || drag.pointer !== event.pointerId) return;
     const point = view.point(event.clientX, event.clientY); drag.dx = point.x - drag.startX; drag.dy = point.y - drag.startY;
-    drag.element.setAttribute('transform', `translate(${drag.dx} ${drag.dy}) ${drag.transform}`);
-    view.previewMove(drag.id, drag.x + drag.dx, drag.y + drag.dy);
+    preview(drag.id, drag.x + drag.dx, drag.y + drag.dy);
   });
   canvas.addEventListener('pointerup', event => {
     if (!drag || drag.pointer !== event.pointerId) return;
-    const current = drag; drag = null; current.element.setAttribute('transform', current.transform);
-    view.previewMove(current.id, current.x, current.y);
+    const current = drag; drag = null;
     if (Math.hypot(current.dx, current.dy) > 2) move(current.id, Math.round(current.x + current.dx), Math.round(current.y + current.dy));
+    else preview(current.id, current.x, current.y);
   });
   canvas.addEventListener('pointercancel', cancelDrag); canvas.addEventListener('lostpointercapture', cancelDrag);
   canvas.addEventListener('keydown', event => {
@@ -128,7 +136,7 @@ export function mountLandingDemo(): void {
     else if (event.key.toLowerCase() === 'f' && !event.ctrlKey && !event.metaKey && !event.altKey) { event.preventDefault(); view.fit(); }
     else if (selected && /^Arrow/.test(event.key) && !event.altKey && !event.ctrlKey && !event.metaKey) {
       const node = compiled.scene.nodes.find(item => item.id === selected);
-      if (!node || node.tap || error || !editable(compiled, node.id, 'x') || !editable(compiled, node.id, 'y')) return;
+      if (!node || node.tap || error || !movable(node.id)) return;
       event.preventDefault(); const step = event.shiftKey ? 1 : 10;
       move(node.id, Number(node.props.x) + (event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0),
         Number(node.props.y) + (event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0));

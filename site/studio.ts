@@ -355,7 +355,12 @@ export async function mountStudio() {
     positionPreviewFrame = requestAnimationFrame(() => {
       positionPreviewFrame = 0;
       const preview = positionPreview; if (!preview) return;
-      const scene = { ...compiled.scene, nodes: compiled.scene.nodes.map(node => node.id === preview.id ? { ...node, props: { ...node.props, x: preview.x, y: preview.y } } : node) };
+      let scene;
+      if (isPlant() && plant) {
+        const simulations = plant.project.simulations.map(item => item.id === preview.id ? { ...item, at: { x: preview.x, y: preview.y } } : item);
+        const devices = plant.project.devices.map(item => item.id === preview.id ? { ...item, layout: { x: preview.x, y: preview.y } } : item);
+        scene = plantTools!.plantScene({ ...plant.project, simulations, devices });
+      } else scene = { ...compiled.scene, nodes: compiled.scene.nodes.map(node => node.id === preview.id ? { ...node, props: { ...node.props, x: preview.x, y: preview.y } } : node) };
       view.render(scene); spatial?.render(scene); view.select(selected); spatial?.select(selected);
     });
   }

@@ -57,4 +57,4 @@ export function nestedStarter() {
   files['README.md'] = '# Насосная установка\n\nplant.ts — состав проекта.\nsystems/pumping.ts — насос и команда.\nviews.ts — операторский экран.\n\nИзменения здесь остаются черновиком до публикации на сервере.\n';
   return files;
 }
-export { validateFiles, visualFrame };
+export { validateFiles, visualFrame, sceneFor as plantScene };
