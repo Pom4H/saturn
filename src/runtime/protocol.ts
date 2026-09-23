@@ -1,6 +1,6 @@
 /** Data and installed metadata only: no transport or behavior execution. */
 import type { ProjectSnapshot } from './project';
-import { catalog } from '../core';
+import { catalog } from '../scene';
 export type Quality = 'good' | 'stale' | 'bad' | 'offline';
 interface SignalBase { unit: string; timestamp: number; quality: Quality }
 export interface NumericSignal extends SignalBase { type: 'number'; value: number | null }
