@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { checkLandingDemo } from './site-landing-check.mjs';
 import { checkShellUx } from './site-shell-ux-check.mjs';
 import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
@@ -17,10 +18,11 @@ try{
     await new Promise(r=>setTimeout(r,100));
   }
   browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{channel:'chrome'})});
+  await checkLandingDemo(browser, origin + '/?mode=demo');
   const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
   const page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(origin);
+  await page.goto(origin + '/?mode=ide');
   await page.waitForSelector('#studio-spatial canvas',{state:'attached'});
   await page.waitForFunction(()=>document.getElementById('project-switch')?.options.length>0);
 

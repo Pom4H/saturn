@@ -1,17 +1,27 @@
 import './styles.css';
 import './studio.css';
-import { mountProjectPicker } from './project-picker';
-mountProjectPicker();
+import './landing-demo.css';
 import { configureAppUpdates } from './pwa';
-import { mountCommands } from './commands';
 import './commands.css';
-mountCommands();
+const params = new URLSearchParams(location.search);
+const demo = params.get('mode') === 'demo' || (document.querySelector<HTMLMetaElement>('meta[name="saturn-shell-mode"]')?.content !== 'ide'
+  && params.get('mode') !== 'ide' && !params.has('project')
+  && !['#workspace', '#studio'].includes(location.hash) && !location.hash.startsWith('#code=')
+  && !matchMedia('(display-mode: standalone)').matches);
+document.getElementById('studio-shell')?.setAttribute('data-demo', String(demo));
 const shortcut = document.querySelector('#command-launcher kbd');
 if (shortcut) shortcut.textContent = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘ K' : 'Ctrl K';
-import { mountStudio } from './studio';
-mountStudio().catch(error => {
+async function mountWorkspace() {
+  if (demo) return (await import('./landing-demo')).mountLandingDemo();
+  const [{ mountStudio }, { mountProjectPicker }, { mountCommands }] = await Promise.all([
+    import('./studio'), import('./project-picker'), import('./commands'),
+  ]);
+  mountProjectPicker(); mountCommands();
+  return mountStudio();
+}
+mountWorkspace().catch(error => {
   const status = document.getElementById('studio-diagnostics');
-  if (status) status.textContent = 'Не удалось открыть среду. Обновите страницу.';
+  if (status) { status.dataset.error = 'true'; status.textContent = 'Не удалось открыть среду. Обновите страницу.'; }
   console.error(error);
 });
 

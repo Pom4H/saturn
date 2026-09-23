@@ -20,7 +20,7 @@ try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'no-preference', permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await context.newPage(), errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto(origin);
+  await page.goto(origin + '/?mode=ide');
   await page.waitForSelector('#studio-spatial canvas', { state: 'attached' });
   assert.equal(await page.locator('h1').innerText(), 'Saturn');
   assert.equal(await page.locator('.project-section,.operator,.delivery').count(), 0, 'Old landing sections must be replaced');
@@ -162,9 +162,9 @@ try {
   const sharedContext = await browser.newContext(); const shared = await sharedContext.newPage(); await shared.goto(sharedURL);
   await shared.waitForFunction(() => document.body.classList.contains('shell-fullscreen'));
   assert.equal(await shared.locator('#project-switch option:checked').textContent(), 'Проект по ссылке');
-  await checkFiles(browser, origin);
+  await checkFiles(browser, origin + '/?mode=ide');
   await checkServerFiles(browser);
-  await checkShell(browser, origin);
+  await checkShell(browser, origin + '/?mode=ide');
   await checkInteractions(browser, origin);
   assert.deepEqual(errors, []);
   console.log('PASS: NEW landing; scroll preserves view; explicit 2D/3D; same mounted Shell and selection in fullscreen; modified example→independent project; saved projects; source diagnostics/undo/redo/drag; blank/add/connect/delete; .ts/standalone HTML/share; offline reload; mobile Shell; WebGL fallback.');

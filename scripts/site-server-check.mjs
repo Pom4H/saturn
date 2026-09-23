@@ -50,7 +50,7 @@ export async function checkServerFiles(browser) {
     packages: 'external',
     plugins: [raw],
   });
-  await buildSite('dist/plant/site');
+  await buildSite('dist/plant/site', 'ide');
 
   const { startWorkspaceTestServer } = await import(pathToFileURL(resolve('.plant/site-workspace-server.mjs')));
   const directory = await mkdtemp(join(tmpdir(), 'saturn-shell-workspace-'));

@@ -25,13 +25,14 @@ try {
     assert.equal(await page.locator('meta[name="saturn-revision"]').getAttribute('content'), expectedRevision, 'Published revision matches this workflow');
   }
 
-  await page.waitForSelector('#studio-spatial canvas', { state: 'attached' });
+  await page.waitForSelector('#studio-svg [data-node]', { state: 'attached' });
+  assert.equal(await page.locator('#studio-shell').getAttribute('data-demo'), 'true');
+  assert.equal(await page.locator('#studio-spatial canvas').count(), 0, 'Landing does not mount 3D');
   assert.equal(await page.locator('h1').innerText(), 'Saturn');
   assert.equal(await page.locator('.capability-row').count(), 5);
   assert.equal(await page.locator('.distribution-item').count(), 6);
   assert.equal(await page.locator('.extension-index > div').count(), 6);
 
-  await page.locator('#studio-2d').click();
   assert((await page.locator('#studio-svg [data-node]').count()) > 0, 'Published landing renders the real Saturn scene');
 
   const expectedScope = new URL('./', url).pathname;

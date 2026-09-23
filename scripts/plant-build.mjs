@@ -41,7 +41,7 @@ for (const asset of assets)
 const sw = (await readFile('plant/web/sw.js', 'utf8')).replace('__VERSION__', hash.digest('hex').slice(0, 16)).replace('__ASSETS__', JSON.stringify(assets));
 await writeFile('dist/plant/sw.js', sw);
 console.log('Built Bun server and installable /plant/demo/');
-await buildSite('dist/plant/site');
+await buildSite('dist/plant/site', 'ide');
 
 await cp('LICENSE', 'dist/plant/LICENSE');
 await cp('catalog/licenses/drawio-Apache-2.0.txt', 'dist/plant/Apache-2.0.txt');

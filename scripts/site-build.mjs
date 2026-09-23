@@ -10,7 +10,8 @@ export async function loadSiteModule(name) {
   return import('data:text/javascript;base64,' + Buffer.from(result.outputFiles[0].contents).toString('base64'));
 }
 
-export async function buildSite(outdir = 'dist/site') {
+export async function buildSite(outdir = 'dist/site', mode = 'demo') {
+  if (!['demo', 'ide'].includes(mode)) throw new Error('Unknown Saturn shell mode');
   const { starter } = await loadSiteModule('starter');
   const { bankCounts, bankExample } = await loadSiteModule('typescript-example');
   const { projectContext } = await loadSiteModule('project-context');
@@ -23,7 +24,7 @@ export async function buildSite(outdir = 'dist/site') {
     outdir: `${outdir}/assets`, chunkNames: '[name]-[hash]', legalComments: 'linked', define: { __VSCODE_EXTENSION__: JSON.stringify(extensionId) } });
   const [entry, metadata] = Object.entries(bundle.metafile.outputs).find(([, metadata]) => metadata.entryPoint === 'site/main.ts');
   const revision = process.env.GITHUB_SHA || `local-${Date.now()}`;
-  const html = (await readFile('site/index.html', 'utf8')).replace('./site/assets/site.js', './site/assets/' + basename(entry)).replace('./site/assets/site.css', './site/assets/' + basename(metadata.cssBundle)).replace('</head>', `<meta name="saturn-revision" content="${revision}"></head>`);
+  const html = (await readFile('site/index.html', 'utf8')).replace('./site/assets/site.js', './site/assets/' + basename(entry)).replace('./site/assets/site.css', './site/assets/' + basename(metadata.cssBundle)).replace('</head>', `<meta name="saturn-revision" content="${revision}"><meta name="saturn-shell-mode" content="${mode}"></head>`);
   await writeFile(`${outdir}/index.html`, html);
   await cp('site/mark.svg', `${outdir}/assets/mark.svg`);
   await cp('site/saturn-icon.png', `${outdir}/assets/saturn-icon.png`);

@@ -13,7 +13,7 @@ const raw = { name: 'raw', setup(b) {
   b.onLoad({ filter: /.*/, namespace: 'raw' }, async a => ({ contents: await readFile(a.path, 'utf8'), loader: 'text' }));
 } };
 await build({ stdin: { contents: `export { startPlantServer } from './plant/server'; export { demoFiles } from './plant/demo/files'; export { GitRepository } from './plant/adapters/git'; export { compileProject } from './plant/compiler';`, resolveDir: process.cwd(), loader: 'ts' }, outfile: directory + '/server.mjs', bundle: true, platform: 'node', format: 'esm', packages: 'external', plugins: [raw] });
-await buildSite('dist/plant/site');
+await buildSite('dist/plant/site', 'ide');
 const { startPlantServer, demoFiles, GitRepository, compileProject } = await import(pathToFileURL(directory + '/server.mjs'));
 const repository = await new GitRepository(directory + '/project.git').initialize();
 if (!await repository.head()) {
