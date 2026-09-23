@@ -43,7 +43,7 @@ export function unavailableRuntime(project: Project, mode: 'draft' | 'offline' =
   return runtime;
 }
 export function previewRuntime(project: Project) {
-  const kernel = new Kernel(project, 'draft', 'preview', 0);
+  const kernel = new Kernel(project, 'draft', 'draft', 0);
   for (let i = 0; i < 8; i++) kernel.step();
   const runtime = visualFrame(project, kernel.frame());
   for (const equipment of Object.values(runtime.equipment)) equipment.facts.mode = 'simulation';
