@@ -93,6 +93,8 @@ export async function checkLandingDemo(browser, origin) {
     }
     await page.emulateMedia({ colorScheme: 'light' });
     await page.setViewportSize({ width: 390, height: 844 });
+    // Viewport emulation can finish before the resize listener updates the pane.
+    await page.locator('#studio-editor-pane').waitFor({ state: 'hidden' });
     assert(!await page.locator('#studio-editor-pane').isVisible());
     await page.locator('[data-demo-pane="source"]').click();
     assert(await page.locator('#studio-editor-pane').isVisible());
