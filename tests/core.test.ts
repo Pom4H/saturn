@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, patchFields, applyChanges, editable, removeObject, appendEquipment, appendConnection, appendTap, formatSource } from '../src/source';
-import { catalog, simulate, worldPort, pump, valve, connect } from '../src/core';
+import { catalog, simulate, worldPort, pump, valve, pipe } from '../src/core';
 import { layout, segmentClear, bounds } from '../src/geometry';
 import { deriveSchematicProjection, defineElementPack } from '../src/elements/model';
 import { registry as elementRegistry } from '../src/elements/core-elements';
@@ -14,7 +14,7 @@ test('initial scene: eight nodes, five connections, two taps', () => {
 });
 test('ordinary TypeScript builders share vocabulary and ports', () => {
  const p = pump('P', {x:0,y:0,rpm:1000}), v = valve('V',{x:300,y:0,opening:80});
- assert.equal(connect(p.outlet,v.inlet).from.node,'P'); assert.equal(p.props.rpm,1000);
+ assert.equal(pipe('P-V',p.outlet,v.inlet).from.node,'P'); assert.equal(p.props.rpm,1000);
 });
 test('drag changes only numeric initializer spans, preserving comments', () => {
  const s = booster.replace('x: 325, y: 338', 'x: /* maintain */ 325, y: 338 /* mounting height */');
@@ -22,41 +22,41 @@ test('drag changes only numeric initializer spans, preserving comments', () => {
  assert.equal(out,s.replace('/* maintain */ 325','/* maintain */ 365').replace('y: 338 /* mounting','y: 400 /* mounting'));
 });
 test('negative coordinates and single quotes preserve source style', () => {
- const s = `import { pump } from '@scada/core';\nconst p = pump('P', {x: -100, y: 0, quality: 'good'});`;
+ const s = `import { pump } from '@saturn/core';\nconst p = pump('P', {x: -100, y: 0, quality: 'good'});`;
  assert.match(patch(s,'P',{x:-240,quality:'bad'}),/x: -240, y: 0, quality: 'bad'/);
 });
 test('missing default fields are inserted without changing other bytes', () => {
- const s = `import { pump } from '@scada/core'; const p = pump('P', {/* position */ x: 1, y: 2});`;
+ const s = `import { pump } from '@saturn/core'; const p = pump('P', {/* position */ x: 1, y: 2});`;
  const out=patch(s,'P',{rpm:800}); assert.match(out,/rpm: 800/); assert.match(out,/\/\* position \*\/ x: 1, y: 2/);
  assert.equal(compile(out).scene.nodes[0].props.rpm,800);
 });
 test('computed coordinates are evaluated but never overwritten by drag', () => {
- const s = `import { pump } from '@scada/core'; const GRID = 10; const p = pump('P',{x: GRID * 32, y: (200 + 50), rpm: 1500});`;
+ const s = `import { pump } from '@saturn/core'; const GRID = 10; const p = pump('P',{x: GRID * 32, y: (200 + 50), rpm: 1500});`;
  const c=compile(s); assert.equal(c.scene.nodes[0].props.x,320); assert.equal(editable(c,'P','x'),false);
  assert.throws(()=>patchFields(s,'P',{x:340}),/вычисляется/);
 });
-test('imports may be aliased',()=>{ const s=`import { pump as motor } from '@scada/core'; const p=motor('P',{x:10,y:20});`; assert.equal(compile(s).scene.nodes[0].kind,'pump'); assert.equal(compile(patch(s,'P',{x:40})).scene.nodes[0].props.x,40); });
+test('imports may be aliased',()=>{ const s=`import { pump as motor } from '@saturn/core'; const p=motor('P',{x:10,y:20});`; assert.equal(compile(s).scene.nodes[0].kind,'pump'); assert.equal(compile(patch(s,'P',{x:40})).scene.nodes[0].props.x,40); });
 for (const [name, fragment, expected] of [
  ['arbitrary script','window.alert(1);',/DSL|выполняются/],
  ['infinite loop','while(true) {}',/Поддерживаются/],
  ['fetch','fetch("https://example.test");',/импортирован/],
  ['external import','import {pump} from "other";',/Разрешён/],
  ['duplicate identifiers','const q=1; const q=2;',/Повторное имя/],
- ['unknown call','import {pump} from "@scada/core"; const p=evil();',/импортирован/],
+ ['unknown call','import {pump} from "@saturn/core"; const p=evil();',/импортирован/],
  ['syntax','const =',/expected|ожидается|declaration/i],
- ['bad numeric','import {pump} from "@scada/core"; const p=pump("P",{x:1/0});',/значение/],
- ['prototype key','import {pump} from "@scada/core"; const p=pump("P",{__proto__:0});',/нет свойства/],
- ['wrong type','import {pump} from "@scada/core"; const p=pump("P",{rpm:"fast"});',/ожидает number/],
- ['wrong enum','import {pump} from "@scada/core"; const p=pump("P",{quality:"maybe"});',/good/],
- ['duplicate field','import {pump} from "@scada/core"; const p=pump("P",{x:2,x:3});',/Повторное свойство/],
- ['spread','import {pump} from "@scada/core"; const p=pump("P",{...window});',/явные свойства/],
- ['invalid id','import {pump} from "@scada/core"; const p=pump("<script>",{});',/ID:/],
+ ['bad numeric','import {pump} from "@saturn/core"; const p=pump("P",{x:1/0});',/значение/],
+ ['prototype key','import {pump} from "@saturn/core"; const p=pump("P",{__proto__:0});',/нет свойства/],
+ ['wrong type','import {pump} from "@saturn/core"; const p=pump("P",{rpm:"fast"});',/ожидает number/],
+ ['wrong enum','import {pump} from "@saturn/core"; const p=pump("P",{quality:"maybe"});',/good/],
+ ['duplicate field','import {pump} from "@saturn/core"; const p=pump("P",{x:2,x:3});',/Повторное свойство/],
+ ['spread','import {pump} from "@saturn/core"; const p=pump("P",{...window});',/явные свойства/],
+ ['invalid id','import {pump} from "@saturn/core"; const p=pump("<script>",{});',/ID:/],
 ] as const) test(`reject ${name} without execution`,()=>assert.throws(()=>compile(fragment),expected));
 test('too large a document is rejected before parsing',()=>assert.throws(()=>compile(' '.repeat(120001)),/размер/));
 test('unknown ports, reverse port roles, occupied ports, duplicate IDs rejected',()=>{
  assert.throws(()=>compile(booster.replace('motor.inlet','motor.missing')),/Неизвестный порт/);
  assert.throws(()=>compile(booster.replace('reservoir.outlet, motor.inlet','motor.inlet, reservoir.outlet')),/выхода ко входу/);
- assert.throws(()=>compile(booster+'connect(reservoir.outlet, motor.inlet);'),/уже занят/);
+ assert.throws(()=>compile(booster+'pipe("DUP", reservoir.outlet, motor.inlet);'),/уже занят/);
  assert.throws(()=>compile(booster.replace('"F-101"','"P-101"')),/Повторный ID/);
 });
 test('delete node removes incident connections and attached instruments',()=>{
@@ -74,8 +74,8 @@ test('palette and port clicks append valid declarations',()=>{
  const c=compile(s); s=appendConnection(s,{node:c.scene.nodes[0].id,port:'outlet'},{node:c.scene.nodes[1].id,port:'inlet'});
  assert.equal(compile(s).scene.links.length,1);
 });
-test('tap names previously unnamed connect expression, preserving its text',()=>{
- const edge=compile(booster).scene.links[0]; const s=appendTap(booster,edge.id,'pressure'); const c=compile(s); assert.equal(c.scene.nodes.length,9); assert.match(s,/const line1 = connect\(reservoir/);
+test('tap names previously unnamed pipe expression, preserving its text',()=>{
+ const edge=compile(booster).scene.links[0]; const s=appendTap(booster,edge.id,'pressure'); const c=compile(s); assert.equal(c.scene.nodes.length,9); assert.match(s,/const pipe1 = pipe\("PIPE-101", reservoir/);
 });
 test('formatter produces a valid scene',()=>assert.deepEqual(compile(formatSource(booster)).scene,compile(booster).scene));
 test('closed valve stops the entire series flow while RPM stays explicit',()=>{
