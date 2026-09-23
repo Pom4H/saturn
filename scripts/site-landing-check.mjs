@@ -27,7 +27,10 @@ export async function checkLandingDemo(browser, origin) {
     const shell = page.locator('#studio-shell'), content = page.locator('#studio-editor .cm-content');
     const source = () => content.innerText();
     const initial = await source();
-    assert.match(initial, /rpm: 1850/, 'Landing ignores the saved project');
+    assert.match(initial, /from '@saturn\/core'/, 'Landing authors the canonical Saturn package');
+    assert.match(initial, /pipe\('suction'/, 'Fluid topology is authored as pipe()');
+    assert.match(initial, /cable\('feeder'/, 'Electrical topology is authored as cable()');
+    assert.doesNotMatch(initial, /@scada\/core|\bconnect\s*\(/, 'Legacy scene DSL is absent from the landing');
     assert.equal(await shell.getAttribute('data-demo'), 'true');
     assert.equal(await shell.getAttribute('data-mode'), '2d');
     assert.equal(await page.locator('#studio-spatial canvas').count(), 0, 'No 3D renderer mounted');
@@ -57,7 +60,7 @@ export async function checkLandingDemo(browser, origin) {
 
     const transform = await pump.getAttribute('transform');
     await content.click(); await page.keyboard.press('ControlOrMeta+a');
-    await page.keyboard.insertText(initial.replace('x: 330', 'x: 430'));
+    await page.keyboard.insertText(initial.replace('x: 390, y: 190', 'x: 490, y: 190'));
     assert.notEqual(await pump.getAttribute('transform'), transform, 'Code edits update the real diagram');
     const validTransform = await pump.getAttribute('transform');
     await page.keyboard.press('ControlOrMeta+End'); await page.keyboard.insertText('\ninvalid(');
@@ -102,6 +105,6 @@ export async function checkLandingDemo(browser, origin) {
     assert(await page.locator('#file-browser').isVisible(), 'Full IDE restores saved layout');
     assert.match(await content.innerText(), /rpm: 2111/, 'Full IDE restores the saved project, not disposable demo edits');
     assert.deepEqual(errors, []);
-    console.log('PASS: focused landing; live two-way editing; pipe preview; undo/reset/errors; storage isolation; mobile; full IDE handoff.');
+    console.log('PASS: canonical @saturn/core landing; pipe/cable authoring; live rerouting; two-way editing; storage isolation; mobile; full IDE handoff.');
   } finally { await context.close(); }
 }
