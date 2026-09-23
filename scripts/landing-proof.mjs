@@ -29,13 +29,23 @@ export async function captureLandingProof(browser, siteDir) {
     contexts.push(context);
     const page = await context.newPage();
     page.on('pageerror', error => errors.push(error.message));
+    const anonymous = await context.request.get(app.origin + '/plant/ide/');
+    assert.equal(anonymous.status(), 401, 'Anonymous clients cannot enter the authoring document');
+    assert(!anonymous.headers()['content-security-policy'].includes("'unsafe-eval'"));
     const response = await context.request.post(app.origin + '/plant/api/login', {
       data: { user: role, password: passwords[role] }, headers: { Origin: app.origin },
     });
     assert.equal(response.status(), 200, 'Real Saturn authentication succeeds');
     assert((await context.cookies()).some(cookie => cookie.name === 'scada_session' && cookie.httpOnly));
+    const authoring = await context.request.get(app.origin + '/plant/ide/');
+    assert.equal(authoring.status(), role === 'engineer' ? 200 : 403, 'Only engineers can enter the trusted build document');
+    assert.equal(authoring.headers()['content-security-policy'].includes("'unsafe-eval'"), role === 'engineer');
+    assert.equal(authoring.headers()['cache-control'], 'no-store');
     if (role === 'operator') assert.equal((await context.request.get(app.origin + '/plant/api/workspace')).status(), 403);
+    const root = await context.request.get(app.origin + '/');
+    assert(!root.headers()['content-security-policy'].includes("'unsafe-eval'"), 'Public and runtime entry keep strict script policy');
     await page.goto(app.origin + '/?project=server#workspace');
+    if (role === 'engineer') await page.waitForURL(url => url.pathname === '/plant/ide/');
     await page.waitForFunction(expected => {
       const shell = document.getElementById('studio-shell');
       return shell?.dataset.role === expected && (expected === 'engineer' ? shell.dataset.serverProject === 'true' : shell.dataset.runtimeOnly === 'true');
@@ -112,11 +122,12 @@ export async function captureLandingProof(browser, siteDir) {
     await writeFile(`${siteDir}/assets/landing-proof.json`, manifest);
     await writeFile(join(out, 'landing-proof.json'), manifest);
     await writeSiteCache(siteDir); // Generated evidence is part of this build's offline cache identity.
-    console.log('PASS: real engineer publication -> independent operator session; roles, pause/resume, alarms; light/dark screenshots.');
+    console.log('PASS: real engineer publication -> independent operator session; roles, scoped authoring CSP, pause/resume, alarms; light/dark screenshots.');
   } catch (error) {
     for (const [index, context] of contexts.entries()) for (const page of context.pages()) {
       await page.screenshot({ path: join(out, `failed-${index}.png`), fullPage: true }).catch(() => {});
       console.error('Capture state:', await page.locator('#studio-shell').evaluate(shell => ({ ...shell.dataset })).catch(() => null));
+      console.error('Capture diagnostic:', await page.locator('#server-error').textContent().catch(() => null));
     }
     throw error;
   } finally {

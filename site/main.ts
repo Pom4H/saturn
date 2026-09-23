@@ -19,6 +19,20 @@ async function mountWorkspace() {
     import('./landing-proof').then(({ mountLandingProof }) => mountLandingProof()).catch(console.error);
     return result;
   }
+  // Runtime HTML keeps a strict CSP. A workspace host exposes a separate,
+  // authenticated document for trusted TypeScript authoring, never for operators.
+  if (document.querySelector<HTMLMetaElement>('meta[name="saturn-authoring-entry"]')?.content === '/plant/ide/') {
+    try {
+      const response = await fetch('/plant/api/session', { signal: AbortSignal.timeout(5000) });
+      const session: unknown = response.ok ? await response.json() : null;
+      if (session && typeof session === 'object' && 'actor' in session
+        && session.actor && typeof session.actor === 'object' && 'role' in session.actor
+        && session.actor.role === 'engineer') {
+        location.replace('/plant/ide/?project=server#workspace');
+        return;
+      }
+    } catch { /* Offline and unauthenticated entry keeps the local workspace. */ }
+  }
   const [{ mountStudio }, { mountProjectPicker }, { mountCommands }] = await Promise.all([
     import('./studio'), import('./project-picker'), import('./commands'),
   ]);

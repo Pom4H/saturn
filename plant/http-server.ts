@@ -14,6 +14,7 @@ import type { BuildArtifact } from './artifact';
 import { diagnosticLocale, errorPayload, failCode } from './diagnostics';
 import { commandValue, nullableStringValue, numberMapValue, objectValue, stringMapValue, stringValue, type JsonObject } from './http-input';
 const prefix = '/plant';
+const contentSecurityPolicy = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; worker-src 'self'; connect-src 'self'; img-src 'self' data:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'";
 async function body(req: IncomingMessage): Promise<JsonObject> { if (!req.headers['content-type']?.startsWith('application/json'))
     failCode('SATURN_HTTP_INVALID',{reason:'malformed'},{field:'content-type'},{status:415}); let size = 0; const chunks: Buffer[] = []; for await (const chunk of req) {
     size += chunk.length;
@@ -92,7 +93,7 @@ export async function startPlantHttpServer(options: {
         res.setHeader('X-Content-Type-Options', 'nosniff');
         res.setHeader('Referrer-Policy', 'no-referrer');
         res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-        res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; worker-src 'self'; connect-src 'self'; img-src 'self' data:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'");
+        res.setHeader('Content-Security-Policy', contentSecurityPolicy);
         try {
             const url = new URL(req.url ?? '/', origin || 'http://localhost');
             let path: string;
@@ -106,7 +107,23 @@ export async function startPlantHttpServer(options: {
                 failCode('SATURN_PERMISSION',{role:'same-origin'},{origin:req.headers.origin},{status:403});
             if (path === '/') {
                 if (!['GET', 'HEAD'].includes(req.method ?? '')) failCode('SATURN_HTTP_INVALID',{reason:'disabled'},{method:req.method,path},{status:405});
-                html(200, req.method === 'HEAD' ? '' : (await readStatic('site/index.html')).toString('utf8').replaceAll('/plant/', `${prefix}/`));
+                let page = req.method === 'HEAD' ? '' : (await readStatic('site/index.html')).toString('utf8').replaceAll('/plant/', `${prefix}/`);
+                if (options.workspace && (options.uiMode ?? 'ide') === 'ide')
+                    page = page.replace('</head>', `<meta name="saturn-authoring-entry" content="${prefix}/ide/"></head>`);
+                html(200, page);
+                return;
+            }
+            if (path === `${prefix}/ide/`) {
+                if (!['GET', 'HEAD'].includes(req.method ?? '')) failCode('SATURN_HTTP_INVALID',{reason:'disabled'},{method:req.method,path},{status:405});
+                // Compilation executes trusted authored TypeScript. Only an authenticated
+                // engineer on an authoring host may enter this document; runtime stays strict.
+                requireRole(auth.session(req.headers.cookie, req.headers.authorization).actor, 'engineer');
+                if (!options.workspace || (options.uiMode ?? 'ide') !== 'ide')
+                    failCode('SATURN_RUNTIME_INVALID',{reason:'disabled'},{resource:'workspace'},{status:404});
+                const page = req.method === 'HEAD' ? '' : (await readStatic('site/index.html')).toString('utf8').replace('<head>', '<head><base href="/">');
+                res.setHeader('Content-Security-Policy', contentSecurityPolicy.replace("script-src 'self'", "script-src 'self' 'unsafe-eval'"));
+                res.setHeader('Vary', 'Cookie, Authorization');
+                html(200, page);
                 return;
             }
             if (path === `${prefix}/api/health` && req.method === 'GET') {
