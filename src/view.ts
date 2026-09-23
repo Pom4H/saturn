@@ -102,6 +102,8 @@ const medium2d = {
   stale: materialCssColor('staleFluid'),
   shell: materialCssColor('pipeShell'),
 };
+const flowDash = [18, 30] as const;
+const flowDashPeriod = flowDash[0] + flowDash[1];
 let serial = 0;
 export class SceneView {
   scene: Scene = { nodes: [], links: [] };
@@ -281,13 +283,13 @@ export class SceneView {
       el(g, 'path', { d: route.path, ...pipeAttrs, stroke: '#718995', 'stroke-width': 26 });
       el(g, 'path', { d: route.path, ...pipeAttrs, stroke: medium2d.shell, 'stroke-opacity': .72, 'stroke-width': 22 });
       const water = el(g, 'path', { d: route.path, ...pipeAttrs, stroke: route.valid ? medium2d.water : '#ca6661', 'stroke-opacity': .88, 'stroke-width': 17, 'data-water': edge.id, 'data-medium': 'water' });
-      const flow = el(g, 'path', { d: route.path, ...pipeAttrs, stroke: medium2d.highlight, 'stroke-width': 6, 'stroke-linecap': 'round', 'stroke-dasharray': '18 30', 'data-flow': edge.id });
+      const flow = el(g, 'path', { d: route.path, ...pipeAttrs, stroke: medium2d.highlight, 'stroke-width': 6, 'stroke-linecap': 'round', 'stroke-dasharray': flowDash.join(' '), 'data-flow': edge.id });
       const hit = el(g, 'g', { class: 'edge-hit' });
       for (let i = 1; i < route.points.length; i++) {
         const a = route.points[i - 1], b = route.points[i];
         el(hit, 'rect', { x: Math.min(a.x, b.x) - 10, y: Math.min(a.y, b.y) - 10, width: Math.abs(a.x - b.x) + 20, height: Math.abs(a.y - b.y) + 20, fill: 'transparent' });
       }
-      this.updates.push(dt => { const q = route.valid ? this.flows.get(edge.id) : 0; const phase = this.phase(edge.id, q == null ? 0 : q * 4.5, dt); flow.setAttribute('stroke-dashoffset', String(-phase % 66)); flow.setAttribute('opacity', q == null || q === 0 ? '0' : '.86'); water.setAttribute('stroke', !route.valid ? '#ca6661' : q == null ? medium2d.stale : medium2d.water); });
+      this.updates.push(dt => { const q = route.valid ? this.flows.get(edge.id) : 0; const phase = this.phase(edge.id, q == null ? 0 : q * 4.5, dt); flow.setAttribute('stroke-dashoffset', String(-phase % flowDashPeriod)); flow.setAttribute('opacity', q == null || q === 0 ? '0' : '.86'); water.setAttribute('stroke', !route.valid ? '#ca6661' : q == null ? medium2d.stale : medium2d.water); });
     }
     for (const n of [...this.renderedNodes.values()].filter(n => !catalog[n.kind].instrument)) this.equipment(devices, n);
     for (const n of [...this.renderedNodes.values()].filter(n => catalog[n.kind].instrument)) this.instrument(instruments, n);
