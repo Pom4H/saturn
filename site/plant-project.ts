@@ -1,6 +1,7 @@
 import ts from '@typescript/typescript6';
 import { compileProject, validateFiles } from '../plant/compiler';
 import { installEquipment, sceneFor, visualFrame } from '../plant/equipment';
+import { Kernel } from '../plant/kernel';
 import type { Frame, Project } from '../plant/types';
 import { starter } from './starter';
 export interface SourceField { key: string; label: string; value: number; from: number; to: number; }
@@ -41,9 +42,16 @@ export function unavailableRuntime(project: Project, mode: 'draft' | 'offline' =
   for (const equipment of Object.values(runtime.equipment)) { equipment.facts.mode = mode; for (const signal of Object.values(equipment.signals)) { signal.quality = 'offline'; signal.value = null; } }
   return runtime;
 }
+export function previewRuntime(project: Project) {
+  const kernel = new Kernel(project, 'draft', 'preview', 0);
+  for (let i = 0; i < 8; i++) kernel.step();
+  const runtime = visualFrame(project, kernel.frame());
+  for (const equipment of Object.values(runtime.equipment)) equipment.facts.mode = 'simulation';
+  return runtime;
+}
 export function plantProjection(files: Record<string, string>) {
   const project = compileProject(files); installEquipment();
-  return { project, scene: sceneFor(project), runtime: unavailableRuntime(project), objects: sourceObjects(files) };
+  return { project, scene: sceneFor(project), runtime: previewRuntime(project), objects: sourceObjects(files) };
 }
 export function runtimeProjection(project: Project, frame: Frame) {
   installEquipment();
