@@ -1,0 +1,75 @@
+name: Apply verified canonical source change
+on:
+  push:
+    branches: [fix/canonical-pipe-cable-shell]
+    paths: [.canonical-transfer/**]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 2
+          ref: ${{ github.ref_name }}
+      - name: Verify and apply exact source change
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import gzip, hashlib, json, os, pathlib, shutil, subprocess
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True).strip()
+          def blob(data):
+              return hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+          assert git('rev-parse', 'HEAD') == os.environ['GITHUB_SHA'], 'Concurrent branch change'
+          assert git('rev-parse', 'HEAD^') == '13d7f61434518f26395c594e8d0f80b599d02c85', 'Unexpected base'
+          transfer = pathlib.Path('.canonical-transfer')
+          packed = b''.join((transfer / f'part-{i}.gzpart').read_bytes() for i in range(3))
+          assert hashlib.sha256(packed).hexdigest() == '7e2f485a1cb631211b1fe9e560e81e8e1895481c098fb8b5883ceddde291980e', 'Transfer checksum'
+          payload = json.loads(gzip.decompress(packed))
+          names = set(payload['edits']) | set(payload['files']) | set(payload['replacements'])
+          for name in names:
+              path = pathlib.PurePosixPath(name)
+              assert not path.is_absolute() and '..' not in path.parts
+              assert path.parts[0] in ['site', 'src', 'scripts', 'plant', 'experiments']
+          for name, expected in payload['baseHashes'].items():
+              assert blob(pathlib.Path(name).read_bytes()) == expected, f'Base mismatch: {name}'
+          for name, edits in payload['edits'].items():
+              path = pathlib.Path(name)
+              lines = path.read_text().splitlines(keepends=True)
+              for start, end, text in reversed(edits):
+                  lines[start:end] = text.splitlines(keepends=True)
+              path.write_text(''.join(lines))
+          for name, text in payload['files'].items():
+              path = pathlib.Path(name)
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_text(text)
+          for name, replacements in payload['replacements'].items():
+              path = pathlib.Path(name)
+              text = path.read_text()
+              for old, new in replacements:
+                  assert old in text, f'Missing replacement: {name}: {old}'
+                  text = text.replace(old, new)
+              path.write_text(text)
+          for name, expected in payload['expectedHashes'].items():
+              assert blob(pathlib.Path(name).read_bytes()) == expected, f'Result mismatch: {name}'
+              print(name, expected)
+          shutil.rmtree(transfer)
+          subprocess.run(['git', 'add', '--', *sorted(names), '.canonical-transfer'], check=True)
+          subprocess.run(['git', 'config', 'user.name', 'github-actions[bot]'], check=True)
+          subprocess.run(['git', 'config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com'], check=True)
+          message = '''fix: use canonical pipe and cable projects in landing and IDE
+
+          Usegit-Change-Id: canonical-pipe-cable-shell-20260923
+          Usegit-Experiment: EXP-shell-pipe-cable
+          Usegit-Intent: Remove the retired scene DSL from product entry points
+          Usegit-Hypothesis: One canonical compiler and typed pipe/cable preserve two-way editing without a second authored model
+          Usegit-Granularity: Canonical source adapter, fixtures, physical route preview and coupled regressions
+          Usegit-Decision: pending exact-tree evidence'''
+          subprocess.run(['git', 'commit', '-m', message], check=True)
+          subprocess.run(['git', 'push', 'origin', 'HEAD:' + os.environ['GITHUB_REF_NAME']], check=True)
+          print('APPLIED_COMMIT=' + git('rev-parse', 'HEAD'))
+          print('APPLIED_TREE=' + git('rev-parse', 'HEAD^{tree}'))
+          PY
