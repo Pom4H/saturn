@@ -1,7 +1,7 @@
 import { failCode } from './diagnostics';
 import { validatePresentation, type Presentation, type ViewNode } from './presentation';
 import type { Expr } from './types';
-import type { HmiBinding, HmiNode, SaturnHmiScene } from './hmi-frame';
+import type { HmiBinding, HmiFrameNode, SaturnHmiScene } from './hmi-frame';
 
 export const SATURN_C23_HMI_ABI = 'saturn.c23.satgui@1' as const;
 
@@ -125,7 +125,7 @@ export function compileSaturnC23Presentation(view:Presentation,scene?:SaturnHmiS
         return value;
     };
     const color=(value:number)=>value;
-    const addSceneNode=(node:HmiNode,index:number):void=>{
+    const addSceneNode=(node:HmiFrameNode,index:number):void=>{
         const id=`hmi_scene_${index}`;
         if(node.kind==='rect'){
             declarations.push(`static gui_element_t *${id};`);

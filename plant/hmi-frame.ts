@@ -2,7 +2,7 @@ export type HmiColor = number;
 export interface HmiBinding { signal:string; scale?:number; offset?:number; min?:number; max?:number; fallback?:number }
 export interface HmiPoint { x:number; y:number }
 interface HmiBase { id?:string; visible?:HmiBinding; visibleAbove?:number }
-export type HmiNode =
+export type HmiFrameNode =
   | (HmiBase & {kind:'rect';x:number;y:number;width:number;height:number;fill:HmiColor;stroke?:HmiColor;strokeWidth?:number;radius?:number;opacity?:number})
   | (HmiBase & {kind:'circle';cx:number;cy:number;r:number;fill:HmiColor;stroke?:HmiColor;strokeWidth?:number;opacity?:number})
   | (HmiBase & {kind:'line';x1:number;y1:number;x2:number;y2:number;color:HmiColor;width?:number;opacity?:number})
@@ -12,7 +12,7 @@ export type HmiNode =
   | (HmiBase & {kind:'flow';points:HmiPoint[];value:HmiBinding;background:HmiColor;color:HmiColor;width?:number;backgroundWidth?:number;packetRadius?:number;packetSpacing?:number;speed?:number;threshold?:number})
   | (HmiBase & {kind:'lamp';cx:number;cy:number;r:number;value:HmiBinding;off:HmiColor;on:HmiColor;highlight?:HmiColor;halo?:HmiColor;stroke?:HmiColor;pulseHz?:number});
 
-export interface SaturnHmiScene { width?:320; height?:240; background:HmiColor; nodes:readonly HmiNode[] }
+export interface SaturnHmiScene { width?:320; height?:240; background:HmiColor; nodes:readonly HmiFrameNode[] }
 interface DrawBase { opacity?:number; source?:string }
 export type SaturnHmiCommand =
   | (DrawBase & {type:'rect';x:number;y:number;width:number;height:number;fill:HmiColor;stroke?:HmiColor;strokeWidth?:number;radius?:number})
@@ -32,7 +32,7 @@ const resolve=(b:HmiBinding,s:HmiSignals)=>{
   v=v*(b.scale??1)+(b.offset??0);
   if(b.min!==undefined)v=Math.max(b.min,v);if(b.max!==undefined)v=Math.min(b.max,v);return v;
 };
-const visible=(n:HmiNode,s:HmiSignals)=>!n.visible||resolve(n.visible,s)>(n.visibleAbove??0);
+const visible=(n:HmiFrameNode,s:HmiSignals)=>!n.visible||resolve(n.visible,s)>(n.visibleAbove??0);
 const rotate=(p:HmiPoint,cx:number,cy:number,a:number):HmiPoint=>{const dx=p.x-cx,dy=p.y-cy,c=Math.cos(a),sn=Math.sin(a);return{x:cx+dx*c-dy*sn,y:cy+dx*sn+dy*c};};
 const length=(p:readonly HmiPoint[])=>p.slice(1).reduce((t,b,i)=>t+Math.hypot(b.x-p[i]!.x,b.y-p[i]!.y),0);
 const pointAt=(points:readonly HmiPoint[],distance:number):HmiPoint=>{

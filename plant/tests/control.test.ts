@@ -7,6 +7,7 @@ import { runControlTrace } from './control-trace';
 import { Kernel } from '../kernel';
 import { Service } from '../service';
 import { Store } from '../store';
+import { migrate } from '../migrations';
 import { NodeSql } from '../adapters/node-sql';
 import { model, models } from '../models';
 import { createPlantModel } from '../visual3d';
@@ -16,8 +17,9 @@ import { buildArtifact } from '../artifact';
 const operator: Actor = { id: 'operator', role: 'operator' };
 const engineer: Actor = { id: 'engineer', role: 'engineer' };
 const source = () => compileProject(demoFiles);
+const openStore = () => { const db = new NodeSql(); migrate(db); return new Store(db); };
 async function service() {
-    const store = new Store(new NodeSql()); let n = 0;
+    const store = openStore(); let n = 0;
     const s = new Service(store, { now: () => 1000, uuid: () => `id-${++n}`, reportRunner: async () => ({ rows: [], html: '' }) });
     await s.start(await buildArtifact(demoFiles, { packageName: '@saturn/test' })); return s;
 }

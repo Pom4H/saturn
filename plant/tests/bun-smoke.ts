@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { BunSql } from '../adapters/bun-sql';
 import { Store } from '../store';
+import { migrate } from '../migrations';
 import { startPlantServer } from '../bun-server';
 import { runReport } from '../adapters/bun-reports';
 import { ModbusTcpClient } from '../adapters/modbus-tcp';
@@ -12,6 +13,7 @@ import { BunAuth } from '../adapters/bun-auth';
 import type { ReportTask } from '../types';
 
 const sql = new BunSql(':memory:');
+migrate(sql);
 const portableStore = new Store(sql);
 portableStore.set('bun-smoke', { ok: true });
 assert.deepEqual(portableStore.meta('bun-smoke', null), { ok: true });
@@ -24,6 +26,7 @@ assert.equal(portableStore.meta('tx-b', 0), 2);
 sql.close();
 
 const authSql = new BunSql(':memory:');
+migrate(authSql);
 const authStore = new Store(authSql);
 const legacyAuth = new Auth(authStore);
 assert.equal(legacyAuth.seed('legacy', 'legacy-password-2026'), true);
