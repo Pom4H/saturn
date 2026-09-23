@@ -1,3 +1,4 @@
+import { dslHover } from '../src/editor-hover';
 /** Disposable landing experience over the canonical @saturn/core project model.
  * No legacy scene compiler, connect() abstraction, workspace, server, command or 3D tools. */
 import { EditorState } from '@codemirror/state';
@@ -9,7 +10,8 @@ import { closeBrackets } from '@codemirror/autocomplete';
 import { tags } from '@lezer/highlight';
 import { setDiagnostics } from '@codemirror/lint';
 import { SceneView } from '../src/view';
-import { installEquipment, sceneFor } from '../plant/equipment';
+import { installEquipment, sceneFor, visualFrame } from '../plant/equipment';
+import { Kernel } from '../plant/kernel';
 import { compileProject } from '../plant/compiler';
 import { sourceObjects } from './plant-project';
 import { landingProjectFiles, landingProjectSource } from "../examples/landing/project";
@@ -17,7 +19,7 @@ import { landingProjectFiles, landingProjectSource } from "../examples/landing/p
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const projectScene = (source: string) => {
   const project = compileProject(landingProjectFiles(source));
-  installEquipment();
+  installEquipment('ru');
   return { project, scene: sceneFor(project), objects: sourceObjects(landingProjectFiles(source)) };
 };
 export function mountLandingDemo(): void {
@@ -26,18 +28,28 @@ export function mountLandingDemo(): void {
   shell.style.setProperty('--studio-progress', '1');
   $('studio-flat').inert = false; $('studio-spatial').inert = true;
   const header = document.createElement('header'); header.className = 'demo-header';
-  header.innerHTML = `<div class="demo-heading"><strong>Насосная станция</strong><span>@saturn/core · pipe + cable</span></div>
+  header.innerHTML = `<div class="demo-heading"><strong>Насосный контур</strong><span>@saturn/core · TypeScript</span></div>
     <nav class="demo-tabs" aria-label="Представление примера"><button data-demo-pane="scene" aria-pressed="true">Схема</button><button data-demo-pane="source" aria-pressed="false">Код</button></nav>
     <a class="demo-open" href="?mode=ide#workspace">Открыть IDE ↗</a>`;
   shell.prepend(header);
   const hint = document.createElement('p'); hint.className = 'demo-hint';
-  hint.textContent = 'Перетащите насос — TypeScript изменится, pipe перестроится. Ниже силовой cable использует ту же модель.'; shell.append(hint);
+  hint.textContent = 'Перетащите насос — координаты изменятся в TypeScript, трубы последуют за ним. Наведите курсор на функцию, чтобы прочитать документацию.'; shell.append(hint);
   const reset = document.createElement('button'); reset.id = 'demo-reset'; reset.textContent = 'Сбросить'; reset.title = 'Вернуть исходный пример';
   $('studio-undo').parentElement!.append(reset, $('studio-play'), $('studio-fit'));
   const canvas = document.getElementById('studio-svg') as unknown as SVGSVGElement;
   const view = new SceneView(canvas), compact = matchMedia('(max-width:760px)'), reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let compiled = projectScene(landingProjectSource), error = false, paused = reduced.matches, visible = true;
   let selected: string | null = null, pane = 'scene';
+  // The landing runs the same bounded model as the workbench, locally and explicitly.
+  // Renderers consume its samples; they never invent rotation or a tank level.
+  let previewKernel = new Kernel(compiled.project, 'landing-preview', 'landing-preview', 0);
+  let previewTimer: ReturnType<typeof setTimeout> | undefined;
+  function advancePreview() {
+    if (!view.paused && !error) view.setRuntime(visualFrame(compiled.project, previewKernel.step()));
+    previewTimer = setTimeout(advancePreview, compiled.project.stepMs);
+  }
+  window.addEventListener('pagehide', () => { clearTimeout(previewTimer); previewTimer = undefined; });
+  window.addEventListener('pageshow', () => { if (previewTimer === undefined) advancePreview(); });
   const theme = EditorView.theme({
     '&': { height: '100%', background: 'var(--bg)', color: 'var(--text)', fontSize: '13px' },
     '.cm-scroller': { overflow: 'auto', fontFamily: 'var(--mono)' },
@@ -46,8 +58,9 @@ export function mountLandingDemo(): void {
     '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': { background: 'var(--shell-selection)' },
     '.cm-activeLine': { background: 'var(--shell-panel)' },
   });
-  function state() {
+  function state(): EditorState {
     return EditorState.create({ doc: landingProjectSource, extensions: [
+      dslHover({ files: () => landingProjectFiles(editor.state.doc.toString()), path: () => 'plant.ts' }),
       lineNumbers(), drawSelection(), history(), highlightActiveLine(), EditorView.lineWrapping,
       javascript({ typescript: true }), bracketMatching(), closeBrackets(), theme,
       syntaxHighlighting(HighlightStyle.define([
@@ -64,12 +77,13 @@ export function mountLandingDemo(): void {
       }),
     ] });
   }
-  const editor = new EditorView({ parent: $('studio-editor'), state: state() });
+  const editor: EditorView = new EditorView({ parent: $('studio-editor'), state: state() });
   function render() {
     const diagnostics = $('studio-diagnostics');
     try {
       compiled = projectScene(editor.state.doc.toString()); error = false;
-      view.render(compiled.scene); view.select(selected);
+      previewKernel = new Kernel(compiled.project, 'landing-preview', 'landing-preview', 0);
+      view.render(compiled.scene); view.setRuntime(visualFrame(compiled.project, previewKernel.frame())); view.select(selected);
       diagnostics.dataset.error = 'false'; diagnostics.textContent = '';
       editor.dispatch(setDiagnostics(editor.state, []));
     } catch (cause) {
@@ -166,5 +180,5 @@ export function mountLandingDemo(): void {
   document.addEventListener('visibilitychange', animation);
   reduced.addEventListener('change', () => { paused = reduced.matches; playback(); });
   new IntersectionObserver(entries => { visible = entries[0].isIntersecting; animation(); }, { rootMargin: '80px' }).observe(shell);
-  render(); layout(); playback(); $('studio-undo').setAttribute('disabled', '');
+  render(); layout(); playback(); advancePreview(); $('studio-undo').setAttribute('disabled', '');
 }

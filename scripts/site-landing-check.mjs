@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { checkHoverAndSvg } from './site-hover-svg-check.mjs';
 import { mkdir } from 'node:fs/promises';
 import { loadSiteModule } from './site-build.mjs';
 
@@ -25,11 +26,18 @@ export async function checkLandingDemo(browser, origin) {
     await page.goto(origin);
     await page.locator('#studio-svg [data-node="P-01"]').waitFor({ state: 'attached' });
     const shell = page.locator('#studio-shell'), content = page.locator('#studio-editor .cm-content');
-    const source = () => content.innerText();
+    // CodeMirror virtualizes the DOM: innerText is not the authored document.
+    // This test-only bridge targets the pinned view package; no production globals.
+    const source = () => content.evaluate(node => {
+      const view = node.cmTile?.view;
+      if (!view?.state?.doc) throw new Error('Mounted CodeMirror document is unavailable');
+      return view.state.doc.toString();
+    });
+    await checkHoverAndSvg(page);
     const initial = await source();
     assert.match(initial, /from '@saturn\/core'/, 'Landing authors the canonical Saturn package');
     assert.match(initial, /pipe\('suction'/, 'Fluid topology is authored as pipe()');
-    assert.match(initial, /cable\('feeder'/, 'Electrical topology is authored as cable()');
+    assert.match(initial, /pipe\('delivery'/, 'Both pipe connections are authored in the project');
     assert.doesNotMatch(initial, /@scada\/core|\bconnect\s*\(/, 'Legacy scene DSL is absent from the landing');
     assert.equal(await shell.getAttribute('data-demo'), 'true');
     assert.equal(await shell.getAttribute('data-mode'), '2d');
@@ -45,15 +53,20 @@ export async function checkLandingDemo(browser, origin) {
     await page.locator('#studio-play').click();
 
     const pipe = page.locator('#studio-svg [data-connection="suction"][data-medium="pipe"] path').first();
-    const cable = page.locator('#studio-svg [data-connection="feeder"][data-medium="power"] path').first();
-    assert.equal(await page.locator('#studio-svg [data-connection][data-medium="pipe"]').count(), 1);
-    assert.equal(await page.locator('#studio-svg [data-connection][data-medium="power"]').count(), 1);
+    const delivery = page.locator('#studio-svg [data-connection="delivery"][data-medium="pipe"] path').first();
+    assert.equal(await page.locator('#studio-svg [data-connection][data-medium="pipe"]').count(), 2);
+    assert.equal(await page.locator('#studio-svg [data-connection][data-medium="power"]').count(), 0);
     const pipeBefore = await pipe.getAttribute('d');
-    assert(await cable.getAttribute('d'), 'Canonical cable is rendered');
+    assert(await delivery.getAttribute('d'), 'The return pipe meets the original top pump outlet');
     const pump = page.locator('#studio-svg [data-node="P-01"]');
-    const box = await pump.boundingBox(); assert(box);
-    await page.mouse.move(box.x + box.width * .6, box.y + box.height * .75); await page.mouse.down();
-    await page.mouse.move(box.x + box.width * .6 + 40, box.y + box.height * .75 + 20, { steps: 5 });
+    // Use the actual casing center; a group bounding box includes labels, ports and shadows.
+    const casing = pump.locator('[data-anatomy="saturn-pump"] > circle[r="48"]');
+    await casing.scrollIntoViewIfNeeded();
+    const box = await casing.boundingBox(); assert(box);
+    const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    assert.equal(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[data-node]')?.getAttribute('data-node'), point), 'P-01', 'Drag starts on the pump, not a clipped/overlaid part of its bounds');
+    await page.mouse.move(point.x, point.y); await page.mouse.down();
+    await page.mouse.move(point.x + 40, point.y + 20, { steps: 5 });
     assert.notEqual(await pipe.getAttribute('d'), pipeBefore, 'Pipes follow during drag, not just after drop');
     assert.equal(await source(), initial, 'Drag preview does not spam source history');
     await page.mouse.up();
@@ -86,6 +99,8 @@ export async function checkLandingDemo(browser, origin) {
     }
     await page.emulateMedia({ colorScheme: 'light' });
     await page.setViewportSize({ width: 390, height: 844 });
+    // Viewport emulation can finish before the resize listener updates the pane.
+    await page.locator('#studio-editor-pane').waitFor({ state: 'hidden' });
     assert(!await page.locator('#studio-editor-pane').isVisible());
     await page.locator('[data-demo-pane="source"]').click();
     assert(await page.locator('#studio-editor-pane').isVisible());
@@ -107,8 +122,8 @@ export async function checkLandingDemo(browser, origin) {
     assert.equal(await page.locator('.demo-header').count(), 0);
     assert(await page.locator('.shell-topbar').isVisible(), 'Full IDE retains its tools');
     assert(await page.locator('#file-browser').isVisible(), 'Full IDE restores saved layout');
-    assert.match(await content.innerText(), /rpm: 2111/, 'Full IDE restores the saved project, not disposable demo edits');
+    assert.match(await source(), /rpm: 2111/, 'Full IDE restores the saved project, not disposable demo edits');
     assert.deepEqual(errors, []);
-    console.log('PASS: canonical @saturn/core landing; pipe/cable authoring; live rerouting; two-way editing; storage isolation; mobile; full IDE handoff.');
+    console.log('PASS: canonical @saturn/core landing; native process pipe authoring; live rerouting; two-way editing; storage isolation; mobile; full IDE handoff.');
   } finally { await context.close(); }
 }

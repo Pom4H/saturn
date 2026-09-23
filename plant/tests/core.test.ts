@@ -1,3 +1,4 @@
+import './svg-projection.test';
 import "./presentation.test.ts";
 import "./connections.test.ts";
 import "./stability.test.ts";

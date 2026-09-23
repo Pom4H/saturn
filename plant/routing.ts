@@ -8,7 +8,7 @@ export function routeConnection(p:Project,w:Connection):PhysicalRoute {
  const a=resolvePort(p,w.from),b=resolvePort(p,w.to),clearance=w.medium==='pipe'?12:7;
  const anchor=(v:typeof a):RoutePoint=>({x:v.device.layout.x+v.terminal.x,y:v.device.layout.y+v.terminal.y,z:v.terminal.z});
  const start=anchor(a),end=anchor(b);
- const boxes=p.devices.map(d=>{const f=footprint(d.type);return{x:d.layout.x-clearance,y:d.layout.y-clearance,right:d.layout.x+f.width+clearance,bottom:d.layout.y+f.height+clearance,id:d.id};});
+ const boxes=p.devices.map(d=>{const f=footprint(d.type);return{x:d.layout.x-clearance,y:d.layout.y-clearance-54,right:d.layout.x+f.width+clearance,bottom:d.layout.y+f.height+clearance,id:d.id};});
  const lead=(v:typeof a,pt:RoutePoint)=>{const r=boxes.find(r=>r.id===v.device.id)!,[dx,dy]=direction[v.terminal.side];return{x:dx<0?r.x:dx>0?r.right:pt.x,y:dy<0?r.y:dy>0?r.bottom:pt.y,z:pt.z};};
  const s=lead(a,start),t=lead(b,end);
  const blocked=(a:RoutePoint,b:RoutePoint,ignore='')=>boxes.some(r=>r.id!==ignore&&(a.x===b.x ? a.x>r.x+.01&&a.x<r.right-.01&&Math.max(a.y,b.y)>r.y+.01&&Math.min(a.y,b.y)<r.bottom-.01 : a.y===b.y ? a.y>r.y+.01&&a.y<r.bottom-.01&&Math.max(a.x,b.x)>r.x+.01&&Math.min(a.x,b.x)<r.right-.01 : true));

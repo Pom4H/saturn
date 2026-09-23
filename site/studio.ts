@@ -1,3 +1,4 @@
+import { dslHover } from '../src/editor-hover';
 import { nestedStarter } from '../examples/pumping/files';
 import { simulate } from '../examples/diagram/simulation';
 import { EditorState } from '@codemirror/state';
@@ -53,7 +54,7 @@ export async function mountStudio() {
   const view = new SceneView(canvas, simulate);
   const editorTheme = EditorView.theme({ '&': { height: '100%', background: 'var(--bg)', color: 'var(--text)', fontSize: '12px' }, '.cm-scroller': { overflow: 'auto', fontFamily: 'var(--mono)' }, '.cm-content': { padding: '16px 0', caretColor: 'var(--text)' }, '.cm-gutters': { background: 'var(--bg)', color: 'var(--muted)', border: 'none' }, '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': { background: 'var(--shell-selection)' }, '.cm-activeLine': { background: 'var(--shell-panel)' } }, { dark: true });
   function editorState(source: string, path = 'station.ts') {
-    return EditorState.create({ doc: source, extensions: [lineNumbers(), drawSelection(), history(), foldGutter(), highlightActiveLine(), ...(path.endsWith('.ts') || path.endsWith('.json') ? [javascript({ typescript: path.endsWith('.ts') })] : []), bracketMatching(), closeBrackets(), syntaxHighlighting(HighlightStyle.define([{ tag: tags.keyword, color: 'var(--code-keyword)' }, { tag: tags.string, color: 'var(--code-string)' }, { tag: tags.number, color: 'var(--code-number)' }, { tag: tags.comment, color: 'var(--code-comment)' }, { tag: [tags.function(tags.variableName), tags.definition(tags.variableName)], color: 'var(--code-function)' }, { tag: tags.propertyName, color: 'var(--code-property)' }, { tag: tags.variableName, color: 'var(--text)' }])), editorTheme,
+    return EditorState.create({ doc: source, extensions: [dslHover({ files: () => documents.files, path: () => path }), lineNumbers(), drawSelection(), history(), foldGutter(), highlightActiveLine(), ...(path.endsWith('.ts') || path.endsWith('.json') ? [javascript({ typescript: path.endsWith('.ts') })] : []), bracketMatching(), closeBrackets(), syntaxHighlighting(HighlightStyle.define([{ tag: tags.keyword, color: 'var(--code-keyword)' }, { tag: tags.string, color: 'var(--code-string)' }, { tag: tags.number, color: 'var(--code-number)' }, { tag: tags.comment, color: 'var(--code-comment)' }, { tag: [tags.function(tags.variableName), tags.definition(tags.variableName)], color: 'var(--code-function)' }, { tag: tags.propertyName, color: 'var(--code-property)' }, { tag: tags.variableName, color: 'var(--text)' }])), editorTheme,
       autocompletion({ override: [context => { const word = context.matchBefore(/[\w-]*/); if (isPlant()) return null; if (!word || word.from === word.to && !context.explicit) return null; return { from: word.from, options: dslCompletions(context.state.doc.toString(), context.pos, compiled.scene) }; }] }),
       keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab, { key: 'Mod-s', run: () => { download(); return true; } }]),
       EditorView.contentAttributes.of({ 'aria-label': 'Исходник установки TypeScript', spellcheck: 'false' }),
@@ -87,14 +88,17 @@ export async function mountStudio() {
     applyTelemetry();
   });
   let serverLoading = false;
-  const shortRevision = (value: string | null | undefined) => value ? value.slice(0, 7) : '—';
+  const shortRevision = (value: string | null | undefined) => value ? value.replace(/^sha256:/, '').slice(0, 8) : '—';
   function syncProductContext() {
     const source = workspaceSnapshot?.sourceRevision ?? serverSession?.head ?? null;
     const published = serverSession?.desired ?? null;
     const applied = telemetry.frame?.revision ?? runtimeRevision ?? serverSession?.frame.revision ?? null;
-    $('revision-source').textContent = source ? shortRevision(source) : workspace.active.kind === 'example' ? 'demo' : 'local';
+    $('revision-source').textContent = source ? shortRevision(source) : runtimeOnly ? '—' : workspaceSnapshot || workspace.active.kind !== 'example' ? 'local' : 'demo';
     $('revision-published').textContent = shortRevision(published);
     $('revision-applied').textContent = shortRevision(applied);
+    $('revision-source').title = source ?? '';
+    $('revision-published').title = published ?? '';
+    $('revision-applied').title = applied ?? '';
     const drift = Boolean(published && applied && published !== applied);
     const sourceAhead = Boolean(workspaceSnapshot && applied && workspaceSnapshot.id !== applied);
     shell.dataset.revisionState = drift || sourceAhead ? 'drift' : published && applied ? 'synced' : 'local';
@@ -469,7 +473,7 @@ export async function mountStudio() {
       $('studio-diagnostics').dataset.error = 'false'; $('studio-diagnostics').title = '';
       renderTree(); select(selected); renderSignals();
       $('empty-canvas').hidden = compiled.scene.nodes.length > 0;
-      $('studio-count').textContent = `${compiled.scene.nodes.length} объектов · ${compiled.scene.links.length} связей`;
+      renderSceneCounts();
     } catch (e) {
       error = true;
       const text = e instanceof Error ? e.message : String(e);
@@ -496,7 +500,12 @@ export async function mountStudio() {
     const applied = telemetry.frame?.revision ?? serverSession?.frame.revision;
     $('server-publish').toggleAttribute('disabled', !engineer || documents.dirty() || !workspaceSnapshot || workspaceSnapshot.id === applied);
   }
+  function renderSceneCounts() {
+    const project = plant?.project;
+    $('studio-count').textContent = `${project?.devices.length ?? compiled.scene.nodes.length} объектов · ${project?.connections?.length ?? compiled.scene.links.length} связей`;
+  }
   function renderMeta() {
+    renderSceneCounts();
     const picker = $<HTMLSelectElement>('project-switch'); picker.replaceChildren();
     const exampleGroup = document.createElement('optgroup'); exampleGroup.label = 'Примеры';
     for (const [id, example] of Object.entries(examples)) { const option = document.createElement('option'); option.value = `example:${id}`; option.textContent = example.title; exampleGroup.append(option); }

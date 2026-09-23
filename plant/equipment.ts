@@ -1,3 +1,4 @@
+import { plantPumpSvg, plantTankSvg, plantValveSvg } from './equipment-svg';
 import { terminals, footprint } from './ports';
 import { routeConnections } from './routing';
 import { renderSaturnPlcSvg } from './saturn-view';
@@ -20,7 +21,7 @@ const shaft = (c: SvgRendererContext) => el(c.root, 'path', { d: 'M0 48H25 M125 
 const rotor = (c: SvgRendererContext, key: string) => { const g = el(c.root, 'g'); for (let i = 0; i < 6; i++)
     el(g, 'path', { d: 'M0 0 Q20 -14 26 0 L7 6Z', fill: '#385866', transform: `rotate(${i * 60})` }); el(g, 'circle', { r: 7, fill: '#cad9dd', stroke: metalStroke }); c.onUpdate(dt => { g.setAttribute('transform', `translate(75 45) rotate(${c.phase('rotor', (c.number(key, dt) ?? 0) * .3, dt) % 360})`); }); };
 const shapes: Record<string, Draw> = {
-    pump: c => { shaft(c); el(c.root, 'path', { d: 'M48 80H103L112 94H37Z', fill: c.paint('dark') }); el(c.root, 'circle', { cx: 75, cy: 45, r: 37, fill: c.paint('metal'), stroke: metalStroke, 'stroke-width': 3 }); el(c.root, 'circle', { cx: 75, cy: 45, r: 28, fill: '#e8f2f3', stroke: metalStroke }); rotor(c, 'rpm'); },
+    pump: plantPumpSvg,
     turbine: c => { shaft(c); body(c, 23, 7, 105, 75); el(c.root, 'circle', { cx: 75, cy: 45, r: 32, fill: '#dfebed', stroke: metalStroke }); rotor(c, 'rpm'); },
     reactor: c => { body(c, 28, 4, 96, 82); el(c.root, 'ellipse', { cx: 76, cy: 8, rx: 48, ry: 10, fill: c.paint('metal'), stroke: metalStroke }); for (let i = 0; i < 7; i++)
         el(c.root, 'rect', { x: 43 + i * 9, y: 20, width: 5, height: 50, rx: 2, fill: fuel }); el(c.root, 'path', { d: 'M0 68H28 M124 28H150', fill: 'none', stroke: water, 'stroke-width': 9 }); },
@@ -33,14 +34,8 @@ const shapes: Record<string, Draw> = {
     control: c => { body(c, 24, 5, 102, 78); for (let i = 0; i < 3; i++)
         el(c.root, 'rect', { x: 35 + i * 29, y: 19, width: 18, height: 14, fill: '#2d5564' }); el(c.root, 'path', { d: 'M43 61H106', stroke: '#3a6674', 'stroke-width': 5 }); const indicator = el(c.root, 'circle', { cx: 75, cy: 57, r: 8, fill: water }); c.onUpdate(() => indicator.setAttribute('fill', (c.number('trip') ?? 0) > .5 ? '#c45544' : water)); },
     sensor: c => { el(c.root, 'path', { d: 'M75 68V93', stroke: metalStroke, 'stroke-width': 8 }); el(c.root, 'circle', { cx: 75, cy: 38, r: 34, fill: c.paint('metal'), stroke: metalStroke, 'stroke-width': 3 }); el(c.root, 'circle', { cx: 75, cy: 38, r: 27, fill: '#f1f7f8' }); const needle = el(c.root, 'path', { d: 'M75 38L75 15', stroke: '#315b6e', 'stroke-width': 3 }); c.onUpdate(dt => needle.setAttribute('transform', `rotate(${Math.max(-100, Math.min(100, (c.number('value', dt) ?? 0) * 50 - 60))} 75 38)`)); },
-    reservoir: c => { body(c, 32, 8, 86, 78); el(c.root, 'ellipse', { cx: 75, cy: 12, rx: 43, ry: 9, fill: c.paint('metal'), stroke: metalStroke });
-        el(c.root, 'rect', { x: 48, y: 28, width: 54, height: 45, fill: '#314f60' });
-        const level = el(c.root, 'rect', { x: 51, y: 32, width: 48, height: 38, fill: water, opacity: .7 });
-        c.onUpdate(dt => { const v = c.number('level', dt); level.setAttribute('visibility', v === null ? 'hidden' : 'visible'); const h = Math.max(0, Math.min(1, (v ?? 0) / 100)) * 40; level.setAttribute('height', String(h)); level.setAttribute('y', String(72 - h)); }); },
-    valve: c => { shaft(c); el(c.root, 'path', { d: 'M32 25L116 73V25L32 73Z', fill: c.paint('metal'), stroke: metalStroke, 'stroke-width': 2 });
-        el(c.root, 'path', { d: 'M75 48V12', stroke: metalStroke, 'stroke-width': 5 });
-        const lever = el(c.root, 'path', { d: 'M57 11H93', stroke: water, 'stroke-width': 6 });
-        c.onUpdate(dt => { const v = c.number('opening', dt); lever.setAttribute('visibility', v === null ? 'hidden' : 'visible'); lever.setAttribute('transform', `rotate(${(v ?? 0) * .9} 75 11)`); }); },
+    reservoir: plantTankSvg,
+    valve: plantValveSvg,
     battery: c => { body(c, 27, 6, 98, 81); for (let i = 0; i < 3; i++) { el(c.root, 'rect', { x: 37, y: 16 + i * 21, width: 77, height: 15, fill: '#31566a' }); el(c.root, 'path', { d: `M99 ${20 + i * 21}v7 m-3 -3h6`, stroke: '#e2b67c', 'stroke-width': 2 }); }
         const charge = el(c.root, 'rect', { x: 38, y: 80, height: 3, width: 75, fill: water }); c.onUpdate(dt => { const v = c.number('charge', dt); charge.setAttribute('width', String(Math.max(0, Math.min(100, v ?? 0)) * .75)); }); },
     switchgear: c => { body(c, 22, 5, 106, 83); el(c.root, 'path', { d: 'M75 10V81', stroke: metalStroke });
@@ -133,7 +128,7 @@ export function installEquipment(locale: SaturnLocale = 'en') {
         installed.add(kind);
         if (!componentRegistry.findSchematic(kind))
             componentRegistry.register(defineSchematicElement(kind, { version: '1.0.0', label: modelTitle(spec.kind, locale), ...footprint(spec.visual), visual:{glyph:glyphByVisual[spec.visual]??'generic.element',category:categoryByVisual(spec.visual),geometry:`plant.${spec.visual}`,envelope:{min:[-.8,-.6,.02],max:[.8,.6,1.9]}}, fields: { x: { label: 'X', scope: 'layout', default: 0 }, y: { label: 'Y', scope: 'layout', default: 0 } }, ports: Object.fromEntries(Object.entries(terminals(spec.visual)).map(([name,t])=>[name,{x:t.x,y:t.y,direction:t.side,role:t.role==='source'?'out':'in'}])), signals: Object.fromEntries(Object.entries(spec.outputs).map(([k, unit]) => [k, { label: k, unit, type: outputType(spec, k) }])) }));
-        registerSvgRenderer(kind, c => { shapes[spec.visual](c); if(spec.visual==='saturn')return; const key = Object.keys(spec.outputs)[0]; const text = el(c.root, 'text', { x: 75, y: 111, 'text-anchor': 'middle', 'font-family': 'ui-monospace,monospace', 'font-size': 15, fill: '#214d5f' }); c.onUpdate(dt => { const value = c.number(key, dt); text.textContent = value === null ? '—' : `${value.toFixed(2)} ${spec.outputs[key]}`; }); });
+        registerSvgRenderer(kind, c => { shapes[spec.visual](c); if(['saturn','pump','reservoir','valve'].includes(spec.visual))return; const key = Object.keys(spec.outputs)[0]; const text = el(c.root, 'text', { x: 75, y: 111, 'text-anchor': 'middle', 'font-family': 'ui-monospace,monospace', 'font-size': 15, fill: '#214d5f' }); c.onUpdate(dt => { const value = c.number(key, dt); text.textContent = value === null ? '—' : `${value.toFixed(2)} ${spec.outputs[key]}`; }); });
         register3dRenderer(kind, c => createPlantModel(c, spec.visual, Object.keys(spec.outputs)[0]));
     }
 }
@@ -168,5 +163,14 @@ export function visualFrame(project: Project, frame: Frame): RuntimeFrame {
         const alarm = relevant.some(rule => rule.priority === 'critical') ? 'trip' : relevant.length ? 'warning' : 'none';
         equipment[n.id] = { positionId: n.id, instanceId: `${frame.runId}:${n.id}`, facts: { mode: frame.paused ? 'paused' : 'simulation', alarm }, signals };
     }
-    return { runId: frame.runId, seq: frame.seq, simTimeMs: frame.time, type: 'snapshot', timestamp: frame.time, equipment, flows: {}, events: [] };
+    // A pipe displays the observed flow at its declared source terminal. No geometry-derived solver.
+    const flows: RuntimeFrame['flows'] = {};
+    for (const connection of project.connections ?? []) {
+        if (connection.medium !== 'pipe') continue;
+        const source = project.devices.find(device => device.id === connection.from.device);
+        const key = source && terminals(source.type)[connection.from.port]?.signal;
+        const sample = key && equipment[connection.from.device]?.signals[key];
+        if (sample && sample.type === 'number') flows[connection.id] = sample;
+    }
+    return { runId: frame.runId, seq: frame.seq, simTimeMs: frame.time, type: 'snapshot', timestamp: frame.time, equipment, flows, events: [] };
 }

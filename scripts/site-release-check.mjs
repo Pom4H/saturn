@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { checkLandingDemo } from './site-landing-check.mjs';
 import { checkShellUx } from './site-shell-ux-check.mjs';
+import { captureLandingProof, checkLandingStory } from './landing-proof.mjs';
 import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
@@ -26,7 +27,7 @@ try{
   await page.waitForSelector('#studio-spatial canvas',{state:'attached'});
   await page.waitForFunction(()=>document.getElementById('project-switch')?.options.length>0);
 
-  assert.equal(await page.locator('h1').innerText(),'Saturn');
+  assert.match(await page.locator('h1').innerText(),/Инженерная IDE/);
   assert.equal(await page.locator('.surface-nav .surface-tab').count(),3,'Project shell exposes stable engineering surfaces');
   assert(await page.locator('#environment-trigger').isVisible(),'Environment is persistent application context');
   assert.equal(await page.locator('#revision-source').textContent(),'demo');
@@ -48,6 +49,7 @@ try{
   const pipe=page.locator('#studio-svg [data-edge]').filter({has:page.locator('[data-water]')}).first().locator('[data-water]');
   const pipeBefore=await pipe.getAttribute('d');
   const pump=page.locator('#studio-svg [data-node="P-01"]');
+  await pump.scrollIntoViewIfNeeded();
   const box=await pump.boundingBox();
   assert(box,'Pump must be visible');
   await page.mouse.move(box.x+box.width*.6,box.y+box.height*.75);
@@ -72,6 +74,9 @@ try{
   assert.deepEqual(animations,['rotate','current','water-level'],'README equipment and water animate in the rendered SVG');
   await animated.close();
   assert.deepEqual(errors,[]);
+  await context.close();
+  await captureLandingProof(browser, process.argv.includes('--built') ? 'dist/plant/site' : 'dist/site');
+  await checkLandingStory(browser, origin);
   console.log('PASS: release shell; Project/Surface/Environment; provenance; 2D/3D projection; visual drag -> canonical TypeScript.');
 }finally{
   await browser?.close();

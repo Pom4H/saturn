@@ -9,6 +9,7 @@ export async function startWorkspaceTestServer(options: {
   data: string;
   password: string;
   root?: string;
+  autoTick?: boolean;
 }) {
   const workspace = new WorkspaceHost(options.project);
   const seed = await workspace.build();
@@ -18,7 +19,7 @@ export async function startWorkspaceTestServer(options: {
     host: '127.0.0.1',
     password: options.password,
     root: resolve(options.root ?? 'dist/plant'),
-    autoTick: false,
+    autoTick: options.autoTick ?? false,
     uiMode: 'ide',
     database,
     workspace,

@@ -1,0 +1,39 @@
+{
+  "id": "EXP-0003",
+  "question": "Can the landing explain engineering and operation with verified product evidence while keeping its editing demo simple?",
+  "hypothesis": "A role-based narrative backed by authenticated screenshots from the same build can demonstrate edit/publish/operate without adding controls to the focused demo or claiming hardware readiness.",
+  "status": "running",
+  "metrics": {
+    "demoDesktopButtons": 4,
+    "proofRoles": 2,
+    "captureThemes": 2,
+    "newWorkflows": 0
+  },
+  "evidencePlan": [
+    "Existing release tests retain two-way editing, routing during drag, undo/reset, storage isolation and full IDE handoff",
+    "Authenticated engineer publishes a project; a separate operator session opens the same applied revision after the engineer disconnects",
+    "On the small example, operate the pump, observe low flow, acknowledge the active warning and restore the setpoint; downloadable source must match exactly",
+    "Generate current-build screenshots in light and dark modes, then check their loading and provenance on the landing",
+    "Check native keyboard role selection, local links and no horizontal overflow at 320/390/768px",
+    "Visually inspect the actual generated desktop, operator and mobile screenshots"
+  ],
+  "negativeKnowledge": [
+    {
+      "hypothesis": "A marketing reconstruction is sufficient evidence of the operator experience",
+      "decision": "rejected",
+      "condition": "It would not establish that the authenticated Saturn runtime provides the shown UI"
+    },
+    {
+      "hypothesis": "A supported protocol name proves compatibility with arbitrary equipment",
+      "decision": "rejected",
+      "condition": "An equipment-specific adapter and bench validation are still required"
+    },
+    {
+      "hypothesis": "An entire multi-system training installation is a useful first operator screenshot",
+      "decision": "rejected",
+      "condition": "The full-plant fit makes equipment and operational details too small; use a bounded, executable pump example instead"
+    }
+  ],
+  "decision": "candidate: local build observed; browser verification on existing release CI",
+  "validity": "Product communication and authenticated server simulation only; no physical PLC, availability or field reliability claims. Local source retrieval used the matching Pages artifact and connector reads because the container could not resolve GitHub. The required npx usegit context attempt exited 128; no lease or work state is claimed."
+}

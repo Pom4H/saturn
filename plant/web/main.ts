@@ -1,3 +1,4 @@
+import { dslHover } from '../../src/editor-hover';
 import { bindPresentation, renderPresentation, presentationCss, presentationActions } from '../presentation';
 import { terminals, resolvePort, type Endpoint, type Connection as PhysicalConnection } from '../ports';
 import { appendConnection, addExpansionSource, removeConnection } from '../connection-edit';
@@ -323,7 +324,7 @@ async function loadFiles() {
     refreshActions();
     $('recover-draft').hidden = !sessionStorage.getItem(`scada-draft:${demo ? 'demo' : 'server'}`);
 }
-function setEditor() { loadingEditor = true; editor.setState(EditorState.create({ doc: files[file] ?? '', extensions: [basicSetup, javascript({ typescript: true }), EditorView.updateListener.of(update => { if (update.docChanged && !loadingEditor) {
+function setEditor() { loadingEditor = true; editor.setState(EditorState.create({ doc: files[file] ?? '', extensions: [dslHover({ files: () => files, path: () => file, locale: () => uiLocale, libraryUrl: () => new URL('assets/dsl-library.json', base) }), basicSetup, javascript({ typescript: true }), EditorView.updateListener.of(update => { if (update.docChanged && !loadingEditor) {
             files[file] = update.state.doc.toString();
             dirty = true;
             validDraft = false;
