@@ -113,7 +113,9 @@ export function compileProject(files: Record<string, string>, entry = files['src
         } catch (error) {
             cache.delete(path);
             if (error instanceof SaturnDiagnosticError) {
-                error.diagnostic.data = { path, ...(error.diagnostic.data ?? {}) };
+                // Preserve the innermost source owner (and any native TS range).
+                // A runtime DSL error identifies its module, not an invented span.
+                error.diagnostic.data = { path, source: { path }, ...(error.diagnostic.data ?? {}) };
             }
             throw error;
         } finally {
