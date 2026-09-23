@@ -31,9 +31,8 @@ try {
   const primaryHeading = page.locator('h1');
   assert.equal(await primaryHeading.count(), 1, 'Landing has exactly one primary heading');
   assert((await primaryHeading.innerText()).trim().length > 0, 'Landing primary heading is not empty');
-  assert.equal(await page.locator('.capability-row').count(), 5);
-  assert.equal(await page.locator('.distribution-item').count(), 6);
-  assert.equal(await page.locator('.extension-index > div').count(), 6);
+  assert.equal(await page.locator('#workflow, #readiness, #start').count(), 3, 'Landing keeps the workflow, readiness, and start sections');
+  assert((await page.locator('a[href*="mode=ide"]').count()) > 0, 'Landing exposes an entry into the IDE');
 
   assert((await page.locator('#studio-svg [data-node]').count()) > 0, 'Published landing renders the real Saturn scene');
 
