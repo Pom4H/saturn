@@ -61,7 +61,7 @@ catalog.pressure.signals = { value: numericSignal('Давление', 'bar') };
 catalog.temperature.signals = { value: numericSignal('Температура', '°C') };
 /** Public extension point for metadata. Installed modules call this, never project text. */
 export function registerComponent(kind: string, definition: Definition): void {
-  if (!/^[a-z][a-zA-Z0-9_]{0,47}$/.test(kind) || ['__proto__', 'prototype', 'constructor', 'component', 'runtime', 'connect', 'tap'].includes(kind)) throw new Error(`Invalid component type: ${kind}`);
+  if (!/^[a-z][a-zA-Z0-9_]{0,47}$/.test(kind) || ['__proto__', 'prototype', 'constructor', 'component', 'runtime', 'pipe', 'tap'].includes(kind)) throw new Error(`Invalid component type: ${kind}`);
   if (Object.prototype.hasOwnProperty.call(catalog, kind)) throw new Error(`Duplicate component type: ${kind}`);
   if (!(Number.isFinite(definition.width) && definition.width > 0 && Number.isFinite(definition.height) && definition.height > 0) || !definition.version) throw new Error('A component needs dimensions and a version');
   if (definition.visual && (!/^[a-z][a-z0-9_.-]+$/i.test(definition.visual.glyph) || !definition.visual.geometry)) throw new Error('Invalid component visual identity');
@@ -105,8 +105,8 @@ export const exchanger = (id: string, props: Base & { temperature?: number }) =>
 export const outlet = (id: string, props: Base) => create<Equipment & { inlet: InPort }>('outlet', id, props);
 export const pressure = (id: string, props: { value?: number; at?: number; offset?: number; quality?: Quality; alarm?: Alarm }) => create<Equipment>('pressure', id, props);
 export const temperature = (id: string, props: { value?: number; at?: number; offset?: number; quality?: Quality; alarm?: Alarm }) => create<Equipment>('temperature', id, props);
-export const connect = (from: OutPort, to: InPort): Link => ({ id: `${from.node}.${from.port}:${to.node}.${to.port}`, from, to });
-export const tap = (line: Link, instrument: Equipment): Equipment => ({ ...instrument, tap: line.id });
+export const pipe = (id: string, from: OutPort, to: InPort): Link => ({ id, from, to });
+export const tap = (pipeLine: Link, instrument: Equipment): Equipment => ({ ...instrument, tap: pipeLine.id });
 
 /** Explicit, deliberately simple series-circuit DEMO. Not a hydraulic solver. */
 export function simulate(scene: Scene): { flows: Map<string, number | null>; notes: string[] } {
