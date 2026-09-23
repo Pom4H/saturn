@@ -1,8 +1,27 @@
 import { test, expect } from '@playwright/test';
 
+declare global {
+  interface Window {
+    __scada: {
+      source: string;
+      error: unknown;
+      flows: Record<string, number | null>;
+      warnings: string[];
+      setSource(source: string): void;
+      fit(): void;
+      select(id: string): void;
+      undo(): void;
+    };
+    __challengeRotor?: Element | null;
+    __challengePipe?: Element | null;
+    __rotorProbe?: Element | null;
+    __pipeProbe?: Element | null;
+  }
+}
+
 test.beforeEach(async ({ page }) => {
   await page.goto('./');
-  await page.waitForFunction(() => !!(window as any).__scada);
+  await page.waitForFunction(() => !!window.__scada);
 });
 
 test('parameter edits retain SVG nodes, routing and the paused rotor phase', async ({ page }) => {
@@ -13,17 +32,17 @@ test('parameter edits retain SVG nodes, routing and the paused rotor phase', asy
   await page.locator('#pause').click();
   const phase = await rotor.getAttribute('transform');
   await page.evaluate(() => {
-    (window as any).__rotorProbe = document.querySelector('[data-node="P-101"] [data-part="rotor"]');
-    (window as any).__pipeProbe = document.querySelector('[data-water]');
+    window.__rotorProbe = document.querySelector('[data-node="P-101"] [data-part="rotor"]');
+    window.__pipeProbe = document.querySelector('[data-water]');
   });
   await page.locator('#field-temperature').fill('85');
   await page.locator('#field-temperature').press('Tab');
   expect(await page.evaluate(() =>
-    (window as any).__rotorProbe === document.querySelector('[data-node="P-101"] [data-part="rotor"]') &&
-    (window as any).__pipeProbe === document.querySelector('[data-water]')
+    window.__rotorProbe === document.querySelector('[data-node="P-101"] [data-part="rotor"]') &&
+    window.__pipeProbe === document.querySelector('[data-water]')
   )).toBe(true);
   expect(await rotor.getAttribute('transform')).toBe(phase);
-  expect(await page.evaluate(() => (window as any).__scada.source)).toContain('temperature: 85');
+  expect(await page.evaluate(() => window.__scada.source)).toContain('temperature: 85');
   await page.locator('#pause').click();
   await expect.poll(() => rotor.getAttribute('transform')).not.toBe(phase);
 });
@@ -59,8 +78,8 @@ test('changing coordinates still reroutes after parameter-only updates', async (
   await page.locator('#field-y').fill('220');
   await page.locator('#field-y').press('Tab');
   expect(await page.locator('[data-water]').nth(2).getAttribute('d')).not.toBe(before);
-  expect(await page.evaluate(() => (window as any).__scada.flows['F-101'])).toBe(0);
+  expect(await page.evaluate(() => window.__scada.flows['F-101'])).toBe(0);
   await page.locator('#field-opening').fill('100');
   await page.locator('#field-opening').press('Tab');
-  expect(await page.evaluate(() => (window as any).__scada.flows['F-101'])).toBe(12);
+  expect(await page.evaluate(() => window.__scada.flows['F-101'])).toBe(12);
 });

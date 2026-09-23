@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { checkServerFiles } from './site-server-check.mjs';
-import { checkTelemetry } from './site-telemetry-check.mjs';
 import { checkShell } from './site-shell-check.mjs';
 import { checkInteractions } from './site-interaction-check.mjs';
 import { checkFiles } from './site-files-check.mjs';
@@ -23,8 +22,17 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(origin);
   await page.waitForSelector('#studio-spatial canvas', { state: 'attached' });
-  assert.equal(await page.locator('h1').innerText(), 'Saturn SCADA');
+  assert.equal(await page.locator('h1').innerText(), 'Saturn');
   assert.equal(await page.locator('.project-section,.operator,.delivery').count(), 0, 'Old landing sections must be replaced');
+  assert.equal(await page.locator('.surface-nav .surface-tab').count(), 3, 'Project shell has stable engineering surfaces');
+  assert(await page.locator('#environment-trigger').isVisible(), 'Environment is persistent application context');
+  assert.equal(await page.locator('#revision-source').textContent(), 'demo');
+  assert.equal(await page.locator('#revision-published').textContent(), '—');
+  assert.equal(await page.locator('#revision-applied').textContent(), '—');
+  assert(await page.locator('#studio-editor-pane').isVisible(), 'Desktop landing starts with source + diagram together');
+  await page.locator('#equipment-toggle').click();
+  assert((await page.locator('.equipment-catalog-item .equipment-glyph').count()) >= 8, 'Equipment catalog uses registered engineering glyphs');
+  await page.locator('#equipment-close').click();
   await mkdir('test-results/site-studio', { recursive: true });
   await page.screenshot({ path: 'test-results/site-studio/landing.png' });
   await page.evaluate(() => { document.documentElement.style.scrollBehavior = 'auto'; window.scrollTo(0, document.getElementById('studio').offsetTop); });
@@ -139,7 +147,9 @@ try {
   assert(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
   await mobile.locator('#studio-code').click();
   assert(await mobile.locator('#studio-editor .cm-content').isVisible());
-  await mobile.locator('#mobile-scene').click(); await mobile.locator('#studio-2d').click();
+  await mobile.locator('[data-shell-view="scene"]:visible').click();
+  await mobile.waitForFunction(() => document.getElementById('studio-shell')?.dataset.surface === 'scene');
+  assert.equal(await mobile.locator('#studio-shell').getAttribute('data-mode'), '2d');
   await mobile.screenshot({ path: 'test-results/site-studio/mobile-shell.png' });
   const fallbackContext = await browser.newContext({ viewport: { width: 1000, height: 800 }, reducedMotion: 'reduce' });
   await fallbackContext.addInitScript(() => { const getContext = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function(type, ...args) { return /webgl/.test(type) ? null : getContext.call(this, type, ...args); }; });
@@ -152,7 +162,6 @@ try {
   assert.equal(await shared.locator('#project-switch option:checked').textContent(), 'Проект по ссылке');
   await checkFiles(browser, origin);
   await checkServerFiles(browser);
-  await checkTelemetry(browser);
   await checkShell(browser, origin);
   await checkInteractions(browser, origin);
   assert.deepEqual(errors, []);

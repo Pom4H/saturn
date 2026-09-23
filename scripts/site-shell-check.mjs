@@ -55,6 +55,7 @@ export async function checkShell(browser, origin) {
     await page.locator('#files-close').click();
     await page.setViewportSize({ width: 1440, height: 1000 });
     const notificationState = () => page.evaluate(() => window.__shellNotificationTest);
+    const openSettings = () => page.locator('#shell-settings').evaluate((button) => button.click());
     assert.equal((await notificationState()).requests, 0, 'Loading the Shell must not request notification permission');
 
     // Ctrl+Shift+P belongs to commands and must not also hit the existing Ctrl+P file handler.
@@ -91,6 +92,8 @@ export async function checkShell(browser, origin) {
     await page.keyboard.press('Enter');
     assert.match((await downloaded).suggestedFilename(), /\.(ts|json)$/);
     assert.equal(await page.locator('.export-options').getAttribute('open'), null, 'Palette export does not need to open the menu');
+    await page.locator('#shell-command-dialog').waitFor({ state: 'hidden' });
+    await page.waitForFunction(() => document.activeElement?.id === 'command-launcher');
 
     await page.locator('#shell-help').focus();
     await page.keyboard.press('F1');
@@ -100,10 +103,10 @@ export async function checkShell(browser, origin) {
     assert.match(await page.locator('.shell-help-article').innerText(), /не перезаписывает/);
     await page.screenshot({ path: 'test-results/site-studio/shell-help.png' });
     await page.keyboard.press('Escape');
-    assert.equal(await page.evaluate(() => document.activeElement?.id), 'shell-help');
+    await page.locator('#shell-help-dialog').waitFor({ state: 'hidden' });
 
     // Opening settings and reading permission state must never trigger a permission prompt.
-    await page.locator('#shell-notifications').click();
+    await openSettings();
     await page.locator('#app-settings').waitFor({ state: 'visible' });
     assert.equal((await notificationState()).requests, 0, 'Notification settings must not request permission on open');
     assert.equal(await page.locator('#app-notifications-state').innerText(), 'Не включены');
@@ -129,7 +132,7 @@ export async function checkShell(browser, origin) {
     await page.waitForSelector('#studio-spatial canvas', { state: 'attached' });
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'light', 'Theme survives reload');
     assert.equal((await notificationState()).requests, 0, 'Reload also must not request permission');
-    await page.locator('#shell-settings').click();
+    await openSettings();
     assert(await page.locator('[name="app-theme"][value="light"]').isChecked());
     await page.locator('.app-theme-options label:has([value="dark"])').click();
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');

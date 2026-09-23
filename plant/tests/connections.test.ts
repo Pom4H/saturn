@@ -11,6 +11,7 @@ import { fbdCrc32 } from '../vendor/saturn/src/format';
 import { appendConnection, addExpansionSource, removeConnection } from '../connection-edit';
 import { createPlantModel } from '../visual3d';
 import * as THREE from 'three';
+import { diagnostic } from './diagnostic';
 const project=()=>compileProject(demoFiles);
 test('physical connections use exact installed anchors and all demo routes avoid equipment',()=>{
  const p=project(),routes=routeConnections(p);assert.equal(routes.length,p.connections!.length);console.log('routes',routes.length,routes.filter(r=>!r.valid));
@@ -22,7 +23,7 @@ test('compiler rejects wrong medium, opposite polarity, unknown terminals and oc
  const q=project();q.connections!.find(w=>w.id==='dc-positive')!.to.port='DC-';assert.throws(()=>validateProject(q),/Incompatible/);
 });
 test('reference Saturn terminal centers are shared with the vendor SVG, including DC and bus contacts',()=>{
- const ports=terminals('saturn');for(const p of [...SATURN_TERMINAL_ANCHORS,...SATURN_SERVICE_ANCHORS]){assert.equal(ports[p.id].x,p.x*.5);assert.equal(ports[p.id].y,p.y*.5);}
+ const saturnType:string='saturn',ports=terminals(saturnType);for(const p of [...SATURN_TERMINAL_ANCHORS,...SATURN_SERVICE_ANCHORS]){assert.equal(ports[p.id].x,p.x*.5);assert.equal(ports[p.id].y,p.y*.5);}
  assert.equal(ports['DC+'].family,'dc24');assert.equal(ports['DC-'].family,'dc0');
 });
 test('all installed visual terminal anchors match the 3D connection points',()=>{
@@ -31,9 +32,9 @@ test('all installed visual terminal anchors match the 3D connection points',()=>
  const size=footprint(d.type);for(const[name,t]of Object.entries(terminals(d.type))){assert.deepEqual(model.ports.get(name)!.toArray(),[(t.x-size.width/2)/100,-(t.y-size.height/2)/100,t.z]);assert.ok(model.root.getObjectsByProperty('type','Mesh').some(m=>m.userData.terminal===name));}model.dispose!();}
  for(const m of Object.values(mats))m.dispose();
 });
-test('FBD compilation is byte-reproducible, CRC-valid and drives actual WASM and HMI',()=>{
+test('legacy FBD logic backend is byte-reproducible, CRC-valid and drives actual WASM without owning physical HMI',()=>{
  const c=project().controllers![0],a=compileController(c),b=compileController(structuredClone(c));assert.deepEqual(a.fbdbin,b.fbdbin);assert.equal(fbdCrc32(a.fbdbin),0);
- const vm=new ControllerVM(c);assert.equal(vm.scan({AI1:400},100).outputs.DO1,0);const result=vm.scan({AI1:700},100);assert.equal(result.outputs.DO1,1);assert.ok(result.hmi.some(c=>c.type==='text'&&c.text.includes('700')));
+ const vm=new ControllerVM(c);assert.equal(vm.scan({AI1:400},100,100).outputs.DO1,0);const result=vm.scan({AI1:700},100,200);assert.equal(result.outputs.DO1,1);assert.ok(result.hmi.length>8);assert.ok(result.hmi.some(c=>c.type==='polygon'));
 });
 test('unsafe/arbitrary/stateful PLC expressions and unmapped expansion addresses are rejected',()=>{
  const c=project().controllers![0];for(const expression of [{ref:'EXP-AI4.AI1'},{op:'div',args:[1,0]},{op:'timer',args:[10]},2147483648,.5]){c.outputs.DO1=expression as never;assert.throws(()=>compileController(c));}
@@ -54,14 +55,14 @@ test('checkpoint restore and device order preserve integer PLC/HMI trajectory',(
 test('visual connection edit only patches the wiring array, stays a draft and rejects ignored arrays',()=>{
  const wire={id:'module-signal',from:{device:'LEVEL-TX',port:'value'},to:{device:'EXP-AI4',port:'AI1'},medium:'control' as const};
  // The existing sensor output uses a single conductor; a second is not silently fanned out.
- assert.throws(()=>appendConnection(demoFiles,wire),/Occupied/);
+ assert.throws(()=>appendConnection(demoFiles,wire),diagnostic('SATURN_PORT_OCCUPIED'));
  const p={...demoFiles,'wiring.ts':demoFiles['wiring.ts'].replace('export const userWires=[]','export const userWires=[] // preserved')};
  const next=appendConnection(p,{id:'power-com2',from:{device:'PSU-24',port:'minus'},to:{device:'SATURN-1',port:'COM2'},medium:'power'});
  assert.equal(next['plant.ts'],demoFiles['plant.ts']);assert.ok(next['wiring.ts'].includes('// preserved'));assert.ok(compileProject(next).connections!.some(w=>w.id==='power-com2'));
- assert.throws(()=>appendConnection({...demoFiles,'plant.ts':demoFiles['plant.ts'].replace(', ...userWires','')},{id:'ignored',from:{device:'PSU-24',port:'minus'},to:{device:'SATURN-1',port:'COM2'},medium:'power'}),/not included/);
+ assert.throws(()=>appendConnection({...demoFiles,'plant.ts':demoFiles['plant.ts'].replace(', ...userWires','')},{id:'ignored',from:{device:'PSU-24',port:'minus'},to:{device:'SATURN-1',port:'COM2'},medium:'power'}),diagnostic('SATURN_PROJECT_INVALID'));
 });
 test('expansion adds a typed slot and real module declaration without overwriting other files',()=>{
- const next=addExpansionSource(demoFiles,'SATURN-1','EXP-SECOND','expansion-2.ts',"import {simulation} from '@scada/plant'; export const module=simulation('EXP-SECOND','io-module',{system:'commissioning',at:{x:1700,y:3850}});",2),p=compileProject(next);
+ const next=addExpansionSource(demoFiles,'SATURN-1','EXP-SECOND','expansion-2.ts',"import {simulation} from '@saturn/core'; export const module=simulation('EXP-SECOND','io-module',{system:'commissioning',at:{x:1700,y:3850}});",2),p=compileProject(next);
  assert.ok(p.devices.some(d=>d.id==='EXP-SECOND'));assert.equal(p.attachments!.length,2);assert.equal(next['core.ts'],demoFiles['core.ts']);
  p.attachments![1].slot=1;assert.throws(()=>validateConnections(p),/slot/);
 });
@@ -81,12 +82,12 @@ test('disconnect patches the explicit source, preserving unrelated declarations 
  const removed=removeConnection(demoFiles,'level-input');assert.equal(removed['plant.ts'],demoFiles['plant.ts']);assert.equal(compileProject(removed).connections!.length,22);assert.ok(removed['commissioning.ts'].includes('// Generic isolated'));assert.throws(()=>removeConnection(removed,'level-input'),/literal/);
 });
 
-test('controller checkpoint rejects a changed runtime ABI rather than claiming deterministic restoration',()=>{const p=project(),k=new Kernel(p,'v','r',0);k.state.controllerAbi='unknown-runtime';assert.throws(()=>new Kernel(p,'v','r',0,k.state),/ABI mismatch/);});
+test('controller checkpoint rejects a changed runtime ABI rather than claiming deterministic restoration',()=>{const p=project(),k=new Kernel(p,'v','r',0);k.state.controllerAbi='unknown-runtime';assert.throws(()=>new Kernel(p,'v','r',0,k.state),diagnostic('SATURN_RUNTIME_INVALID',{field:'controllerAbi'}));});
 
 test('prototype members cannot masquerade as physical connectors',()=>{for(const port of ['__proto__','constructor','toString']){const p=project();p.connections![0].to.port=port;assert.throws(()=>validateProject(p),/Unknown terminal/);}assert.throws(()=>terminals('__proto__'),/No physical/);});
 
 test('a second virtual expansion is reachable by a two-conductor daisy chain, and a broken branch becomes unknown',()=>{
- const next=addExpansionSource(demoFiles,'SATURN-1','EXP-SECOND','expansion-2.ts',"import {simulation} from '@scada/plant'; export const module=simulation('EXP-SECOND','io-module',{system:'commissioning',at:{x:1600,y:3480}});",2),p=compileProject(next);
+ const next=addExpansionSource(demoFiles,'SATURN-1','EXP-SECOND','expansion-2.ts',"import {simulation} from '@saturn/core'; export const module=simulation('EXP-SECOND','io-module',{system:'commissioning',at:{x:1600,y:3480}});",2),p=compileProject(next);
  for(const [id,a,b,medium] of [['chain-a','busA','busA','bus'],['chain-b','busB','busB','bus'],['second-plus','plus','plus','power'],['second-minus','minus','minus','power']] as const)p.connections!.push({id,from:{device:medium==='bus'?'EXP-AI4':'PSU-24',port:a},to:{device:'EXP-SECOND',port:b},medium});
  p.connections!.find(w=>w.id==='level-input')!.to={device:'EXP-SECOND',port:'AI1'};validateProject(p);const a=new Kernel(p,'v','r',0);for(let i=0;i<30;i++)a.step();assert.equal(a.frame().samples['EXP-SECOND.channel1'].value,300);
  p.connections=p.connections!.filter(w=>w.id!=='module-b');validateProject(p);const b=new Kernel(p,'v','r',0);for(let i=0;i<30;i++)b.step();assert.equal(b.frame().samples['EXP-SECOND.channel1'].quality,'bad');

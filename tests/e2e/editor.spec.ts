@@ -1,12 +1,31 @@
 import { test, expect, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { booster } from '../../src/examples';
+
+declare global {
+  interface Window {
+    __scada: {
+      source: string;
+      error: unknown;
+      flows: Record<string, number | null>;
+      warnings: string[];
+      setSource(source: string): void;
+      fit(): void;
+      select(id: string): void;
+      undo(): void;
+    };
+    __challengeRotor?: Element | null;
+    __challengePipe?: Element | null;
+    __rotorProbe?: Element | null;
+    __pipeProbe?: Element | null;
+  }
+}
 async function open(page:Page){
  await page.goto('./');
- await page.waitForFunction(()=>!!(window as any).__scada);
+ await page.waitForFunction(()=>!!window.__scada);
 }
 
-const api=(page:Page)=>page.evaluate(()=>({source:(window as any).__scada.source,error:(window as any).__scada.error,flows:(window as any).__scada.flows,warnings:(window as any).__scada.warnings}));
+const api=(page:Page)=>page.evaluate(()=>({source:window.__scada.source,error:window.__scada.error,flows:window.__scada.flows,warnings:window.__scada.warnings}));
 async function choose(page:Page,id:string){await page.locator(`[data-node="${id}"]`).click();await expect(page.locator('.inspector-id')).toHaveText(id);}
 async function field(page:Page,name:string,value:string){const el=page.locator(`#field-${name}`);await el.fill(value);await el.press('Tab');}
 const rotor=(page:Page)=>page.locator('[data-node="P-101"] [data-part="rotor"]').getAttribute('transform');
@@ -52,23 +71,23 @@ test('all equipment fields mutate the same source, with no disconnected UI state
  }
 });
 test('editing TS updates positions and reports bad code without losing last good frame',async({page})=>{
- await page.evaluate(s=>(window as any).__scada.setSource(s),booster.replace('rpm: 1500','rpm: 700'));
+ await page.evaluate(s=>window.__scada.setSource(s),booster.replace('rpm: 1500','rpm: 700'));
  expect((await api(page)).flows['P-101']).toBeCloseTo(12*700/1500*.76);
- await page.evaluate(()=>(window as any).__scada.setSource('while (true) {}'));
+ await page.evaluate(()=>window.__scada.setSource('while (true) {}'));
  await expect(page.locator('#error-banner')).toBeVisible();await expect(page.locator('[data-node]')).toHaveCount(8);expect((await api(page)).error).not.toBeNull();
- await page.evaluate(()=>(window as any).__scada.undo());expect((await api(page)).error).toBeNull();
+ await page.evaluate(()=>window.__scada.undo());expect((await api(page)).error).toBeNull();
 });
 test('source may be typed with keyboard and undone',async({page})=>{
  await page.locator('.cm-content').click();await page.keyboard.press('ControlOrMeta+End');await page.keyboard.type('\n// keyboard roundtrip');
  expect((await api(page)).source).toContain('// keyboard roundtrip');await page.keyboard.press('ControlOrMeta+z');expect((await api(page)).error).toBeNull();
 });
 test('computed coordinates cannot be overwritten with a drag or inspector',async({page})=>{
- await page.evaluate(s=>(window as any).__scada.setSource(s),booster.replace('x: 325','x: 300 + 25'));
+ await page.evaluate(s=>window.__scada.setSource(s),booster.replace('x: 325','x: 300 + 25'));
  await choose(page,'P-101');await expect(page.locator('#field-x')).toBeDisabled();expect((await api(page)).source).toContain('x: 300 + 25');
 });
 test('palette append, delete, undo work; connect creates TS and tap attaches to it',async({page})=>{
  const s='import { tank, pump } from "@scada/core";\nconst a=tank("T",{x:50,y:250});\nconst b=pump("P",{x:400,y:338});';
- await page.evaluate(s=>{(window as any).__scada.setSource(s);(window as any).__scada.fit()},s);
+ await page.evaluate(s=>{window.__scada.setSource(s);window.__scada.fit()},s);
  await page.locator('#connect-mode').click();await page.locator('[data-owner="T"][data-port="outlet"]').click();await page.locator('[data-owner="P"][data-port="inlet"]').click();
  expect((await api(page)).source).toContain('connect(a.outlet, b.inlet)');await expect(page.locator('[data-edge]')).toHaveCount(1);
  await page.locator('[data-edge] .edge-hit').click();await page.getByRole('button',{name:'+ Манометр',exact:true}).click();await expect(page.locator('[data-kind="pressure"]')).toHaveCount(1);
@@ -91,11 +110,11 @@ test('help dialog and standalone HTML export are usable',async({page})=>{
 test('TS export equals exact source, import and reload retain source',async({page})=>{
  await choose(page,'P-101');await field(page,'rpm','800');const s=(await api(page)).source;
  const dEvent=page.waitForEvent('download');await page.locator('#save').click();const d=await dEvent;expect(await readFile((await d.path())!,'utf8')).toBe(s);
- await page.reload();await page.waitForFunction(()=>!!(window as any).__scada);expect((await api(page)).source).toBe(s);
+ await page.reload();await page.waitForFunction(()=>!!window.__scada);expect((await api(page)).source).toBe(s);
  const context=await page.context().browser()!.newContext();const fresh=await context.newPage();await fresh.goto('http://127.0.0.1:4173/scada/');await fresh.locator('#file').setInputFiles({name:'roundtrip.ts',mimeType:'text/plain',buffer:Buffer.from(s)});expect((await api(fresh)).source).toBe(s);await context.close();
 });
 test('shared source loads from a unicode-safe URL hash',async({page})=>{
- const s=booster.replace('opening: 76','opening: 33'),code=Buffer.from(s).toString('base64url');await page.goto('./#code='+code);await page.waitForFunction(()=>!!(window as any).__scada);expect((await api(page)).source).toBe(s);
+ const s=booster.replace('opening: 76','opening: 33'),code=Buffer.from(s).toString('base64url');await page.goto('./#code='+code);await page.waitForFunction(()=>!!window.__scada);expect((await api(page)).source).toBe(s);
 });
 
 test('deselect and deletion clear stale inspector controls',async({page})=>{

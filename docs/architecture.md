@@ -1,4 +1,4 @@
-# Architecture
+> **System-level architecture:** [ADR-0001 — Saturn system architecture](adr/0001-saturn-system-architecture.md) defines the application/project/runtime boundaries, Git release model, runtime authority, instance-to-instance live environments, standalone modes, extensions and update lifecycle. This document describes the lower-level runtime/component contracts inside that system.\n\n# Architecture
 
 The authored project is one TypeScript document. Equipment configuration is separate from server runs, commands, actual equipment state and sensor observations. A runtime frame never becomes a CodeMirror transaction, a local-storage write or a source edit.
 

@@ -1,4 +1,4 @@
-import { system, simulation, signal, add, div } from '@scada/plant';
+import { system, simulation, signal, add, div } from '@saturn/core';
 export const steamSystem = system('steam', 'Паровой тракт и турбогенератор', 'unit4');
 export const separatorA = simulation('DRUM-A', 'separator', {
     system: 'steam', at: { x: 1540, y: 520 },

@@ -1,8 +1,9 @@
-import { terminals, footprint } from './ports';
+import { terminals, footprint, type Side, type Terminal } from './ports';
 import { drawHmiCanvas, getDisplay } from './hmi-view';
 import { renderSaturnPlcSvg } from './saturn-view';
 import type * as THREE from 'three';
 import type { EquipmentModel3D, Renderer3DContext } from '../src/view';
+import { materialPresets, type MaterialPreset } from '../src/elements/materials';
 
 /** Schematic Z-up equipment, using the host's metal/teal/dark palette.
  * No plant coordinates, real reactor geometry or behavior lives in the renderer. */
@@ -13,8 +14,11 @@ export function createPlantModel(c: Renderer3DContext, visual: string, readout: 
     const owned: THREE.Material[] = [];
     const instances: THREE.InstancedMesh[] = [];
     const update: ((dt: number) => void)[] = [];
-    const material = (color: number) => { const m = new T.MeshStandardMaterial({ color, roughness: .5, metalness: .35 }); owned.push(m); return m; };
-    const copper = material(0xd39b51), red = material(0xc45544);
+    const material = (preset: MaterialPreset) => {
+        const m = new T.MeshStandardMaterial({ color:preset.color, roughness:preset.roughness, metalness:preset.metalness, transparent:(preset.opacity??1)<1, opacity:preset.opacity??1 });
+        owned.push(m); return m;
+    };
+    const copper = material(materialPresets.copper), red = material(materialPresets.danger);
     const mesh = (g: THREE.BufferGeometry, m: THREE.Material, x = 0, y = 0, z = 0, parent: THREE.Object3D = root) => {
         geometries.add(g); const n = new T.Mesh(g, m); n.position.set(x, y, z); n.castShadow = true; n.receiveShadow = true; parent.add(n); return n;
     };
@@ -186,7 +190,7 @@ export function createPlantModel(c: Renderer3DContext, visual: string, readout: 
                 const screen=new T.CanvasTexture(hmi);screen.colorSpace=T.SRGBColorSpace;
                 const screenMaterial=new T.MeshBasicMaterial({map:screen,side:T.DoubleSide});owned.push(screenMaterial);
                 mesh(new T.PlaneGeometry(1.11,.79),screenMaterial,0,.1,1.02);
-                let key='';update.push(()=>{const next=JSON.stringify(getDisplay(c.equipment.id));if(next!==key){key=next;drawHmiCanvas(hmi,c.equipment.id);screen.needsUpdate=true;}});
+                let key='';update.push(()=>{const next=JSON.stringify(getDisplay(c.equipment.id));if(next!==key){key=next;drawHmiCanvas(hmi,c.equipment.id,()=>{screen.needsUpdate=true;c.invalidate?.();});}});
                 // Textures are separate GPU resources, retained until the device is disposed.
                 textureDisposers.push(()=>{img.onload=null;texture.dispose();screen.dispose();});
             }
@@ -195,9 +199,10 @@ export function createPlantModel(c: Renderer3DContext, visual: string, readout: 
         default: throw new Error(`No installed 3D anatomy for ${visual}`);
     }
     const size=footprint(visual);
-    for(const [name,p] of Object.entries(terminals(visual))){
+    const directions:Record<Side,THREE.Vector3>={left:new T.Vector3(-1,0,0),right:new T.Vector3(1,0,0),up:new T.Vector3(0,1,0),down:new T.Vector3(0,-1,0)};
+    for(const [name,p] of Object.entries(terminals(visual)) as [string,Terminal][]){
         const point=new T.Vector3((p.x-size.width/2)/100,-(p.y-size.height/2)/100,p.z);
-        const normal=({left:new T.Vector3(-1,0,0),right:new T.Vector3(1,0,0),up:new T.Vector3(0,1,0),down:new T.Vector3(0,-1,0)})[p.side];
+        const normal=directions[p.side];
         ports.set(name,point);portNormals.set(name,normal);
         const socket=mesh(new T.SphereGeometry(visual==='saturn'?.027:.047,8,6),p.medium==='pipe'?steel:p.medium==='power'?copper:teal,point.x,point.y,point.z);
         socket.userData.terminal=name;socket.userData.endpoint=point.toArray();

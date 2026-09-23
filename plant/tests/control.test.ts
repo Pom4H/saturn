@@ -6,19 +6,20 @@ import { demoFiles } from '../demo/files';
 import { runControlTrace } from './control-trace';
 import { Kernel } from '../kernel';
 import { Service } from '../service';
-import { Store, LocalRepository } from '../store';
+import { Store } from '../store';
 import { NodeSql } from '../adapters/node-sql';
 import { model, models } from '../models';
 import { createPlantModel } from '../visual3d';
 import type { Actor, Project } from '../types';
+import { diagnostic } from './diagnostic';
+import { buildArtifact } from '../artifact';
 const operator: Actor = { id: 'operator', role: 'operator' };
 const engineer: Actor = { id: 'engineer', role: 'engineer' };
 const source = () => compileProject(demoFiles);
 async function service() {
     const store = new Store(new NodeSql()); let n = 0;
-    const repository = new LocalRepository(store, () => `local:${++n}`);
-    const s = new Service(store, repository, { now: () => 1000, uuid: () => `id-${++n}`, reportRunner: async () => ({ rows: [], html: '' }) });
-    await s.start(demoFiles); return s;
+    const s = new Service(store, { now: () => 1000, uuid: () => `id-${++n}`, reportRunner: async () => ({ rows: [], html: '' }) });
+    await s.start(await buildArtifact(demoFiles, { packageName: '@saturn/test' })); return s;
 }
 const payload = (s: Service, target = 'MAKEUP', value = .2) => ({ id: 'input-1', action: 'operate', revision: s.frame().revision, runId: s.frame().runId, target, value });
 
@@ -53,20 +54,20 @@ test('interlock closes continuously, clears old demand and never auto-restarts',
     const k = new Kernel(source(), 'r', 'run', 0); k.operate('DRAW', .8);
     k.state.states['AUX-TANK'].inventory = .5; k.step();
     assert.equal(k.samples()['DRAW.blocked'].value, 1); assert.equal(k.samples()['DRAW.requested'].value, 0);
-    assert.throws(() => k.operate('DRAW', .8), /Низкий запас/);
+    assert.throws(() => k.operate('DRAW', .8), diagnostic('SATURN_RUNTIME_INVALID',{control:'DRAW'}));
     k.state.states['AUX-TANK'].inventory = 5; k.step(); assert.equal(k.samples()['DRAW.blocked'].value, 0);
     assert.equal(k.samples()['DRAW.value'].value, 0);
 });
 test('unknown interlock input blocks operation rather than treating missing as zero', () => {
     const p = source(); p.controls![0].enableWhen = { op: 'div', args: [1, 0] }; p.controls![0].safeValue = 0; p.controls![0].blockedReason = 'Unknown data'; validateProject(p);
-    const k = new Kernel(p, 'r', 'run', 0); assert.throws(() => k.operate('MAKEUP', .2), /Unknown data/); k.step(); assert.equal(k.samples()['MAKEUP.value'].value, 0);
+    const k = new Kernel(p, 'r', 'run', 0); assert.throws(() => k.operate('MAKEUP', .2), diagnostic('SATURN_RUNTIME_INVALID',{control:'MAKEUP',blockedReason:'Unknown data'})); k.step(); assert.equal(k.samples()['MAKEUP.value'].value, 0);
 });
 test('operator commands enforce role, run identity, idempotency and bounds', async () => {
     const s = await service(); try {
         const cmd = payload(s); assert.throws(() => s.command(cmd, {id:'view',role:'viewer'}), /permission/);
-        assert.throws(() => s.command({...cmd, runId:'stale'}, operator), /run changed/);
+        assert.throws(() => s.command({...cmd, runId:'stale'}, operator), diagnostic('SATURN_CONFLICT'));
         const first = s.command(cmd, operator); assert.deepEqual(s.command(cmd, operator), first);
-        assert.throws(() => s.command({...cmd, value:.1}, operator), /reused/);
+        assert.throws(() => s.command({...cmd, value:.1}, operator), diagnostic('SATURN_CONFLICT',{id:cmd.id}));
         assert.throws(() => s.command({...cmd, id:'range', value:999}, operator));
         assert.equal(s.store.db.all('SELECT * FROM commands').length, 1);
         assert.ok(s.store.db.all("SELECT * FROM events WHERE type='command.rejected'").length >= 2);
@@ -76,8 +77,8 @@ test('control failure leaves checkpoint unchanged and accepted values survive re
     const s = await service(); try {
         s.command(payload(s), operator); s.tick(); const before = s.frame();
         assert.throws(() => s.command({...payload(s), id:'bad', target:'absent'}, operator)); assert.deepEqual(s.frame(), before);
-        const restored = new Service(s.store, s.repository, {reportRunner:async()=>({rows:[],html:''})}); await restored.start(demoFiles); assert.deepEqual(restored.frame(), before);
-        await s.restart(engineer); assert.throws(() => s.command({...payload(s), id:'old-run',runId:before.runId}, operator), /run changed/);
+        const restored = new Service(s.store, {reportRunner:async()=>({rows:[],html:''})}); await restored.start(await buildArtifact(demoFiles, { packageName: '@saturn/test' })); assert.deepEqual(restored.frame(), before);
+        await s.restart(engineer); assert.throws(() => s.command({...payload(s), id:'old-run',runId:before.runId}, operator), diagnostic('SATURN_CONFLICT'));
     } finally { s.store.db.close(); }
 });
 test('reservoir mass balance closes across empty, filling and overflow states', () => {

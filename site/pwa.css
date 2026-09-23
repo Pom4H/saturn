@@ -1,12 +1,12 @@
 .app-settings {
-  --app-bg: var(--shell-panel, #202125);
-  --app-text: var(--shell-text, #e6e7ea);
-  --app-muted: var(--shell-muted, #a1a2aa);
-  --app-border: var(--shell-border, #35363d);
-  --app-hover: var(--shell-hover, #303138);
+  --app-bg: var(--shell-panel);
+  --app-text: var(--shell-text);
+  --app-muted: var(--shell-muted);
+  --app-border: var(--shell-border);
+  --app-hover: var(--shell-hover);
   box-sizing: border-box; width: min(490px, calc(100vw - 32px)); max-height: min(760px, calc(100dvh - 48px));
   padding: 0; border: 1px solid var(--app-border); border-radius: 14px;
-  background: var(--app-bg); color: var(--app-text); box-shadow: 0 24px 90px #0007;
+  background: var(--app-bg); color: var(--app-text); box-shadow: var(--shadow-modal);
   font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; overflow: auto;
 }
 .app-settings::backdrop { background: #0007; backdrop-filter: blur(4px); }
@@ -19,7 +19,7 @@
 .app-settings button { min-height: 32px; padding: 5px 10px; border: 1px solid var(--app-border); border-radius: 7px; background: transparent; color: var(--app-text); font: inherit; cursor: pointer; }
 .app-settings button:hover { background: var(--app-hover); }
 .app-settings button:disabled { opacity: .45; cursor: default; }
-.app-settings button:focus-visible, .app-settings a:focus-visible { outline: 2px solid #9baeff; outline-offset: 3px; }
+.app-settings button:focus-visible, .app-settings a:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
 .app-settings button.app-settings-close { width: 30px; height: 30px; min-height: 30px; padding: 0; font-size: 22px; line-height: 1; border: 0; color: var(--app-muted); }
 .app-settings-body { padding: 0 20px; }
 .app-settings-section { padding: 18px 0; }
@@ -31,12 +31,12 @@
 .app-settings-status > div { display: flex; justify-content: space-between; gap: 16px; }
 .app-settings-status dt { color: var(--app-muted); }
 .app-settings-status dd { margin: 0; text-align: right; }
-.app-theme-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 3px; margin: 12px 0 0; background: var(--shell-bg, #17181c); border: 1px solid var(--app-border); border-radius: 8px; }
+.app-theme-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 3px; margin: 12px 0 0; background: var(--shell-bg); border: 1px solid var(--app-border); border-radius: 8px; }
 .app-theme-options label { position: relative; cursor: pointer; }
 .app-theme-options input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .app-theme-options span { display: block; text-align: center; border-radius: 5px; padding: 6px; color: var(--app-muted); font-size: 12px; }
 .app-theme-options input:checked + span { background: var(--app-hover); color: var(--app-text); }
-.app-theme-options input:focus-visible + span { outline: 2px solid #9baeff; outline-offset: 2px; }
+.app-theme-options input:focus-visible + span { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .app-settings .app-settings-footnote { margin-bottom: 0; }
 .app-settings a { color: var(--app-text); text-decoration-color: var(--app-muted); text-underline-offset: 3px; }
 .app-settings-message { padding: 0 20px 16px; color: var(--app-muted); font-size: 12px; }

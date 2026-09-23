@@ -1,4 +1,4 @@
-import { control, signal, simulation, system, add, mul, div, gt, alarm } from '@scada/plant';
+import { control, signal, simulation, system, add, mul, div, gt, alarm } from '@saturn/core';
 // A separate normalized service loop; this is not a real plant's equipment layout.
 export const auxiliarySystem = system('auxiliary', 'Вспомогательные системы', 'unit4');
 export const waterSystem = system('aux-water', 'Запас воды и регулирование', 'auxiliary');

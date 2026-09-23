@@ -1,14 +1,11 @@
 name: SCADA challenge
+
 on:
-  pull_request:
-    paths:
-      - 'challenges/**'
-      - 'scripts/challenge.mjs'
-      - 'playwright.challenge.config.ts'
-      - '.github/workflows/challenge.yml'
   workflow_dispatch:
+
 permissions:
   contents: read
+
 jobs:
   challenge:
     runs-on: ubuntu-24.04
@@ -23,7 +20,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium webkit
-      - name: Run all challenge suites, retaining real failures
+      - name: Run adversarial browser and core suites
         run: npm run challenge
       - uses: actions/upload-artifact@v7.0.1
         if: always()

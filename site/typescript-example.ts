@@ -2,7 +2,7 @@
 export const bankCounts = [1, 4, 8] as const;
 export function bankExample(count: number) {
   if (!bankCounts.some(value => value === count)) throw new Error('Unsupported example size');
-  const source = `import { bank } from '@scada/plant';
+  const source = `import { bank } from '@saturn/core';
 
 export const pumps = bank('PUMP-', 'pump', {
   count: ${count},
@@ -13,7 +13,7 @@ export const pumps = bank('PUMP-', 'pump', {
 `;
   const files: Record<string, string> = {
     'equipment.ts': source,
-    'plant.ts': `import { project, system } from '@scada/plant';
+    'plant.ts': `import { project, system } from '@saturn/core';
 import { pumps } from './equipment';
 import { screen } from './views';
 
@@ -26,7 +26,7 @@ export default project('pump-bank', {
   signals: [], alarms: [], reports: [],
 });
 `,
-    'views.ts': `import { view, panel, readout, aggregate } from '@scada/plant';
+    'views.ts': `import { view, panel, readout, aggregate } from '@saturn/core';
 import { pumps } from './equipment';
 
 export const screen = view('operator', {

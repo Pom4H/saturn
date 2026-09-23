@@ -1,6 +1,13 @@
-import { simulation, bank, aggregate, control, gt, signal } from '../dsl';
+import { simulation, bank, aggregate, control, gt, signal, add, mul, report, reportField, numberField, reportSchema, reportColumn, excelColumn, excelSheet, workbook, asc } from '../dsl';
+import type { ExpressionDimensionOf, SignalDimensionOf, SignalId, SignalUnitOf, SignalValueOf } from '../types';
+type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
+type Assert<T extends true> = T;
 const pump = simulation('P', 'pump', { system: 'cooling', at: { x: 0, y: 0 }, inputs: { voltage: 1 }, parameters: { inertia: 2 } });
 const flow = pump.flow;
+type _FlowId = Assert<Equal<SignalId<typeof flow>, 'P.flow'>>;
+type _FlowValue = Assert<Equal<SignalValueOf<typeof flow>, number>>;
+type _FlowUnit = Assert<Equal<SignalUnitOf<typeof flow>, 'отн.'>>;
+type _FlowDimension = Assert<Equal<SignalDimensionOf<typeof flow>, 'flow'>>;
 // @ts-expect-error Signals are inferred from installed model metadata.
 pump.pressure;
 // @ts-expect-error Unknown model parameter.
@@ -29,3 +36,79 @@ const heatBalance = lab.balance;
 lab.reactivity;
 // @ts-expect-error Invalid drive input must not typecheck.
 simulation('DRIVE', 'electric-motor', {system:'lab', at:{x:0,y:0}, inputs:{frequency:50}});
+
+
+type _BlockedId = Assert<Equal<SignalId<typeof valveDemand.blocked>, 'DEMAND.blocked'>>;
+type _BlockedValue = Assert<Equal<SignalValueOf<typeof valveDemand.blocked>, boolean>>;
+type _BlockedUnit = Assert<Equal<SignalUnitOf<typeof valveDemand.blocked>, 'лог.'>>;
+
+
+const typedRows = reportSchema({
+    time: numberField('ms'),
+    flow: reportField(pump.flow),
+    blocked: reportField(valveDemand.blocked),
+});
+const typedReport = report('typed-report', {
+    title: 'Typed report',
+    on: { workflow_dispatch: {} },
+    signals: [pump.flow, valveDemand.blocked],
+    window: 60_000,
+    sql: 'SELECT 0 AS time, 1 AS flow, 0 AS blocked',
+    schema: typedRows,
+    columns: [
+        reportColumn('Time', typedRows.time),
+        reportColumn('Flow', typedRows.flow),
+        reportColumn('Blocked', typedRows.blocked),
+    ],
+    excel: workbook([
+        excelSheet('Signals', typedRows, {
+            columns: [
+                excelColumn('Time', typedRows.time, { format: '0' }),
+                excelColumn('Flow', typedRows.flow, { format: '0.00' }),
+                excelColumn('Blocked', typedRows.blocked),
+            ],
+            sort: [asc(typedRows.time)],
+            freezeRows: 1,
+            autoFilter: true,
+        }),
+    ]),
+});
+void typedReport;
+// @ts-expect-error Reports consume typed signal refs, not unchecked string IDs.
+report('bad-signals', { title:'Bad', on:{workflow_dispatch:{}}, signals:['P.flow'], window:1000, sql:'SELECT 1 AS x', columns:[{key:'x',title:'x'}] });
+// @ts-expect-error Boolean fields do not accept numeric Excel formats.
+excelColumn('Blocked', typedRows.blocked, { format: '0.00' });
+
+const guard = simulation('GUARD', 'protection', {
+    system: 'lab',
+    at: { x: 0, y: 0 },
+    inputs: { temperature: 1, power: 1, demand: 0 },
+});
+type _TripId = Assert<Equal<SignalId<typeof guard.trip>, 'GUARD.trip'>>;
+type _TripValue = Assert<Equal<SignalValueOf<typeof guard.trip>, boolean>>;
+type _TripUnit = Assert<Equal<SignalUnitOf<typeof guard.trip>, 'лог.'>>;
+
+// Dimensions participate in authoring types, while runtime IR remains plain refs/ops.
+const gridTyped = simulation('GRID-T', 'supply', { system: 'cooling', at: { x: 0, y: 0 } });
+simulation('P-TYPED', 'pump', {
+    system: 'cooling',
+    at: { x: 0, y: 0 },
+    inputs: { voltage: gridTyped.voltage },
+});
+simulation('P-WRONG-DIM', 'pump', {
+    system: 'cooling',
+    at: { x: 0, y: 0 },
+    // @ts-expect-error Flow cannot feed a voltage input.
+    inputs: { voltage: pump.flow },
+});
+// @ts-expect-error add() requires compatible dimensions.
+const impossibleSum = add(pump.flow, pump.rpm);
+void impossibleSum;
+simulation('P-WRONG-TYPE', 'pump', {
+    system: 'cooling',
+    at: { x: 0, y: 0 },
+    // @ts-expect-error Boolean signals cannot feed numeric model inputs.
+    inputs: { voltage: valveDemand.blocked },
+});
+const scaledFlow = mul(pump.flow, .5);
+type _ScaledFlowDimension = Assert<Equal<ExpressionDimensionOf<typeof scaledFlow>, 'flow'>>;

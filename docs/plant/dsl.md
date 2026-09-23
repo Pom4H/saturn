@@ -2,12 +2,12 @@
 
 The project is a map of UTF-8 source files with `plant.ts` as its entry. It is a bounded declarative TypeScript subset, interpreted through the TypeScript AST. No project code is evaluated as JavaScript. Named imports, const declarations, explicit values, ordinary scalar arithmetic, arrays/spreads and installed DSL functions are supported. Relative imports resolve only inside the immutable supplied project. Functions, loops, getters, arbitrary calls and imports from the network/filesystem are rejected.
 
-For a normal TypeScript-aware IDE, the same functions are available through the public `./plant` package export. The workbench's metadata validator remains authoritative at runtime.
+For TypeScript-aware tooling, authored projects use the canonical `@saturn/core` module. The bounded Saturn compiler remains authoritative at runtime. Legacy project module names are rejected instead of being kept as compatibility aliases.
 
 ## Decomposition
 
 ```ts
-import { system, simulation, bank, aggregate, derived, signal } from '@scada/plant';
+import { system, simulation, bank, aggregate, derived, signal } from '@saturn/core';
 
 export const cooling = system('cooling', 'Circulation', 'unit');
 export const supply = simulation('GRID', 'supply', {
@@ -34,7 +34,7 @@ Model output keys, input names and parameter names are inferred from literal met
 `equipment()` binds arbitrary signal expressions to an installed visual type. When omitted from the project, devices are derived from simulation metadata. A visual consumes observations and never advances a model. A device may use a derived value or the output of a model in another subsystem. The current live source is simulation; real PLC/network adapters are **not implemented by this change**.
 
 ```ts
-import { equipment, signal } from '@scada/plant';
+import { equipment, signal } from '@saturn/core';
 export const gauge = equipment('FLOW-GAUGE', 'sensor', {
   system: 'cooling', at: { x: 50, y: 250 },
   signals: { value: signal('loop.flow') },
@@ -58,7 +58,7 @@ The same policy can be set for a model output using `history: { flow: { ... } }`
 ## Alarms
 
 ```ts
-import { alarm, signal } from '@scada/plant';
+import { alarm, signal } from '@saturn/core';
 const highTemperature = alarm('temperature-high', {
   title: 'High temperature', signal: signal('loop.temperature'),
   above: 1.6, clearBelow: 1.5, delay: 1000,
@@ -71,7 +71,7 @@ Alarm activation, acknowledgement, return to normal and measurement quality are 
 ## Reports
 
 ```ts
-import { report } from '@scada/plant';
+import { report } from '@saturn/core';
 export const flow = report('flow-hour', {
   title: 'Flow history',
   on: {
@@ -109,7 +109,7 @@ segments(signal TEXT, start INTEGER, end INTEGER, value REAL, quality TEXT)
 
 For volume from a flow rate in m³/h, integrate good segments with `SUM(value*(end-start)/3600000.0)` and expose coverage. Such units are not implicitly assumed for normalized model signals. Counter resets/rollovers are not automatically corrected by this generic query API.
 
-For a chart, return an x column and a numeric-or-null y column and specify `chart: {x, y, title}`. Null/unknown points split the SVG line. Templates are deliberately limited to an escaped table and optional SVG plot, rather than unrestricted HTML/JS execution. Import of third-party report formats belongs in external migration adapters, not the core. Adding a new report needs no HTTP route or rendering component.
+For a chart, return an x column and a numeric-or-null y column. Reports support `type: 'line' | 'bar'`; null/unknown points split a line and are omitted from bars. `unit` is rendered explicitly rather than inferred.\n\nReports may declare summary metrics with `sum`, `avg`, `min`, `max` or `last`. The default Saturn report layout is designed for screen and A4 print: masthead, report title/description, tabular-numeric KPI row, chart before the detailed table, provenance footer and repeating table headers. Rendering stays deterministic: escaped HTML/CSS/SVG only, with no report JavaScript, remote assets or live reads after the report capsule is frozen.\n\nTemplates are deliberately limited to presentation primitives rather than unrestricted HTML/JS execution. Import of third-party report formats belongs in external migration adapters, not the core. Adding a new report needs no HTTP route or rendering component.
 
 ## Root
 

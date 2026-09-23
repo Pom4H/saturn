@@ -1,18 +1,15 @@
 import { build } from 'esbuild';
+import { rawText } from './esbuild-raw-text.mjs';
 import { chromium } from '@playwright/test';
-import { mkdtemp, mkdir, rm, copyFile, readFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, copyFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomBytes } from 'node:crypto';
 
-const raw = { name: 'project-source', setup(b) {
-  b.onResolve({ filter: /\?raw$/ }, a => ({ path: resolve(a.resolveDir, a.path.slice(0, -4)), namespace: 'raw' }));
-  b.onLoad({ filter: /.*/, namespace: 'raw' }, async a => ({ contents: await readFile(a.path, 'utf8'), loader: 'text' }));
-} };
 const out = process.env.SATURN_TOUR_OUT ?? 'product-tour';
 await mkdir(out, { recursive: true });
-await build({ entryPoints: ['plant/server.ts'], outfile: '.plant/tour-server.mjs', bundle: true, platform: 'node', format: 'esm', packages: 'external', plugins: [raw] });
+await build({ entryPoints: ['plant/server.ts'], outfile: '.plant/tour-server.mjs', bundle: true, platform: 'node', format: 'esm', packages: 'external', plugins: [rawText] });
 const { startPlantServer } = await import(pathToFileURL(join(process.cwd(), '.plant/tour-server.mjs')));
 const work = await mkdtemp(join(tmpdir(), 'saturn-tour-'));
 const password = () => randomBytes(24).toString('base64url');

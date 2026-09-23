@@ -1,5 +1,5 @@
-import { registry } from '../src/next/components';
-import type { Asset, Quality, Sample, Signals } from '../src/next/model';
+import { registry } from '../src/elements/core-elements';
+import type { Asset, Quality, Sample, Signals } from '../src/elements/model';
 export const assets: Asset[] = [
   { ...registry.create('process.tank.vertical', 'TK-101'), pose3D: { position: [-3.1, 0, 0], rotation: [0, 0, 0, 1] }, layout2D: { x: 110, y: 65, rotation: 0 } },
   { ...registry.create('process.pump.centrifugal', 'P-101'), pose3D: { position: [0, 0, 0], rotation: [0, 0, 0, 1] }, layout2D: { x: 410, y: 65, rotation: 0 } },

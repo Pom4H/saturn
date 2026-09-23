@@ -1,4 +1,7 @@
 import { registerComponent } from '../../core';
+import { deriveSchematicProjection } from '../../elements/model';
+import { registry as elementRegistry } from '../../elements/core-elements';
+const projection=deriveSchematicProjection(elementRegistry.get('process.filter.inline'),{}, {width:130,height:100});
 registerComponent('filter', {
   version: '1.0.0', label: 'Фильтр', prefix: 'FLT', width: 130, height: 100,
   fields: {
@@ -7,7 +10,8 @@ registerComponent('filter', {
     quality: { label: 'Качество', default: 'good', choices: ['good', 'stale', 'bad'] },
     alarm: { label: 'Состояние', default: 'none', choices: ['none', 'warning', 'trip'] },
   },
-  ports: { inlet: { x: 0, y: 50, direction: 'left', role: 'in' }, outlet: { x: 130, y: 50, direction: 'right', role: 'out' } },
+  ports: Object.fromEntries(Object.entries(projection.ports).map(([id,p])=>[id,{x:p.x,y:p.y,direction:p.direction,role:p.role==='bidirectional'?'in':p.role}])),
   signals: { flow: { label: 'Расход', type: 'number', unit: 'm3/h' }, differentialPressure: { label: 'Перепад давления', type: 'number', unit: 'bar' } },
   commands: { clean: { label: 'Очистить фильтр' } },
+  visual: elementRegistry.get('process.filter.inline').visual,
 });

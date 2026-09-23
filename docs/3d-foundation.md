@@ -46,7 +46,7 @@ Suggested next families, using source categories rather than inventing a new clo
 
 ## Why Z is only part of the change
 
-`src/next/model.ts` contains no Three.js dependency. The physical convention is **metres, right-handed, Z-up**, with unit quaternions and local port normals. The 2D drawing has independent coordinates. Old editor pixel coordinates are not silently reinterpreted as metres.
+`src/elements/model.ts` contains no Three.js dependency. The physical convention is **metres, right-handed, Z-up**, with unit quaternions and local port normals. The 2D drawing has independent coordinates. Old editor pixel coordinates are not silently reinterpreted as metres.
 
 The intended separation is:
 
@@ -61,7 +61,7 @@ flowchart TD
   V3 --> H["Geometry and visual review harness"]
 ```
 
-`src/next/components.ts` registers a vertical tank, centrifugal pump and three-way diverting valve. The valve has named AB/A/B ports, independent command and feedback, and three separately declared flows. Renderer registration is in `lab3d/models.ts`. The lab is an opt-in consumer; legacy `SceneView` and the DSL do not consume this registry yet.
+`src/elements/core-elements.ts` registers a vertical tank, centrifugal pump and three-way diverting valve. The valve has named AB/A/B ports, independent command and feedback, and three separately declared flows. Renderer registration is in `src/elements/models3d.ts`. The same registry now drives production spatial rendering and the lab is only a visual review consumer. Legacy project syntax remains compatible through the catalog adapter.
 
 Tank level describes liquid **height** in a vertical cylindrical working volume. Its cutaway is conditional visualization, not an open vessel design. The prototype rejects tank pitch/roll because a tilted tank requires clipping liquid against a world-horizontal plane and a different level interpretation. Pump and valve meshes support arbitrary pose rotation; the test checks transformed port position and normal.
 

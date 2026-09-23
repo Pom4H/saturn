@@ -1,6 +1,9 @@
-/* Public landing assets only. Never cache plant routes, APIs or authenticated responses. */
+/* Public Saturn landing assets only. Never cache plant routes, APIs or authenticated responses. */
 const CACHE = '__SATURN_CACHE__';
-const ASSETS = __SATURN_ASSETS__;
+const ROOT_URL = new URL('./', self.location.href);
+const ROOT = ROOT_URL.pathname;
+const ASSETS = __SATURN_ASSETS__.map(path => new URL(path || './', ROOT_URL).pathname);
+
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
 });
@@ -10,11 +13,11 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
-  if (event.request.mode === 'navigate' && url.pathname === '/') {
-    event.respondWith(fetch(event.request).catch(() => caches.open(CACHE).then(cache => cache.match('/'))));
+  if (event.request.mode === 'navigate' && url.pathname === ROOT) {
+    event.respondWith(fetch(event.request).catch(() => caches.open(CACHE).then(cache => cache.match(ROOT))));
     return;
   }
-  if (!ASSETS.includes(url.pathname) || url.pathname === '/') return;
+  if (!ASSETS.includes(url.pathname) || url.pathname === ROOT) return;
   event.respondWith(caches.open(CACHE).then(async cache => {
     return (await cache.match(url.pathname)) || fetch(event.request);
   }));
@@ -26,8 +29,8 @@ self.addEventListener('message', event => {
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async clients => {
-    const client = clients.find(client => new URL(client.url).pathname === '/');
+    const client = clients.find(client => new URL(client.url).pathname === ROOT);
     if (client) return client.focus();
-    return self.clients.openWindow('/');
+    return self.clients.openWindow(ROOT);
   }));
 });

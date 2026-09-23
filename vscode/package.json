@@ -1,0 +1,182 @@
+{
+  "name": "saturn-vscode",
+  "displayName": "Saturn",
+  "description": "VS Code host for Saturn engineering projects.",
+  "version": "0.1.0",
+  "private": true,
+  "publisher": "saturn",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./extension.cjs",
+  "activationEvents": [
+    "workspaceContains:plant.ts",
+    "onView:saturn.project",
+    "onView:saturn.catalog",
+    "onView:saturn.targets",
+    "onCommand:saturn.openDiagram",
+    "onCommand:saturn.runServer",
+    "onView:saturn.reports",
+    "onCommand:saturn.openReport"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "saturn",
+          "title": "Saturn",
+          "icon": "media/saturn.svg"
+        }
+      ]
+    },
+    "views": {
+      "saturn": [
+        {
+          "id": "saturn.project",
+          "name": "Project"
+        },
+        {
+          "id": "saturn.catalog",
+          "name": "Equipment Catalog"
+        },
+        {
+          "id": "saturn.reports",
+          "name": "Reports"
+        },
+        {
+          "id": "saturn.targets",
+          "name": "Targets"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "saturn.openDiagram",
+        "title": "Saturn: Open Diagram"
+      },
+      {
+        "command": "saturn.runServer",
+        "title": "Saturn: Run Server"
+      },
+      {
+        "command": "saturn.stopServer",
+        "title": "Saturn: Stop Server"
+      },
+      {
+        "command": "saturn.openHmi",
+        "title": "Saturn: Open HMI"
+      },
+      {
+        "command": "saturn.refresh",
+        "title": "Saturn: Refresh"
+      },
+      {
+        "command": "saturn.insertEquipment",
+        "title": "Saturn: Insert Equipment"
+      },
+      {
+        "command": "saturn.deployTarget",
+        "title": "Saturn: Deploy Target"
+      },
+      {
+        "command": "saturn.flashController",
+        "title": "Saturn: Flash Controller"
+      },
+      {
+        "command": "saturn.openTarget",
+        "title": "Saturn: Open Target"
+      },
+      {
+        "command": "saturn.openReport",
+        "title": "Saturn: Open Report Preview"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "saturn.openDiagram",
+          "when": "view == saturn.project",
+          "group": "navigation@1"
+        },
+        {
+          "command": "saturn.runServer",
+          "when": "view == saturn.project",
+          "group": "navigation@2"
+        },
+        {
+          "command": "saturn.refresh",
+          "when": "view =~ /saturn\\.(project|catalog|targets)/",
+          "group": "navigation@9"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "saturn.insertEquipment",
+          "when": "view == saturn.catalog && viewItem == saturnEquipment",
+          "group": "inline"
+        },
+        {
+          "command": "saturn.openTarget",
+          "when": "view == saturn.targets && viewItem == saturnTarget",
+          "group": "inline"
+        },
+        {
+          "command": "saturn.openReport",
+          "when": "view == saturn.reports && viewItem == saturnReport",
+          "group": "inline"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Saturn",
+      "properties": {
+        "saturn.cli.path": {
+          "type": "string",
+          "default": "saturn",
+          "description": "Path to the Saturn CLI or standalone executable."
+        },
+        "saturn.server.host": {
+          "type": "string",
+          "default": "127.0.0.1",
+          "description": "Host used by the local Saturn runtime started from VS Code."
+        },
+        "saturn.server.port": {
+          "type": "number",
+          "default": 4176,
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Port used by the local Saturn runtime started from VS Code."
+        },
+        "saturn.project.entry": {
+          "type": "string",
+          "default": "plant.ts",
+          "description": "Preferred Saturn project entry file."
+        },
+        "saturn.locale": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "en",
+            "ru"
+          ],
+          "default": "auto",
+          "description": "Language for Saturn diagnostics and DSL documentation. Auto follows the VS Code display language."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "cd .. && npm run vscode:build"
+  },
+  "files": [
+    "extension.cjs",
+    "lib/**",
+    "media/**",
+    "dist/**",
+    "README.md"
+  ]
+}

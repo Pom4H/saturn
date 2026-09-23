@@ -1,7 +1,7 @@
 import { views } from './views';
 import { benchSystem, benchNodes, benchControllers, benchControls, benchModules, benchWires, benchAlarm } from './commissioning';
 import { plantWires, userWires } from './wiring';
-import { project, system, alarm, signal } from '@scada/plant';
+import { project, system, alarm, signal } from '@saturn/core';
 import { coreSystem, groupA, groupB, reactor, channels, coreSignals } from './core';
 import { coolingSystem, electricalSystem, grid, pumpA, pumpB, condenser } from './cooling';
 import { steamSystem, separatorA, separatorB, turbine } from './steam';

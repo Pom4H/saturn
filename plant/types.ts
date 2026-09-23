@@ -1,16 +1,64 @@
 import type { Presentation } from './presentation';
 import type { Controller, ControllerState } from './controller';
 import type { Connection, Attachment } from './ports';
-import type { HmiDrawCommand } from './vendor/saturn/src/runtime';
+import type { SaturnHmiCommand } from './hmi-frame';
+import type { TextKey } from './i18n';
+import { failCode } from './diagnostics';
+export { AppError } from './diagnostics';
 /** Portable contracts. No DOM, Node, filesystem, SQL driver or network imports. */
 export type Scalar = number | boolean | string;
 export type Quality = 'good' | 'bad' | 'stale' | 'offline';
-export type Expr = number | boolean | {
-    ref: string;
-} | {
-    op: 'add' | 'mul' | 'sub' | 'div' | 'min' | 'max' | 'gt' | 'lt' | 'not' | 'and';
-    args: Expr[];
-};
+
+declare const signalValueType: unique symbol;
+declare const expressionValueType: unique symbol;
+export const expressionMetadata = Symbol('saturn.expression.metadata');
+export type SignalRuntimeType = 'number' | 'boolean' | 'string';
+export type SignalDimension = 'unknown' | 'scalar' | 'boolean' | 'voltage' | 'current' | 'power' | 'energy' | 'flow' | 'volume' | 'pressure' | 'temperature' | 'resistance' | 'rotational-speed' | 'ratio' | 'frequency' | 'time' | (string & {});
+export type SignalValueForRuntime<Type extends SignalRuntimeType> = Type extends 'boolean' ? boolean : Type extends 'string' ? string : number;
+export interface RefExpr { readonly ref: string }
+export interface SignalRef<ID extends string = string, Value extends Scalar = number, Unit extends string = string, Dimension extends SignalDimension = SignalDimension> extends RefExpr {
+    readonly ref: ID;
+    readonly [signalValueType]: { value: Value; unit: Unit; dimension: Dimension };
+}
+export interface RuntimeOperationExpr {
+    readonly op: 'add' | 'mul' | 'sub' | 'div' | 'min' | 'max' | 'gt' | 'lt' | 'not' | 'and';
+    readonly args: Expr[];
+}
+export interface OperationExpr<Value extends Scalar = number, Dimension extends SignalDimension = SignalDimension> extends RuntimeOperationExpr {
+    readonly [expressionValueType]: { value: Value; dimension: Dimension };
+}
+export type SignalId<S> = S extends SignalRef<infer ID, Scalar, string, SignalDimension> ? ID : never;
+export type SignalValueOf<S> = S extends SignalRef<string, infer Value, string, SignalDimension> ? Value : never;
+export type SignalUnitOf<S> = S extends SignalRef<string, Scalar, infer Unit, SignalDimension> ? Unit : never;
+export type SignalDimensionOf<S> = S extends SignalRef<string, Scalar, string, infer Dimension> ? Dimension : never;
+export type ExpressionDimensionOf<E> = E extends SignalRef<string, Scalar, string, infer Dimension> ? Dimension : E extends OperationExpr<Scalar, infer Dimension> ? Dimension : 'unknown';
+export type ExpressionValueOf<E> = E extends SignalRef<string, infer Value, string, SignalDimension> ? Value : E extends OperationExpr<infer Value, SignalDimension> ? Value : E extends number ? number : E extends boolean ? boolean : never;
+export interface SignalMetadata { type: SignalRuntimeType; unit: string; dimension: SignalDimension }
+export interface ExpressionMetadata { type: SignalRuntimeType; dimension: SignalDimension }
+export const signalMetadata = Symbol('saturn.signal.metadata');
+export function signalRef<const ID extends string, const Type extends SignalRuntimeType, const Unit extends string, const Dimension extends SignalDimension = 'unknown'>(ref: ID, type: Type, unit: Unit, dimension?: Dimension): SignalRef<ID, SignalValueForRuntime<Type>, Unit, Dimension> {
+    const value = { ref };
+    Object.defineProperty(value, signalMetadata, { value: { type, unit, dimension: dimension ?? 'unknown' }, enumerable: false, configurable: false, writable: false });
+    return value as unknown as SignalRef<ID, SignalValueForRuntime<Type>, Unit, Dimension>;
+}
+export function signalInfo(ref: SignalRef<string, Scalar, string, SignalDimension>): SignalMetadata {
+    return (ref as SignalRef<string, Scalar, string, SignalDimension> & { [signalMetadata]?: SignalMetadata })[signalMetadata] ?? { type: 'number', unit: '', dimension: 'unknown' };
+}
+export function expressionInfo(value: unknown): ExpressionMetadata | undefined {
+    if (typeof value === 'number') return { type: 'number', dimension: 'unknown' };
+    if (typeof value === 'boolean') return { type: 'boolean', dimension: 'boolean' };
+    if (!value || typeof value !== 'object') return undefined;
+    const signal = (value as { [signalMetadata]?: SignalMetadata })[signalMetadata];
+    if (signal) return { type: signal.type, dimension: signal.dimension };
+    return (value as { [expressionMetadata]?: ExpressionMetadata })[expressionMetadata];
+}
+
+export type Expr<Value extends Scalar = Scalar, Dimension extends SignalDimension = SignalDimension> =
+    | number
+    | boolean
+    | RefExpr
+    | RuntimeOperationExpr
+    | OperationExpr<Value, Dimension>;
 export interface Sample {
     value: number | null;
     quality: Quality;
@@ -80,10 +128,34 @@ export interface ReportInput {
     min: number;
     max: number;
 }
+export type ReportValueType = 'number' | 'boolean' | 'string' | 'datetime';
+export interface ReportField {
+    key: string;
+    type: ReportValueType;
+    unit?: string;
+}
+export interface ExcelColumnSpec {
+    key: string;
+    title: string;
+    unit?: string;
+    format?: string;
+    width?: number;
+}
+export interface ExcelSortSpec { key: string; direction: 'asc' | 'desc' }
+export interface ExcelSheetSpec {
+    name: string;
+    columns: ExcelColumnSpec[];
+    sort?: ExcelSortSpec[];
+    freezeRows?: number;
+    autoFilter?: boolean;
+}
+export interface ExcelWorkbookSpec { sheets: ExcelSheetSpec[] }
+
 export interface Report {
     view?: Presentation;
     id: string;
     title: string;
+    description?: string;
     on: {
         workflow_dispatch?: {
             inputs?: Record<string, ReportInput>;
@@ -100,10 +172,22 @@ export interface Report {
         title: string;
         unit?: string;
     }[];
+    summary?: {
+        key: string;
+        label: string;
+        unit?: string;
+        aggregate: 'sum' | 'avg' | 'min' | 'max' | 'last';
+        digits?: number;
+        emphasis?: 'primary' | 'secondary';
+    }[];
+    schema?: ReportField[];
+    excel?: ExcelWorkbookSpec;
     chart?: {
         x: string;
         y: string;
         title: string;
+        type?: 'line' | 'bar';
+        unit?: string;
     };
     notify: boolean;
 }
@@ -152,7 +236,7 @@ export interface Project {
 export interface ModelSpec {
     kind: string;
     version: string;
-    title: string;
+    titleKey: TextKey;
     visual: string;
     inputs: Record<string, number>;
     parameters: Record<string, {
@@ -161,6 +245,10 @@ export interface ModelSpec {
         max: number;
     }>;
     outputs: Record<string, string>;
+    inputTypes?: Record<string, SignalRuntimeType>;
+    inputDimensions?: Record<string, SignalDimension>;
+    outputTypes?: Record<string, SignalRuntimeType>;
+    outputDimensions?: Record<string, SignalDimension>;
     initialize(p: Readonly<Record<string, number>>): Record<string, number>;
     advance(s: Readonly<Record<string, number>>, inputs: Readonly<Record<string, number>>, p: Readonly<Record<string, number>>, dt: number): Record<string, number>;
     observe(s: Readonly<Record<string, number>>, p: Readonly<Record<string, number>>): Record<string, number>;
@@ -181,7 +269,7 @@ export interface Checkpoint {
     invalidModels?: string[];
 }
 export interface Frame {
-    displays?: Record<string,HmiDrawCommand[]>;
+    displays?: Record<string,SaturnHmiCommand[]>;
     runId: string;
     revision: string;
     seq: number;
@@ -215,6 +303,8 @@ export interface Repository {
     read(id: string): Promise<Revision>;
     log(limit?: number): Promise<Revision[]>;
     commit(files: Record<string, string>, expected: string | null, message: string, actor: string): Promise<Revision>;
+    /** Optional source refresh for filesystem/Git-backed workspaces. */
+    refresh?(): Promise<void>;
 }
 export interface SqlDatabase {
     exec(sql: string, bind?: unknown[] | Record<string, unknown>): void;
@@ -258,22 +348,19 @@ export interface Actor {
     id: string;
     role: 'viewer' | 'operator' | 'engineer';
 }
-export class AppError extends Error {
-    constructor(message: string, public status = 400) { super(message); }
-}
 export const clone = <T>(v: T): T => structuredClone(v);
 export function finite(v: unknown, name: string, min = -1e12, max = 1e12): number {
     if (typeof v !== 'number' || !Number.isFinite(v) || v < min || v > max)
-        throw new AppError(`${name}: expected ${min}..${max}`);
+        failCode('SATURN_VALUE_INVALID', { field: name, reason: 'range' }, { min, max, value: v });
     return v;
 }
 export const id = (v: unknown): string => {
     if (typeof v !== 'string' || !/^[A-Za-z][A-Za-z0-9_.-]{0,95}$/.test(v) || /(?:__proto__|constructor|prototype)/.test(v))
-        throw new AppError('Invalid identifier');
+        failCode('SATURN_VALUE_INVALID', { field: 'identifier', reason: 'invalid' }, { value: v });
     return v;
 };
 export function requireRole(actor: Actor, role: Actor['role']): void {
     const ranks = { viewer: 0, operator: 1, engineer: 2 };
     if (!(actor.role in ranks) || ranks[actor.role] < ranks[role])
-        throw new AppError('Insufficient permission', 403);
+        failCode('SATURN_PERMISSION', { role }, { actor: actor.id, actualRole: actor.role, requiredRole: role });
 }

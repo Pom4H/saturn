@@ -1,4 +1,4 @@
-import { system, simulation, control, alarm, report } from '@scada/plant';
+import { system, simulation, control, alarm, report } from '@saturn/core';
 // Deliberately independent of the historical reactor schematic. No real reactor commands,
 // operating limits or protective-system bypasses. Only normalized fictional heat balance.
 export const trainingSystem = system('training', 'Тепловой стенд · восстановление устойчивости', 'site');
@@ -15,5 +15,5 @@ export const trainingAlarms = [
     alarm('lab-damage', { title: 'Учебный стенд: накопленное повреждение', signal: store.damage, above: .01, clearBelow: .001, priority: 'critical', delay: 0 }),
 ];
 export const trainingReport = report('lab-recovery', { title: 'Учебный стенд · тепловой баланс', on: { workflow_dispatch: {} },
-    window: 900000, signals: ['LAB-THERMAL.temperature', 'LAB-THERMAL.generated', 'LAB-THERMAL.removed', 'LAB-THERMAL.damage'],
+    window: 900000, signals: [store.temperature, store.generated, store.removed, store.damage],
     sql: "SELECT signal, MAX(value) AS maximum FROM samples WHERE quality='good' GROUP BY signal", columns: [{key:'signal',title:'Сигнал'},{key:'maximum',title:'Максимум'}] });

@@ -42,7 +42,13 @@ try {
     assert(compiled.simulations.every(node => node.parameters.inertia === 1.6));
     assert.equal(compiled.views[0].bindings.flow.args.length, count, 'Operator view must aggregate the entire bank');
   }
-  assert.throws(() => compileProject({ ...starter, 'views.ts': starter['views.ts'].replace('pump.flow', 'pump.flwo') }), /Unknown field: flwo/);
+  assert.throws(
+    () => compileProject({ ...starter, 'views.ts': starter['views.ts'].replace('pump.flow', 'pump.flwo') }),
+    error => {
+      assert.equal(error?.diagnostic?.code, 'SATURN_DSL_INVALID');
+      return true;
+    },
+  );
   const context = projectContext(4);
   const reference = JSON.parse(context.match(/```json\n([\s\S]*?)\n```/)[1]);
   assert.equal(compileProject(reference).simulations.length, 4, 'Project context must contain the matching importable example');

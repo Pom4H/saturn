@@ -28,20 +28,20 @@
 .navigator-icon { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 17px; flex-shrink: 0; color: var(--muted); }
 .navigator-icon svg { width: 15px; height: 15px; }
 .navigator-icon>span { font: 8px var(--mono); letter-spacing: -.5px; }
-.navigator-icon[data-kind=ts] { color: #6499c7; }
-.navigator-icon[data-kind=json] { color: #ac9360; }
+.navigator-icon[data-kind=ts] { color: var(--syntax-ts); }
+.navigator-icon[data-kind=json] { color: var(--syntax-data); }
 .navigator-label { display: grid; min-width: 0; }
 .navigator-label>span,.navigator-label>small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .navigator-label>small { color: var(--muted); font-size: 10px; }
-.navigator-mark { margin-left: auto; flex-shrink: 0; font: 10px var(--mono); color: #b69a64; }
+.navigator-mark { margin-left: auto; flex-shrink: 0; font: 10px var(--mono); color: var(--status-dirty); }
 #file-tree [data-error=true]::before { content: none; }
-#file-tree [data-error=true] .navigator-mark { color: #d78068; }
+#file-tree [data-error=true] .navigator-mark { color: var(--status-error); }
 .navigator-empty { padding: 26px 12px; text-align: center; font-size: 12px; color: var(--muted); }
 #file-origin { padding: 8px 11px; font-size: 10px; border-top: 1px solid var(--line); gap: 6px; }
 #file-origin>span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 #file-origin button { margin-left: auto; }
 #file-server-state { padding: 0 11px 8px; font-size: 10px; color: var(--muted); }
-#file-server-state[data-state=error] { color: #d78068; }
+#file-server-state[data-state=error] { color: var(--status-error); }
 #files-resizer { position: absolute; inset: 0 0 0 auto; width: 4px; cursor: col-resize; touch-action: none; background: transparent; }
 #files-resizer:hover,#files-resizer:focus-visible { background: var(--accent); outline: 0; }
 #file-browser { position: relative; }

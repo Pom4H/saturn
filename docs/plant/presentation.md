@@ -6,7 +6,7 @@ Each `view()` binds those slots to expressions. Project TS is still parsed by
 the restricted project compiler; it is not evaluated as arbitrary JavaScript.
 
 ```ts
-import { panel, label, readout, view, signal } from '@scada/plant';
+import { panel, label, readout, view, signal } from '@saturn/core';
 export const panelBody = panel([
   label('Station overview'),
   readout('Temperature', 'temperature', 'C', 0),

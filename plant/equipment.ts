@@ -7,9 +7,12 @@ import { createPlantModel } from './visual3d';
 import { registerComponent, catalog, type Equipment, type Scene } from '../src/core';
 import { registerSvgRenderer, register3dRenderer, el, type SvgRendererContext } from '../src/view';
 import type { RuntimeFrame } from '../src/runtime/protocol';
-import { models } from './models';
+import { models, outputType } from './models';
 import { evaluate } from './kernel';
-import type { Project, Frame, Expr } from './types';
+import type { Project, Frame, Expr, ModelSpec } from './types';
+import { modelTitle } from './i18n';
+import type { SaturnLocale } from './diagnostics';
+import type { ElementCategory } from '../src/elements/model';
 const metalStroke = '#526f7a', water = '#10a6b5', fuel = '#d39b51';
 type Draw = (c: SvgRendererContext) => void;
 const body = (c: SvgRendererContext, x = 15, y = 10, w = 120, h = 66) => el(c.root, 'rect', { x, y, width: w, height: h, rx: 8, fill: c.paint('metal'), stroke: metalStroke, 'stroke-width': 2 });
@@ -97,17 +100,40 @@ Object.assign(shapes, {
  junction:(c:SvgRendererContext)=>{el(c.root,'path',{d:'M0 48H150 M75 48V85',stroke:metalStroke,'stroke-width':17,fill:'none'});el(c.root,'path',{d:'M0 48H150 M75 48V85',stroke:'#c9e2e7','stroke-width':11,fill:'none'});},
  saturn:(c:SvgRendererContext)=>{const shell=el(c.root,'g',{});shell.innerHTML=renderSaturnPlcSvg({defsPrefix:'saturn-'+c.equipment.id});const svg=shell.querySelector('svg')!;svg.setAttribute('width','310');svg.setAttribute('height','170');const screen=svg.querySelector<SVGSVGElement>('.runtime-hmi')!;c.onUpdate(()=>drawHmiSvg(screen,c.equipment.id));},
 });
+const glyphByVisual:Record<string,string>={
+ pump:'process.pump.centrifugal',turbine:'mechanical.rotating',reactor:'process.reactor',channel:'generic.element',separator:'process.tank.vertical',
+ exchanger:'process.heat-exchanger',generator:'electrical.generator',control:'control.panel',sensor:'instrumentation.sensor',reservoir:'process.tank.vertical',
+ valve:'process.valve.control',battery:'electrical.battery',switchgear:'control.panel',fan:'mechanical.rotating',motor:'electrical.motor',tower:'generic.element',
+ filter:'process.filter.inline',checkvalve:'process.valve.control',accumulator:'process.tank.vertical',relief:'process.valve.control',transformer:'electrical.transformer',
+ alternator:'electrical.generator',calorimeter:'instrumentation.sensor',dcSupply:'electrical.battery',transmitter:'instrumentation.sensor',contactor:'control.panel',
+ indicator:'instrumentation.sensor',ioModule:'control.panel',junction:'generic.element',saturn:'control.panel'
+};
+const categoryByVisual=(visual:string):ElementCategory=>visual==='motor'||visual==='generator'||visual==='alternator'||visual==='transformer'||visual==='battery'||visual==='dcSupply'?'electrical'
+  :visual==='sensor'||visual==='transmitter'||visual==='calorimeter'||visual==='indicator'?'instrumentation'
+  :visual==='control'||visual==='switchgear'||visual==='contactor'||visual==='ioModule'||visual==='saturn'?'control'
+  :visual==='turbine'||visual==='fan'?'mechanical':'process';
+
 const installed = new Set<string>();
-export function installEquipment() {
-    for (const spec of [...models(),{visual:'saturn',title:'Saturn PLC · FBD',outputs:{healthy:'лог.',powered:'лог.'}}]) {
+export function installEquipment(locale: SaturnLocale = 'en') {
+    const specs: Array<Pick<ModelSpec,'kind'|'visual'|'titleKey'|'outputs'|'outputTypes'>> = [
+        ...models(),
+        {
+            kind:'saturn-plc',
+            visual:'saturn',
+            titleKey:'model.saturn-plc',
+            outputs:{healthy:'лог.',powered:'лог.'},
+            outputTypes:{healthy:'boolean',powered:'boolean'},
+        },
+    ];
+    for (const spec of specs) {
         if (!shapes[spec.visual]) throw new Error(`Missing SVG anatomy: ${spec.visual}`);
         const kind = `plant_${spec.visual}`;
         if (installed.has(kind))
             continue;
         installed.add(kind);
         if (!catalog[kind])
-            registerComponent(kind, { version: '1.0.0', label: spec.title, ...footprint(spec.visual), fields: { x: { label: 'X', scope: 'layout', default: 0 }, y: { label: 'Y', scope: 'layout', default: 0 } }, ports: Object.fromEntries(Object.entries(terminals(spec.visual)).map(([name,t])=>[name,{x:t.x,y:t.y,direction:t.side,role:t.role==='source'?'out':'in'}])), signals: Object.fromEntries(Object.entries(spec.outputs).map(([k, unit]) => [k, { label: k, unit, type: 'number' }])) });
-        registerSvgRenderer(kind, c => { shapes[spec.visual](c); if(spec.visual==='saturn')return; const key = Object.keys(spec.outputs)[0]; const text = el(c.root, 'text', { x: 75, y: 111, 'text-anchor': 'middle', 'font-family': 'ui-monospace,monospace', 'font-size': 15, fill: '#214d5f' }); c.onUpdate(dt => { const value = c.number(key, dt); text.textContent = value === null ? '—' : `${value.toFixed(2)} ${(spec.outputs as Record<string,string>)[key]}`; }); });
+            registerComponent(kind, { version: '1.0.0', label: modelTitle(spec.kind, locale), ...footprint(spec.visual), visual:{glyph:glyphByVisual[spec.visual]??'generic.element',category:categoryByVisual(spec.visual),geometry:`plant.${spec.visual}`,envelope:{min:[-.8,-.6,.02],max:[.8,.6,1.9]}}, fields: { x: { label: 'X', scope: 'layout', default: 0 }, y: { label: 'Y', scope: 'layout', default: 0 } }, ports: Object.fromEntries(Object.entries(terminals(spec.visual)).map(([name,t])=>[name,{x:t.x,y:t.y,direction:t.side,role:t.role==='source'?'out':'in'}])), signals: Object.fromEntries(Object.entries(spec.outputs).map(([k, unit]) => [k, { label: k, unit, type: outputType(spec, k) }])) });
+        registerSvgRenderer(kind, c => { shapes[spec.visual](c); if(spec.visual==='saturn')return; const key = Object.keys(spec.outputs)[0]; const text = el(c.root, 'text', { x: 75, y: 111, 'text-anchor': 'middle', 'font-family': 'ui-monospace,monospace', 'font-size': 15, fill: '#214d5f' }); c.onUpdate(dt => { const value = c.number(key, dt); text.textContent = value === null ? '—' : `${value.toFixed(2)} ${spec.outputs[key]}`; }); });
         register3dRenderer(kind, c => createPlantModel(c, spec.visual, Object.keys(spec.outputs)[0]));
     }
 }
@@ -122,7 +148,7 @@ export function sceneFor(project: Project): Scene {
     };
 }
 export function visualFrame(project: Project, frame: Frame): RuntimeFrame {
-    setDisplays(frame.displays??{});
+    setDisplays(frame.displays??{},frame.time);
     const equipment: RuntimeFrame['equipment'] = {};
     const derived = new Map(project.signals.map(s => [s.id, s.expression]));
     const expand = (expr: Expr): string[] => references(expr).flatMap(ref => derived.has(ref) ? expand(derived.get(ref)!) : [ref]);
@@ -131,7 +157,11 @@ export function visualFrame(project: Project, frame: Frame): RuntimeFrame {
         const signals: RuntimeFrame['equipment'][string]['signals'] = {};
         for (const [key, expr] of Object.entries(n.signals)) {
             const s = evaluate(expr, id => frame.samples[id] ?? { value: null, time: frame.time, quality: 'bad' }, frame.time);
-            signals[key] = { type: 'number', value: s.value, quality: s.quality, timestamp: s.time, unit: catalog[`plant_${n.type}`]?.signals?.[key]?.unit ?? 'отн.' };
+            const definition = catalog[`plant_${n.type}`]?.signals?.[key];
+            const common = { quality: s.quality, timestamp: s.time, unit: definition?.unit ?? 'отн.' };
+            signals[key] = definition?.type === 'boolean'
+                ? { type: 'boolean', value: s.value === null ? null : Boolean(s.value), ...common }
+                : { type: 'number', value: s.value, ...common };
         }
         const own = new Set(Object.values(n.signals).flatMap(expand));
         const relevant = active.filter(rule => expand(rule.signal).some(ref => own.has(ref)));

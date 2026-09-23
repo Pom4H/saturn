@@ -1,12 +1,17 @@
-import { AppError } from './types';
+import { failCode } from './diagnostics';
 import { validatePresentation, type Presentation, type ViewNode } from './presentation';
 import type { HmiScreenModel } from './vendor/saturn/src/types';
-/** Small controller screen backend. Unsupported nodes/overflow fail, never silently disappear. */
-export function presentationHmi(view:Presentation,bindings:Record<string,string>):HmiScreenModel {
-    validatePresentation(view,'plc');
+/**
+ * Compile canonical Presentation IR to the bounded Saturn PLC 320x240 target schema.
+ *
+ * HmiScreenModel is a target artifact consumed by the Saturn/Firmverse compiler,
+ * never a second authored HMI model.
+ */
+export function compileSaturnPlcPresentation(view:Presentation,bindings:Record<string,string>):HmiScreenModel {
+    validatePresentation(view,'saturn-plc-320');
     const elements:HmiScreenModel['elements']=[];
     const addText=(text:string,x:number,y:number,width:number,id:string,binding?:string)=>{
-        if(text.length>Math.floor(width/8)||y+22>240)throw new AppError('Presentation exceeds the 320x240 PLC display');
+        if(text.length>Math.floor(width/8)||y+22>240)failCode('SATURN_LIMIT',{resource:'plc.display',reason:'tooLarge'},{width,height:y+22});
         elements.push({id,primitive:binding?'value':'text',label:text,position:{x,y},font:0,...(binding?{binding:{source:'wp' as const,ref:binding,format:'int' as const}}:{})});
     };
     let serial=0;
@@ -24,12 +29,15 @@ export function presentationHmi(view:Presentation,bindings:Record<string,string>
             case 'text':addText(node.text,x,y,width,id);return 24;
             case 'value':
                 // Raw PLC values are int32. Scale explicitly in the program, not by UI rounding.
-                if(node.digits!==0)throw new AppError('PLC readouts require digits=0; scale explicitly in the PLC program');
+                if(node.digits!==0)failCode('SATURN_PRESENTATION_INVALID',{reason:'invalid'},{target:'plc',field:'digits',digits:node.digits});
                 addText(node.label+(node.unit?' ['+node.unit+']':''),x,y,width,id);
                 addText('',x,y+20,width,id+'value',bindings[node.binding]);return 48;
-            default:throw new AppError('Unsupported PLC presentation node');
+            default:failCode('SATURN_PRESENTATION_INVALID',{reason:'invalid'},{target:'plc',nodeKind:node.kind});
         }
     };
     layout(view.body,8,8,304);
     return {id:view.id,title:view.title,screenType:'main',period:0,elements};
 }
+
+/** @deprecated Use the explicit target boundary through projectPresentation(). */
+export const presentationHmi = compileSaturnPlcPresentation;

@@ -1,4 +1,4 @@
-import { system, simulation, signal, add } from '@scada/plant';
+import { system, simulation, signal, add } from '@saturn/core';
 // Generic supporting infrastructure, not the inventory or surveyed layout of a real NPP.
 export const servicesSystem = system('services', 'Общестанционные узлы · учебная схема', 'unit4');
 export const powerSystem = system('services-power', 'Преобразование и распределение энергии', 'services');

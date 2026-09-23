@@ -1,7 +1,7 @@
 /** Portable Saturn toolchain: one Rust compiler, one upstream C execution engine.
  * Each runtime gets its own WebAssembly instance; no shared process-global PLC.
  */
-import { compilerBase64, runtimeBase64, compilerHash, runtimeHash } from './binaries.ts';
+import { compilerBase64, runtimeBase64, compilerHash, runtimeHash } from './binaries';
 export { compilerHash, runtimeHash };
 export const STATE_ABI = `firmverse/saturn-state@1:${runtimeHash}`;
 export interface ElementSpec { id: string; type: string | number; inputs?: readonly string[]; params?: readonly number[]; invert?: boolean; caption?: string; comment?: string }
@@ -16,19 +16,23 @@ const bytes=(s:string)=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 let compiler: Wasm | undefined, runtimeModule: WebAssembly.Module | undefined;
 function call(e:Wasm,name:string,...args:number[]):number { const fn=e[name];if(typeof fn!=='function')throw new Error(`Missing Saturn ABI: ${name}`);return Number(fn(...args)); }
 const heap=(e:Wasm)=>new Uint8Array(e.memory.buffer);
-function invokeCompiler(input:Uint8Array,operation:string):any {
+type CompilerEnvelope = {ok:boolean;error?:string};
+type CompileEnvelope = CompilerEnvelope & {bytes:number[];elementCount:number;screenCount:number;requiredRtl:number;listing:CompiledProgram['listing']};
+type InspectEnvelope = CompilerEnvelope & {elements:number;rtl:number;screens:number};
+function invokeCompiler<T extends CompilerEnvelope>(input:Uint8Array,operation:string):T {
  if(input.length>1_048_576)throw new Error('Saturn compiler input exceeds 1 MiB');
  compiler??=new WebAssembly.Instance(new WebAssembly.Module(bytes(compilerBase64)),{}).exports as Wasm;
  const ptr=call(compiler,'fv_input_reserve',input.length);if(!ptr)throw new Error('Compiler allocation failed');
  heap(compiler).set(input,ptr);call(compiler,operation);
- const result=JSON.parse(new TextDecoder().decode(heap(compiler).slice(call(compiler,'fv_result_ptr'),call(compiler,'fv_result_ptr')+call(compiler,'fv_result_len'))));
- if(!result.ok)throw new Error(result.error);return result;
+ const parsed:unknown=JSON.parse(new TextDecoder().decode(heap(compiler).slice(call(compiler,'fv_result_ptr'),call(compiler,'fv_result_ptr')+call(compiler,'fv_result_len'))));
+ if(!parsed||typeof parsed!=='object'||!('ok' in parsed)||typeof (parsed as {ok?:unknown}).ok!=='boolean')throw new Error('Malformed Firmverse compiler response');
+ const result=parsed as T;if(!result.ok)throw new Error(result.error??'Firmverse compiler rejected input');return result;
 }
 export function compileControlIR(ir:ControlIR):CompiledProgram {
- const result=invokeCompiler(new TextEncoder().encode(JSON.stringify(ir)),'fv_compile');
+ const result=invokeCompiler<CompileEnvelope>(new TextEncoder().encode(JSON.stringify(ir)),'fv_compile');
  return {fbdbin:Uint8Array.from(result.bytes),elementCount:result.elementCount,screenCount:result.screenCount,requiredRtlVersion:result.requiredRtl,listing:result.listing};
 }
-export function inspectProgram(program:Uint8Array):{elements:number;rtl:number;screens:number} {return invokeCompiler(program,'fv_inspect');}
+export function inspectProgram(program:Uint8Array):{elements:number;rtl:number;screens:number} {return invokeCompiler<InspectEnvelope>(program,'fv_inspect');}
 export interface RuntimeSnapshot { abi:string; program:string; data:number[] }
 function integer(value:number,min=-2147483648,max=2147483647):number { if(!Number.isInteger(value)||value<min||value>max)throw new Error('Saturn value outside integer range');return value; }
 function cp1251(e:Wasm,ptr:number):string {

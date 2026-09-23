@@ -2,16 +2,35 @@ import { test, expect, type Page } from '@playwright/test';
 import { booster } from '../../src/examples';
 import { nestedTap, stackedTaps } from '../fixtures';
 
+declare global {
+  interface Window {
+    __scada: {
+      source: string;
+      error: unknown;
+      flows: Record<string, number | null>;
+      warnings: string[];
+      setSource(source: string): void;
+      fit(): void;
+      select(id: string): void;
+      undo(): void;
+    };
+    __challengeRotor?: Element | null;
+    __challengePipe?: Element | null;
+    __rotorProbe?: Element | null;
+    __pipeProbe?: Element | null;
+  }
+}
+
 const start = new Date('2026-09-08T12:00:00Z');
 test.beforeEach(async ({ page }) => {
   await page.clock.install({ time: start });
   await page.goto('./');
-  await page.waitForFunction(() => !!(window as any).__scada);
+  await page.waitForFunction(() => !!window.__scada);
   await page.clock.pauseAt(new Date(start.getTime() + 60_000));
 });
 const setSource = async (page: Page, source: string) => {
   await page.evaluate(source => {
-    (window as any).__scada.setSource(source); (window as any).__scada.fit();
+    window.__scada.setSource(source); window.__scada.fit();
   }, source);
   // Let the 100 ms readout refresh run before capturing evidence.
   await page.clock.runFor(160);
@@ -20,7 +39,7 @@ const click = (page: Page, id: string) => page.locator(`#${id}`).evaluate((node:
 
 test('B01 deleting a nested tap in the inspector preserves its visible pipe', async ({ page }, info) => {
   await setSource(page, nestedTap);
-  await page.evaluate(() => (window as any).__scada.select('PT'));
+  await page.evaluate(() => window.__scada.select('PT'));
   await page.screenshot({ path: info.outputPath('before-delete.png') });
   await click(page, 'delete-object');
   await page.screenshot({ path: info.outputPath('after-delete.png') });
@@ -32,7 +51,7 @@ test('B02 instrument collisions cannot be silently declared warning-free', async
   const positions = await page.evaluate(() => ['PT', 'TT'].map(id => document.querySelector(`[data-node="${id}"]`)!.getAttribute('transform')));
   expect(positions[0]).toBe(positions[1]);
   await page.screenshot({ path: info.outputPath('stacked-taps.png') });
-  const warnings = await page.evaluate(() => (window as any).__scada.warnings as string[]);
+  const warnings = await page.evaluate(() => window.__scada.warnings as string[]);
   expect(warnings.some(w => w.includes('PT') && w.includes('TT'))).toBe(true);
 });
 
@@ -69,11 +88,11 @@ test('B04 resuming after a long preview pause leaves a gap in the sampled trend'
 test('B05 120 parameter updates keep DOM identity and signed water movement', async ({ page }) => {
   await page.clock.runFor(1000);
   await page.evaluate(source => {
-    (window as any).__challengeRotor = document.querySelector('[data-part="rotor"]');
-    (window as any).__challengePipe = document.querySelector('[data-flow]');
-    for (let i = 0; i < 120; i++) (window as any).__scada.setSource(source.replace('rpm: 1500', `rpm: ${i % 2 ? -1500 : 1500}`));
+    window.__challengeRotor = document.querySelector('[data-part="rotor"]');
+    window.__challengePipe = document.querySelector('[data-flow]');
+    for (let i = 0; i < 120; i++) window.__scada.setSource(source.replace('rpm: 1500', `rpm: ${i % 2 ? -1500 : 1500}`));
   }, booster);
-  const identity = await page.evaluate(() => (window as any).__challengeRotor === document.querySelector('[data-part="rotor"]') && (window as any).__challengePipe === document.querySelector('[data-flow]'));
+  const identity = await page.evaluate(() => window.__challengeRotor === document.querySelector('[data-part="rotor"]') && window.__challengePipe === document.querySelector('[data-flow]'));
   expect(identity).toBe(true);
   await page.clock.runFor(1000); // Allow signed visual RPM to settle.
   const before = await page.locator('[data-flow]').evaluateAll(nodes => nodes.map(n => Number(n.getAttribute('stroke-dashoffset'))));

@@ -1,6 +1,6 @@
 /** The downloadable example is compiled by the actual Saturn compiler in site:check. */
 export const starter: Record<string, string> = {
-  'plant.ts': `import { project, system } from '@scada/plant';
+  'plant.ts': `import { project, system } from '@saturn/core';
 import { drive, pump } from './equipment';
 import { screen } from './views';
 
@@ -14,7 +14,7 @@ export default project('first-pump', {
   signals: [], alarms: [], reports: [],
 });
 `,
-  'equipment.ts': `import { control, simulation } from '@scada/plant';
+  'equipment.ts': `import { control, simulation } from '@saturn/core';
 
 export const drive = control('drive', {
   title: 'Скорость насоса', system: 'loop',
@@ -30,7 +30,7 @@ export const pump = simulation('PUMP-01', 'pump', {
 `,
   'views.ts': `import {
   view, panel, readout, commandButton,
-} from '@scada/plant';
+} from '@saturn/core';
 import { pump } from './equipment';
 
 export const screen = view('operator', {

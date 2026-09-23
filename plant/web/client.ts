@@ -1,6 +1,58 @@
-import type { Frame, Project, Actor, Revision, ReportArtifact, ReportData } from '../types';
+import type { Frame, Project, Actor, ReportArtifact, ReportData } from '../types';
+import type { SaturnErrorPayload } from '../diagnostics';
+
+export class SaturnClientError extends Error {
+    readonly status?: number;
+    readonly code?: string;
+    readonly severity?: SaturnErrorPayload['severity'];
+    readonly messageKey?: string;
+    readonly messageArgs?: SaturnErrorPayload['messageArgs'];
+    readonly data?: Record<string, unknown>;
+    readonly locale?: SaturnErrorPayload['locale'];
+    constructor(payload: SaturnErrorPayload, status?: number) {
+        super(payload.error);
+        this.name = 'SaturnClientError';
+        this.status = status;
+        this.code = payload.code;
+        this.severity = payload.severity;
+        this.messageKey = payload.messageKey;
+        this.messageArgs = payload.messageArgs;
+        this.data = payload.data;
+        this.locale = payload.locale;
+    }
+}
+const clientError = (payload: SaturnErrorPayload, status?: number) => new SaturnClientError(payload, status);
+export interface RuntimeInstance {
+    protocol: number;
+    instanceId: string;
+    authority: 'runtime';
+    actor: Actor;
+    projectId: string;
+    source: string | null;
+    build: string;
+    published: string | null;
+    applied: string;
+    runId: string;
+    healthy: boolean;
+}
+export interface EnvironmentDescriptor {
+    name: string;
+    url: string;
+    instanceId: string;
+    projectId: string;
+    applied: string;
+    published: string | null;
+    head: string | null;
+    runId: string;
+    role: Actor['role'];
+}
 export interface Status {
     actor: Actor;
+    runtimeActor?: Actor;
+    instance?: RuntimeInstance;
+    runtimeInstance?: RuntimeInstance;
+    environment?: EnvironmentDescriptor | null;
+    uiMode?: 'ide' | 'runtime' | 'kiosk';
     project: Project;
     frame: Frame;
     head: string | null;
@@ -30,7 +82,7 @@ export class LocalClient implements Connection {
     private worker: Worker;
     private counter = 0;
     private pending = new Map<number, {
-        resolve: (v: any) => void;
+        resolve: (v: unknown) => void;
         reject: (e: Error) => void;
         timer: ReturnType<typeof setTimeout>;
     }>();
@@ -57,11 +109,11 @@ export class LocalClient implements Connection {
         if (p) {
             clearTimeout(p.timer);
             this.pending.delete(m.id);
-            m.error ? p.reject(new Error(m.error)) : p.resolve(m.result);
+            m.error ? p.reject(clientError(m, m.status)) : p.resolve(m.result);
         }
     } }; this.worker.onerror = e => { this.rejectReady(new Error(e.message)); this.onFailure(e.message); }; }
     start(memory = false): Promise<Status> { return new Promise((resolve, reject) => { this.resolveReady = resolve; this.rejectReady = reject; this.worker.postMessage({ action: 'initialize', input: { memory } }); }); }
-    request<T>(action: string, input?: unknown): Promise<T> { return new Promise((resolve, reject) => { const id = ++this.counter, timer = setTimeout(() => { this.pending.delete(id); reject(new Error('Worker request timed out')); }, 15000); this.pending.set(id, { resolve, reject, timer }); this.worker.postMessage({ id, action, input }); }); }
+    request<T>(action: string, input?: unknown): Promise<T> { return new Promise((resolve, reject) => { const id = ++this.counter, timer = setTimeout(() => { this.pending.delete(id); reject(new Error('Worker request timed out')); }, 15000); this.pending.set(id, { resolve: value => resolve(value as T), reject, timer }); this.worker.postMessage({ id, action, input }); }); }
     close() { this.worker.terminate(); for (const p of this.pending.values()) {
         clearTimeout(p.timer);
         p.reject(new Error('Connection closed'));
@@ -101,7 +153,7 @@ export class RemoteClient implements Connection {
         const response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', credentials: 'same-origin', headers: body === undefined ? {} : { 'Content-Type': 'application/json', 'X-CSRF-Token': this.csrf }, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(15000), cache: 'no-store', redirect: 'error' });
         if (!response.ok) {
             const error = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-            throw new Error(error.error);
+            throw clientError(error, response.status);
         }
         return action === 'report-artifact' ? { html: await response.text(), rows: [] } as T : await response.json();
     }
@@ -118,4 +170,67 @@ export class RemoteClient implements Connection {
         this.onFailure('Нет новых данных от сервера'); }, 2000); return status; }
     close() { this.stream?.close(); clearInterval(this.watchdog); }
 }
-export type { Frame, Project, Actor, Revision, ReportArtifact, ReportData };
+export type { Frame, Project, Actor, ReportArtifact, ReportData };
+
+
+/**
+ * One engineering workspace + one live runtime.
+ *
+ * Workspace file writes stay on the authoring connection. Runtime commands,
+ * history, alarms, reports and telemetry are routed to the operator Saturn.
+ */
+export class LinkedClient implements Connection {
+    onFrame = (_frame: Frame) => { };
+    onFailure = (_message: string) => { };
+    onNotification = (_notice: Notice) => { };
+    private sourceStatus!: Status;
+    private runtimeStatus!: Status;
+    private readonly runtimeActions = new Set([
+        'command', 'restart', 'events', 'reports', 'history', 'report-artifact',
+        'subscribe', 'unsubscribe'
+    ]);
+
+    constructor(readonly source: Connection, readonly runtime: Connection) {
+        source.onFailure = message => this.onFailure(`Workspace: ${message}`);
+        runtime.onFailure = message => this.onFailure(`Environment: ${message}`);
+        runtime.onFrame = frame => this.onFrame(frame);
+        runtime.onNotification = notice => this.onNotification(notice);
+    }
+
+    private merge(source: Status, runtime: Status): Status {
+        if (source.project.id !== runtime.project.id)
+            throw new Error(`Environment project mismatch: workspace ${source.project.id}, runtime ${runtime.project.id}`);
+        return {
+            ...source,
+            frame: runtime.frame,
+            healthy: runtime.healthy,
+            releaseError: runtime.releaseError,
+            runtimeActor: runtime.actor,
+            runtimeInstance: runtime.instance,
+        };
+    }
+
+    async start(memory = false): Promise<Status> {
+        this.sourceStatus = await this.source.start(memory);
+        this.runtimeStatus = await this.runtime.start();
+        return this.merge(this.sourceStatus, this.runtimeStatus);
+    }
+
+    async request<T>(action: string, input?: unknown): Promise<T> {
+        if (action === 'session') {
+            const [source, runtime] = await Promise.all([
+                this.source.request<Status>('session'),
+                this.runtime.request<Status>('session'),
+            ]);
+            this.sourceStatus = source;
+            this.runtimeStatus = runtime;
+            return this.merge(source, runtime) as T;
+        }
+        return (this.runtimeActions.has(action) ? this.runtime : this.source).request<T>(action, input);
+    }
+
+    close(): void {
+        this.source.close();
+        this.runtime.close();
+    }
+}

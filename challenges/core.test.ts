@@ -6,6 +6,8 @@ import { layout, bounds, segmentClear, tapPoint } from '../src/geometry';
 import { booster, twin } from '../src/examples';
 import { nestedTap, collidingImport, stackedTaps, crowdedCircuit } from './fixtures';
 
+declare global { var challengeSideEffect: boolean | undefined; }
+
 const patch = (s: string, id: string, fields: Record<string, string | number>) => applyChanges(s, patchFields(s, id, fields));
 
 // These assertions specify the desired behavior. Known defects FAIL normally;
@@ -119,5 +121,5 @@ test('C13 48 elements route without collisions, and element 49 is rejected', () 
 
 test('C14 arbitrary code and prototype access are rejected without execution', () => {
   for (const source of ['while (true) {}', 'globalThis.challengeSideEffect = true;', 'fetch("https://example.invalid");', 'import {pump} from "@scada/core"; const p=pump("P",{}); const x=p.constructor;']) assert.throws(() => compile(source), SourceError);
-  assert.equal((globalThis as any).challengeSideEffect, undefined);
+  assert.equal(globalThis.challengeSideEffect, undefined);
 });

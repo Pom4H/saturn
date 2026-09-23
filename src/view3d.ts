@@ -2,12 +2,13 @@ import { connectionStyles } from './connection-style';
 import { groupFill, groupStroke, groupAccent, groupTitleLines } from './group-style';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { catalog, type Equipment, type Scene, type SceneGroup } from './core';
 import { layout, tapPoint } from './geometry';
 import { numeric, type RuntimeFrame } from './runtime/protocol';
 import { get3dRenderer, observation, observationAlarm, observationQuality, observedFlows, type EquipmentModel3D, type Renderer3D, type Renderer3DContext } from './view';
-import { createModel, materials, tubeBetween } from '../lab3d/models';
-import { registry } from './next/components';
+import { createModel, materials, tubeBetween } from './elements/models3d';
+import { registry } from './elements/core-elements';
 import type { Signals } from './next/model';
 
 const v = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -71,7 +72,10 @@ function procedural(type: string, portNames: Record<string, string>): Renderer3D
 const builtins = new Map<string, Renderer3D>([
   ['tank', procedural('process.tank.vertical', { OUT: 'outlet' })],
   ['pump', procedural('process.pump.centrifugal', { IN: 'inlet', OUT: 'outlet' })],
-  ...['valve', 'flowmeter', 'pressure', 'temperature', 'exchanger', 'outlet'].map(kind => [kind, (context: Renderer3DContext) => primitiveModel(context, kind)] as const),
+  ['valve', procedural('process.valve.control', { IN: 'inlet', OUT: 'outlet' })],
+  ['flowmeter', procedural('instrumentation.flowmeter.inline', { IN: 'inlet', OUT: 'outlet' })],
+  ['exchanger', procedural('process.heat-exchanger.plate', { IN: 'inlet', OUT: 'outlet' })],
+  ...['pressure', 'temperature', 'outlet'].map(kind => [kind, (context: Renderer3DContext) => primitiveModel(context, kind)] as const),
 ]);
 interface Rendered { equipment: Equipment; model: EquipmentModel3D; label: HTMLButtonElement; text: HTMLElement; state: HTMLElement; leader: SVGLineElement }
 interface FlowTrack { id: string; curve: THREE.CurvePath<THREE.Vector3>; particles: THREE.Mesh[]; body: THREE.Mesh[]; phase: number; value: number | null }
@@ -84,8 +88,11 @@ export class SceneView3D {
   onSelect?: (id: string | null) => void;
   onPortSelect?: (id:string,port:string)=>void;
   onOverview?: () => void;
+  canMove?: (id: string) => boolean;
+  onMove?: (id: string, x: number, y: number, commit: boolean) => void;
   private frame: RuntimeFrame | null = null;
   private renderer: THREE.WebGLRenderer;
+  private environmentTexture!: THREE.Texture;
   private world = new THREE.Scene();
   private equipmentLayer = new THREE.Group();
   private pipeLayer = new THREE.Group();
@@ -114,7 +121,8 @@ export class SceneView3D {
   private last = 0;
   private motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
   private raycaster = new THREE.Raycaster();
-  private down: { x: number; y: number } | null = null;
+  private ground = new THREE.Plane(v(0, 0, 1), 0);
+  private down: { x: number; y: number; id: string | null; moved: boolean; offset?: THREE.Vector3; orbitEnabled?: boolean; originalX?: number; originalY?: number } | null = null;
   constructor(public host: HTMLElement, options: { landing?: boolean } = {}) {
     host.classList.add('scene3d');
     this.canvas = document.createElement('canvas'); this.canvas.tabIndex = 0;
@@ -151,16 +159,60 @@ export class SceneView3D {
       if (event.key.toLowerCase() === 'f') { this.fit(); this.onOverview?.(); event.preventDefault(); event.stopPropagation(); }
       if (event.key === 'Escape') { this.select(null); this.onSelect?.(null); }
     });
-    this.canvas.addEventListener('pointerdown', e => { this.down = { x: e.clientX, y: e.clientY }; });
+    this.canvas.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      const picked = this.pick(e.clientX, e.clientY), id = picked.id;
+      this.down = { x: e.clientX, y: e.clientY, id, moved: false };
+      if (!id || !this.canMove?.(id)) return;
+      const point = this.groundPoint(e.clientX, e.clientY), object = this.objects.get(id);
+      if (!point || !object) return;
+      this.down.offset = object.model.root.position.clone().sub(point);
+      this.down.originalX = Number(object.equipment.props.x);
+      this.down.originalY = Number(object.equipment.props.y);
+      this.down.orbitEnabled = this.controls.enabled;
+      this.controls.enabled = false;
+      this.canvas.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    this.canvas.addEventListener('pointermove', e => {
+      const drag = this.down;
+      if (!drag?.id || !drag.offset || !this.canMove?.(drag.id)) return;
+      if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 3) return;
+      const point = this.groundPoint(e.clientX, e.clientY), object = this.objects.get(drag.id);
+      if (!point || !object) return;
+      drag.moved = true;
+      const world = point.add(drag.offset), definition = catalog[object.equipment.kind], centered = !!this.scene.groups?.length;
+      const x = world.x * 100 - (centered ? definition.width / 2 : 0);
+      const y = -world.y * 100 - (centered ? definition.height / 2 : 0);
+      this.onMove?.(drag.id, Math.round(x), Math.round(y), false);
+      e.preventDefault();
+    });
     this.canvas.addEventListener('pointerup', e => {
-      if (!this.down || Math.hypot(e.clientX - this.down.x, e.clientY - this.down.y) > 5) return;
-      const rect = this.canvas.getBoundingClientRect(), drawingHeight = rect.height - (rect.width <= 650 ? 77 : 0);
-      if (e.clientY - rect.top > drawingHeight) return;
-      this.raycaster.setFromCamera(new THREE.Vector2((e.clientX - rect.left) / rect.width * 2 - 1, -(e.clientY - rect.top) / drawingHeight * 2 + 1), this.camera);
-      let object: THREE.Object3D | undefined = this.raycaster.intersectObjects(this.equipmentLayer.children, true)[0]?.object;
-      const terminal=object?.userData.terminal;
-      while (object && !object.userData.equipmentId) object = object.parent ?? undefined;
-      const id = object?.userData.equipmentId ?? null; this.select(id); this.onSelect?.(id); if(id&&terminal)this.onPortSelect?.(id,terminal);
+      const drag = this.down; this.down = null;
+      if (!drag) return;
+      if (drag.offset) {
+        this.controls.enabled = drag.orbitEnabled ?? this.controls.enabled;
+        if (this.canvas.hasPointerCapture(e.pointerId)) this.canvas.releasePointerCapture(e.pointerId);
+        if (drag.moved && drag.id) {
+          const point = this.groundPoint(e.clientX, e.clientY), object = this.objects.get(drag.id);
+          if (point && object) {
+            const world = point.add(drag.offset), definition = catalog[object.equipment.kind], centered = !!this.scene.groups?.length;
+            const x = world.x * 100 - (centered ? definition.width / 2 : 0);
+            const y = -world.y * 100 - (centered ? definition.height / 2 : 0);
+            this.onMove?.(drag.id, Math.round(x), Math.round(y), true);
+          }
+          return;
+        }
+      }
+      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 5) return;
+      const picked = this.pick(e.clientX, e.clientY), id = picked.id;
+      this.select(id); this.onSelect?.(id); if(id&&picked.terminal)this.onPortSelect?.(id,picked.terminal);
+    });
+    this.canvas.addEventListener('pointercancel', e => {
+      const drag = this.down; this.down = null;
+      if (drag?.orbitEnabled !== undefined) this.controls.enabled = drag.orbitEnabled;
+      if (this.canvas.hasPointerCapture(e.pointerId)) this.canvas.releasePointerCapture(e.pointerId);
+      if (drag?.moved && drag.id && Number.isFinite(drag.originalX) && Number.isFinite(drag.originalY)) this.onMove?.(drag.id, drag.originalX!, drag.originalY!, false);
     });
     const animate = (now: number) => {
       const dt = Math.min(.1, this.last ? (now - this.last) / 1000 : 0); this.last = now;
@@ -171,6 +223,24 @@ export class SceneView3D {
       this.raf = requestAnimationFrame(animate);
     };
     this.resize(); this.raf = requestAnimationFrame(animate);
+  }
+  private ndc(clientX: number, clientY: number) {
+    const rect = this.canvas.getBoundingClientRect(), bottom = rect.width <= 650 ? 77 : 0, drawingHeight = Math.max(1, rect.height - bottom);
+    if (clientY - rect.top > drawingHeight) return null;
+    return new THREE.Vector2((clientX - rect.left) / rect.width * 2 - 1, -(clientY - rect.top) / drawingHeight * 2 + 1);
+  }
+  private pick(clientX: number, clientY: number) {
+    const ndc = this.ndc(clientX, clientY); if (!ndc) return { id: null as string | null, terminal: undefined as string | undefined };
+    this.raycaster.setFromCamera(ndc, this.camera);
+    let object: THREE.Object3D | undefined = this.raycaster.intersectObjects(this.equipmentLayer.children, true)[0]?.object;
+    const terminal = object?.userData.terminal as string | undefined;
+    while (object && !object.userData.equipmentId) object = object.parent ?? undefined;
+    return { id: (object?.userData.equipmentId as string | undefined) ?? null, terminal };
+  }
+  private groundPoint(clientX: number, clientY: number) {
+    const ndc = this.ndc(clientX, clientY); if (!ndc) return null;
+    this.raycaster.setFromCamera(ndc, this.camera);
+    return this.raycaster.ray.intersectPlane(this.ground, v());
   }
   private context(equipment: Equipment): Renderer3DContext {
     return { THREE, equipment, materials, invalidate: () => this.draw(),
@@ -240,9 +310,13 @@ export class SceneView3D {
       const startLead = start.clone().addScaledVector(normal(a!, edge.from.port), .30), endLead = end.clone().addScaledVector(normal(b!, edge.to.port), .30);
       const curve = new THREE.CurvePath<THREE.Vector3>(), high = Math.max(startLead.z, endLead.z), middleX = (startLead.x + endLead.x) / 2;
       const points = [start, startLead, v(startLead.x, startLead.y, high), v(middleX, startLead.y, high), v(middleX, endLead.y, high), v(endLead.x, endLead.y, high), endLead, end], body: THREE.Mesh[] = [];
-      for (let i = 1; i < points.length; i++) if (points[i].distanceTo(points[i - 1]) > .001) { curve.add(new THREE.LineCurve3(points[i - 1], points[i])); body.push(tubeBetween(this.pipeLayer, points[i - 1], points[i], .085, materials.fluid)); }
+      for (let i = 1; i < points.length; i++) if (points[i].distanceTo(points[i - 1]) > .001) {
+        curve.add(new THREE.LineCurve3(points[i - 1], points[i]));
+        const shell = tubeBetween(this.pipeLayer, points[i - 1], points[i], .12, materials.pipeShell ?? materials.steel); shell.renderOrder = 1;
+        const liquid = tubeBetween(this.pipeLayer, points[i - 1], points[i], .078, materials.fluid); liquid.renderOrder = 2; body.push(liquid);
+      }
       if (!curve.curves.length) continue;
-      const particles = [0, 1, 2, 3].map(() => addMesh(this.pipeLayer, new THREE.ConeGeometry(.14, .28, 8), materials.dark));
+      const particles = [0, 1, 2, 3].map(() => { const arrow=addMesh(this.pipeLayer, new THREE.ConeGeometry(.105, .23, 12), materials.fluidHighlight ?? materials.dark); arrow.renderOrder=3; return arrow; });
       this.tracks.push({ id: edge.id, curve, particles, body, phase: trackPhases.get(edge.id) ?? 0, value: null });
     }
     for (const { equipment, model } of this.objects.values()) {
@@ -280,7 +354,7 @@ export class SceneView3D {
     for (const track of this.tracks) {
       track.value = this.flows.get(track.id) ?? null;
       track.phase = ((track.phase + (track.value ?? 0) / 24 * .2 * dt) % 1 + 1) % 1;
-      track.body.forEach(mesh => { mesh.material = track.value === null ? materials.greyFluid : materials.fluid; });
+      track.body.forEach(mesh => { mesh.material = track.value === null ? (materials.greyFluid ?? materials.dark) : materials.fluid; });
       track.particles.forEach((arrow, i) => {
         arrow.visible = track.value !== null && track.value !== 0;
         const position = (track.phase + i / 4) % 1; arrow.position.copy(track.curve.getPointAt(position));
@@ -407,5 +481,5 @@ export class SceneView3D {
     for (const layer of [this.equipmentLayer, this.pipeLayer]) { layer.traverse(object => { if (object instanceof THREE.Mesh) {object.geometry.dispose();if(object.userData.ownedConnectionMaterial)(object.material as THREE.Material).dispose();} }); layer.clear(); }
     this.objects.clear(); this.tracks = []; this.leaders.replaceChildren(); this.labels.replaceChildren(this.leaders);
   }
-  dispose() { cancelAnimationFrame(this.raf); this.resizeObserver.disconnect(); this.controls.dispose(); this.clearGroups(); this.clearGeometry(); this.world.traverse(object => { if (object instanceof THREE.Mesh) object.geometry.dispose(); }); this.signalMaterial.dispose(); this.renderer.dispose(); this.host.replaceChildren(); }
+  dispose() { cancelAnimationFrame(this.raf); this.environmentTexture.dispose(); this.resizeObserver.disconnect(); this.controls.dispose(); this.clearGroups(); this.clearGeometry(); this.world.traverse(object => { if (object instanceof THREE.Mesh) object.geometry.dispose(); }); this.signalMaterial.dispose(); this.renderer.dispose(); this.host.replaceChildren(); }
 }

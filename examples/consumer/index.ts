@@ -1,37 +1,86 @@
-import { defineComponent } from '@pom4h/scada/sdk';
-import { connect, tank, outlet } from '@pom4h/scada/core';
+import { cable, pipe, project, simulation, system } from '@saturn/core';
+import { coreElementRegistry, deriveSchematicProjection, getGlyph, mediumPresets } from '@saturn/core/elements';
 
-const regulator = defineComponent('consumerRegulator', {
-  version: '1.0.0', label: 'Regulator', width: 100, height: 60,
-  fields: {
-    x: {label:'X',default:100,scope:'layout'}, y: {label:'Y',default:100,scope:'layout'},
-    gain: {label:'Gain',default:1,min:0,max:10}, enabled: {label:'Enabled',default:true},
-    mode: {label:'Mode',default:'auto',choices:['auto','manual']},
-  },
-  ports: { feed: {x:0,y:30,direction:'left',role:'in'}, drain: {x:100,y:30,direction:'right',role:'out'} },
-  signals: { value: {label:'Value',type:'number',unit:'bar'} },
-  commands: { setGain: {label:'Set gain',valueType:'number'}, reset: {label:'Reset'} },
+const water = system('water', 'Water');
+const tank = simulation('T-101', 'reservoir', {
+  system: 'water',
+  at: { x: 20, y: 120 },
 });
-const source = tank('T', {x:0,y:0}), target = outlet('OUT', {x:300,y:0});
-const node = regulator('R', {x:150,y:0,gain:2,enabled:true,mode:'auto'});
-const incoming = connect(source.outlet,node.feed), outgoing = connect(node.drain,target.inlet);
-const command = regulator.command(node.id,'id-1','setGain',3);
-if (incoming.to.port !== 'feed' || outgoing.from.port !== 'drain' || command.value !== 3) throw new Error('SDK public contract failed');
-// These examples are compiled but never executed. An accidentally weakened API fails the smoke test.
-if (false) {
-  // @ts-expect-error Unknown property
-  regulator('bad', {gian:2});
-  // @ts-expect-error Wrong field type
-  regulator('bad', {gain:'high'});
-  // @ts-expect-error Invalid enum
-  regulator('bad', {mode:'turbo'});
-  // @ts-expect-error No such port
-  connect(node.typo,target.inlet);
-  // @ts-expect-error Input cannot be used as an output
-  connect(node.feed,target.inlet);
-  // @ts-expect-error Command expects a number
-  regulator.command('R','id-2','setGain','high');
-  // @ts-expect-error A parameterless command takes no value
-  regulator.command('R','id-3','reset',1);
+const pump = simulation('P-101', 'pump', {
+  system: 'water',
+  at: { x: 260, y: 120 },
+});
+const separator = simulation('SEP-101', 'separator', {
+  system: 'water',
+  at: { x: 520, y: 120 },
+});
+const generator = simulation('GEN', 'alternator', {
+  system: 'water',
+  at: { x: 20, y: 360 },
+});
+const transformer = simulation('TR', 'transformer', {
+  system: 'water',
+  at: { x: 260, y: 360 },
+});
+const supply = simulation('PSU', 'dc-supply', {
+  system: 'water',
+  at: { x: 520, y: 360 },
+});
+
+const suction = pipe('suction', tank.ports.outlet, pump.ports.inlet);
+const feeder = cable('feeder', generator.ports.output, transformer.ports.primary, { medium: 'power' });
+
+const installation = project('consumer', {
+  title: 'Consumer',
+  description: 'External TypeScript consumer',
+  systems: [water],
+  simulations: [tank, pump, separator, generator, transformer, supply],
+  connections: [suction, feeder],
+  signals: [],
+  alarms: [],
+  reports: [],
+});
+
+if (
+  pump.id !== 'P-101'
+  || pump.kind !== 'pump'
+  || pump.ports.inlet.port !== 'inlet'
+  || !pump.flow
+  || installation.simulations[0].id !== 'T-101'
+) {
+  throw new Error('@saturn/core public contract failed');
 }
-console.log('External SDK consumer passed');
+
+if (false) {
+  // Internal Project IR must not leak into completion/public authoring.
+  // @ts-expect-error hidden implementation detail
+  pump.node;
+
+  // @ts-expect-error unknown model kind
+  simulation('bad', 'definitely-not-a-model', { system: 'water', at: { x: 0, y: 0 } });
+
+  // @ts-expect-error wrong parameter name is rejected from model metadata
+  simulation('bad-params', 'pump', { system: 'water', at: { x: 0, y: 0 }, parameters: { inertai: 2 } });
+
+  // Separator outlet carries steam; pump inlet accepts water.
+  // @ts-expect-error incompatible fluid media
+  pipe('steam-to-water', separator.ports.outlet, pump.ports.inlet);
+
+  // Both are power terminals, but their electrical families are incompatible.
+  // @ts-expect-error drive power cannot be wired directly to a dc24 terminal
+  cable('drive-to-dc24', generator.ports.output, supply.ports.plus, { medium: 'power' });
+}
+
+console.log('@saturn/core consumer passed');
+
+
+const canonicalPump = coreElementRegistry.get('process.pump.centrifugal');
+const pumpProjection = deriveSchematicProjection(canonicalPump, {}, { width: 220, height: 170, padding: 12 });
+if (
+  pumpProjection.ports.IN.direction !== 'left'
+  || pumpProjection.ports.OUT.direction !== 'up'
+  || getGlyph(canonicalPump.visual.glyph).id !== 'process.pump.centrifugal'
+  || mediumPresets.water.ior !== 1.333
+) {
+  throw new Error('@saturn/core/elements public contract failed');
+}

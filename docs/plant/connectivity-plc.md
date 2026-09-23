@@ -36,7 +36,7 @@ There is no automatic conversion between unlabelled physical units. The declared
 See `plant/demo/commissioning.ts`, an imported module of the same project:
 
 ```ts
-import {system, simulation, control, plc, pin, gt, port, cable} from '@scada/plant';
+import {system, simulation, control, plc, pin, gt, port, cable} from '@saturn/core';
 
 export const bench = system('commissioning', 'PLC · клеммы', 'site');
 export const level = control('BENCH-LEVEL', {

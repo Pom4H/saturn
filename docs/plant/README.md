@@ -2,7 +2,7 @@
 
 This implementation is a runnable **simulation/engineering workbench**, not an operational nuclear control system. It adds an isomorphic installation runtime to the existing editor. The old editor, its source-preserving edits, and the PR #11 recorder remain available; the new workbench reuses the component registry, SVG host, and CodeMirror rather than replacing those with a second renderer.
 
-The same `Kernel`, `Service`, alarm evaluator, historian queries, report renderer, and project compiler run in Node.js and a browser Worker. Native SQLite and SQLite WASM are adapters. The browser repository emulates the application-level commit/publish/rollback contract, not the Git wire format.
+The same `Kernel`, `Service`, alarm evaluator, historian queries and report renderer run behind Node/Bun and browser adapters. Project TypeScript runs only at the trusted build boundary. Runtime consumes a content-addressed `saturn.build@1` artifact. Browser source lives in ProjectFs/OPFS; browser runtime state lives in a separate SQLite database.
 
 ## Operator controls and equipment views
 
@@ -17,7 +17,7 @@ npm ci
 npm run plant
 ```
 
-Open `http://127.0.0.1:4176/plant/app/` for the authenticated Node installation, or `/plant/demo/` for the browser-only version. A new database generates an initial named `engineer` account and prints its random password **once**. Save that password. There are no fixed production credentials. The CLI applies `umask(077)` before creating its database and project repository.
+Open `http://127.0.0.1:4176/plant/app/` for the authenticated Node installation, or `/plant/demo/` for the browser-only version. A new database generates an initial named `engineer` account and prints its random password **once**. Save that password. There are no fixed production credentials. The CLI applies `umask(077)` before creating runtime data.
 
 The implementation was exercised in the sandbox using **Node 22.16.0**, native SQLite 3.49.1, SQLite WASM 3.53.4, and isolated Playwright Chromium 153.0.8010.12. The repository's existing `.nvmrc` remains the pinned Node 24 toolchain. Use a patched Node release in either supported major for deployment; the old sandbox patch version is a test observation, not a security recommendation.
 
@@ -26,8 +26,7 @@ Optional environment configuration:
 | Variable | Meaning |
 |---|---|
 | `HOST`, `PORT` | Default `127.0.0.1`, `4176` |
-| `SCADA_DATABASE` | SQLite path; default `data-plant/plant.sqlite3` |
-| `SCADA_PROJECT_REPO` | Dedicated Git repository; default `data-plant/project.git` |
+| `SCADA_DATABASE` | SQLite runtime path; default `data-plant/runtime.sqlite3` |
 | `SCADA_PUBLIC_URL` | Public HTTPS origin behind a reverse proxy; must match browser Origin |
 | `SCADA_USER`, `SCADA_PASSWORD` | Initial named account; password at least 12 characters; existing users are not silently overwritten |
 | `SCADA_PUSH_SUBJECT` | Operator contact `mailto:` or HTTPS URL; enables Web Push |
@@ -61,17 +60,29 @@ The browser-only demo uses `ServiceWorkerRegistration.showNotification()` while 
 
 Verified here: local browser notification creation, alarm acknowledgement, subscription validation, outbox behavior, expiry/retry state handling, logout revocation, and actual `web-push` integration code. **External push-provider delivery to a physical phone was not verified in the sandbox.**
 
-## Project versions and application releases
+## Source, build, published and applied state
 
-Only an immutable committed snapshot can be published. The shared compiler validates every imported module, signal reference, hierarchy, model parameter, archive policy, alarm and schedule before activation. Browser edits are drafts. Saving a commit and publishing it are distinct operations. A stale base revision is rejected; recovered drafts retain their original base revision.
+Saturn deliberately separates four identities:
 
-The server repository uses `refs/heads/main` for authoring and `refs/scada/plant/published` for desired deployment. Check the actual symbolic branch in an existing repository before using external Git commands. Use a dedicated repository initialized by this application; do not point it at an unrelated working clone. Reads use immutable Git objects. No checkout over active files, hooks, arbitrary project JavaScript, or package lifecycle scripts are executed.
+```text
+Git source SHA
+     ↓
+saturn build
+     ↓
+BuildArtifact hash
+     ↓
+published
+     ↓
+applied runtime
+```
 
-The server watches the desired ref. It retains a working applied checkpoint if an external candidate fails validation. The desired Git ref is durable before the applied SQLite checkpoint; restart reconciles a crash between them. Layout, report and archive-policy-only changes preserve the compatible simulation run. Dynamic model/wiring changes create a new run. A rollback creates a new commit containing old files and publishes that commit; it does not erase commits, measurements, report artifacts, or physical actions.
+The runtime does not own a Git repository or compile TypeScript. It stores immutable validated artifacts and checkpoints pin an artifact hash. A deployment uses compare-and-swap on the published artifact identity; a failed candidate leaves the last-good applied artifact and checkpoint intact.
 
-The native Git adapter does not add remote credentials or automatic `git fetch/push`. Repository transport can be handled by deployment tooling outside the service; the previous PR #11 Git project implementation remains available for its original scenes. Browser revisions have opaque `local:` identifiers and are not advertised as real Git object IDs. JSON import/export transfers project files, not an automatic merged history.
+Layout/report-only changes may preserve a compatible run when the normalized runtime configuration is unchanged. Topology/model/controller changes create a new run. Re-applying a retained previous artifact is an operational recovery action and does not fabricate a Git commit.
 
-Installed model implementation changes require an application release and a model version change. Checkpoints reject incompatible model versions; there is no invented state migration. Back up the SQLite database **and** repository before upgrading. Stop the service for a straightforward file backup, or use SQLite's backup facilities; do not copy a live main database without accounting for WAL. Browser project JSON export is not an archive/checkpoint backup. Automated backup orchestration is not included.
+The engineering workspace owns files, package tooling and Git. The standalone IDE exposes workspace file read/write separately from runtime operations. Runtime-only/kiosk hosts do not expose source files.
+
+Back up the runtime SQLite database and retained artifact data together. Source repositories are backed up and reviewed through normal Git workflows; browser ProjectFs/OPFS source is separate from runtime SQLite.
 
 ## Reports as workflows
 
@@ -92,9 +103,9 @@ npm run plant:test:browser
 npm run check
 ```
 
-The browser command starts its own isolated Node server on a free port, uses temporary credentials/database/Git, checks both remote and offline modes, and cleans up. `PWA_CHROMIUM` may select a test browser executable. `PWA_EVIDENCE_DIR` selects screenshots and JSON evidence (default `plant-test-results`). `.github/workflows/plant.yml` is **manual**, not a deploy or a billable test loop on every commit.
+The browser command starts an isolated runtime/workspace host on a free port, uses temporary credentials and runtime storage, checks both remote and offline modes, and cleans up. `PWA_CHROMIUM` may select a test browser executable. `PWA_EVIDENCE_DIR` selects screenshots and JSON evidence (default `plant-test-results`). `.github/workflows/plant.yml` is **manual**, not a deploy or a billable test loop on every commit.
 
-The Chernobyl-inspired model, assumptions and counterfactual results are documented [separately](model.md). Code under `plant/tests/` includes native/browser equation parity, SQL parity, quality, archive compression, native Git, release CAS, rollback, authentication, CSRF, report isolation and notification lifecycle tests. Type assertions also check the public DSL metadata inference. The existing legacy test suite remains separate; do not present its browser test counts as new PWA coverage.
+The Chernobyl-inspired model, assumptions and counterfactual results are documented [separately](model.md). Code under `plant/tests/` includes native/browser equation parity, SQL parity, quality, archive compression, artifact publish/apply CAS, recovery, authentication, CSRF, report isolation and notification lifecycle tests. Type assertions also check the public DSL metadata inference. The existing legacy test suite remains separate; do not present its browser test counts as new PWA coverage.
 
 ## Unified visualization and extended equipment
 

@@ -1,14 +1,33 @@
 import { test, expect } from '@playwright/test';
 import { crowdedCircuit } from '../fixtures';
 
+declare global {
+  interface Window {
+    __scada: {
+      source: string;
+      error: unknown;
+      flows: Record<string, number | null>;
+      warnings: string[];
+      setSource(source: string): void;
+      fit(): void;
+      select(id: string): void;
+      undo(): void;
+    };
+    __challengeRotor?: Element | null;
+    __challengePipe?: Element | null;
+    __rotorProbe?: Element | null;
+    __pipeProbe?: Element | null;
+  }
+}
+
 test('B07 measure geometry edits and parameter edits on a valid 48-element scene', async ({ page }, info) => {
   // Use a fresh page with native performance.now: no fake clock in this file.
   // Measure synchronous editor calls, not FPS or GPU performance.
   await page.goto('./');
-  await page.waitForFunction(() => !!(window as any).__scada);
+  await page.waitForFunction(() => !!window.__scada);
   const source = crowdedCircuit(48);
   const measures = await page.evaluate(source => {
-    const api = (window as any).__scada;
+    const api = window.__scada;
     const times: { kind: string; ms: number }[] = [];
     let t = performance.now(); api.setSource(source); times.push({ kind: 'initial', ms: performance.now() - t });
     for (let i = 0; i < 3; i++) {
@@ -25,6 +44,6 @@ test('B07 measure geometry edits and parameter edits on a valid 48-element scene
   expect(measures.error).toBeNull(); expect(measures.warnings).toEqual([]);
   await info.attach('editor-timings', { body: JSON.stringify(measures, null, 2), contentType: 'application/json' });
   console.log('48-element editor timings', JSON.stringify(measures));
-  await page.evaluate(() => (window as any).__scada.fit());
+  await page.evaluate(() => window.__scada.fit());
   await page.screenshot({ path: info.outputPath('48-elements.png') });
 });

@@ -41,3 +41,28 @@
 .terminal-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.terminal-grid button{display:flex;flex-direction:column;align-items:flex-start;min-width:0;padding:7px;font-family:ui-monospace,monospace}.terminal-grid small{font-size:10px;opacity:.7}.terminal-panel h3{margin:18px 0 8px}.terminal-panel p,.connection-list{font-size:11px;overflow-wrap:anywhere}.connection-list{border-top:1px solid #d4e1e6;margin-top:14px}.connection-list p{padding:5px 0}#plc-front svg{width:100%;height:auto}#plc-front{margin:12px -8px}.ports circle{cursor:crosshair}.ports circle:hover,.ports circle:focus{stroke:#dc8749;outline:none;stroke-width:3}.node[data-kind="plant_saturn"] .ports circle{stroke-width:.8}.node[data-kind="plant_saturn"] .ports circle:hover{stroke-width:1.5}[data-connection]:focus path:first-of-type{stroke:#dd934e}.terminal-panel button[data-disconnect]{font-size:10px;padding:3px 6px}
 
 .legend-pipe{color:#7e9aa8}.legend-power{color:#836344}.legend-control{color:#148c8f}.legend-bus{color:#72628e}
+
+
+/* Engineering workspace ↔ live runtime environment */
+.environment-link{display:flex;align-items:center;gap:.55rem;margin-top:.65rem;flex-wrap:wrap}
+.environment-link span{font-size:.78rem;padding:.3rem .55rem;border:1px solid var(--line,#ccd7dc);border-radius:999px}
+#environment-dialog{width:min(520px,calc(100vw - 32px));border:1px solid var(--line,#ccd7dc);border-radius:12px;padding:0;background:var(--panel,#fff);color:inherit;box-shadow:0 24px 80px #0004}
+#environment-dialog::backdrop{background:#10242b66;backdrop-filter:blur(2px)}
+#environment-form{padding:20px;display:grid;gap:14px}
+#environment-form label{display:grid;gap:6px;font-size:.82rem}
+#environment-form input{width:100%;box-sizing:border-box}
+.dialog-actions{display:flex;justify-content:flex-end;gap:8px}
+
+
+/* Installed Saturn extensions */
+.extension-install{display:flex;gap:8px;margin:0 0 16px}.extension-install input{flex:1;min-width:220px;font-family:ui-monospace,monospace}
+.extension-list{display:grid;gap:8px}.extension-card{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:14px;border:1px solid #cbdbe2;background:#f8fbfc}.extension-card h3{margin:0 0 4px;font-size:14px}.extension-card p{margin:0;color:#527383;font:12px ui-monospace,monospace}.extension-card small{display:block;margin-top:8px;color:#526b75;line-height:1.45}
+
+
+/* Saturn application update: appears only when a signed update is available. */
+.shell-update{position:fixed;left:14px;bottom:14px;z-index:90;display:flex;align-items:center;gap:9px;min-height:42px;padding:7px 11px 7px 8px;border:1px solid #b9c8cf;border-radius:9px;background:#fff;color:#173746;box-shadow:0 8px 26px #17374618;text-align:left}
+.shell-update[hidden]{display:none}.shell-update:hover{border-color:#8faab6;background:#f7fafb}.shell-update:focus-visible{outline:2px solid #17879a;outline-offset:2px}.shell-update:disabled{cursor:wait;opacity:.72}
+.shell-update-mark{display:grid;place-items:center;width:26px;height:26px;border-radius:7px;background:#173746;color:#fff;font-size:15px;line-height:1}
+.shell-update-copy{display:flex;flex-direction:column;gap:1px}.shell-update-copy strong{font-size:12px;line-height:1.05}.shell-update-copy small{font:10px ui-monospace,SFMono-Regular,Consolas,monospace;color:#6a818c}
+.shell-update.installing .shell-update-mark{animation:saturn-update-pulse 1s ease-in-out infinite}@keyframes saturn-update-pulse{50%{opacity:.45;transform:translateY(-1px)}}
+@media(max-width:680px){.shell-update{left:10px;bottom:10px}}

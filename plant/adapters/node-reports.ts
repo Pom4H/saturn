@@ -3,7 +3,7 @@ import type { ReportTask, ReportArtifact } from '../types';
 /** A process, not a thread: SIGKILL can interrupt a native SQLite query as well as JS. */
 export function runReport(task: ReportTask, timeoutMs = 5000): Promise<ReportArtifact> {
     return new Promise((resolve, reject) => {
-        const child = fork(new URL('./report-worker.mjs', import.meta.url), [], {
+        const child = fork(new URL('./node-report-worker.mjs', import.meta.url), [], {
             execArgv: ['--experimental-sqlite', '--max-old-space-size=96'],
             stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
             serialization: 'advanced',

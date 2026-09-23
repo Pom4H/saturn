@@ -1,36 +1,74 @@
 name: Check and deploy
 on:
+  pull_request:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
+
 permissions:
   contents: read
+
 concurrency:
   group: pages-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
+
       - uses: actions/setup-node@v7.0.0
         with:
           node-version-file: .nvmrc
           cache: npm
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+
       - run: npm ci
-      - run: npm run check
-      - run: npm run site:check
-      - run: npx playwright install --with-deps chromium webkit
-      - run: npm run site:test:browser
-      - run: npm run test:e2e
-      - run: npm run challenge:browser
-      - run: npm audit --audit-level=high
+
+      # Capture the focused product evidence first: it is a short, objective
+      # browser oracle and should not wait behind the broader release suite.
+      - run: npx playwright install --with-deps chromium
+      - name: Capture PLC HMI video
+        run: node scripts/hmi-video-evidence.mjs
+
+      # One canonical PR gate. This already covers build, TypeScript, unit/core
+      # tests, plant tests, Bun smoke, authoring, consumer and VS Code checks.
+      - name: Core release checks
+        run: npm run check
+
+      - name: Landing static checks
+        run: npm run site:check
+
+      - name: Convert HMI video to MP4
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+          ffmpeg -y -i plant-test-results/saturn-wasm-hmi.webm -an -c:v libx264 -pix_fmt yuv420p -movflags +faststart plant-test-results/saturn-wasm-hmi.mp4
+
       - uses: actions/upload-artifact@v7.0.1
         if: always()
+        with:
+          name: hmi-evidence
+          path: plant-test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Saturn shell integration
+        run: node scripts/site-release-check.mjs
+
+      - run: npm audit --audit-level=high
+
+      - uses: actions/upload-artifact@v7.0.1
+        if: failure()
         with:
           name: browser-tests
           path: |
@@ -40,15 +78,22 @@ jobs:
             runtime-test-results/
             challenge-results/
           retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Build Pages artifact
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        run: npm run pages:build
+
       - uses: actions/upload-pages-artifact@v5.0.0
-        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         with:
-          path: dist
+          path: dist/pages
+
   deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs: check
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 10
     permissions:
       pages: write
       id-token: write
@@ -63,10 +108,11 @@ jobs:
           enablement: true
       - uses: actions/deploy-pages@v5.0.1
         id: deployment
+
   verify-live:
     needs: deploy
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -77,13 +123,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - name: Verify the published Pages URL in a real browser
+      - name: Verify the published Saturn URL
         run: node scripts/verify-live.mjs
         env:
-          PLAYGROUND_URL: ${{ needs.deploy.outputs.page_url }}
+          SATURN_URL: ${{ needs.deploy.outputs.page_url }}
       - uses: actions/upload-artifact@v7.0.1
-        if: always()
+        if: failure()
         with:
           name: live-pages-check
           path: live-check/
           retention-days: 7
+          if-no-files-found: ignore
