@@ -1,4 +1,4 @@
-import { bankExample } from './typescript-example';
+import { bankExample } from './files';
 
 /** Portable project context, shared by review, editors and automation. */
 export function projectContext(count: number) {

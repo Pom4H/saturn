@@ -1,5 +1,5 @@
 import ts from '@typescript/typescript6';
-import { catalog, defaults, type Scene, type Equipment, type Endpoint, type Link, type Value, type Kind } from './core';
+import { componentRegistry, defaults, type Scene, type Equipment, type Endpoint, type Link, type Value, type Kind } from './core';
 import './components/installed';
 import type { RuntimeConfig } from './runtime/protocol';
 
@@ -72,7 +72,7 @@ export function compile(source: string): Compiled {
     }
     if (ts.isPropertyAccessExpression(n)) {
       const object = ev(n.expression), port = n.name.text;
-      if (!isEquipment(object) || !has(catalog[object.kind].ports, port)) fail(n, `Неизвестный порт «${port}».`);
+      if (!isEquipment(object) || !has(componentRegistry.schematic(object.kind).ports, port)) fail(n, `Неизвестный порт «${port}».`);
       return { node: object.id, port } satisfies Endpoint;
     }
     if (ts.isCallExpression(n) && ts.isIdentifier(n.expression)) {
@@ -104,7 +104,7 @@ export function compile(source: string): Compiled {
         if (from.node === to.node) fail(n, 'Нельзя соединить элемент с самим собой.');
         for (const [endpoint, role] of [[from, 'out'], [to, 'in']] as const) {
           const node = scene.nodes.find(v => v.id === endpoint.node)!;
-          if (catalog[node.kind].ports[endpoint.port].role !== role) fail(n, 'Соединение должно идти от выхода ко входу.');
+          if (componentRegistry.schematic(node.kind).ports[endpoint.port].role !== role) fail(n, 'Соединение должно идти от выхода ко входу.');
           if (scene.links.some(l => [l.from, l.to].some(p => p.node === endpoint.node && p.port === endpoint.port))) fail(n, `Порт ${endpoint.node}.${endpoint.port} уже занят.`);
         }
         const assigned = ts.isVariableStatement(statement) && statement.declarationList.declarations[0].initializer === n;
@@ -115,16 +115,16 @@ export function compile(source: string): Compiled {
       if (name === 'tap') {
         if (n.arguments.length !== 2) fail(n, 'tap(line, instrument) принимает линию и прибор.');
         const line = ev(n.arguments[0]); const instrument = ev(n.arguments[1]);
-        if (!isLink(line) || !isEquipment(instrument) || !catalog[instrument.kind].instrument) fail(n, 'tap ожидает connect(...) и pressure(...) или temperature(...).');
+        if (!isLink(line) || !isEquipment(instrument) || !componentRegistry.schematic(instrument.kind).instrument) fail(n, 'tap ожидает connect(...) и pressure(...) или temperature(...).');
         if (instrument.tap) fail(n, 'Прибор уже подключён к линии.');
         instrument.tap = line.id; tapExpressions.set(instrument.id, n); statements.set(`tap:${instrument.id}`, statement); return instrument;
       }
-      if (name === 'component' || has(catalog, name!)) {
+      if (name === 'component' || componentRegistry.hasSchematic(name!)) {
         const offset = name === 'component' ? 1 : 0;
         if (n.arguments.length !== 2 + offset) fail(n, `${name}: неверное число аргументов.`);
         const kindValue = offset ? ev(n.arguments[0]) : name;
-        if (typeof kindValue !== 'string' || !has(catalog, kindValue)) fail(n, `Не установлен тип компонента: ${String(kindValue)}.`);
-        const kind = kindValue as Kind, definition = catalog[kind];
+        if (typeof kindValue !== 'string' || !componentRegistry.hasSchematic(kindValue)) fail(n, `Не установлен тип компонента: ${String(kindValue)}.`);
+        const kind = kindValue as Kind, definition = componentRegistry.schematic(kind);
         if (n.arguments.length !== 2 + offset || !ts.isObjectLiteralExpression(n.arguments[1 + offset])) fail(n, `${name}("ID", { ... }) требует литерал объекта свойств.`);
         const id = ev(n.arguments[offset]);
         if (typeof id !== 'string' || !/^[\p{L}\p{N}_.-]{1,48}$/u.test(id)) fail(n.arguments[0], 'ID: 1–48 букв, цифр, точек, дефисов или подчёркиваний.');
@@ -160,7 +160,7 @@ export function compile(source: string): Compiled {
       if (!binding || !ts.isNamedImports(binding)) fail(s, 'Используйте именованные импорты: import { pump } from "@scada/core".');
       for (const item of binding.elements) {
         const remote = item.propertyName?.text ?? item.name.text;
-        if (!has(catalog, remote) && !['connect', 'tap', 'component', 'runtime'].includes(remote)) fail(item, `Неизвестный экспорт: ${remote}.`);
+        if (!componentRegistry.hasSchematic(remote) && !['connect', 'tap', 'component', 'runtime'].includes(remote)) fail(item, `Неизвестный экспорт: ${remote}.`);
         if (imports.has(item.name.text) || values.has(item.name.text)) fail(item, 'Повторное имя импорта.');
         imports.set(item.name.text, remote);
       }
@@ -176,7 +176,7 @@ export function compile(source: string): Compiled {
       evaluate(s.expression);
     } else if (s.kind !== ts.SyntaxKind.EmptyStatement) fail(s, 'Поддерживаются import, const, connect и tap.');
   }
-  for (const item of scene.nodes) if (catalog[item.kind].instrument && !item.tap) throw new SourceError(`${item.id}: подключите прибор через tap(line, ...).`, objects.get(item.id)!.span.from, objects.get(item.id)!.span.to);
+  for (const item of scene.nodes) if (componentRegistry.schematic(item.kind).instrument && !item.tap) throw new SourceError(`${item.id}: подключите прибор через tap(line, ...).`, objects.get(item.id)!.span.from, objects.get(item.id)!.span.to);
   return { scene, runtime, file, objects, statements, imports, linkExpressions, tapExpressions };
 }
 export function editable(compiled: Compiled, id: string, key: string): boolean { const p = compiled.objects.get(id)?.fields.get(key); return !p || literal(p); }
@@ -192,7 +192,7 @@ export function patchFields(source: string, id: string, patch: Record<string, Va
   if (!object || !node) throw new SourceError(`Элемент ${id} не найден.`);
   const changes: Change[] = []; const missing: string[] = [];
   for (const [key, value] of Object.entries(patch)) {
-    if (!has(catalog[node.kind].fields, key)) throw new SourceError(`Неизвестное свойство: ${key}.`);
+    if (!has(componentRegistry.schematic(node.kind).fields, key)) throw new SourceError(`Неизвестное свойство: ${key}.`);
     const old = object.fields.get(key);
     if (old && !literal(old)) throw new SourceError(`${id}.${key} вычисляется выражением. Измените его в коде; визуальный редактор не перезаписывает формулы.`, old.getStart(), old.getEnd());
     const text = typeof value === 'string' ? (old?.getText().startsWith("'") ? `'${value.replace(/'/g, "\\'")}'` : JSON.stringify(value)) : String(value);
@@ -233,9 +233,9 @@ export function ensureImport(source: string, names: string[]): string {
   return `import { ${bindings.join(', ')} } from "@scada/core";\n` + source;
 }
 export function appendEquipment(source: string, kind: Kind, x: number, y: number): string {
-  const c = compile(source); let i = 1; const prefix = catalog[kind].prefix ?? ({ tank: 'T', pump: 'P', valve: 'V', flowmeter: 'F', exchanger: 'HX', outlet: 'OUT', pressure: 'PT', temperature: 'TT' } as Record<string, string>)[kind] ?? kind.toUpperCase();
+  const c = compile(source); let i = 1; const prefix = componentRegistry.schematic(kind).prefix ?? ({ tank: 'T', pump: 'P', valve: 'V', flowmeter: 'F', exchanger: 'HX', outlet: 'OUT', pressure: 'PT', temperature: 'TT' } as Record<string, string>)[kind] ?? kind.toUpperCase();
   while (c.scene.nodes.some(n => n.id === `${prefix}-${100 + i}`) || c.file.text.includes(`${kind}${i}`)) i++;
-  if (catalog[kind].instrument) throw new SourceError('Выберите трубопровод, затем добавьте отвод с прибором.');
+  if (componentRegistry.schematic(kind).instrument) throw new SourceError('Выберите трубопровод, затем добавьте отвод с прибором.');
   const builtin = ['tank', 'pump', 'valve', 'flowmeter', 'exchanger', 'outlet', 'pressure', 'temperature'].includes(kind), factory = builtin ? kind : 'component';
   const imported = ensureImport(source, [factory]);
   const local = [...compile(imported).imports].find(([, remote]) => remote === factory)![0];

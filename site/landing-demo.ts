@@ -12,7 +12,7 @@ import { SceneView } from '../src/view';
 import { installEquipment, sceneFor } from '../plant/equipment';
 import { compileProject } from '../plant/compiler';
 import { sourceObjects } from './plant-project';
-import { landingProjectFiles, landingProjectSource } from './landing-project';
+import { landingProjectFiles, landingProjectSource } from "../examples/landing/project";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const projectScene = (source: string) => {

@@ -1,12 +1,14 @@
+import "./component-registry.test.ts";
+import { simulate } from '../examples/diagram/simulation';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, patchFields, applyChanges, editable, removeObject, appendEquipment, appendConnection, appendTap, formatSource } from '../src/source';
-import { catalog, simulate, worldPort, pump, valve, connect } from '../src/core';
+import { componentRegistry, worldPort, pump, valve, connect } from '../src/core';
 import { layout, segmentClear, bounds } from '../src/geometry';
 import { deriveSchematicProjection, defineElementPack } from '../src/elements/model';
 import { registry as elementRegistry } from '../src/elements/core-elements';
 import { getGlyph } from '../src/elements/symbols';
-import { booster, twin, empty } from '../src/examples';
+import { booster, twin, empty } from "../examples/diagram/projects";
 const patch = (s: string, id: string, props: Record<string, string | number | boolean>) => applyChanges(s, patchFields(s,id,props));
 test('initial scene: eight nodes, five connections, two taps', () => {
  const s = compile(booster).scene; assert.equal(s.nodes.length,8); assert.equal(s.links.length,5); assert.equal(s.nodes.filter(n=>n.tap).length,2);
@@ -101,7 +103,7 @@ function validateGeometry(s:string, expectedWarnings: string[] = []){
   const route=geometry.routes.get(edge.id)!; assert(route.valid);
   const from=worldPort(c.nodes.find(n=>n.id===edge.from.node)!,edge.from.port),to=worldPort(c.nodes.find(n=>n.id===edge.to.node)!,edge.to.port);
   assert.equal(route.points[0].x,from.x);assert.equal(route.points[0].y,from.y); assert.equal(route.points.at(-1)!.x,to.x);assert.equal(route.points.at(-1)!.y,to.y);
-  const boxes=c.nodes.filter(n=>!catalog[n.kind].instrument&&![edge.from.node,edge.to.node].includes(n.id)).map(n=>bounds(n,10));
+  const boxes=c.nodes.filter(n=>!componentRegistry.schematic(n.kind).instrument&&![edge.from.node,edge.to.node].includes(n.id)).map(n=>bounds(n,10));
   for(let i=1;i<route.points.length;i++)assert(segmentClear(route.points[i-1],route.points[i],boxes),`collision ${edge.id}`);
  }
 }

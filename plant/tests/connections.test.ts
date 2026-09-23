@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compileProject, validateProject } from '../compiler';
-import { demoFiles } from '../demo/files';
+import { demoFiles } from "../../examples/plant/files";
 import { terminals, resolvePort, validateConnections, footprint } from '../ports';
 import { routeConnections } from '../routing';
 import { compileController, ControllerVM } from '../controller';

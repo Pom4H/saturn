@@ -1,5 +1,5 @@
 import { compileProject } from '../compiler';
-import { demoFiles } from '../demo/files';
+import { demoFiles } from "../../examples/plant/files";
 import { Kernel } from '../kernel';
 import { updateAlarms } from '../alarms';
 import type { AlarmState } from '../types';

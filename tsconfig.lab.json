@@ -1,5 +1,10 @@
 {
   "extends": "./tsconfig.json",
-  "compilerOptions": { "resolveJsonModule": true },
-  "include": ["src/next", "lab3d"]
+  "compilerOptions": {
+    "resolveJsonModule": true
+  },
+  "include": [
+    "src/elements",
+    "examples/elements-lab"
+  ]
 }

@@ -3,7 +3,7 @@ import { runTrainingSuite } from './stability-trace';
 import { runCounterfactuals, runControlTrace } from './counterfactual';
 import { openBrowserSql } from '../adapters/browser-sql';
 import { compileProject } from '../compiler';
-import { demoFiles } from '../demo/files';
+import { demoFiles } from "../../examples/plant/files";
 import { executeReport } from '../workflows';
 self.onmessage = async () => { try {
     const physics = runCounterfactuals(), { db } = await openBrowserSql({ memory: true });

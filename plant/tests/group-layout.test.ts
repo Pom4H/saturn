@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compileProject } from '../compiler';
-import { demoFiles } from '../demo/files';
+import { demoFiles } from "../../examples/plant/files";
 import { groupLayout } from '../group-layout';
 import { groupTitleLines } from '../../src/group-style';
 import { Kernel } from '../kernel';

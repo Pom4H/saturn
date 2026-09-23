@@ -113,7 +113,7 @@ For a chart, return an x column and a numeric-or-null y column. Reports support 
 
 ## Root
 
-The default export is `project(id, {...})` with systems, simulations, derived signals, alarms and reports. `overview` optionally names the dashboard metrics; no Chernobyl-specific signal IDs are hard-coded in the UI. See executable multi-file examples under `plant/demo/` and the public typed consumer test in `plant/tests/sdk-types.ts`.
+The default export is `project(id, {...})` with systems, simulations, derived signals, alarms and reports. `overview` optionally names the dashboard metrics; no Chernobyl-specific signal IDs are hard-coded in the UI. See executable multi-file examples under `examples/plant/` and the public typed consumer test in `plant/tests/sdk-types.ts`.
 
 ## Operator input signals
 

@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { registry } from '../src/elements/core-elements';
-import { advancePhase, readSignal, worldPort, type Vec3 } from '../src/elements/model';
+import { registry } from "../../src/elements/core-elements";
+import { advancePhase, readSignal, worldPort, type Vec3 } from "../../src/elements/model";
 import { assets, fixture, scenarios, type Scenario } from './fixtures';
 import { createModel, materials, tubeBetween } from './models';
-import index from '../catalog/drawio-pid-index.json';
+import index from "../../catalog/drawio-pid-index.json";
 import './style.css';
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) => document.querySelector<T>(selector)!;

@@ -4,7 +4,7 @@ import { renderSaturnPlcSvg } from './saturn-view';
 import { drawHmiSvg, setDisplays } from './hmi-view';
 import { groupLayout } from './group-layout';
 import { createPlantModel } from './visual3d';
-import { registerComponent, catalog, type Equipment, type Scene } from '../src/core';
+import { componentRegistry, defineSchematicElement, type Equipment, type Scene } from '../src/core';
 import { registerSvgRenderer, register3dRenderer, el, type SvgRendererContext } from '../src/view';
 import type { RuntimeFrame } from '../src/runtime/protocol';
 import { models, outputType } from './models';
@@ -131,8 +131,8 @@ export function installEquipment(locale: SaturnLocale = 'en') {
         if (installed.has(kind))
             continue;
         installed.add(kind);
-        if (!catalog[kind])
-            registerComponent(kind, { version: '1.0.0', label: modelTitle(spec.kind, locale), ...footprint(spec.visual), visual:{glyph:glyphByVisual[spec.visual]??'generic.element',category:categoryByVisual(spec.visual),geometry:`plant.${spec.visual}`,envelope:{min:[-.8,-.6,.02],max:[.8,.6,1.9]}}, fields: { x: { label: 'X', scope: 'layout', default: 0 }, y: { label: 'Y', scope: 'layout', default: 0 } }, ports: Object.fromEntries(Object.entries(terminals(spec.visual)).map(([name,t])=>[name,{x:t.x,y:t.y,direction:t.side,role:t.role==='source'?'out':'in'}])), signals: Object.fromEntries(Object.entries(spec.outputs).map(([k, unit]) => [k, { label: k, unit, type: outputType(spec, k) }])) });
+        if (!componentRegistry.findSchematic(kind))
+            componentRegistry.register(defineSchematicElement(kind, { version: '1.0.0', label: modelTitle(spec.kind, locale), ...footprint(spec.visual), visual:{glyph:glyphByVisual[spec.visual]??'generic.element',category:categoryByVisual(spec.visual),geometry:`plant.${spec.visual}`,envelope:{min:[-.8,-.6,.02],max:[.8,.6,1.9]}}, fields: { x: { label: 'X', scope: 'layout', default: 0 }, y: { label: 'Y', scope: 'layout', default: 0 } }, ports: Object.fromEntries(Object.entries(terminals(spec.visual)).map(([name,t])=>[name,{x:t.x,y:t.y,direction:t.side,role:t.role==='source'?'out':'in'}])), signals: Object.fromEntries(Object.entries(spec.outputs).map(([k, unit]) => [k, { label: k, unit, type: outputType(spec, k) }])) }));
         registerSvgRenderer(kind, c => { shapes[spec.visual](c); if(spec.visual==='saturn')return; const key = Object.keys(spec.outputs)[0]; const text = el(c.root, 'text', { x: 75, y: 111, 'text-anchor': 'middle', 'font-family': 'ui-monospace,monospace', 'font-size': 15, fill: '#214d5f' }); c.onUpdate(dt => { const value = c.number(key, dt); text.textContent = value === null ? '—' : `${value.toFixed(2)} ${spec.outputs[key]}`; }); });
         register3dRenderer(kind, c => createPlantModel(c, spec.visual, Object.keys(spec.outputs)[0]));
     }
@@ -144,7 +144,7 @@ export function sceneFor(project: Project): Scene {
         nodes: project.devices.map((n): Equipment => ({ id: n.id, kind: `plant_${n.type}`, variable: n.id, props: { ...n.layout, quality: 'good', alarm: 'none' } })),
         links: [],
         connections: routeConnections(project),
-        groups: groupLayout(project, type => catalog[`plant_${type}`]),
+        groups: groupLayout(project, type => componentRegistry.schematic(`plant_${type}`)),
     };
 }
 export function visualFrame(project: Project, frame: Frame): RuntimeFrame {
@@ -157,7 +157,7 @@ export function visualFrame(project: Project, frame: Frame): RuntimeFrame {
         const signals: RuntimeFrame['equipment'][string]['signals'] = {};
         for (const [key, expr] of Object.entries(n.signals)) {
             const s = evaluate(expr, id => frame.samples[id] ?? { value: null, time: frame.time, quality: 'bad' }, frame.time);
-            const definition = catalog[`plant_${n.type}`]?.signals?.[key];
+            const definition = componentRegistry.findSchematic(`plant_${n.type}`)?.signals?.[key];
             const common = { quality: s.quality, timestamp: s.time, unit: definition?.unit ?? 'отн.' };
             signals[key] = definition?.type === 'boolean'
                 ? { type: 'boolean', value: s.value === null ? null : Boolean(s.value), ...common }

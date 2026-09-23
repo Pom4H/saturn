@@ -223,7 +223,7 @@ app = await startPlantHttpServer({
 console.log(`Saturn ${SATURN_VERSION} · ${kiosk ? 'kiosk' : command}`);
 console.log(`Project: ${projectTitle}${projectDirectory ? ` · ${projectDirectory}` : ' · built-in demo'}`);
 console.log(`SCADA: ${app.origin}/plant/app/`);
-console.log(`Demo:  ${app.origin}/plant/demo/`);
+console.log(`Demo:  ${app.origin}/examples/plant/`);
 console.log(`Data:  ${dataDirectory}`);
 if (!projectDirectory) {
     const recent = (await registry.read()).recent.slice(0, 5);

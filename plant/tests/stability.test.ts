@@ -6,7 +6,7 @@ import { validateProject } from '../compiler';
 import { model, models } from '../models';
 import { svgVisualKinds, installEquipment, sceneFor, visualFrame } from '../equipment';
 import { compileProject } from '../compiler';
-import { demoFiles } from '../demo/files';
+import { demoFiles } from "../../examples/plant/files";
 const exercise = new Map<string, ReturnType<typeof runExercise>>();
 const run = (mode: Parameters<typeof runExercise>[0], delay = 20) => {
     const key = `${mode}:${delay}`; if(!exercise.has(key))exercise.set(key,runExercise(mode,delay));return exercise.get(key)!;

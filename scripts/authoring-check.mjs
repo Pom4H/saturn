@@ -5,7 +5,7 @@ await mkdir('.authoring', { recursive: true });
 const source = `
 import assert from 'node:assert/strict';
 import { compileProject } from '../plant/compiler';
-import { demoFiles } from '../plant/demo/files';
+import { demoFiles } from '../examples/plant/files';
 
 const project = compileProject(demoFiles);
 const transient = project.reports.find(report => report.id === 'transient');

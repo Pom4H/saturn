@@ -22,12 +22,12 @@
     }
   },
   "include": [
-    "plant/demo/**/*.ts",
+    "examples/plant/**/*.ts",
     "plant/tests/sdk-types.ts",
     "packages/core/index.ts",
     "packages/core/elements.ts"
   ],
   "exclude": [
-    "plant/demo/files.ts"
+    "examples/plant/files.ts"
   ]
 }

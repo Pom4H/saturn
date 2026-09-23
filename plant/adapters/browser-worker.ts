@@ -2,7 +2,7 @@ import { openBrowserSql } from './browser-sql';
 import { Store } from '../store';
 import { migrate } from '../migrations';
 import { Service } from '../service';
-import { demoFiles } from '../demo/files';
+import { demoFiles } from "../../examples/plant/files";
 import { buildArtifact } from '../artifact';
 import { AppError, type Actor, type ReportTask, type ReportArtifact } from '../types';
 import { diagnosticLocale, errorPayload, failCode } from '../diagnostics';

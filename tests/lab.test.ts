@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { advancePhase, ComponentRegistry, readSignal, worldPort } from '../src/elements/model';
 import { registry, pump } from '../src/elements/core-elements';
-import { createModel } from '../lab3d/models';
-import { assets, fixture } from '../lab3d/fixtures';
+import { createModel } from "../examples/elements-lab/models";
+import { assets, fixture } from "../examples/elements-lab/fixtures";
 
 test('A separately registered component supports custom fields and a third named port', () => {
   const custom = { ...pump, type: 'vendor.pump.v2', parameters: { ...pump.parameters, stages: { default: 2, min: 1, max: 8, unit: 'count' } }, ports: p => [...pump.ports(p), { id: 'DRAIN', position: [0, 0, 0], normal: [0, 0, -1], medium: 'water', role: 'out' }] } as typeof pump;

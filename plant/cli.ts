@@ -21,7 +21,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         password: process.env.SCADA_PASSWORD,
         pushSubject: process.env.SCADA_PUSH_SUBJECT,
     });
-    console.log(`Saturn: ${app.origin}/plant/app/\nDemo: ${app.origin}/plant/demo/`);
+    console.log(`Saturn: ${app.origin}/plant/app/\nDemo: ${app.origin}/examples/plant/`);
     if (app.initialPassword)
         console.log(`Initial engineer password (store securely): ${app.initialPassword}`);
     for (const signal of ['SIGINT', 'SIGTERM'])

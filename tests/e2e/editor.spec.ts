@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { booster } from '../../src/examples';
+import { booster } from "../../examples/diagram/projects";
 
 declare global {
   interface Window {
