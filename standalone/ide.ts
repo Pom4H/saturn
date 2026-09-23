@@ -7,7 +7,7 @@ import { BunSql } from './bun-sql';
 import { localizedDslEntities, localizedDslOperators } from '../plant/dsl-i18n';
 import { modelTitle } from '../plant/i18n';
 import { formatDiagnostic, SaturnDiagnosticError, type SaturnLocale } from '../plant/diagnostics';
-import { catalog } from '../src/core';
+import { catalog } from '../src/scene';
 import { listRegistry } from './registry';
 import { loadProjectDirectory } from './project-loader';
 
