@@ -3,7 +3,7 @@ import { groupFill, groupStroke, groupAccent, groupTitleLines } from './group-st
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { catalog, type Equipment, type Scene, type SceneGroup } from './core';
+import { catalog, type Equipment, type Scene, type SceneGroup } from './scene';
 import { layout, tapPoint } from './geometry';
 import { numeric, type RuntimeFrame } from './runtime/protocol';
 import { get3dRenderer, observation, observationAlarm, observationQuality, observedFlows, type EquipmentModel3D, type Renderer3D, type Renderer3DContext } from './view';
