@@ -1,4 +1,4 @@
-import { terminals, footprint } from './ports';
+import { terminals, footprint, connectionExpression } from './ports';
 import { routeConnections } from './routing';
 import { renderSaturnPlcSvg } from './saturn-view';
 import { drawHmiSvg, setDisplays } from './hmi-view';
@@ -32,6 +32,7 @@ const shapes: Record<string, Draw> = {
     generator: c => { body(c, 15, 8, 120, 70); el(c.root, 'circle', { cx: 75, cy: 44, r: 25, fill: '#eaf2f4', stroke: metalStroke }); el(c.root, 'path', { d: 'M54 44Q63 15 75 44T96 44', stroke: water, 'stroke-width': 4, fill: 'none' }); },
     control: c => { body(c, 24, 5, 102, 78); for (let i = 0; i < 3; i++)
         el(c.root, 'rect', { x: 35 + i * 29, y: 19, width: 18, height: 14, fill: '#2d5564' }); el(c.root, 'path', { d: 'M43 61H106', stroke: '#3a6674', 'stroke-width': 5 }); const indicator = el(c.root, 'circle', { cx: 75, cy: 57, r: 8, fill: water }); c.onUpdate(() => indicator.setAttribute('fill', (c.number('trip') ?? 0) > .5 ? '#c45544' : water)); },
+    flowmeter: c => { shaft(c); el(c.root, 'circle', { cx: 75, cy: 48, r: 32, fill: c.paint('metal'), stroke: metalStroke, 'stroke-width': 3 }); el(c.root, 'circle', { cx: 75, cy: 48, r: 24, fill: '#f1f7f8' }); const needle = el(c.root, 'path', { d: 'M75 48L75 29', stroke: '#315b6e', 'stroke-width': 3 }); c.onUpdate(dt => { const value = c.number('flow', dt); needle.setAttribute('visibility', value === null ? 'hidden' : 'visible'); needle.setAttribute('transform', `rotate(${Math.max(-110, Math.min(110, (value ?? 0) * 55 - 55))} 75 48)`); }); },
     sensor: c => { el(c.root, 'path', { d: 'M75 68V93', stroke: metalStroke, 'stroke-width': 8 }); el(c.root, 'circle', { cx: 75, cy: 38, r: 34, fill: c.paint('metal'), stroke: metalStroke, 'stroke-width': 3 }); el(c.root, 'circle', { cx: 75, cy: 38, r: 27, fill: '#f1f7f8' }); const needle = el(c.root, 'path', { d: 'M75 38L75 15', stroke: '#315b6e', 'stroke-width': 3 }); c.onUpdate(dt => needle.setAttribute('transform', `rotate(${Math.max(-100, Math.min(100, (c.number('value', dt) ?? 0) * 50 - 60))} 75 38)`)); },
     reservoir: c => { body(c, 32, 8, 86, 78); el(c.root, 'ellipse', { cx: 75, cy: 12, rx: 43, ry: 9, fill: c.paint('metal'), stroke: metalStroke });
         el(c.root, 'rect', { x: 48, y: 28, width: 54, height: 45, fill: '#314f60' });
@@ -101,7 +102,7 @@ Object.assign(shapes, {
  saturn:(c:SvgRendererContext)=>{const shell=el(c.root,'g',{});shell.innerHTML=renderSaturnPlcSvg({defsPrefix:'saturn-'+c.equipment.id});const svg=shell.querySelector('svg')!;svg.setAttribute('width','310');svg.setAttribute('height','170');const screen=svg.querySelector<SVGSVGElement>('.runtime-hmi')!;c.onUpdate(()=>drawHmiSvg(screen,c.equipment.id));},
 });
 const glyphByVisual:Record<string,string>={
- pump:'process.pump.centrifugal',turbine:'mechanical.rotating',reactor:'process.reactor',channel:'generic.element',separator:'process.tank.vertical',
+ pump:'process.pump.centrifugal',flowmeter:'instrumentation.sensor',turbine:'mechanical.rotating',reactor:'process.reactor',channel:'generic.element',separator:'process.tank.vertical',
  exchanger:'process.heat-exchanger',generator:'electrical.generator',control:'control.panel',sensor:'instrumentation.sensor',reservoir:'process.tank.vertical',
  valve:'process.valve.control',battery:'electrical.battery',switchgear:'control.panel',fan:'mechanical.rotating',motor:'electrical.motor',tower:'generic.element',
  filter:'process.filter.inline',checkvalve:'process.valve.control',accumulator:'process.tank.vertical',relief:'process.valve.control',transformer:'electrical.transformer',
@@ -109,7 +110,7 @@ const glyphByVisual:Record<string,string>={
  indicator:'instrumentation.sensor',ioModule:'control.panel',junction:'generic.element',saturn:'control.panel'
 };
 const categoryByVisual=(visual:string):ElementCategory=>visual==='motor'||visual==='generator'||visual==='alternator'||visual==='transformer'||visual==='battery'||visual==='dcSupply'?'electrical'
-  :visual==='sensor'||visual==='transmitter'||visual==='calorimeter'||visual==='indicator'?'instrumentation'
+  :visual==='sensor'||visual==='flowmeter'||visual==='transmitter'||visual==='calorimeter'||visual==='indicator'?'instrumentation'
   :visual==='control'||visual==='switchgear'||visual==='contactor'||visual==='ioModule'||visual==='saturn'?'control'
   :visual==='turbine'||visual==='fan'?'mechanical':'process';
 
@@ -168,5 +169,19 @@ export function visualFrame(project: Project, frame: Frame): RuntimeFrame {
         const alarm = relevant.some(rule => rule.priority === 'critical') ? 'trip' : relevant.length ? 'warning' : 'none';
         equipment[n.id] = { positionId: n.id, instanceId: `${frame.runId}:${n.id}`, facts: { mode: frame.paused ? 'paused' : 'simulation', alarm }, signals };
     }
-    return { runId: frame.runId, seq: frame.seq, simTimeMs: frame.time, type: 'snapshot', timestamp: frame.time, equipment, flows: {}, events: [] };
+    const flows: RuntimeFrame['flows'] = {};
+    for (const connection of project.connections ?? []) {
+        if (connection.medium !== 'pipe') continue;
+        const expression = connectionExpression(project, connection);
+        if (expression === undefined) continue;
+        const sample = evaluate(expression, id => frame.samples[id] ?? { value: null, quality: 'bad', time: frame.time }, frame.time);
+        flows[connection.id] = {
+            type: 'number',
+            value: sample.value,
+            quality: sample.quality,
+            timestamp: sample.time,
+            unit: 'отн.',
+        };
+    }
+    return { runId: frame.runId, seq: frame.seq, simTimeMs: frame.time, type: 'snapshot', timestamp: frame.time, equipment, flows, events: [] };
 }
