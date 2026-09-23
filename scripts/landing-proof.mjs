@@ -13,9 +13,11 @@ export async function captureLandingProof(browser, siteDir) {
   const out = 'test-results/release-shell/product';
   await mkdir(out, { recursive: true });
   await mkdir('.plant', { recursive: true });
-  await build({ entryPoints: ['plant/server.ts'], outfile: '.plant/landing-proof-server.mjs', bundle: true,
+  await build({ entryPoints: { server: 'scripts/site-workspace-server.ts', project: 'plant/demo/files.ts' },
+    outdir: '.plant/landing-proof', outExtension: { '.js': '.mjs' }, bundle: true,
     platform: 'node', format: 'esm', packages: 'external', plugins: [rawText] });
-  const { startPlantServer } = await import(pathToFileURL(resolve('.plant/landing-proof-server.mjs')));
+  const { startWorkspaceTestServer } = await import(pathToFileURL(resolve('.plant/landing-proof/server.mjs')));
+  const { demoFiles } = await import(pathToFileURL(resolve('.plant/landing-proof/project.mjs')));
   const work = await mkdtemp(join(tmpdir(), 'saturn-landing-proof-'));
   const passwords = { engineer: randomBytes(24).toString('base64url'), operator: randomBytes(24).toString('base64url') };
   const revision = (await readFile(`${siteDir}/index.html`, 'utf8')).match(/name="saturn-revision" content="([^"]+)"/)?.[1];
@@ -27,10 +29,13 @@ export async function captureLandingProof(browser, siteDir) {
     contexts.push(context);
     const page = await context.newPage();
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto(app.origin + '/plant/login');
-    await page.locator('[name=user]').fill(role);
-    await page.locator('[name=password]').fill(passwords[role]);
-    await page.locator('#login button').click();
+    const response = await context.request.post(app.origin + '/plant/api/login', {
+      data: { user: role, password: passwords[role] }, headers: { Origin: app.origin },
+    });
+    assert.equal(response.status(), 200, 'Real Saturn authentication succeeds');
+    assert((await context.cookies()).some(cookie => cookie.name === 'scada_session' && cookie.httpOnly));
+    if (role === 'operator') assert.equal((await context.request.get(app.origin + '/plant/api/workspace')).status(), 403);
+    await page.goto(app.origin + '/?project=server#workspace');
     await page.waitForFunction(expected => {
       const shell = document.getElementById('studio-shell');
       return shell?.dataset.role === expected && (expected === 'engineer' ? shell.dataset.serverProject === 'true' : shell.dataset.runtimeOnly === 'true');
@@ -52,7 +57,12 @@ export async function captureLandingProof(browser, siteDir) {
   }
   const errors = [];
   try {
-    app = await startPlantServer({ port: 0, data: join(work, 'plant.sqlite'), repository: join(work, 'project.git'), user: 'engineer', password: passwords.engineer });
+    const project = join(work, 'project');
+    await mkdir(join(project, 'src'), { recursive: true });
+    await writeFile(join(project, 'package.json'), JSON.stringify({ name: 'saturn-landing-proof', private: true, type: 'module', version: '0.0.0' }));
+    for (const [name, source] of Object.entries(demoFiles)) await writeFile(join(project, 'src', name), source);
+    app = await startWorkspaceTestServer({ project, data: join(work, 'plant.sqlite'), password: passwords.engineer,
+      root: resolve(siteDir, '..'), autoTick: true });
     app.auth.seed('operator', passwords.operator, 'operator');
     const engineering = await login('engineer');
     const page = engineering.page;
@@ -62,15 +72,21 @@ export async function captureLandingProof(browser, siteDir) {
     await source.press('ControlOrMeta+End');
     await page.keyboard.insertText('\n// Проверенный пример для знакомства с Saturn.\n');
     await page.waitForFunction(() => !document.getElementById('server-save')?.disabled);
+    const before = await (await engineering.context.request.get(app.origin + '/plant/api/session')).json();
+    const saved = page.waitForResponse(response => response.url().endsWith('/plant/api/workspace/save') && response.request().method() === 'POST');
     await page.locator('#server-save').click();
-    await page.locator('#server-commit-message').fill('Landing proof: engineer publishes the demonstration project');
-    await page.locator('#server-commit-form button[type=submit]').click();
-    await page.locator('#server-commit-dialog').waitFor({ state: 'hidden' });
+    const saveResponse = await saved; assert.equal(saveResponse.status(), 200);
+    const snapshot = await saveResponse.json();
+    assert.notEqual(snapshot.id, before.frame.revision, 'Saving creates a new artifact identity');
+    assert.equal((await (await engineering.context.request.get(app.origin + '/plant/api/session')).json()).frame.revision, before.frame.revision, 'Save does not deploy');
     await page.waitForFunction(() => !document.getElementById('server-publish')?.disabled);
     await page.locator('#server-publish').click();
     await page.waitForFunction(() => document.getElementById('studio-shell')?.dataset.telemetry === 'live' && document.getElementById('server-publish')?.hasAttribute('disabled'));
-    const applied = await page.locator('#revision-applied').textContent();
-    assert(applied && applied !== '—', 'The project must actually be applied');
+    const deployed = await (await engineering.context.request.get(app.origin + '/plant/api/session')).json();
+    assert.equal(deployed.frame.revision, snapshot.id, 'The checked artifact is actually applied');
+    const applied = deployed.frame.revision;
+    const appliedLabel = await page.locator('#revision-applied').textContent();
+    assert(appliedLabel && appliedLabel !== '—', 'The applied revision is visible');
     await source.press('ControlOrMeta+Home');
     await capture(page, 'engineer');
     await engineering.context.close(); // Runtime must survive closing the engineering workstation.
@@ -78,7 +94,8 @@ export async function captureLandingProof(browser, siteDir) {
     const { page: operator } = await login('operator');
     assert(!await operator.locator('#studio-code').isVisible(), 'Operator has no code editor');
     assert(!await operator.locator('#server-publish').isVisible(), 'Operator cannot publish');
-    assert.equal(await operator.locator('#revision-applied').textContent(), applied, 'Both roles use the same published project');
+    assert.equal(await operator.locator('#revision-applied').textContent(), appliedLabel, 'Both roles display the same published project');
+    assert.equal((await (await operator.context().request.get(app.origin + '/plant/api/session')).json()).frame.revision, applied);
     await operator.locator('#runtime-controls').click();
     assert(await operator.locator('.runtime-control-edit button:not([disabled])').count() > 0, 'Operator has allowed controls');
     await operator.locator('#runtime-pause').click();
@@ -96,6 +113,12 @@ export async function captureLandingProof(browser, siteDir) {
     await writeFile(join(out, 'landing-proof.json'), manifest);
     await writeSiteCache(siteDir); // Generated evidence is part of this build's offline cache identity.
     console.log('PASS: real engineer publication -> independent operator session; roles, pause/resume, alarms; light/dark screenshots.');
+  } catch (error) {
+    for (const [index, context] of contexts.entries()) for (const page of context.pages()) {
+      await page.screenshot({ path: join(out, `failed-${index}.png`), fullPage: true }).catch(() => {});
+      console.error('Capture state:', await page.locator('#studio-shell').evaluate(shell => ({ ...shell.dataset })).catch(() => null));
+    }
+    throw error;
   } finally {
     for (const context of contexts) await context.close().catch(() => {});
     await app?.close().catch(() => {});

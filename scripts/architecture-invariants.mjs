@@ -110,8 +110,10 @@ await assertText('plant/targets/saturn-plc-c23.ts', {
 });
 
 await assertText('site/index.html', {
-  // Keep the semantic promise in the actual Russian UI, not its old English label.
-  required: ['data-surface="scene"', 'Source, build, published и applied', 'saturn add pump', 'project-owned source', 'Запуск собранного проекта'],
+  // Keep lifecycle states and canonical documentation discoverable without freezing marketing headlines.
+  // The source-owned registry and runtime contracts are checked above; release tests exercise save/deploy.
+  required: ['data-surface="scene"', '01 / SOURCE', '02 / BUILD', '03 / PUBLISHED', '04 / APPLIED',
+    'docs/developer/element-packs.md', 'docs/standalone.md', 'docs/adr/0008-conventions-first-artifact-runtime.md'],
   forbidden: ['data-view="scene"', 'saturn extension add', 'self-contained npm package', 'Git-managed'],
 });
 
