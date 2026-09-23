@@ -7,6 +7,7 @@ import { Auth } from './adapters/auth';
 import { EnvironmentBroker } from './environment';
 import { Push } from './adapters/push';
 import { Store } from './store';
+import { migrate } from './migrations';
 import { Service } from './service';
 import { AppError, requireRole, type SqlDatabase, type ReportTask, type ReportArtifact } from './types';
 import type { BuildArtifact } from './artifact';
@@ -55,6 +56,7 @@ export async function startPlantHttpServer(options: {
     seed: BuildArtifact;
 }) {
     const database = options.database;
+    migrate(database);
     const store = new Store(database);
     const service = new Service(store, { reportRunner: options.reportRunner });
     await service.start(options.seed);
