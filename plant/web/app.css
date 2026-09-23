@@ -66,3 +66,5 @@
 .shell-update-copy{display:flex;flex-direction:column;gap:1px}.shell-update-copy strong{font-size:12px;line-height:1.05}.shell-update-copy small{font:10px ui-monospace,SFMono-Regular,Consolas,monospace;color:#6a818c}
 .shell-update.installing .shell-update-mark{animation:saturn-update-pulse 1s ease-in-out infinite}@keyframes saturn-update-pulse{50%{opacity:.45;transform:translateY(-1px)}}
 @media(max-width:680px){.shell-update{left:10px;bottom:10px}}
+
+body[data-embed=landing] .eyebrow{display:none}\n
