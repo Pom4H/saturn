@@ -1,0 +1,40 @@
+{
+  "id": "EXP-restore-svg-hover-20260923",
+  "question": "Can the canonical plant projection reuse the original detailed Saturn SVG anatomy and provide real TypeScript hover documentation without a parallel diagram or SDK?",
+  "hypothesis": "Using the original SVG coordinate systems and builders, shared by both projections, preserves the approved equipment; actual SDK quick info supplies hover without a second DSL.",
+  "status": "candidate",
+  "evidencePlan": [
+    "Existing check, site and authoring gates",
+    "Actual browser pointer hover, original SVG structure, unchanged port anchors, pipe rerouting during drag and undo",
+    "Light/dark tooltip contrast and 320/390/768px layouts",
+    "Current-PR patch applicability"
+  ],
+  "observed": [
+    "Original renderer vector/material fixture captured from e97d1d9 and matched by actual canonical browser rendering",
+    "Exact e97d1d9 base plus native restoration passed local source, type and architecture checks",
+    "Offline Chromium matched original SVG anatomy and passed hover, drag/undo, pause, light/dark and mobile checks"
+  ],
+  "limits": [
+    "Normal local URL navigation is blocked (ERR_BLOCKED_BY_ADMINISTRATOR); full release browser validation remains assigned to existing CI",
+    "No physical equipment or hydraulic solver validation",
+    "User visual approval is not inferred from passing tests"
+  ],
+  "negativeKnowledge": [
+    {
+      "hypothesis": "A second simplified equipment drawer is an acceptable replacement on the canonical project path",
+      "decision": "rejected",
+      "condition": "It silently removed the detailed symbols still present in the original renderer"
+    },
+    {
+      "hypothesis": "Unbounded inferred generic signatures should occupy the hover popover",
+      "decision": "rejected",
+      "condition": "They hid the JSDoc text; the real signature remains scrollable in a bounded header"
+    },
+    {
+      "hypothesis": "Shrink original symbols to the old 150x118 footprint and add connector adapters",
+      "decision": "rejected",
+      "condition": "It changes their scale and adds spurious plumbing around the original shape, despite reusing paths"
+    }
+  ],
+  "decision": "Candidate for existing PR72; wait for observed exact-head CI."
+}

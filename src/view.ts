@@ -1,7 +1,10 @@
+import { el } from './svg';
+export { el } from './svg';
+import { renderProcessSvg } from './equipment-svg';
 import { connectionStyles } from './connection-style';
 import { groupFill, groupStroke, groupAccent, groupTitleLines } from './group-style';
 import { catalog, simulate, type Equipment, type Scene, type Point } from './core';
-import { layout, tapPoint, type Route } from './geometry';
+import { layout, tapPoint, roundedPath, type Route } from './geometry';
 import { numeric, type RuntimeFrame, type Signal, type Quality, type Alarm } from './runtime/protocol';
 import type * as Three from 'three';
 import { materialCssColor, mediumCssColor } from './elements/materials';
@@ -81,15 +84,9 @@ export function observedFlows(scene: Scene, frame: RuntimeFrame | null): Map<str
   if (!frame) return simulate(scene).flows;
   return new Map([
     ...scene.links.map(l => [l.id, numeric(frame.flows[l.id])] as const),
+    ...(scene.connections ?? []).filter(c => c.medium === 'pipe').map(c => [c.id, numeric(frame.flows[c.id])] as const),
     ...scene.nodes.map(n => [n.id, numeric(frame.equipment[n.id]?.signals.flow)] as const),
   ]);
-}
-const NS = 'http://www.w3.org/2000/svg';
-export function el<K extends keyof SVGElementTagNameMap>(parent: SVGElement, tag: K, attrs: Record<string, string | number> = {}, text?: string): SVGElementTagNameMap[K] {
-  const node = document.createElementNS(NS, tag);
-  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value));
-  if (text !== undefined) node.textContent = text;
-  parent.appendChild(node); return node;
 }
 const label = (g: SVGElement, x: number, y: number, text: string, size = 12, anchor = 'middle', color = '#38566a') => el(g, 'text', { x, y, fill: color, 'font-size': size, 'text-anchor': anchor, 'font-family': 'ui-monospace, SFMono-Regular, Consolas, monospace', 'font-weight': 600 }, text);
 const part = (g: SVGElement, name: string, attrs: Record<string, string | number> = {}) => el(g, 'g', { 'data-part': name, ...attrs });
@@ -266,35 +263,40 @@ export class SceneView {
     this.geometryKey = key; this.updates = []; this.roots.clear();
     this.renderedNodes = new Map(scene.nodes.map(n => [n.id, { ...n, props: { ...n.props } }]));
     // Remove animation state for deleted items as well as rendered values.
-    for (const id of this.phases.keys()) if (!scene.links.some(l => l.id === id) && !scene.nodes.some(n => id.startsWith(`${n.id}:`))) this.phases.delete(id);
+    for (const id of this.phases.keys()) if (!scene.links.some(l => l.id === id) && !scene.connections?.some(c => c.id === id) && !scene.nodes.some(n => id.startsWith(`${n.id}:`))) this.phases.delete(id);
     for (const id of this.visual.keys()) if (!scene.nodes.some(n => n.id === id)) this.visual.delete(id);
     const geometry = layout(scene); this.routes = geometry.routes; this.warnings = geometry.warnings;
     this.layers.replaceChildren(); const pipes = el(this.layers, 'g'), devices = el(this.layers, 'g'), instruments = el(this.layers, 'g');
     for(const wire of scene.connections??[]) {
-      const style=connectionStyles[wire.medium],d=wire.points.map((p,i)=>`${i?'L':'M'}${p.x} ${p.y}`).join(' ');
+      const style=connectionStyles[wire.medium],d=wire.medium==='pipe'?roundedPath(wire.points):wire.points.map((p,i)=>`${i?'L':'M'}${p.x} ${p.y}`).join(' ');
       const g=el(pipes,'g',{'data-connection':wire.id,'data-medium':wire.medium,'data-valid':String(wire.valid),tabindex:0});
       el(g,'title',{},`${wire.from.device}.${wire.from.port} → ${wire.to.device}.${wire.to.port}${wire.error?' · '+wire.error:''}`);
+      if(wire.medium==='pipe'){this.processPipe(g,d,wire.id,wire.valid);continue;}
       el(g,'path',{d,fill:'none',stroke:wire.valid?style.color:'#c45544','stroke-width':style.width,'stroke-linejoin':'round','stroke-linecap':'butt'});
       el(g,'path',{d,fill:'none',stroke:style.inner,'stroke-width':Math.max(1,style.width-4),'stroke-dasharray':wire.valid?style.dash:'6 4','pointer-events':'none'});
     }
     for (const edge of scene.links) {
       const route = this.routes.get(edge.id)!;
       const g = el(pipes, 'g', { 'data-edge': edge.id, class: `edge${route.valid ? '' : ' invalid'}`, tabindex: 0, role: 'button', 'aria-label': `Труба ${edge.from.node} → ${edge.to.node}` });
-      el(g, 'path', { d: route.path, ...pipeAttrs, stroke: '#718995', 'stroke-width': 26 });
-      el(g, 'path', { d: route.path, ...pipeAttrs, stroke: medium2d.shell, 'stroke-opacity': .72, 'stroke-width': 22 });
-      const water = el(g, 'path', { d: route.path, ...pipeAttrs, stroke: route.valid ? medium2d.water : '#ca6661', 'stroke-opacity': .88, 'stroke-width': 17, 'data-water': edge.id, 'data-medium': 'water' });
-      const flow = el(g, 'path', { d: route.path, ...pipeAttrs, stroke: medium2d.highlight, 'stroke-width': 6, 'stroke-linecap': 'round', 'stroke-dasharray': flowDash.join(' '), 'data-flow': edge.id });
+      this.processPipe(g, route.path, edge.id, route.valid);
       const hit = el(g, 'g', { class: 'edge-hit' });
       for (let i = 1; i < route.points.length; i++) {
         const a = route.points[i - 1], b = route.points[i];
         el(hit, 'rect', { x: Math.min(a.x, b.x) - 10, y: Math.min(a.y, b.y) - 10, width: Math.abs(a.x - b.x) + 20, height: Math.abs(a.y - b.y) + 20, fill: 'transparent' });
       }
-      this.updates.push(dt => { const q = route.valid ? this.flows.get(edge.id) : 0; const phase = this.phase(edge.id, q == null ? 0 : q * 4.5, dt); flow.setAttribute('stroke-dashoffset', String(-phase % flowDashPeriod)); flow.setAttribute('opacity', q == null || q === 0 ? '0' : '.86'); water.setAttribute('stroke', !route.valid ? '#ca6661' : q == null ? medium2d.stale : medium2d.water); });
+
     }
     for (const n of [...this.renderedNodes.values()].filter(n => !catalog[n.kind].instrument)) this.equipment(devices, n);
     for (const n of [...this.renderedNodes.values()].filter(n => catalog[n.kind].instrument)) this.instrument(instruments, n);
     this.syncStatuses(); this.select(this.selected);
     for (const fn of this.updates) fn(0);
+  }
+  private processPipe(g: SVGGElement, path: string, id: string, valid: boolean) {
+      el(g, 'path', { d: path, ...pipeAttrs, stroke: '#718995', 'stroke-width': 26 });
+      el(g, 'path', { d: path, ...pipeAttrs, stroke: medium2d.shell, 'stroke-opacity': .72, 'stroke-width': 22 });
+      const water = el(g, 'path', { d: path, ...pipeAttrs, stroke: valid ? medium2d.water : '#ca6661', 'stroke-opacity': .88, 'stroke-width': 17, 'data-water': id, 'data-medium': 'water' });
+      const flow = el(g, 'path', { d: path, ...pipeAttrs, stroke: medium2d.highlight, 'stroke-width': 6, 'stroke-linecap': 'round', 'stroke-dasharray': flowDash.join(' '), 'data-flow': id });
+      this.updates.push(dt => { const q = valid ? this.flows.get(id) : 0; const phase = this.phase(id, q == null ? 0 : q * 4.5, dt); flow.setAttribute('stroke-dashoffset', String(-phase % flowDashPeriod)); flow.setAttribute('opacity', q == null || q === 0 ? '0' : '.86'); water.setAttribute('stroke', !valid ? '#ca6661' : q == null ? medium2d.stale : medium2d.water); });
   }
   private root(parent: SVGGElement, n: Equipment, x: number, y: number): SVGGElement {
     const d = catalog[n.kind];
@@ -326,57 +328,8 @@ export class SceneView {
     const rect = (x: number, y: number, width: number, height: number, rx = 2, fill = metal) => el(body, 'rect', { x, y, width, height, rx, fill, stroke: '#718e9c', 'stroke-width': 1.4 });
     const renderer = svgRenderers.get(n.kind);
     if (renderer) renderer(this.context(n, body));
-    else if (n.kind === 'tank') {
-      el(body, 'ellipse', { cx: 79, cy: 226, rx: 67, ry: 4, fill: '#1c4055', opacity: .07 });
-      rect(28, 193, 12, 31, 1, dark); rect(120, 193, 12, 31, 1, dark);
-      rect(120, 172, 50, 24); rect(157, 167, 11, 34);
-      el(body, 'path', { d: 'M18 42 C18 15 140 15 140 42V193C140 218 18 218 18 193Z', fill: '#e4f2f5', 'fill-opacity': .65, stroke: '#86a2ae', 'stroke-width': 2 });
-      const clipId = this.id(`tank-${n.id}`), defs = el(body, 'defs'), clip = el(defs, 'clipPath', { id: clipId });
-      el(clip, 'path', { d: 'M23 45C23 24 135 24 135 45V192C135 211 23 211 23 192Z' });
-      const water = el(body, 'g', { 'clip-path': `url(#${clipId})` });
-      const fluid = el(water, 'rect', { x: 20, y: 90, width: 120, height: 125, fill: medium2d.water, opacity: .82, 'data-medium': 'water' });
-      const surface = el(water, 'ellipse', { cx: 79, cy: 90, rx: 60, ry: 9, fill: medium2d.surface, stroke: medium2d.highlight, 'stroke-width': 1.2, 'data-medium-surface': 'water' });
-      el(body, 'path', { d: 'M29 52V187M34 58V183', stroke: '#fff', 'stroke-width': 2.5, opacity: .5 });
-      el(body, 'ellipse', { cx: 79, cy: 41, rx: 61, ry: 15, fill: metal, stroke: '#86a2ae', 'stroke-width': 1.5 });
-      rect(68, 3, 23, 25, 1);
-      const value = label(body, 79, 135, '', 22, 'middle', '#12475e');
-      this.updates.push(dt => { const v = this.value(n, 'level', dt), y = 195 - Math.max(0, Math.min(100, v ?? 0)) * 1.44; fluid.setAttribute('y', String(y)); fluid.setAttribute('height', String(215 - y)); surface.setAttribute('cy', String(y)); value.textContent = v === null ? '—' : `${Math.round(v)}%`; water.setAttribute('opacity', v === null ? '0' : '1'); });
-    } else if (n.kind === 'pump') {
-      el(body, 'ellipse', { cx: 118, cy: 160, rx: 95, ry: 5, fill: '#254e60', opacity: .07 });
-      el(body, 'path', { d: 'M40 132 32 151H109L100 132M143 130 138 151H207L200 130', fill: dark, stroke: '#547685' });
-      rect(25, 151, 190, 7); [34, 107, 142, 205].forEach(x => bolt(body, x, 154, 1.7));
-      rect(0, 84, 40, 24); rect(0, 79, 10, 34); [84, 108].forEach(y => bolt(body, 5, y, 1.7));
-      rect(64, 0, 24, 57); rect(58, 1, 36, 9); [64, 87].forEach(x => bolt(body, x, 5, 1.7));
-      rect(114, 82, 23, 26); rect(129, 57, 81, 77, 13, dark);
-      for (let x = 141; x < 202; x += 7) { el(body, 'path', { d: `M${x} 65V126`, stroke: '#0b2c3c', 'stroke-width': 3.5 }); el(body, 'path', { d: `M${x + 1} 66V125`, stroke: '#65818e', 'stroke-width': 1 }); }
-      rect(203, 66, 12, 60, 6, dark); rect(155, 40, 29, 21, 3, dark);
-      el(body, 'circle', { cx: 76, cy: 96, r: 48, fill: metal, stroke: '#7b97a3', 'stroke-width': 2 });
-      el(body, 'circle', { cx: 76, cy: 96, r: 39, fill: dark, stroke: '#acbfc7', 'stroke-width': 3 });
-      el(body, 'circle', { cx: 76, cy: 96, r: 32, fill: '#143e50', stroke: '#deedf1', 'stroke-width': 1.3 });
-      const rotor = part(body, 'rotor');
-      for (let angle = 0; angle < 360; angle += 72) el(rotor, 'path', { d: 'M76 91C83 87 96 86 101 75C105 89 94 101 82 104Z', transform: `rotate(${angle} 76 96)`, fill: metal, stroke: '#abc0c9', 'stroke-width': .65 });
-      el(body, 'circle', { cx: 76, cy: 96, r: 8, fill: metal, stroke: '#718f9c' });
-      for (let angle = 0; angle < 360; angle += 60) bolt(body, 76 + 43 * Math.cos(angle * Math.PI / 180), 96 + 43 * Math.sin(angle * Math.PI / 180), 2.3);
-      const value = label(body, 171, 149, '', 9); const lamp = el(body, 'circle', { cx: 141, cy: 145, r: 2.4 });
-      this.updates.push(dt => {
-        const rpm = this.value(n, 'rpm', dt), alarm = this.alarm(n), stopped = (!this.runtime && alarm === 'trip') || rpm === null || Math.abs(rpm) < 1;
-        const angle = this.phase(`${n.id}:rotor`, stopped ? 0 : rpm / 10, dt);
-        rotor.setAttribute('transform', `rotate(${angle % 360} 76 96)`); rotor.setAttribute('opacity', rpm === null ? '.3' : '1');
-        rotor.dataset.rpm = rpm === null ? 'unknown' : String(rpm);
-        value.textContent = alarm === 'trip' ? 'TRIP' : rpm === null ? 'НЕТ ДАННЫХ' : stopped ? 'СТОП' : 'РАБОТА';
-        lamp.setAttribute('fill', alarm === 'trip' ? '#cd6152' : alarm === 'warning' ? '#b5822f' : rpm === null || stopped ? '#91a7af' : '#23a381');
-      });
-    } else if (n.kind === 'valve') {
-      rect(0, 90, 160, 24); [7, 137].forEach(x => { rect(x, 81, 13, 42, 3); [88, 116].forEach(y => bolt(body, x + 6.5, y)); });
-      el(body, 'path', { d: 'M43 88 62 72H98L119 88V116L98 132H62L43 116Z', fill: metal, stroke: '#6d8d9b', 'stroke-width': 1.4 });
-      rect(57, 88, 46, 29, 6, '#0ca6c0');
-      const gate = el(body, 'rect', { x: 59, y: 90, width: 42, height: 25, rx: 2, fill: metal, stroke: '#587d90', 'data-part': 'gate' });
-      const stem = part(body, 'stem'); el(stem, 'rect', { x: 77, y: 40, width: 6, height: 42, rx: 1, fill: metal, stroke: '#66899c' });
-      el(body, 'path', { d: 'M61 73V31H99V73M57 73H104', fill: 'none', stroke: '#5f7f8f', 'stroke-width': 4 });
-      rect(51, 6, 58, 28, 6, dark); rect(60, 13, 40, 9, 2, '#9abcc9');
-      const value = label(body, 80, 156, '', 14);
-      this.updates.push(dt => { const v = this.value(n, 'opening', dt), travel = Math.max(0, Math.min(100, v ?? 0)); gate.setAttribute('height', String(25 * (1 - travel / 100))); gate.setAttribute('opacity', travel > 99.9 ? '0' : '1'); stem.setAttribute('transform', `translate(0 ${-travel * .11})`); gate.setAttribute('visibility', v === null ? 'hidden' : 'visible'); stem.setAttribute('visibility', v === null ? 'hidden' : 'visible'); value.textContent = v === null ? '—' : `${Math.round(v)}%`; });
-    } else if (n.kind === 'flowmeter') {
+    else if (n.kind === 'tank' || n.kind === 'pump' || n.kind === 'valve') renderProcessSvg(n.kind, this.context(n, body), () => !this.runtime);
+    else if (n.kind === 'flowmeter') {
       rect(0, 26, 96, 24); [0, 87].forEach(x => { rect(x, 16, 9, 44, 2); [23, 53].forEach(y => bolt(body, x + 4.5, y, 1.8)); });
       el(body, 'circle', { cx: 48, cy: 38, r: 32, fill: '#f1f8fa', stroke: '#7b9aa7', 'stroke-width': 3 });
       el(body, 'circle', { cx: 48, cy: 38, r: 25, fill: '#163e51', stroke: '#bed3dd', 'stroke-width': 1 });

@@ -1,3 +1,4 @@
+import { processSymbolGeometry as symbol, symbolFootprint } from '../src/equipment-geometry';
 import { SATURN_TERMINAL_ANCHORS, SATURN_SERVICE_ANCHORS } from './vendor/saturn/src/view';
 import { type Project, type Device, type Expr } from './types';
 import { failCode } from './diagnostics';
@@ -31,13 +32,13 @@ type SaturnProfile =
 const saturnProfile=Object.fromEntries([...SATURN_TERMINAL_ANCHORS.map(a=>[a.id,t(a.x*.5,a.y*.5,a.side==='top'?'up':'down','control',a.signal,a.direction==='input'?'sink':'source',{z:1,max:a.direction==='output'?8:1,signal:a.direction==='output'?a.id:undefined})] as const),
  ...SATURN_SERVICE_ANCHORS.map(a=>[a.id,t(a.x*.5,a.y*.5,a.side==='top'?'up':'down',a.id.startsWith('RS')?'bus':'power',a.family,a.id.startsWith('RS')?'passive':'sink',{z:1})] as const)]) as SaturnProfile;
 export const profiles={
-    pump:{...inline(),drive:t(75,9,'up','power','drive','sink',{input:'voltage'})},
+    pump:{inlet:t(symbol.pump.inlet.x,symbol.pump.inlet.y,'left','pipe','water','sink'),outlet:t(symbol.pump.outlet.x,symbol.pump.outlet.y,'up','pipe','water','source',{signal:'flow'}),drive:t(symbol.pump.drive.x,symbol.pump.drive.y,'up','power','drive','sink',{input:'voltage'})},
     turbine:{...inline()},separator:{inlet:t(0,48,'left','pipe','water','sink'),outlet:t(150,48,'right','pipe','steam','source')},
     exchanger:{...inline(),coldIn:t(40,85,'down','pipe','water','sink'),coldOut:t(110,85,'down','pipe','water','source')},
-    valve:{...inline(),command:t(75,11,'up','control','analog','sink',{input:'demand'})},
+    valve:{inlet:t(symbol.valve.inlet.x,symbol.valve.inlet.y,'left','pipe','water','sink'),outlet:t(symbol.valve.outlet.x,symbol.valve.outlet.y,'right','pipe','water','source',{signal:'flow'}),command:t(symbol.valve.command.x,symbol.valve.command.y,'up','control','analog','sink',{input:'demand'})},
     checkvalve:inline(),filter:inline(),
     tower:{...inline(),drive:t(75,15,'up','power','drive','sink')},
-    reservoir:{inlet:t(33,12,'left','pipe','water','sink'),outlet:t(116,75,'right','pipe','water','source',{signal:'flow'})},
+    reservoir:{inlet:t(symbol.tank.inlet.x,symbol.tank.inlet.y,'up','pipe','water','sink'),outlet:t(symbol.tank.outlet.x,symbol.tank.outlet.y,'right','pipe','water','source',{signal:'flow'})},
     accumulator:{inlet:t(75,97,'down','pipe','water','passive')},
     relief:{inlet:t(75,96,'down','pipe','water','sink'),outlet:t(141,55,'right','pipe','water','source')},
     calorimeter:{inlet:t(0,64,'left','pipe','water','sink'),outlet:t(150,34,'right','pipe','water','source')},
@@ -76,7 +77,10 @@ export function portRefs<T extends PhysicalType,ID extends string>(device:ID,typ
 export function terminals<T extends PhysicalType>(type:T):(typeof profiles)[T];
 export function terminals(type:string):Record<string,Terminal>;
 export function terminals(type:string):Record<string,Terminal>{const p=Object.hasOwn(profiles,type)?profiles[type as PhysicalType]:undefined;if(!p)failCode('SATURN_PORT_PROFILE_MISSING',{type},{type});return p;}
-export function footprint(type:string){return type==='saturn'?{width:310,height:190}:{width:150,height:118};}
+export function footprint(type:string){
+ const native=type==='reservoir'?symbol.tank:type==='pump'?symbol.pump:type==='valve'?symbol.valve:null;
+ return native?symbolFootprint(native):type==='saturn'?{width:310,height:190}:{width:150,height:118};
+}
 export const physicalTypes=()=>Object.keys(profiles);
 export function resolvePort(p:Project,e:Endpoint):{device:Device;terminal:Terminal}{const device=p.devices.find(d=>d.id===e.device);const ports=device&&terminals(device.type);const terminal=ports&&Object.hasOwn(ports,e.port)?ports[e.port]:undefined;if(!device||!terminal)failCode('SATURN_PORT_UNKNOWN',{device:e.device,port:e.port},{endpoint:e});return{device,terminal};}
 export function validateConnections(p:Project):void {

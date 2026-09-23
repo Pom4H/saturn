@@ -1,3 +1,4 @@
+import { writeDslLibrary } from './dsl-library.mjs';
 import { build } from 'esbuild';
 import { mkdir, readFile, writeFile, cp, rm, readdir } from 'node:fs/promises';
 import { resolve, basename } from 'node:path';
@@ -19,6 +20,7 @@ export async function buildSite(outdir = 'dist/site', mode = 'demo') {
   if (extensionId && !/^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+$/.test(extensionId)) throw new Error('SATURN_VSCODE_EXTENSION_ID must be publisher.extension');
   await rm(`${outdir}/assets`, { recursive: true, force: true });
   await mkdir(`${outdir}/assets`, { recursive: true });
+  await writeDslLibrary(`${outdir}/assets/dsl-library.json`);
   await build({ entryPoints: ['src/standalone.ts'], outfile: `${outdir}/assets/standalone.js`, bundle: true, format: 'iife', platform: 'browser', minify: true, target: 'es2022' });
   const bundle = await build({ entryPoints: { site: 'site/main.ts' }, metafile: true, entryNames: '[name]-[hash]', bundle: true, splitting: true, format: 'esm', platform: 'browser', target: 'es2022', minify: true,
     outdir: `${outdir}/assets`, chunkNames: '[name]-[hash]', legalComments: 'linked', define: { __VSCODE_EXTENSION__: JSON.stringify(extensionId) } });

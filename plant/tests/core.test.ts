@@ -1,3 +1,4 @@
+import './svg-projection.test';
 import './presentation.test';
 import './connections.test';
 import './stability.test';

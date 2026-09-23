@@ -29,3 +29,5 @@ runtime-playwright-report/
 .plant/
 data-plant/
 plant-test-results/
+
+.authoring/

@@ -2,7 +2,7 @@ import type { SaturnLocale } from './diagnostics';
 
 export const textCatalog = {
   'model.supply': { en:'Power supply', ru:'Электропитание' },
-  'model.pump': { en:'Circulation pump', ru:'Циркуляционный насос' },
+  'model.pump': { en:'Pump', ru:'Насос' },
   'model.feedback-source': { en:'Active core · aggregate', ru:'Активная зона · агрегат' },
   'model.channel': { en:'Fuel channel', ru:'Топливный канал' },
   'model.separator': { en:'Drum separator', ru:'Барабан-сепаратор' },
@@ -11,8 +11,8 @@ export const textCatalog = {
   'model.sensor': { en:'Measurement channel', ru:'Измерительный канал' },
   'model.protection': { en:'Protection and absorber', ru:'Защита и поглотитель' },
   'model.structure': { en:'Reactor building', ru:'Реакторное здание' },
-  'model.reservoir': { en:'Buffer tank', ru:'Буферная ёмкость' },
-  'model.motor-valve': { en:'Control valve', ru:'Регулирующий клапан' },
+  'model.reservoir': { en:'Reservoir', ru:'Резервуар' },
+  'model.motor-valve': { en:'Valve', ru:'Клапан' },
   'model.ups': { en:'Backup power', ru:'Резервное питание' },
   'model.switchgear': { en:'Power switchgear', ru:'Щит питания' },
   'model.fan': { en:'Ventilation and heat removal', ru:'Вентиляция и теплоотвод' },

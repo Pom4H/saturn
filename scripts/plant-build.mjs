@@ -1,3 +1,4 @@
+import { writeDslLibrary } from './dsl-library.mjs';
 import './plant-toolchain-check.mjs';
 import { build } from 'esbuild';
 import { rawText } from './esbuild-raw-text.mjs';
@@ -14,6 +15,7 @@ if (process.argv.includes('--server'))
     process.exit(0);
 await rm('dist/plant/assets', { recursive: true, force: true });
 await mkdir('dist/plant/assets', { recursive: true });
+await writeDslLibrary('dist/plant/assets/dsl-library.json');
 await build({ ...options, entryPoints: { app: 'plant/web/main.ts', 'dsl-reference': 'plant/web/dsl-reference.ts', worker: 'plant/adapters/browser-worker.ts', 'browser-report-worker': 'plant/adapters/browser-report-worker.ts', login: 'plant/web/login.ts' }, outdir: 'dist/plant/assets', platform: 'browser', define: {'process.env.NODE_ENV':'"production"'}, minify: true, sourcemap: false, legalComments: 'linked', splitting: true, chunkNames: 'chunks/[name]-[hash]', loader: { '.wasm': 'file' } });
 await cp('node_modules/@sqlite.org/sqlite-wasm/dist/sqlite3.wasm', 'dist/plant/assets/sqlite3.wasm');
 await cp('node_modules/@sqlite.org/sqlite-wasm/dist/sqlite3.wasm', 'dist/plant/assets/chunks/sqlite3.wasm');
@@ -34,7 +36,7 @@ manifest.scope = '../';
 for (const icon of manifest.icons)
     icon.src = '.' + icon.src;
 await writeFile('dist/plant/demo/manifest.webmanifest', JSON.stringify(manifest));
-const assets = ['demo/', 'demo/manifest.webmanifest', ...(await readdir('dist/plant/assets', { recursive: true })).filter(p => /\.(js|css|wasm|svg|png|txt)$/.test(p)).map(p => 'assets/' + p.replaceAll('\\', '/'))];
+const assets = ['demo/', 'demo/manifest.webmanifest', ...(await readdir('dist/plant/assets', { recursive: true })).filter(p => /\.(js|css|wasm|svg|png|txt|json)$/.test(p)).map(p => 'assets/' + p.replaceAll('\\', '/'))];
 const hash = createHash('sha256');
 for (const asset of assets)
     hash.update(await readFile('dist/plant/' + (asset === 'demo/' ? 'demo/index.html' : asset)));

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { checkHoverAndSvg } from './site-hover-svg-check.mjs';
 import { mkdir } from 'node:fs/promises';
 import { loadSiteModule } from './site-build.mjs';
 
@@ -32,10 +33,11 @@ export async function checkLandingDemo(browser, origin) {
       if (!view?.state?.doc) throw new Error('Mounted CodeMirror document is unavailable');
       return view.state.doc.toString();
     });
+    await checkHoverAndSvg(page);
     const initial = await source();
     assert.match(initial, /from '@saturn\/core'/, 'Landing authors the canonical Saturn package');
     assert.match(initial, /pipe\('suction'/, 'Fluid topology is authored as pipe()');
-    assert.match(initial, /cable\('feeder'/, 'Electrical topology is authored as cable()');
+    assert.match(initial, /pipe\('delivery'/, 'Both pipe connections are authored in the project');
     assert.doesNotMatch(initial, /@scada\/core|\bconnect\s*\(/, 'Legacy scene DSL is absent from the landing');
     assert.equal(await shell.getAttribute('data-demo'), 'true');
     assert.equal(await shell.getAttribute('data-mode'), '2d');
@@ -51,11 +53,11 @@ export async function checkLandingDemo(browser, origin) {
     await page.locator('#studio-play').click();
 
     const pipe = page.locator('#studio-svg [data-connection="suction"][data-medium="pipe"] path').first();
-    const cable = page.locator('#studio-svg [data-connection="feeder"][data-medium="power"] path').first();
-    assert.equal(await page.locator('#studio-svg [data-connection][data-medium="pipe"]').count(), 1);
-    assert.equal(await page.locator('#studio-svg [data-connection][data-medium="power"]').count(), 1);
+    const delivery = page.locator('#studio-svg [data-connection="delivery"][data-medium="pipe"] path').first();
+    assert.equal(await page.locator('#studio-svg [data-connection][data-medium="pipe"]').count(), 2);
+    assert.equal(await page.locator('#studio-svg [data-connection][data-medium="power"]').count(), 0);
     const pipeBefore = await pipe.getAttribute('d');
-    assert(await cable.getAttribute('d'), 'Canonical cable is rendered');
+    assert(await delivery.getAttribute('d'), 'The return pipe meets the original top pump outlet');
     const pump = page.locator('#studio-svg [data-node="P-01"]');
     await pump.scrollIntoViewIfNeeded();
     const box = await pump.boundingBox(); assert(box);
@@ -118,6 +120,6 @@ export async function checkLandingDemo(browser, origin) {
     assert(await page.locator('#file-browser').isVisible(), 'Full IDE restores saved layout');
     assert.match(await source(), /rpm: 2111/, 'Full IDE restores the saved project, not disposable demo edits');
     assert.deepEqual(errors, []);
-    console.log('PASS: canonical @saturn/core landing; pipe/cable authoring; live rerouting; two-way editing; storage isolation; mobile; full IDE handoff.');
+    console.log('PASS: canonical @saturn/core landing; native process pipe authoring; live rerouting; two-way editing; storage isolation; mobile; full IDE handoff.');
   } finally { await context.close(); }
 }

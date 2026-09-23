@@ -42,11 +42,11 @@ export function unavailableRuntime(project: Project, mode: 'draft' | 'offline' =
   return runtime;
 }
 export function plantProjection(files: Record<string, string>) {
-  const project = compileProject(files); installEquipment();
+  const project = compileProject(files); installEquipment(typeof document === 'undefined' ? 'en' : document.documentElement.lang === 'ru' ? 'ru' : 'en');
   return { project, scene: sceneFor(project), runtime: unavailableRuntime(project), objects: sourceObjects(files) };
 }
 export function runtimeProjection(project: Project, frame: Frame) {
-  installEquipment();
+  installEquipment(typeof document === 'undefined' ? 'en' : document.documentElement.lang === 'ru' ? 'ru' : 'en');
   return { project, scene: sceneFor(project), runtime: visualFrame(project, frame), objects: new Map<string, SourceObject>() };
 }
 export function nestedStarter() {

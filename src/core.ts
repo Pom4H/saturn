@@ -1,3 +1,4 @@
+import { processSymbolGeometry as symbol, symbolFootprint } from './equipment-geometry';
 /** Installed declarative vocabulary. Definitions are code; projects never execute it. */
 import type { RuntimeConfig, Signal } from './runtime/protocol';
 import type { ElementVisualIdentity } from './elements/model';
@@ -21,9 +22,9 @@ const pos = { x: { ...num('X', 100, -3000, 6000), scope: 'layout' as const }, y:
 const left = (y: number): PortSpec => ({ x: 0, y, direction: 'left', role: 'in' });
 const right = (x: number, y: number): PortSpec => ({ x, y, direction: 'right', role: 'out' });
 export const catalog: Record<Kind, Definition> = {
-  tank: { label: 'Резервуар', width: 170, height: 230, fields: { ...pos, level: num('Уровень', 64, 0, 100, 1, '%'), ...common }, ports: { outlet: right(170, 184) } },
-  pump: { label: 'Насос', width: 220, height: 170, fields: { ...pos, rpm: num('Обороты', 1500, -3000, 3000, 50, 'об/мин'), temperature: num('Температура', 48, -40, 150, 1, '°C'), vibration: num('Вибрация', 1.8, 0, 20, .1, 'мм/с'), ...common }, ports: { inlet: left(96), outlet: { x: 76, y: 0, direction: 'up', role: 'out' } } },
-  valve: { label: 'Клапан', width: 160, height: 164, fields: { ...pos, opening: num('Открытие', 76, 0, 100, 1, '%'), ...common }, ports: { inlet: left(102), outlet: right(160, 102) } },
+  tank: { label: 'Резервуар', ...symbolFootprint(symbol.tank), fields: { ...pos, level: num('Уровень', 64, 0, 100, 1, '%'), ...common }, ports: { outlet: right(symbol.tank.outlet.x, symbol.tank.outlet.y) } },
+  pump: { label: 'Насос', ...symbolFootprint(symbol.pump), fields: { ...pos, rpm: num('Обороты', 1500, -3000, 3000, 50, 'об/мин'), temperature: num('Температура', 48, -40, 150, 1, '°C'), vibration: num('Вибрация', 1.8, 0, 20, .1, 'мм/с'), ...common }, ports: { inlet: left(symbol.pump.inlet.y), outlet: { ...symbol.pump.outlet, direction: 'up', role: 'out' } } },
+  valve: { label: 'Клапан', ...symbolFootprint(symbol.valve), fields: { ...pos, opening: num('Открытие', 76, 0, 100, 1, '%'), ...common }, ports: { inlet: left(symbol.valve.inlet.y), outlet: right(symbol.valve.outlet.x, symbol.valve.outlet.y) } },
   flowmeter: { label: 'Расходомер', width: 96, height: 76, fields: { ...pos, ...common }, ports: { inlet: left(38), outlet: right(96, 38) } },
   exchanger: { label: 'Теплообменник', width: 170, height: 170, fields: { ...pos, temperature: num('Температура', 72, -40, 150, 1, '°C'), ...common }, ports: { inlet: left(85), outlet: right(170, 85) } },
   outlet: { label: 'В систему', width: 44, height: 40, fields: { ...pos, ...common }, ports: { inlet: left(20) } },
