@@ -44,6 +44,7 @@ export async function checkHoverAndSvg(page) {
   assert.notEqual(await d.getAttribute('d'), before, 'Canonical pipe follows detailed pump before drop');
   assert.equal(await source.evaluate(node => node.cmTile.view.state.doc.toString()), initial);
   await page.mouse.up();
+  assert.equal(await page.evaluate(() => window.getSelection()?.toString() ?? ''), '', 'Dragging equipment must not select SVG labels and trigger native text dragging');
   assert.notEqual(await source.evaluate(node => node.cmTile.view.state.doc.toString()), initial);
   await page.locator('#studio-undo').click();
   assert.equal(await source.evaluate(node => node.cmTile.view.state.doc.toString()), initial);
