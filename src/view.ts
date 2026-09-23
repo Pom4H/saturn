@@ -185,6 +185,30 @@ export class SceneView {
   }
   zoom(factor: number) { const c = this.camera; const width = Math.max(220, Math.min(12000, c.width * factor)), height = width / c.width * c.height; this.setCamera({ x: c.x + (c.width - width) / 2, y: c.y + (c.height - height) / 2, width, height }); }
   select(id: string | null) { this.selected = id; this.layers.querySelectorAll('[data-node], [data-edge]').forEach(n => n.classList.toggle('selected', id !== null && (n.getAttribute('data-node') === id || n.getAttribute('data-edge') === id))); }
+  /** Preview derived routes during a drag; the authored scene changes only on drop. */
+  previewMove(id: string, x: number, y: number) {
+    const nodes = this.scene.nodes.map(node => node.id === id ? { ...node, props: { ...node.props, x, y } } : node);
+    const routes = layout({ ...this.scene, nodes }).routes;
+    for (const [edgeId, next] of routes) {
+      const previous = this.routes.get(edgeId);
+      if (!previous || previous.path === next.path && previous.valid === next.valid) continue;
+      Object.assign(previous, next);
+      const edge = [...this.layers.querySelectorAll<SVGGElement>('[data-edge]')].find(element => element.dataset.edge === edgeId);
+      if (!edge) continue;
+      edge.classList.toggle('invalid', !next.valid);
+      edge.querySelectorAll<SVGPathElement>('path').forEach(path => path.setAttribute('d', next.path));
+      const water = edge.querySelector<SVGPathElement>('[data-water]');
+      if (water) water.setAttribute('stroke', next.valid ? medium2d.water : '#ca6661');
+      const hit = edge.querySelector<SVGGElement>('.edge-hit');
+      if (hit) {
+        hit.replaceChildren();
+        for (let i = 1; i < next.points.length; i++) {
+          const a = next.points[i - 1], b = next.points[i];
+          el(hit, 'rect', { x: Math.min(a.x, b.x) - 10, y: Math.min(a.y, b.y) - 10, width: Math.abs(a.x - b.x) + 20, height: Math.abs(a.y - b.y) + 20, fill: 'transparent' });
+        }
+      }
+    }
+  }
   setSelected(id: string | null) { this.select(id); }
   focusGroup(id: string | null) {
     this.focusedGroup = id;

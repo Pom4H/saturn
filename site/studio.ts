@@ -764,9 +764,10 @@ export async function mountStudio() {
     if (!drag) return;
     const point = view.point(event.clientX, event.clientY); drag.dx = point.x - drag.startX; drag.dy = point.y - drag.startY;
     drag.element.setAttribute('transform', `translate(${drag.dx} ${drag.dy}) ${drag.transform}`);
+    view.previewMove(drag.id, drag.x + drag.dx, drag.y + drag.dy);
   });
   canvas.addEventListener('pointerup', () => { pan = null; if (!drag) return; const d = drag; drag = null; d.element.setAttribute('transform', d.transform); if (Math.hypot(d.dx, d.dy) > 2) fields(d.id, { x: Math.round(d.x + d.dx), y: Math.round(d.y + d.dy) }); else renderInspector(); });
-  canvas.addEventListener('pointercancel', () => { pan = null; if (drag) drag.element.setAttribute('transform', drag.transform); drag = null; });
+  canvas.addEventListener('pointercancel', () => { pan = null; if (drag) { drag.element.setAttribute('transform', drag.transform); view.previewMove(drag.id, drag.x, drag.y); } drag = null; });
   canvas.addEventListener('wheel', event => { if (!fullscreen && !event.ctrlKey && !event.metaKey) return; event.preventDefault(); const before = view.point(event.clientX, event.clientY); view.zoom(Math.exp(event.deltaY * .0015)); const after = view.point(event.clientX, event.clientY); view.setCamera({ ...view.camera, x: view.camera.x + before.x - after.x, y: view.camera.y + before.y - after.y }); }, { passive: false });
   function clearConnection() { connecting = null; shell.classList.remove('connecting'); $('studio-connect').setAttribute('aria-pressed', 'false'); $('studio-mode-note').textContent = ''; $('studio-mode-note').hidden = true; }
   function choosePort(node: string, port: string) {
