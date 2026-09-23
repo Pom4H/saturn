@@ -85,11 +85,11 @@ test('computed coordinates cannot be overwritten with a drag or inspector',async
  await page.evaluate(s=>window.__scada.setSource(s),booster.replace('x: 325','x: 300 + 25'));
  await choose(page,'P-101');await expect(page.locator('#field-x')).toBeDisabled();expect((await api(page)).source).toContain('x: 300 + 25');
 });
-test('palette append, delete, undo work; connect creates TS and tap attaches to it',async({page})=>{
- const s='import { tank, pump } from "@scada/core";\nconst a=tank("T",{x:50,y:250});\nconst b=pump("P",{x:400,y:338});';
+test('palette append, delete, undo work; pipe creates TS and tap attaches to it',async({page})=>{
+ const s='import { tank, pump } from "@saturn/core";\nconst a=tank("T",{x:50,y:250});\nconst b=pump("P",{x:400,y:338});';
  await page.evaluate(s=>{window.__scada.setSource(s);window.__scada.fit()},s);
  await page.locator('#connect-mode').click();await page.locator('[data-owner="T"][data-port="outlet"]').click();await page.locator('[data-owner="P"][data-port="inlet"]').click();
- expect((await api(page)).source).toContain('connect(a.outlet, b.inlet)');await expect(page.locator('[data-edge]')).toHaveCount(1);
+ expect((await api(page)).source).toContain('pipe("PIPE-101", a.outlet, b.inlet)');await expect(page.locator('[data-edge]')).toHaveCount(1);
  await page.locator('[data-edge] .edge-hit').click();await page.getByRole('button',{name:'+ Манометр',exact:true}).click();await expect(page.locator('[data-kind="pressure"]')).toHaveCount(1);
  await page.locator('#add').click();await page.locator('#palette button').filter({hasText:'Клапан'}).click();expect((await api(page)).source).toContain('valve(');
  await page.locator('#delete-object').click();await expect(page.locator('[data-kind="valve"]')).toHaveCount(0);await page.locator('#undo').click();await expect(page.locator('[data-kind="valve"]')).toHaveCount(1);
