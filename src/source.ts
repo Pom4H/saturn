@@ -253,13 +253,13 @@ export function appendConnection(source: string, from: Endpoint, to: Endpoint): 
   const result = imported + `\nconst pipe${i} = ${fn}("PIPE-${100 + i}", ${a}.${from.port}, ${b}.${to.port});\n`;
   compile(result); return result;
 }
-export function appendTap(source: string, lineId: string, kind: 'pressure' | 'temperature'): string {
-  const c = compile(source), line = c.scene.links.find(l => l.id === lineId);
-  if (!line) throw new SourceError('Выберите линию.');
-  let text = source; let ref = line.variable;
+export function appendTap(source: string, pipeId: string, kind: 'pressure' | 'temperature'): string {
+  const c = compile(source), pipeLine = c.scene.links.find(link => link.id === pipeId);
+  if (!pipeLine) throw new SourceError('Выберите трубу.');
+  let text = source; let ref = pipeLine.variable;
   if (!ref) {
-    let i = 1; while (new RegExp(`\\bline${i}\\b`).test(text)) i++; ref = `line${i}`;
-    const s = c.statements.get(line.id)!, call = c.linkExpressions.get(line.id)!;
+    let i = 1; while (new RegExp(`\\bpipe${i}\\b`).test(text)) i++; ref = `pipe${i}`;
+    const s = c.statements.get(pipeLine.id)!, call = c.linkExpressions.get(pipeLine.id)!;
     if (ts.isExpressionStatement(s) && s.expression === call) text = text.slice(0, s.getStart()) + `const ${ref} = ` + text.slice(s.getStart());
     else text = applyChanges(text, [{ from: s.getStart(), to: s.getStart(), insert: `const ${ref} = ${call.getText(c.file)};\n` }, { from: call.getStart(c.file), to: call.getEnd(), insert: ref }]);
   }
