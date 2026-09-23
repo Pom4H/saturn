@@ -1,6 +1,6 @@
 import { connectionStyles } from './connection-style';
 import { groupFill, groupStroke, groupAccent, groupTitleLines } from './group-style';
-import { catalog, simulate, type Equipment, type Scene, type Point } from './scene';
+import { catalog, type Equipment, type Scene, type Point } from './scene';
 import { layout, tapPoint, type Route } from './geometry';
 import { numeric, type RuntimeFrame, type Signal, type Quality, type Alarm } from './runtime/protocol';
 import type * as Three from 'three';
@@ -78,7 +78,11 @@ export function observationAlarm(scene: Scene, frame: RuntimeFrame | null, id: s
   return frame ? frame.equipment[id]?.facts.alarm ?? 'none' : (scene.nodes.find(n => n.id === id)?.props.alarm ?? 'none') as Alarm;
 }
 export function observedFlows(scene: Scene, frame: RuntimeFrame | null): Map<string, number | null> {
-  if (!frame) return simulate(scene).flows;
+  if (!frame) return new Map([
+    ...scene.links.map(link => [link.id, null] as const),
+    ...(scene.connections ?? []).map(connection => [connection.id, null] as const),
+    ...scene.nodes.map(node => [node.id, null] as const),
+  ]);
   return new Map([
     ...scene.links.map(l => [l.id, numeric(frame.flows[l.id])] as const),
     ...(scene.connections ?? []).map(connection => [connection.id, numeric(frame.flows[connection.id])] as const),
@@ -173,7 +177,7 @@ export class SceneView {
     if (frame?.runId !== this.runtime?.runId) { this.visual.clear(); this.phases.clear(); }
     this.runtime = frame;
     this.flows = observedFlows(this.scene, frame);
-    this.notes = frame ? [] : simulate(this.scene).notes;
+    this.notes = [];
     this.svg.dataset.runId = frame?.runId ?? ''; this.svg.dataset.sequence = String(frame?.seq ?? '');
     this.syncStatuses(); for (const update of this.updates) update(0);
   }
@@ -249,7 +253,7 @@ export class SceneView {
   render(scene: Scene) {
     this.scene = scene;
     this.renderGroups();
-    this.flows = observedFlows(scene, this.runtime); this.notes = this.runtime ? [] : simulate(scene).notes;
+    this.flows = observedFlows(scene, this.runtime); this.notes = [];
     // Parameters/quality do not change routing. Keep DOM nodes and animation
     // closures alive; refresh only the derived props they read on the next frame.
     const key = JSON.stringify([
