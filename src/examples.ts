@@ -1,7 +1,7 @@
 export const booster = `import {
   tank, pump, valve, flowmeter, exchanger,
-  outlet, connect, tap, pressure, temperature
-} from "@scada/core";
+  outlet, pipe, tap, pressure, temperature
+} from "@saturn/core";
 
 // Координаты меняются здесь при перетаскивании.
 const reservoir = tank("T-101", {
@@ -24,11 +24,11 @@ const system = outlet("OUT", {
 });
 
 // Связи привязаны к портам, не к пикселям.
-connect(reservoir.outlet, motor.inlet);
-const discharge = connect(motor.outlet, meter.inlet);
-connect(meter.outlet, gate.inlet);
-connect(gate.outlet, heater.inlet);
-const delivery = connect(heater.outlet, system.inlet);
+pipe("PIPE-101", reservoir.outlet, motor.inlet);
+const discharge = pipe("PIPE-102", motor.outlet, meter.inlet);
+pipe("PIPE-103", meter.outlet, gate.inlet);
+pipe("PIPE-104", gate.outlet, heater.inlet);
+const delivery = pipe("PIPE-105", heater.outlet, system.inlet);
 
 // Приборы следуют за своими линиями.
 tap(discharge, pressure("PT-101", {
@@ -38,31 +38,31 @@ tap(delivery, temperature("TT-101", {
   value: 72, at: 0.5, offset: 110
 }));
 `;
-export const twin = `import { tank, pump, valve, outlet, connect } from "@scada/core";
+export const twin = `import { tank, pump, valve, outlet, pipe } from "@saturn/core";
 
 // Два независимых контура: закрытие V-101 не влияет на V-102.
 const tankA = tank("T-101", { x: 40, y: 150, level: 72 });
 const pumpA = pump("P-101", { x: 330, y: 238, rpm: 1500 });
 const valveA = valve("V-101", { x: 680, y: 50, opening: 100 });
 const outA = outlet("OUT-A", { x: 1000, y: 132 });
-connect(tankA.outlet, pumpA.inlet);
-connect(pumpA.outlet, valveA.inlet);
-connect(valveA.outlet, outA.inlet);
+pipe("PIPE-A1", tankA.outlet, pumpA.inlet);
+pipe("PIPE-A2", pumpA.outlet, valveA.inlet);
+pipe("PIPE-A3", valveA.outlet, outA.inlet);
 
 const tankB = tank("T-102", { x: 40, y: 560, level: 48 });
 const pumpB = pump("P-102", { x: 330, y: 648, rpm: -1000 });
 const valveB = valve("V-102", { x: 680, y: 460, opening: 50 });
 const outB = outlet("OUT-B", { x: 1000, y: 542 });
-connect(tankB.outlet, pumpB.inlet);
-connect(pumpB.outlet, valveB.inlet);
-connect(valveB.outlet, outB.inlet);
+pipe("PIPE-B1", tankB.outlet, pumpB.inlet);
+pipe("PIPE-B2", pumpB.outlet, valveB.inlet);
+pipe("PIPE-B3", valveB.outlet, outB.inlet);
 `;
-export const empty = `import { tank, pump, valve, outlet, connect } from "@scada/core";
+export const empty = `import { tank, pump, valve, outlet, pipe } from "@saturn/core";
 
 // Добавьте оборудование кнопкой «+ Элемент» или напишите DSL.
 // Для соединения нажмите выходной порт, затем входной.
 `;
-export const serverDemo = `import { runtime, tank, pump, valve, flowmeter, outlet, connect, tap, pressure } from "@scada/core";
+export const serverDemo = `import { runtime, tank, pump, valve, flowmeter, outlet, pipe, tap, pressure } from "@saturn/core";
 
 // Только декларация. Подключение выполняется кнопкой, токен вводится отдельно.
 runtime({ server: "http://127.0.0.1:4175", project: "pump-demo" });
@@ -76,10 +76,10 @@ const motor = pump("P-101", {
 const meter = flowmeter("F-101", { x: 675, y: 236 });
 const gate = valve("V-101", { x: 955, y: 160, opening: 85 });
 const outlet1 = outlet("OUT", { x: 1265, y: 242 });
-connect(source.outlet, motor.inlet);
-const discharge = connect(motor.outlet, meter.inlet);
-connect(meter.outlet, gate.inlet);
-connect(gate.outlet, outlet1.inlet);
+pipe("PIPE-101", source.outlet, motor.inlet);
+const discharge = pipe("PIPE-102", motor.outlet, meter.inlet);
+pipe("PIPE-103", meter.outlet, gate.inlet);
+pipe("PIPE-104", gate.outlet, outlet1.inlet);
 tap(discharge, pressure("PT-101", { at: 0.5, offset: 110 }));
 `;
 export const examples: Record<string, { name: string; source: string }> = {
