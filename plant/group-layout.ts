@@ -1,4 +1,4 @@
-import type { SceneGroup } from '../src/core';
+import type { SceneGroup } from '../src/scene';
 import type { Project } from './types';
 
 /** Derived presentation only. Membership comes from system(); positions remain authored TS. */
