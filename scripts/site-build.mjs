@@ -35,6 +35,13 @@ export async function buildSite(outdir = 'dist/site', mode = 'demo') {
     await writeFile(`${outdir}/assets/saturn-context-${count}.md`, projectContext(count));
   }
   for (const name of ['manifest.json', 'icon-192.png', 'icon-512.png']) await cp(`site/${name}`, `${outdir}/assets/${name}`);
+  // A normal build has a text fallback. The existing browser gate supplies verified captures.
+  await writeFile(`${outdir}/assets/landing-proof.json`, JSON.stringify({ available: false, revision }));
+  await writeSiteCache(outdir);
+  console.log(`Saturn landing built → ${outdir}`);
+}
+
+export async function writeSiteCache(outdir) {
   const files = (await readdir(`${outdir}/assets`)).sort();
   const hash = createHash('sha256');
   hash.update(await readFile(`${outdir}/index.html`));
@@ -43,6 +50,5 @@ export async function buildSite(outdir = 'dist/site', mode = 'demo') {
   const assets = ['', ...files.filter(name => /\.(js|css|png|svg|json|md)$/.test(name)).map(name => `site/assets/${name}`)];
   const worker = (await readFile('site/sw.js', 'utf8')).replace('__SATURN_CACHE__', 'saturn-landing-' + hash.digest('hex').slice(0, 16)).replace('__SATURN_ASSETS__', JSON.stringify(assets));
   await writeFile(`${outdir}/saturn-sw.js`, worker);
-  console.log(`Saturn landing built → ${outdir}`);
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await buildSite();

@@ -44,6 +44,7 @@ export async function checkLandingDemo(browser, origin) {
     const pipe = page.locator('#studio-svg [data-edge] [data-water]').first();
     const pipeBefore = await pipe.getAttribute('d');
     const pump = page.locator('#studio-svg [data-node="P-01"]');
+    await pump.scrollIntoViewIfNeeded();
     const box = await pump.boundingBox(); assert(box);
     await page.mouse.move(box.x + box.width * .6, box.y + box.height * .75); await page.mouse.down();
     await page.mouse.move(box.x + box.width * .6 + 40, box.y + box.height * .75 + 20, { steps: 5 });

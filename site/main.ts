@@ -1,6 +1,7 @@
 import './styles.css';
 import './studio.css';
 import './landing-demo.css';
+import './landing.css';
 import { configureAppUpdates } from './pwa';
 import './commands.css';
 const params = new URLSearchParams(location.search);
@@ -12,7 +13,12 @@ document.getElementById('studio-shell')?.setAttribute('data-demo', String(demo))
 const shortcut = document.querySelector('#command-launcher kbd');
 if (shortcut) shortcut.textContent = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘ K' : 'Ctrl K';
 async function mountWorkspace() {
-  if (demo) return (await import('./landing-demo')).mountLandingDemo();
+  if (demo) {
+    const { mountLandingDemo } = await import('./landing-demo');
+    const result = mountLandingDemo();
+    import('./landing-proof').then(({ mountLandingProof }) => mountLandingProof()).catch(console.error);
+    return result;
+  }
   const [{ mountStudio }, { mountProjectPicker }, { mountCommands }] = await Promise.all([
     import('./studio'), import('./project-picker'), import('./commands'),
   ]);

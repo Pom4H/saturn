@@ -2,8 +2,8 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="color-scheme" content="light dark"><meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#111315" media="(prefers-color-scheme: dark)"><title>Saturn — инженерная IDE для физических систем</title>
-  <meta name="description" content="Open-source инженерная IDE и runtime: TypeScript-модель, HMI, телеметрия, история, отчёты, PLC и развёртывание в одном проекте.">
+  <meta name="color-scheme" content="light dark"><meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#111315" media="(prefers-color-scheme: dark)"><title>Saturn IDE — разработка и SCADA в одном проекте</title>
+  <meta name="description" content="Инженерная IDE со встроенной SCADA. Редактируйте схему и код, готовьте рабочее место оператора и проверяйте изменения перед запуском. Открытый код, MIT.">
   <link rel="icon" href="./site/assets/mark.svg" type="image/svg+xml"><link rel="manifest" href="./site/assets/manifest.json"><link rel="apple-touch-icon" href="./site/assets/icon-192.png">
   <link rel="stylesheet" href="./site/assets/site.css"><script type="module" src="./site/assets/site.js"></script>
 </head>
@@ -32,9 +32,20 @@
   <symbol id="i-platform-runtime" viewBox="0 0 24 24"><path d="m12 2 9 5v10l-9 5-9-5V7l9-5Zm-4 8 4 2 4-2m-4 2v5"/></symbol>
 <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol><symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.2 2.4c-.7.3-.7 1-.7 1.6M12 16h.01"/></symbol><symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></symbol><symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol><symbol id="i-undo" viewBox="0 0 24 24"><path d="m8 4-5 5 5 5M3 9h11a6 6 0 0 1 0 12"/></symbol><symbol id="i-redo" viewBox="0 0 24 24"><path d="m16 4 5 5-5 5m5-5H10a6 6 0 0 0 0 12"/></symbol><symbol id="i-link" viewBox="0 0 24 24"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M5 8v4h14v4"/></symbol><symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></symbol><symbol id="i-play" viewBox="0 0 24 24"><path d="m7 4 14 8-14 8Z"/></symbol><symbol id="i-fit" viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><rect x="8" y="8" width="8" height="8" rx="1"/></symbol><symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol><symbol id="i-inspector" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M18 8h.01M18 12h.01"/></symbol></defs></svg>
 <a class="skip-link" href="#studio-shell">К редактору</a>
-<header class="site-header"><a class="brand" href="#top"><img src="./site/assets/saturn-icon.png" alt="" width="30" height="30">Saturn</a><div><a href="https://github.com/Pom4H/saturn" target="_blank" rel="noopener">GitHub ↗</a><button data-install-studio>Установить</button></div></header>
+<header class="site-header">
+  <a class="brand" href="#top"><img src="./site/assets/mark.svg" alt="" width="30" height="30">Saturn<span class="brand-kind">IDE</span></a>
+  <nav class="landing-nav" aria-label="О Saturn"><a href="#workflow">Как работает</a><a href="#readiness">Для вашего объекта</a><a href="https://github.com/Pom4H/saturn#readme" target="_blank" rel="noopener">Документация ↗</a></nav>
+  <a class="landing-button compact" href="?mode=ide#workspace">Открыть IDE <span aria-hidden="true">↗</span></a>
+</header>
 <main id="top">
-  <section class="hero" aria-labelledby="hero-title"><h1 id="hero-title">Saturn</h1><p>Один TypeScript-проект — схема, runtime, HMI, история, отчёты и PLC.</p></section>
+  <section class="hero landing-hero" aria-labelledby="hero-title">
+    <p class="eyebrow"><span class="open-mark" aria-hidden="true"></span>Saturn / открытая инженерная среда</p>
+    <h1 id="hero-title">Инженерная IDE<br>со встроенной SCADA.</h1>
+    <p class="hero-description">От схемы оборудования до рабочего места оператора — в одном проекте. Редактируйте визуально или в коде, проверяйте изменения перед запуском.</p>
+    <div class="hero-actions"><a class="landing-button" href="?mode=ide#workspace">Начать в браузере <svg aria-hidden="true"><use href="#i-arrow"/></svg></a><a class="landing-text-link" href="#example">Посмотреть пример <span aria-hidden="true">↓</span></a></div>
+    <p class="hero-note">Без регистрации и установки. MIT — исходный код открыт.</p>
+  </section>
+  <div class="demo-intro" id="example"><span><span class="section-number">01</span> Попробуйте редактирование</span><span class="demo-boundary">Симуляция. Без подключения к оборудованию.</span></div>
   <section class="shell-stage" id="studio" aria-label="SCADA-редактор">
     <div class="shell-frame">
       <div class="shell" id="studio-shell" data-mode="3d" data-surface="scene" style="--studio-progress:0">
@@ -120,100 +131,64 @@
       </div>
     </div>
   </section>
-  <section class="product-summary" aria-labelledby="capabilities-title">
-    <div class="section-split">
-      <div class="section-heading">
-        <h2 id="capabilities-title">Проект — это модель объекта, а не файл мнемосхемы.</h2>
-        <p>Оборудование, topology, сигналы и поведение остаются в обычном TypeScript. Saturn строит из этой модели разные рабочие представления, не создавая параллельный формат.</p>
-      </div>
-      <div class="projection-tree" aria-label="Проекции одного Saturn проекта">
-        <div class="projection-source"><span>source</span><strong>plant.ts</strong><code>@saturn/core</code></div>
-        <div class="projection-branches" aria-hidden="true"></div>
-        <div class="capability-row"><span>01</span><strong>Diagram</strong><p>Оборудование и связи в 2D и 3D. Переход между схемой и кодом.</p></div>
-        <div class="capability-row"><span>02</span><strong>Runtime</strong><p>Телеметрия, управление, алармы, история и воспроизведение.</p></div>
-        <div class="capability-row"><span>03</span><strong>Operator HMI</strong><p>Состояние и команды в интерфейсе оператора.</p></div>
-        <div class="capability-row"><span>04</span><strong>Reports</strong><p>Запросы к истории, таблицы, графики и отчёты A4.</p></div>
-        <div class="capability-row"><span>05</span><strong>PLC targets</strong><p>Привязки сигналов и проекция 320×240 для PLC/HMI.</p></div>
-      </div>
-    </div>
-  </section>
+  <p class="demo-takeaway">Схема и код меняют один проект. Исходники остаются у вас — их можно сравнить, сохранить в Git и передать другому инженеру.</p>
 
-  <section class="lifecycle-section" aria-labelledby="lifecycle-title">
-    <div class="section-heading lifecycle-heading">
-      <h2 id="lifecycle-title">Source, build, published и applied — разные состояния.</h2>
-      <p>Исходник сначала становится проверенным immutable artifact. Только потом он может быть опубликован и применён к runtime.</p>
-    </div>
-    <div class="release-flow" aria-label="Жизненный цикл Saturn проекта">
-      <article><span>01</span><small>SOURCE</small><strong>HEAD</strong><p>Инженер редактирует обычные файлы. Git хранит историю и review.</p></article>
-      <i>→</i>
-      <article><span>02</span><small>BUILD</small><strong>sha256:…</strong><p>Trusted build создаёт immutable artifact с provenance исходников и зависимостей.</p></article>
-      <i>→</i>
-      <article><span>03</span><small>PUBLISHED</small><strong>target</strong><p>Artifact выбран для конкретного Environment, но ещё может не быть применён.</p></article>
-      <i>→</i>
-      <article><span>04</span><small>APPLIED</small><strong>Plant-01</strong><p>Runtime работает на конкретном проверенном artifact.</p></article>
-    </div>
-    <div class="release-invariant"><code>invalid published ≠ applied</code><p>Если новая ревизия невалидна, последняя рабочая конфигурация продолжает работать.</p></div>
-  </section>
-
-  <section class="extensions-section" aria-labelledby="extensions-title">
-    <div class="section-heading extensions-heading">
-      <h2 id="extensions-title">Если Saturn не знает ваше оборудование — расширьте его доменную модель.</h2>
-      <p>Registry копирует типизированный source прямо в проект. После этого это обычный код проекта: его видно, можно менять, тестировать и версионировать в Git.</p>
-    </div>
-    <div class="extensions-layout">
-      <div class="extension-code" aria-label="Добавление проектного building block">
-        <div class="code-window-head"><span>registry</span><span>project-owned source</span></div>
-        <pre><code><span class="code-muted">$</span> saturn add pump
-<span class="code-comment"># src/equipment/pump.ts</span>
-
-<span class="code-keyword">import</span> { <span class="code-function">simulation</span> } <span class="code-keyword">from</span> <span class="code-string">'@saturn/core'</span>
-
-<span class="code-keyword">export function</span> <span class="code-function">pump</span>(id, system, at) {
-  <span class="code-keyword">return</span> <span class="code-function">simulation</span>(id, <span class="code-string">'pump'</span>, { system, at })
-}</code></pre>
-        <div class="extension-install-line"><span>git</span><code>diff src/equipment/pump.ts</code></div>
-      </div>
-      <div class="extension-index">
-        <div><code>equipment</code><p>Типизированные фабрики оборудования, порты, сигналы и topology.</p></div>
-        <div><code>reports</code><p>Отраслевые формы, SQL-запросы, таблицы и графики.</p></div>
-        <div><code>targets</code><p>PLC/HMI target providers и правила сборки для конкретного оборудования.</p></div>
-        <div><code>templates</code><p>Готовые фрагменты инженерного проекта без скрытого runtime state.</p></div>
-        <div><code>packages</code><p>Обычные dependencies остаются для кода с действительно независимым lifecycle.</p></div>
-        <div><code>Git</code><p>После копирования история building block принадлежит самому проекту.</p></div>
+  <section class="landing-section workflow-section" id="workflow" aria-labelledby="workflow-title">
+    <div class="section-heading"><p class="eyebrow"><span class="section-number">02</span> Разработка и эксплуатация</p><h2 id="workflow-title">Один объект.<br>Два рабочих места.</h2><p>Инженер готовит и проверяет проект. Оператор видит состояние оборудования и доступные ему действия.</p></div>
+    <div class="proof-switcher" role="group" aria-label="Рабочее место Saturn">
+      <input class="proof-radio" type="radio" name="landing-role" id="proof-engineer" value="engineer" checked>
+      <label for="proof-engineer"><svg aria-hidden="true"><use href="#i-code"/></svg>Инженер</label>
+      <input class="proof-radio" type="radio" name="landing-role" id="proof-operator" value="operator">
+      <label for="proof-operator"><svg aria-hidden="true"><use href="#i-platform-operator"/></svg>Оператор</label>
+      <div class="proof-panels">
+        <article class="proof-panel engineer-proof" aria-labelledby="engineer-title">
+          <div class="proof-description"><h3 id="engineer-title">Подготовьте следующую версию проекта.</h3><p>Исходники, схема и сигналы рядом. Черновик отделён от версии, на которой работает объект.</p></div>
+          <figure class="product-proof" data-proof="engineer"><a class="proof-image" hidden target="_blank" rel="noopener" aria-label="Открыть снимок рабочего места инженера в полном размере"><picture><source media="(prefers-color-scheme: dark)"><img loading="lazy" decoding="async" width="1280" height="800" alt="Saturn: исходник проекта рядом со схемой и состоянием опубликованной версии"></picture></a><figcaption>Рабочее место инженера. <span class="proof-status">Серверный сценарий доступен при локальном запуске.</span></figcaption></figure>
+        </article>
+        <article class="proof-panel operator-proof" aria-labelledby="operator-title">
+          <div class="proof-description"><h3 id="operator-title">Следите за объектом. Управляйте по своей роли.</h3><p>Схема, сигналы, разрешённые команды и аварийные события. Исходники и публикация скрыты от оператора.</p></div>
+          <figure class="product-proof" data-proof="operator"><a class="proof-image" hidden target="_blank" rel="noopener" aria-label="Открыть снимок рабочего места оператора в полном размере"><picture><source media="(prefers-color-scheme: dark)"><img loading="lazy" decoding="async" width="1280" height="800" alt="Saturn: операторская схема и телеметрия без редактора исходников"></picture></a><figcaption>Рабочее место оператора. <span class="proof-status">Серверный сценарий доступен при локальном запуске.</span></figcaption></figure>
+        </article>
       </div>
     </div>
-    <div class="target-flow">
-      <div><span class="flow-label">TARGET PROVIDER</span><strong>PLC compiler / deploy / flash</strong></div>
-      <div class="flow-path"><span>project</span><i>→</i><span>compile</span><i>→</i><span>artifact</span><i>→</i><span>flash</span><i>→</i><span>monitor</span></div>
-    </div>
-    <div class="ecosystem-line">
-      <span>Следующие точки расширения</span>
-      <p>Импорт TIA, CODESYS и WinCC. История в Timescale или Influx, события через MQTT и webhooks. Пакеты для наладки и симуляции, вход через OIDC или LDAP.</p>
-      <a href="https://github.com/Pom4H/saturn/blob/main/docs/adr/0008-conventions-first-artifact-runtime.md" target="_blank" rel="noopener">Architecture ↗</a>
-    </div>
+    <div class="proof-footnote"><p id="proof-origin">Браузерный пример выше показывает редактирование. Для эксплуатации нужен запущенный runtime.</p><a href="./site/assets/server-guide.md" target="_blank" rel="noopener">Запустить свой сервер <span aria-hidden="true">↗</span></a></div>
   </section>
 
-  <section class="distribution-section" aria-labelledby="distribution-title">
-    <div class="distribution-head">
-      <div><h2 id="distribution-title">Один Saturn. Нужная роль на нужной машине.</h2><p>Формат проекта не меняется между инженерной и эксплуатационной средой.</p></div>
-      <a href="https://github.com/Pom4H/saturn/releases/latest" target="_blank" rel="noopener">Download ↗</a>
-    </div>
-    <div class="distribution-list">
-      <span class="distribution-item"><svg aria-hidden="true"><use href="#i-platform-browser"/></svg><span><strong>Browser / PWA</strong><small>Установка и работа офлайн</small></span></span>
-      <span class="distribution-item"><svg aria-hidden="true"><use href="#i-platform-desktop"/></svg><span><strong>Standalone</strong><small>Windows, Linux, macOS</small></span></span>
-      <span class="distribution-item"><svg aria-hidden="true"><use href="#i-platform-operator"/></svg><span><strong>Operator</strong><small>Режим киоска для HMI</small></span></span>
-      <span class="distribution-item"><svg aria-hidden="true"><use href="#i-platform-server"/></svg><span><strong>Server</strong><small>Bun, SQLite, SSE</small></span></span>
-      <span class="distribution-item"><svg aria-hidden="true"><use href="#i-platform-editor"/></svg><span><strong>VS Code</strong><small>Расширение редактора</small></span></span>
-      <span class="distribution-item"><svg aria-hidden="true"><use href="#i-platform-runtime"/></svg><span><strong>Production</strong><small>Запуск собранного проекта</small></span></span>
-    </div>
-    <div class="distribution-command"><span>$</span><code>npm run saturn -- pack --target windows-x64</code></div>
+  <section class="landing-section change-section" id="changes" aria-labelledby="changes-title">
+    <div class="section-heading"><p class="eyebrow"><span class="section-number">03</span> Изменения под контролем</p><h2 id="changes-title">Знайте, какая версия<br>работает на объекте.</h2><p>Можно продолжать разработку, пока runtime исполняет применённую версию. Публикация и применение — отдельные состояния.</p></div>
+    <ol class="change-path" aria-label="Путь изменения проекта">
+      <li><span class="change-step">01 / SOURCE</span><h3>Черновик</h3><p>Редактируйте схему и обычные файлы проекта. Git сохраняет историю изменений.</p></li>
+      <li><span class="change-step">02 / BUILD</span><h3>Проверка</h3><p>Сборка проверяет проект и создаёт артефакт с привязкой к исходной версии.</p></li>
+      <li><span class="change-step">03 / PUBLISHED</span><h3>Публикация</h3><p>Выберите подготовленную сборку для конкретного окружения.</p></li>
+      <li><span class="change-step">04 / APPLIED</span><h3>Рабочая версия</h3><p>Видно, какую сборку фактически исполняет runtime на объекте.</p></li>
+    </ol>
+    <p class="change-note"><svg aria-hidden="true"><use href="#i-check"/></svg>Ошибка в новом черновике не заменяет работающую конфигурацию.<a href="https://github.com/Pom4H/saturn/blob/main/docs/adr/0008-conventions-first-artifact-runtime.md" target="_blank" rel="noopener">Как это устроено ↗</a></p>
   </section>
 
-  <footer class="site-footer">
-    <div><img src="./site/assets/saturn-icon.png" alt="" width="28" height="28"><strong>Saturn</strong><span>MIT</span></div>
-    <nav aria-label="Документация"><a href="https://github.com/Pom4H/saturn" target="_blank" rel="noopener">GitHub ↗</a><a href="https://github.com/Pom4H/saturn/blob/main/docs/adr/0001-saturn-system-architecture.md" target="_blank" rel="noopener">Architecture</a><a href="https://github.com/Pom4H/saturn/blob/main/docs/developer/README.md" target="_blank" rel="noopener">Develop extensions</a><a href="https://github.com/Pom4H/saturn/blob/main/SECURITY.md" target="_blank" rel="noopener">Security</a></nav>
-  </footer>
+  <section class="landing-section readiness-section" id="readiness" aria-labelledby="readiness-title">
+    <div class="section-heading"><p class="eyebrow"><span class="section-number">04</span> Проверка на вашей задаче</p><h2 id="readiness-title">Начните со стенда.<br>Проверьте весь путь.</h2><p>Saturn активно развивается. До выбора для действующего объекта проверьте конкретное оборудование, связь и восстановление вашей конфигурации.</p></div>
+    <div class="readiness-table" role="table" aria-label="Возможности и границы Saturn">
+      <div class="readiness-row table-heading" role="row"><span role="columnheader">Что проверяем</span><span role="columnheader">С чего начать</span></div>
+      <div class="readiness-row" role="row"><h3 role="rowheader">Разработка проекта</h3><p role="cell">Откройте пример в браузере. Измените схему и исходник, проверьте диагностику, сохраните свою копию.<a href="?mode=ide#workspace">Открыть IDE ↗</a></p></div>
+      <div class="readiness-row" role="row"><h3 role="rowheader">Работа оператора</h3><p role="cell">Запустите сервер. Проверьте роли, отправку команд и поведение при потере соединения.<a href="./site/assets/server-guide.md" target="_blank" rel="noopener">Инструкция запуска ↗</a></p></div>
+      <div class="readiness-row" role="row"><h3 role="rowheader">История и отчёты</h3><p role="cell">Задайте архивируемые сигналы и отчёт по истории. Сверьте результат на данных своего сценария.<a href="https://github.com/Pom4H/saturn/blob/main/docs/plant/dsl.md" target="_blank" rel="noopener">Описание сигналов и отчётов ↗</a></p></div>
+      <div class="readiness-row" role="row"><h3 role="rowheader">Реальное оборудование</h3><p role="cell">Нужен адаптер для вашего оборудования и проверенная карта сигналов. Встроенные примеры используют синтетические данные.<a href="https://github.com/Pom4H/saturn/blob/main/SECURITY.md#extensions-and-equipment-integration" target="_blank" rel="noopener">Границы интеграции ↗</a></p></div>
+    </div>
+    <p class="scope-note">Saturn не заменяет защитную автоматику и оборудование, отвечающее за безопасность. Демонстрационные модели не являются аттестованными расчётами технологического процесса.</p>
+  </section>
+
+  <section class="landing-section ownership-section" aria-labelledby="ownership-title">
+    <div class="section-heading"><p class="eyebrow">Ваш проект остаётся вашим</p><h2 id="ownership-title">Повторно используйте<br>инженерную работу.</h2><p>Храните типовые узлы и отчёты в исходниках. Адаптируйте их под следующий объект, проверяйте изменения и передавайте проект вместе с историей.</p></div>
+    <div class="ownership-details"><h3>Открытый код. Обычные файлы.</h3><p>TypeScript-проект доступен вам и вашим инструментам: редактору, Git и кодовым агентам. Визуальные правки меняют тот же исходник.</p><a href="https://github.com/Pom4H/saturn/blob/main/docs/developer/element-packs.md" target="_blank" rel="noopener">Собственные компоненты и шаблоны ↗</a><h3>Работа на вашей инфраструктуре.</h3><p>Инженерное рабочее место и runtime можно запускать отдельно. Для локального развёртывания облачный аккаунт Saturn не нужен.</p><a href="https://github.com/Pom4H/saturn/blob/main/docs/standalone.md" target="_blank" rel="noopener">Развёртывание Saturn ↗</a></div>
+  </section>
+
+  <section class="landing-section start-section" id="start" aria-labelledby="start-title">
+    <p class="eyebrow">Попробуйте на небольшой задаче</p><h2 id="start-title">Откройте Saturn.<br>Соберите первый проект.</h2>
+    <div class="hero-actions"><a class="landing-button" href="?mode=ide#workspace">Открыть IDE <svg aria-hidden="true"><use href="#i-arrow"/></svg></a><a class="landing-text-link" href="https://github.com/Pom4H/saturn/releases/latest" target="_blank" rel="noopener">Скачать для компьютера ↗</a></div>
+    <div class="landing-platforms" aria-label="Варианты запуска"><span><svg aria-hidden="true"><use href="#i-platform-browser"/></svg>Браузер / PWA</span><span><svg aria-hidden="true"><use href="#i-platform-desktop"/></svg>Windows, Linux, macOS</span><span><svg aria-hidden="true"><use href="#i-platform-server"/></svg>Свой сервер</span><span><svg aria-hidden="true"><use href="#i-platform-editor"/></svg>VS Code</span></div>
+  </section>
 </main>
+<footer class="site-footer"><a class="brand" href="#top">Saturn<span class="brand-kind">IDE</span></a><span>Open source / MIT</span><nav aria-label="Документация и исходники"><a href="https://github.com/Pom4H/saturn" target="_blank" rel="noopener">GitHub ↗</a><a href="https://github.com/Pom4H/saturn/blob/main/docs/standalone.md" target="_blank" rel="noopener">Установка</a><a href="https://github.com/Pom4H/saturn/blob/main/SECURITY.md" target="_blank" rel="noopener">Безопасность</a></nav></footer>
 <div id="project-picker" popover="auto" role="dialog" aria-label="Переключить проект">
  <div class="project-picker-search"><svg aria-hidden="true"><use href="#i-search"/></svg><input id="project-picker-search" type="search" placeholder="Найти проект…" aria-label="Найти проект" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="project-picker-list" autocomplete="off"></div>
  <div id="project-picker-list" role="listbox" aria-label="Проекты"></div>
