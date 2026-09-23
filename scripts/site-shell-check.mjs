@@ -105,7 +105,7 @@ export async function checkShell(browser, origin) {
     await page.locator('#shell-help-dialog').waitFor({ state: 'hidden' });
 
     // Opening settings and reading permission state must never trigger a permission prompt.
-    await page.locator('#shell-notifications').click();
+    await page.locator('#shell-settings').click();
     await page.locator('#app-settings').waitFor({ state: 'visible' });
     assert.equal((await notificationState()).requests, 0, 'Notification settings must not request permission on open');
     assert.equal(await page.locator('#app-notifications-state').innerText(), 'Не включены');
