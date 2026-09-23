@@ -22,6 +22,8 @@ export async function buildSite(outdir = 'dist/site', mode = 'demo') {
   await build({ entryPoints: ['src/standalone.ts'], outfile: `${outdir}/assets/standalone.js`, bundle: true, format: 'iife', platform: 'browser', minify: true, target: 'es2022' });
   const bundle = await build({ entryPoints: { site: 'site/main.ts' }, metafile: true, entryNames: '[name]-[hash]', bundle: true, splitting: true, format: 'esm', platform: 'browser', target: 'es2022', minify: true,
     outdir: `${outdir}/assets`, chunkNames: '[name]-[hash]', legalComments: 'linked', define: { __VSCODE_EXTENSION__: JSON.stringify(extensionId) } });
+  if (Object.keys(bundle.metafile.inputs).some(path => /^src\/(source|completion)\.ts$/.test(path)))
+    throw new Error('Legacy DSL compiler entered the Saturn product bundle');
   const [entry, metadata] = Object.entries(bundle.metafile.outputs).find(([, metadata]) => metadata.entryPoint === 'site/main.ts');
   const revision = process.env.GITHUB_SHA || `local-${Date.now()}`;
   const html = (await readFile('site/index.html', 'utf8')).replace('./site/assets/site.js', './site/assets/' + basename(entry)).replace('./site/assets/site.css', './site/assets/' + basename(metadata.cssBundle)).replace('</head>', `<meta name="saturn-revision" content="${revision}"><meta name="saturn-shell-mode" content="${mode}"></head>`);

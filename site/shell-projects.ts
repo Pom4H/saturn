@@ -1,43 +1,66 @@
-/** Local projects use the same source document as the landing preview. */
+/** Built-in projects are ordinary @saturn/core TypeScript, shared by landing and IDE. */
 export const examples = {
   pump: {
-    title: 'Насосная станция', subtitle: 'Подача воды · 5 объектов',
-    source: `import { tank, pump, valve, flowmeter, outlet, connect } from "@scada/core";
+    title: 'Насосная станция', subtitle: 'Трубы и питание',
+    source: `import { project, system, simulation, pipe, cable } from '@saturn/core';
 
-// Первый проект начинается с работающего примера.
-const reservoir = tank("TK-01", { x: 40, y: 180, level: 68 });
-const motor = pump("P-01", { x: 330, y: 268, rpm: 1850 });
-const meter = flowmeter("FT-01", { x: 655, y: 160 });
-const gate = valve("V-01", { x: 865, y: 96, opening: 80 });
-const system = outlet("OUT-01", { x: 1150, y: 178 });
+const tank = simulation('TK-01', 'reservoir', { system: 'water', at: { x: 40, y: 180 } });
+const pump = simulation('P-01', 'pump', { system: 'water', at: { x: 330, y: 268 }, parameters: { inertia: 1.6 } });
+const valve = simulation('V-01', 'motor-valve', { system: 'water', at: { x: 650, y: 220 } });
+const receiver = simulation('TK-02', 'reservoir', { system: 'water', at: { x: 930, y: 160 } });
+const drive = simulation('PSU-01', 'supply', { system: 'water', at: { x: 330, y: 40 } });
 
-connect(reservoir.outlet, motor.inlet);
-connect(motor.outlet, meter.inlet);
-connect(meter.outlet, gate.inlet);
-connect(gate.outlet, system.inlet);
+export default project('water-station', {
+  title: 'Насосная станция', description: 'Учебная симуляция',
+  systems: [system('water', 'Водоснабжение')],
+  simulations: [tank, pump, valve, receiver, drive],
+  connections: [
+    pipe('PIPE-01', tank.ports.outlet, pump.ports.inlet),
+    pipe('PIPE-02', pump.ports.outlet, valve.ports.inlet),
+    pipe('PIPE-03', valve.ports.outlet, receiver.ports.inlet),
+    cable('CABLE-01', drive.ports.out, pump.ports.drive, { medium: 'power' }),
+  ],
+  signals: [], alarms: [], reports: [],
+});
 `,
   },
   thermal: {
-    title: 'Тепловой контур', subtitle: 'Передача тепла · 6 объектов',
-    source: `import { tank, pump, valve, exchanger, outlet, temperature, connect, tap } from "@scada/core";
+    title: 'Тепловой контур', subtitle: 'Трубы и теплообменник',
+    source: `import { project, system, simulation, pipe } from '@saturn/core';
 
-const reservoir = tank("TK-02", { x: 40, y: 240, level: 82 });
-const motor = pump("P-02", { x: 330, y: 328, rpm: 1450 });
-const gate = valve("V-02", { x: 650, y: 180, opening: 65 });
-const heater = exchanger("HX-01", { x: 925, y: 197, temperature: 72 });
-const system = outlet("OUT-02", { x: 1260, y: 262 });
-connect(reservoir.outlet, motor.inlet);
-connect(motor.outlet, gate.inlet);
-connect(gate.outlet, heater.inlet);
-const supply = connect(heater.outlet, system.inlet);
-tap(supply, temperature("TT-01", { value: 72, at: 0.5, offset: 110 }));
+const tank = simulation('TK-01', 'reservoir', {
+  system: 'water', at: { x: 40, y: 180 },
+});
+const pump = simulation('P-01', 'pump', {
+  system: 'water', at: { x: 330, y: 268 },
+});
+const exchanger = simulation('HX-01', 'heat-exchanger', {
+  system: 'water', at: { x: 650, y: 220 },
+});
+
+export default project('thermal-loop', {
+  title: 'Тепловой контур', description: 'Учебная симуляция',
+  systems: [system('water', 'Теплоснабжение')],
+  simulations: [tank, pump, exchanger],
+  connections: [
+    pipe('PIPE-01', tank.ports.outlet, pump.ports.inlet),
+    pipe('PIPE-02', pump.ports.outlet, exchanger.ports.inlet),
+  ],
+  signals: [], alarms: [], reports: [],
+});
 `,
   },
 } as const;
 export type ExampleId = keyof typeof examples;
-export const emptySource = `import { tank, pump, valve, flowmeter, exchanger, outlet, connect } from "@scada/core";
+export const emptySource = `import { project, system, simulation, pipe, cable } from '@saturn/core';
 
 // Добавьте оборудование из каталога или опишите установку здесь.
+export default project('new-project', {
+  title: 'Новая установка', description: 'Новый инженерный проект',
+  systems: [system('installation', 'Установка')],
+  simulations: [], connections: [],
+  signals: [], alarms: [], reports: [],
+});
 `;
 export interface LocalProject { id: string; title: string; source: string; updatedAt: string; files?: Record<string, string>; }
 export interface WorkspaceState {

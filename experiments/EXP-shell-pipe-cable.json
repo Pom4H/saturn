@@ -1,0 +1,11 @@
+{
+  "id": "EXP-shell-pipe-cable",
+  "question": "Can the focused landing and IDE share the canonical physical project without reintroducing the retired scene DSL?",
+  "hypothesis": "Delegating to compileProject, sourceObjects, sceneFor and Kernel preserves editing while typed pipe/cable remain the only authored physical connections.",
+  "status": "running",
+  "metrics": { "productDslCompilers": 1, "legacyProductCompilerImports": 0, "landingPipeCount": 3, "landingCableCount": 1 },
+  "evidencePlan": ["npm run site:check", "existing release gate on the exact integrated tree", "actual Chromium screenshots and pipe/cable movement before drop"],
+  "negativeKnowledge": [{ "hypothesis": "Reusing the old scene compiler is harmless when the landing has fewer controls", "decision": "rejected", "condition": "PR #70 exposed @scada/core/connect despite the canonical @saturn/core pipe/cable decision; object-count/UI-only tests did not catch the semantic regression" }],
+  "decision": "pending exact-tree CI",
+  "notes": "Local usegit context timed out because the container cannot resolve GitHub; repository usegit refs were inspected via the connector and were empty. No lease or accepted evidence was fabricated. Saved authored source is never silently rewritten."
+}

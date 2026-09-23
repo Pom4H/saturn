@@ -1,29 +1,33 @@
 # Focused landing demo
 
-The root landing mounts `mountLandingDemo`, not the full workspace controller.
-It uses the production `compile`, `patchFields`, `SceneView`, equipment glyphs
-and CodeMirror. There is no second scene format or screenshot imitation.
+The public landing and local IDE examples use ordinary `@saturn/core` projects.
+Physical topology is authored with `pipe(id, from, to)` and
+`cable(id, from, to, { medium })`. Signal expressions are not physical wiring.
 
-The initial experience is the pump example in 2D with TypeScript beside it.
-Only undo, reset, pause and fit remain on the canvas. Small screens switch
-between source and scene. Invalid code keeps the last valid scene and shows
-an actionable diagnostic. Moving equipment previews connected pipe routes
-and commits one undoable source change on drop.
+`site/project-source.ts` delegates compilation to `plant/compiler.ts`, rendering
+to `sceneFor`, source ranges to `sourceObjects`, and local preview to `Kernel`.
+It only patches explicit source spans or project membership. It does not define
+another evaluator, rename `connect`, or serialize a second authored scene.
+The `Scene` type is an internal disposable renderer projection, not the public DSL.
 
-The demo neither reads nor writes workspace/layout storage, mounts server
-connections, nor registers workspace commands. Demo edits are disposable.
-“Open IDE” navigates to `?mode=ide#workspace`; the full IDE restores its own
-saved project. Existing `#workspace`, `#studio`, `#code=…`, `?project=…` and
-standalone-PWA entry points continue to mount the complete workspace. Server
-and standalone bundles call `buildSite(outdir, 'ide')`; their HTML explicitly
-marks the host as an IDE, so authenticated operator/viewer roots are unchanged.
-Pages packaging reuses these assets and changes only the root HTML mode to demo.
-An explicit `?mode=demo` also opens the disposable view in a server build; the
-release gate uses it to exercise both surfaces without a second bundle.
+Moving equipment recomputes both pipe and cable routes from a temporary project
+projection. Drop changes only literal `at.x/at.y` spans, as one undoable edit.
+Invalid code or incompatible ports keep the last valid scene and show canonical
+`SATURN_*` diagnostics. Aliased constructor imports retain their source ranges.
+Catalogue insertion emits canonical simulation declarations; physical attachment
+chooses pipe/cable from the actual typed terminals, then validates the result.
 
-Regression coverage lives in `scripts/site-landing-check.mjs` and runs inside
-the existing `node scripts/site-release-check.mjs` CI gate. Full-workspace
-browser tests explicitly use `?mode=ide`. Published-root verification expects
-the focused 2D demo rather than a WebGL canvas.
+Only undo, reset, pause and fit are on the landing canvas. On a phone, source and
+scene are tabs. Local example simulation is explicitly labelled and does not read
+or command an industrial server. Workspace and layout storage are untouched.
+“Open IDE” uses `?mode=ide#workspace`; saved projects are restored there. Old saved
+source is not silently converted, discarded or sent to a fallback legacy compiler.
 
-Local checks: `npm run site:check` and `node scripts/site-build.mjs`.
+Server, standalone and PWA entry points keep the complete workspace. Server builds
+mark their root as IDE; Pages changes only the HTML marker to demo, using the same
+assets. Existing shared-source and workspace entry points stay full-featured.
+
+`site:check` runs `scripts/canonical-source-check.mjs`. The existing release gate
+runs `scripts/site-landing-check.mjs` and full-shell checks. The production bundler
+rejects transitive imports of the retired scene DSL compiler/completion module.
+No new recurring workflow is needed.

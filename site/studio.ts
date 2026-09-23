@@ -6,12 +6,10 @@ import { bracketMatching, foldGutter, syntaxHighlighting, HighlightStyle } from 
 import { autocompletion, closeBrackets } from '@codemirror/autocomplete';
 import { tags } from '@lezer/highlight';
 import { setDiagnostics } from '@codemirror/lint';
-import { compile, patchFields, editable, appendEquipment, appendConnection, appendTap, removeObject, SourceError, type Compiled } from '../src/source';
+import { compile, patchFields, editable, appendEquipment, appendConnection, removeObject, sourceDiagnostic, previewFrame, previewProject, editableKinds, dslCompletions, type Compiled } from './project-source';
 import { catalog, type Endpoint, type Value } from '../src/core';
-import { dslCompletions } from '../src/completion';
 import { SceneView } from '../src/view';
 import { createGlyphSvg } from '../src/elements/symbols';
-import '../src/visual-components';
 import type { SceneView3D } from '../src/view3d';
 import { examples, emptySource, createWorkspace, parseWorkspace, currentDocument, updateSource, createProject, workspaceKey, type ExampleId, type WorkspaceState } from './shell-projects';
 
@@ -52,7 +50,7 @@ export async function mountStudio() {
   const editorTheme = EditorView.theme({ '&': { height: '100%', background: 'var(--bg)', color: 'var(--text)', fontSize: '12px' }, '.cm-scroller': { overflow: 'auto', fontFamily: 'var(--mono)' }, '.cm-content': { padding: '16px 0', caretColor: 'var(--text)' }, '.cm-gutters': { background: 'var(--bg)', color: 'var(--muted)', border: 'none' }, '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': { background: 'var(--shell-selection)' }, '.cm-activeLine': { background: 'var(--shell-panel)' } }, { dark: true });
   function editorState(source: string, path = 'station.ts') {
     return EditorState.create({ doc: source, extensions: [lineNumbers(), drawSelection(), history(), foldGutter(), highlightActiveLine(), ...(path.endsWith('.ts') || path.endsWith('.json') ? [javascript({ typescript: path.endsWith('.ts') })] : []), bracketMatching(), closeBrackets(), syntaxHighlighting(HighlightStyle.define([{ tag: tags.keyword, color: 'var(--code-keyword)' }, { tag: tags.string, color: 'var(--code-string)' }, { tag: tags.number, color: 'var(--code-number)' }, { tag: tags.comment, color: 'var(--code-comment)' }, { tag: [tags.function(tags.variableName), tags.definition(tags.variableName)], color: 'var(--code-function)' }, { tag: tags.propertyName, color: 'var(--code-property)' }, { tag: tags.variableName, color: 'var(--text)' }])), editorTheme,
-      autocompletion({ override: [context => { const word = context.matchBefore(/[\w-]*/); if (isPlant()) return null; if (!word || word.from === word.to && !context.explicit) return null; return { from: word.from, options: dslCompletions(context.state.doc.toString(), context.pos, compiled.scene) }; }] }),
+      autocompletion({ override: [context => { const word = context.matchBefore(/[\w-]*/); if (isPlant()) return null; if (!word || word.from === word.to && !context.explicit) return null; return { from: word.from, options: dslCompletions(context.state.doc.toString(), context.pos, compiled) }; }] }),
       keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab, { key: 'Mod-s', run: () => { download(); return true; } }]),
       EditorView.contentAttributes.of({ 'aria-label': 'Исходник установки TypeScript', spellcheck: 'false' }),
       EditorView.updateListener.of(update => { documents.capture(update.state); syncHistory(update.state); if (update.docChanged) refresh(true); }),
@@ -355,7 +353,7 @@ export async function mountStudio() {
     positionPreviewFrame = requestAnimationFrame(() => {
       positionPreviewFrame = 0;
       const preview = positionPreview; if (!preview) return;
-      const scene = { ...compiled.scene, nodes: compiled.scene.nodes.map(node => node.id === preview.id ? { ...node, props: { ...node.props, x: preview.x, y: preview.y } } : node) };
+      const scene = previewProject(plant?.project ?? compiled.project, preview.id, preview.x, preview.y);
       view.render(scene); spatial?.render(scene); view.select(selected); spatial?.select(selected);
     });
   }
@@ -453,25 +451,24 @@ export async function mountStudio() {
       } else { plant = undefined; compiled = compile(documents.files['station.ts']); }
       error = false; errorPath = null;
       view.render(compiled.scene); spatial?.render(compiled.scene);
-      view.setRuntime(plant?.runtime ?? null); spatial?.setRuntime(plant?.runtime ?? null);
+      const runtime = plant?.runtime ?? previewFrame(compiled); view.setRuntime(runtime); spatial?.setRuntime(runtime);
       for (const [path, state] of documents.states) if (path !== documents.active) documents.states.set(path, state.update(setDiagnostics(state, [])).state);
       editor.dispatch(setDiagnostics(editor.state, []));
-      if (!compiled.scene.nodes.some(n => n.id === selected) && !compiled.scene.links.some(l => l.id === selected)) selected = null;
-      const warnings = plant ? [] : [...view.warnings, ...view.notes];
+      if (!compiled.scene.nodes.some(n => n.id === selected) && !compiled.scene.connections?.some(l => l.id === selected)) selected = null;
+      const warnings = view.warnings;
       $('studio-diagnostics').textContent = warnings.length ? warnings.join(' · ') : '✓ Нет ошибок';
       $('studio-diagnostics').dataset.error = 'false'; $('studio-diagnostics').title = '';
       renderTree(); select(selected); renderSignals();
       $('empty-canvas').hidden = compiled.scene.nodes.length > 0;
-      $('studio-count').textContent = `${compiled.scene.nodes.length} объектов · ${compiled.scene.links.length} связей`;
+      $('studio-count').textContent = `${compiled.scene.nodes.length} объектов · ${compiled.scene.connections?.filter(c => c.medium === 'pipe').length ?? 0} труб · ${compiled.scene.connections?.filter(c => c.medium !== 'pipe').length ?? 0} кабелей`;
     } catch (e) {
       error = true;
-      const text = e instanceof Error ? e.message : String(e);
+      const text = sourceDiagnostic(e, editor.state.doc.length).message;
       $('studio-diagnostics').textContent = text; $('studio-diagnostics').dataset.error = 'true';
       errorPath = isPlant() ? [...documents.states.keys()].find(path => text.startsWith(path + ':')) ?? null : 'station.ts';
       $('studio-diagnostics').title = text;
-      const from = e instanceof SourceError ? Math.min(editor.state.doc.length, e.from) : 0;
       const path = errorPath ?? documents.active, state = documents.states.get(path)!;
-      const spec = setDiagnostics(state, [{ from: Math.min(from, state.doc.length), to: Math.min(state.doc.length, Math.max(from, e instanceof SourceError ? e.to : from)), severity: 'error', message: text }]);
+      const spec = setDiagnostics(state, [{ ...sourceDiagnostic(e, state.doc.length), severity: 'error' }]);
       if (path === documents.active) editor.dispatch(spec); else documents.states.set(path, state.update(spec).state);
       renderInspector(); clearConnection();
     }
@@ -527,14 +524,14 @@ export async function mountStudio() {
   }
   function removeSelected() {
     if (!selected || error || isPlant() || runtimeOnly) return;
-    try { editor.dispatch({ changes: removeObject(editor.state.doc.toString(), selected), annotations: isolateHistory.of('full'), userEvent: 'delete' }); }
+    try { editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: removeObject(editor.state.doc.toString(), selected) }, annotations: isolateHistory.of('full'), userEvent: 'delete' }); }
     catch (e) { toast(e instanceof Error ? e.message : String(e)); }
   }
   const categoryTitle:Record<string,string>={process:'Технологическое',instrumentation:'Измерительные приборы',electrical:'Электрика',mechanical:'Механика',control:'Управление',structure:'Конструкции',generic:'Другое'};
   function renderEquipmentCatalog() {
     const host=$('equipment-catalog-list'), query=$<HTMLInputElement>('equipment-search').value.trim().toLocaleLowerCase();
     host.replaceChildren();
-    const entries=Object.entries(catalog).filter(([,definition])=>!query || (definition.label+' '+definition.visual?.geometry).toLocaleLowerCase().includes(query));
+    const entries=Object.entries(catalog).filter(([kind,definition])=>editableKinds().has(kind) && (!query || (definition.label+' '+definition.visual?.geometry).toLocaleLowerCase().includes(query)));
     const groups=new Map<string,typeof entries>();
     for(const entry of entries){const category=entry[1].visual?.category??'generic';const list=groups.get(category)??[];list.push(entry);groups.set(category,list);}
     for(const [category,items] of groups){
@@ -565,10 +562,10 @@ export async function mountStudio() {
   }
   function renderInspector() {
     const host = $('studio-fields'); host.replaceChildren();
-    const node = compiled.scene.nodes.find(n => n.id === selected), edge = compiled.scene.links.find(l => l.id === selected);
+    const node = compiled.scene.nodes.find(n => n.id === selected), edge = compiled.scene.connections?.find(l => l.id === selected);
     syncPanels();
-    $('studio-selected').textContent = node?.id ?? (edge ? 'Соединение' : '');
-    $('studio-kind').textContent = node ? catalog[node.kind]?.label ?? node.kind : edge ? `${edge.from.node} → ${edge.to.node}` : '';
+    $('studio-selected').textContent = node?.id ?? edge?.id ?? '';
+    $('studio-kind').textContent = node ? catalog[node.kind]?.label ?? node.kind : edge ? `${edge.medium === 'pipe' ? 'Труба' : 'Кабель'}: ${edge.from.device} → ${edge.to.device}` : '';
     $('object-source').toggleAttribute('disabled', error);
     $('object-source').hidden = runtimeOnly || !node || (isPlant() ? !plant?.objects.has(node.id) : !compiled.objects.has(node.id));
     if (runtimeOnly) {
@@ -588,22 +585,14 @@ export async function mountStudio() {
       return;
     }
     if (!node && !edge) { $('studio-kind').textContent = 'Выберите объект'; return; }
-    if (node) for (const [key, field] of Object.entries(catalog[node.kind].fields)) {
-      if (['nominalFlow', 'degradationRate', 'startDelay', 'maintenanceSeconds'].includes(key)) continue;
-      const label = document.createElement('label'); label.textContent = field.label + (field.unit ? ` · ${field.unit}` : '');
-      const input = field.choices ? document.createElement('select') : document.createElement('input');
-      if (input instanceof HTMLSelectElement) for (const choice of field.choices!) { const option = document.createElement('option'); option.value = choice; option.textContent = choice; input.append(option); }
-      else { input.type = 'number'; input.min = String(field.min ?? -9999); input.max = String(field.max ?? 9999); input.step = String(field.step ?? 1); }
-      input.value = String(node.props[key]); input.setAttribute('aria-label', `${node.id}: ${field.label}`);
-      input.disabled = error || !editable(compiled, node.id, key);
-      if (!editable(compiled, node.id, key)) input.title = 'Задано выражением. Измените исходник.';
-      input.onchange = () => {
-        if (!input.value.trim() || !input.checkValidity()) { input.reportValidity(); input.value = String(node.props[key]); return; }
-        fields(node.id, { [key]: typeof field.default === 'number' ? Number(input.value) : input.value });
-      };
+    if (node) for (const field of compiled.objects.get(node.id)?.fields ?? []) {
+      const label = document.createElement('label'); label.textContent = field.label;
+      const input = document.createElement('input'); input.type = 'number'; input.step = 'any'; input.value = String(field.value);
+      input.setAttribute('aria-label', `${node.id}: ${field.label}`); input.disabled = error;
+      input.onchange = () => { if (input.value.trim() && input.checkValidity()) fields(node.id, { [field.key]: Number(input.value) }); };
       label.append(input); host.append(label);
     }
-    const remove = document.createElement('button'); remove.className = 'studio-delete'; remove.textContent = edge ? 'Удалить связь' : 'Удалить объект'; remove.disabled = error; remove.onclick = removeSelected; host.append(remove);
+    const remove = document.createElement('button'); remove.className = 'studio-delete'; remove.textContent = edge ? edge.medium === 'pipe' ? 'Удалить трубу' : 'Удалить кабель' : 'Удалить объект'; remove.disabled = error; remove.onclick = removeSelected; host.append(remove);
   }
   function renderSignals() {
     const rows = $('signal-rows'); rows.replaceChildren();
@@ -618,10 +607,12 @@ export async function mountStudio() {
       }
       return;
     }
-    for (const node of compiled.scene.nodes) {
-      const data = Object.entries(catalog[node.kind].fields).filter(([key, field]) => typeof field.default === 'number' && !['x', 'y', 'at', 'offset', 'nominalFlow', 'degradationRate', 'startDelay', 'maintenanceSeconds'].includes(key)).map(([key, field]) => [field.label, `${node.props[key]} ${field.unit ?? ''}`, 'Задано в проекте']);
-      if (view.flows.has(node.id)) data.push(['Расход', view.flows.get(node.id) === null ? 'Неизвестно' : `${view.flows.get(node.id)!.toFixed(1)} м³/ч`, 'Расчёт учебной модели']);
-      for (const cells of data) { const row = document.createElement('tr'); for (const value of [node.id, ...cells]) { const cell = document.createElement('td'); cell.textContent = value; row.append(cell); } rows.append(row); }
+    const runtime = previewFrame(compiled);
+    for (const [id, equipment] of Object.entries(runtime.equipment)) for (const [name, signal] of Object.entries(equipment.signals)) {
+      const value = signal.value === null ? '—' : `${typeof signal.value === 'number' ? Number(signal.value.toFixed(3)) : signal.value} ${signal.unit}`;
+      const row = document.createElement('tr'); row.dataset.signal = `${id}.${name}`; row.dataset.quality = signal.quality;
+      for (const text of [id, name, value, 'Локальная учебная симуляция']) { const cell = document.createElement('td'); cell.textContent = text; row.append(cell); }
+      rows.append(row);
     }
   }
   function renderProjects() {
@@ -753,7 +744,7 @@ export async function mountStudio() {
   view.onSelect = select;
   canvas.addEventListener('click', event => {
     const target = (event.target as Element); if (target.closest('[data-port]')) return;
-    const object = target.closest('[data-node], [data-edge]'); if (object) select(object.getAttribute('data-node') ?? object.getAttribute('data-edge'));
+    const object = target.closest('[data-node], [data-connection]'); if (object) select(object.getAttribute('data-node') ?? object.getAttribute('data-connection'));
   });
   let drag: { id: string; x: number; y: number; startX: number; startY: number; dx: number; dy: number; element: SVGGElement; transform: string } | null = null;
   let pan: { x: number; y: number; cameraX: number; cameraY: number } | null = null;
@@ -766,8 +757,8 @@ export async function mountStudio() {
     const node = compiled.scene.nodes.find(n => n.id === element?.dataset.node);
     const point = view.point(event.clientX, event.clientY);
     if (!element || !node) { if (event.pointerType === 'mouse' || fullscreen) { pan = { x: event.clientX, y: event.clientY, cameraX: view.camera.x, cameraY: view.camera.y }; canvas.setPointerCapture(event.pointerId); } return; }
-    if (isPlant() || runtimeOnly) { select(node.id); return; }
-    if (error || node.tap || !editable(compiled, node.id, 'x') || !editable(compiled, node.id, 'y')) return;
+    if (runtimeOnly) { select(node.id); return; }
+    if (!canMoveNode(node.id)) return;
     drag = { id: node.id, x: Number(node.props.x), y: Number(node.props.y), startX: point.x, startY: point.y, dx: 0, dy: 0, element, transform: element.getAttribute('transform') ?? '' };
     canvas.setPointerCapture(event.pointerId); select(node.id);
   });
@@ -775,11 +766,11 @@ export async function mountStudio() {
     if (pan) { const a = view.point(pan.x, pan.y), b = view.point(event.clientX, event.clientY); view.setCamera({ ...view.camera, x: pan.cameraX + a.x - b.x, y: pan.cameraY + a.y - b.y }); return; }
     if (!drag) return;
     const point = view.point(event.clientX, event.clientY); drag.dx = point.x - drag.startX; drag.dy = point.y - drag.startY;
-    drag.element.setAttribute('transform', `translate(${drag.dx} ${drag.dy}) ${drag.transform}`);
-    view.previewMove(drag.id, drag.x + drag.dx, drag.y + drag.dy);
+    previewPosition(drag.id, drag.x + drag.dx, drag.y + drag.dy);
   });
-  canvas.addEventListener('pointerup', () => { pan = null; if (!drag) return; const d = drag; drag = null; d.element.setAttribute('transform', d.transform); if (Math.hypot(d.dx, d.dy) > 2) fields(d.id, { x: Math.round(d.x + d.dx), y: Math.round(d.y + d.dy) }); else { view.previewMove(d.id, d.x, d.y); renderInspector(); } });
-  canvas.addEventListener('pointercancel', () => { pan = null; if (drag) { drag.element.setAttribute('transform', drag.transform); view.previewMove(drag.id, drag.x, drag.y); } drag = null; });
+  canvas.addEventListener('pointerup', () => { pan = null; if (!drag) return; const d = drag; drag = null; restorePositionPreview(); if (Math.hypot(d.dx, d.dy) > 2) commitPosition(d.id, Math.round(d.x + d.dx), Math.round(d.y + d.dy)); else renderInspector(); });
+  const cancelCanvasDrag = () => { pan = null; if (drag) { drag = null; restorePositionPreview(); } };
+  canvas.addEventListener('pointercancel', cancelCanvasDrag); canvas.addEventListener('lostpointercapture', cancelCanvasDrag);
   canvas.addEventListener('wheel', event => { if (!fullscreen && !event.ctrlKey && !event.metaKey) return; event.preventDefault(); const before = view.point(event.clientX, event.clientY); view.zoom(Math.exp(event.deltaY * .0015)); const after = view.point(event.clientX, event.clientY); view.setCamera({ ...view.camera, x: view.camera.x + before.x - after.x, y: view.camera.y + before.y - after.y }); }, { passive: false });
   function clearConnection() { connecting = null; shell.classList.remove('connecting'); $('studio-connect').setAttribute('aria-pressed', 'false'); $('studio-mode-note').textContent = ''; $('studio-mode-note').hidden = true; }
   function choosePort(node: string, port: string) {
@@ -818,16 +809,25 @@ export async function mountStudio() {
   $('studio-minus').onclick = () => { if (progress < .72) spatial?.zoom(1.25); else view.zoom(1.25); };
   function addEquipment(kind: string) {
     if (error || isPlant() || runtimeOnly) return;
-    try { const source = kind === 'pressure' || kind === 'temperature' ? appendTap(editor.state.doc.toString(), selected ?? '', kind) : appendEquipment(editor.state.doc.toString(), kind, 450, 480); editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: source }, annotations: isolateHistory.of('full'), userEvent: 'input' }); toggleEquipment(false); fitScene(); spatial?.fit(); select(compiled.scene.nodes.at(-1)?.id ?? null); }
+    try { const source = appendEquipment(editor.state.doc.toString(), kind, 450, 480); editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: source }, annotations: isolateHistory.of('full'), userEvent: 'input' }); toggleEquipment(false); fitScene(); spatial?.fit(); select(compiled.scene.nodes.at(-1)?.id ?? null); }
     catch (e) { toast(e instanceof Error ? e.message : String(e)); }
   };
   function animateState() { const active = (visible || fullscreen) && !document.hidden && !['signals', 'controls', 'alarms', 'projects'].includes(surface); const stopped = isPlant() || runtimeOnly ? shell.dataset.telemetry !== 'live' : paused; view.paused = stopped || !active; if (spatial) spatial.paused = stopped || !active || progress >= 1; }
   function updatePause() { $('studio-play').hidden = isPlant() || runtimeOnly; $('studio-play').innerHTML = `<svg aria-hidden="true"><use href="#i-${paused ? 'play' : 'pause'}"/></svg>`; $('studio-play').title = paused ? 'Запустить демонстрацию' : 'Приостановить демонстрацию'; $('studio-play').setAttribute('aria-label', $('studio-play').title); $('studio-play').setAttribute('aria-pressed', String(!paused)); }
+  let previewTime = 0;
+  view.onFrame = () => {
+    const now = performance.now();
+    if (plant || runtimeOnly || error || paused || document.hidden || !(visible || fullscreen)) { previewTime = now; return; }
+    if (now - previewTime < compiled.project.stepMs) return;
+    previewTime = now; const runtime = previewFrame(compiled, true);
+    view.setRuntime(runtime); spatial?.setRuntime(runtime);
+    if (surface === 'signals') renderSignals();
+  };
   $('studio-play').onclick = () => { paused = !paused; animateState(); updatePause(); };
   document.addEventListener('visibilitychange', animateState);
   reduced.addEventListener('change', () => { if (reduced.matches) paused = true; updatePause(); animateState(); });
   function download() { if (isPlant()) downloadFile('saturn-project.json', JSON.stringify(documents.files, null, 2)); else downloadFile('saturn-station.ts', documents.files['station.ts']); }
-  $('studio-html').onclick = async () => { try { const source = editor.state.doc.toString(); await exportHTML(source, compile(source).scene); } catch (e) { toast(e instanceof Error ? e.message : String(e)); } };
+  $('studio-html').onclick = async () => { try { const source = editor.state.doc.toString(); const snapshot = compile(source); await exportHTML(source, snapshot.scene, previewFrame(snapshot)); } catch (e) { toast(e instanceof Error ? e.message : String(e)); } };
   $('studio-share').onclick = async () => { try { await navigator.clipboard.writeText(shareURL(editor.state.doc.toString())); toast('Ссылка с исходником скопирована'); } catch (e) { toast(e instanceof Error ? e.message : String(e)); } };
   let resizing = false;
   function resizeSource(clientX: number) { const area = $('studio-editor-pane').getBoundingClientRect(); const width = Math.max(230, Math.min($('studio-editor-pane').parentElement!.clientWidth * .65, clientX - area.left)); shell.style.setProperty('--source-width', `${width}px`); editor.requestMeasure(); }
@@ -893,7 +893,7 @@ export async function mountStudio() {
     const { SceneView3D } = await import('../src/view3d'); spatial = new SceneView3D(spatialHost, { landing: true }); syncCanvasTheme(); spatial.onSelect = select;
     spatial.canMove = canMoveNode;
     spatial.onMove = (id, x, y, commit) => commit ? commitPosition(id, x, y) : previewPosition(id, x, y);
-    spatial.render(compiled.scene); spatial.setRuntime(observedRuntime ?? plant?.runtime ?? null); spatial.select(selected); setMode(explicit);
+    spatial.render(compiled.scene); spatial.setRuntime(observedRuntime ?? plant?.runtime ?? previewFrame(compiled)); spatial.select(selected); setMode(explicit);
   } catch { $('studio-3d').setAttribute('disabled', ''); present(1); toast('WebGL недоступен. Работайте с 2D-схемой.'); }
   const requestedServer = !shared && new URLSearchParams(location.search).get('project') === 'server';
   await probeRuntime();

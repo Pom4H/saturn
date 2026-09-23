@@ -45,7 +45,7 @@ try{
   if(!await page.locator('#studio-editor-pane').isVisible())await page.locator('#studio-code').click();
   const source=page.locator('#studio-editor .cm-content');
   const before=await source.innerText();
-  const pipe=page.locator('#studio-svg [data-edge]').filter({has:page.locator('[data-water]')}).first().locator('[data-water]');
+  const pipe=page.locator('#studio-svg [data-connection="PIPE-01"] path').first();
   const pipeBefore=await pipe.getAttribute('d');
   const pump=page.locator('#studio-svg [data-node="P-01"]');
   const box=await pump.boundingBox();

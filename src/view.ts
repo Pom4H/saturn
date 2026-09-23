@@ -138,7 +138,7 @@ export class SceneView {
     svg.addEventListener('keydown', event => {
       const target = event.target as SVGElement;
       if ((event.key === 'Enter' || event.key === ' ') && !target.hasAttribute('data-port')) {
-        const id = target.getAttribute('data-node') ?? target.getAttribute('data-edge');
+        const id = target.getAttribute('data-node') ?? target.getAttribute('data-edge') ?? target.getAttribute('data-connection');
         if (id) { event.preventDefault(); this.select(id); this.onSelect?.(id); }
       }
     });
@@ -186,7 +186,7 @@ export class SceneView {
     this.setCamera({ x: b.x - 46, y: b.y - 44, width: b.width + 92, height: b.height + 88 });
   }
   zoom(factor: number) { const c = this.camera; const width = Math.max(220, Math.min(12000, c.width * factor)), height = width / c.width * c.height; this.setCamera({ x: c.x + (c.width - width) / 2, y: c.y + (c.height - height) / 2, width, height }); }
-  select(id: string | null) { this.selected = id; this.layers.querySelectorAll('[data-node], [data-edge]').forEach(n => n.classList.toggle('selected', id !== null && (n.getAttribute('data-node') === id || n.getAttribute('data-edge') === id))); }
+  select(id: string | null) { this.selected = id; this.layers.querySelectorAll('[data-node], [data-edge], [data-connection]').forEach(n => n.classList.toggle('selected', id !== null && (n.getAttribute('data-node') === id || n.getAttribute('data-edge') === id || n.getAttribute('data-connection') === id))); }
   /** Preview derived routes during a drag; the authored scene changes only on drop. */
   previewMove(id: string, x: number, y: number) {
     const nodes = this.scene.nodes.map(node => node.id === id ? { ...node, props: { ...node.props, x, y } } : node);
@@ -272,7 +272,7 @@ export class SceneView {
     this.layers.replaceChildren(); const pipes = el(this.layers, 'g'), devices = el(this.layers, 'g'), instruments = el(this.layers, 'g');
     for(const wire of scene.connections??[]) {
       const style=connectionStyles[wire.medium],d=wire.points.map((p,i)=>`${i?'L':'M'}${p.x} ${p.y}`).join(' ');
-      const g=el(pipes,'g',{'data-connection':wire.id,'data-medium':wire.medium,'data-valid':String(wire.valid),tabindex:0});
+      const g=el(pipes,'g',{'data-connection':wire.id,'data-medium':wire.medium,'data-valid':String(wire.valid),class:'connection',tabindex:0,role:'button','aria-label':`${wire.medium === 'pipe' ? 'Труба' : 'Кабель'} ${wire.id}`});
       el(g,'title',{},`${wire.from.device}.${wire.from.port} → ${wire.to.device}.${wire.to.port}${wire.error?' · '+wire.error:''}`);
       el(g,'path',{d,fill:'none',stroke:wire.valid?style.color:'#c45544','stroke-width':style.width,'stroke-linejoin':'round','stroke-linecap':'butt'});
       el(g,'path',{d,fill:'none',stroke:style.inner,'stroke-width':Math.max(1,style.width-4),'stroke-dasharray':wire.valid?style.dash:'6 4','pointer-events':'none'});

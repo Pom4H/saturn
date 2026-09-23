@@ -17,7 +17,7 @@
 .demo-tabs { display: none; }
 .demo-hint { margin: 0; padding: 12px 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; line-height: 1.5; }
 .shell[data-demo=true] .studio-editor-pane { width: 46%; max-width: none; border-right: 1px solid var(--line); }
-.shell[data-demo=true] .studio-editor-pane::before { content: 'station.ts'; padding: 11px 16px; border-bottom: 1px solid var(--line); color: var(--muted); font: 11px/1.5 var(--mono); }
+.shell[data-demo=true] .studio-editor-pane::before { content: 'plant.ts'; padding: 11px 16px; border-bottom: 1px solid var(--line); color: var(--muted); font: 11px/1.5 var(--mono); }
 .shell[data-demo=true] .cm-editor { line-height: 1.65; }
 .shell[data-demo=true] .canvas-toolbar { justify-content: flex-end; }
 .shell[data-demo=true] .canvas-tools { border-radius: 5px; box-shadow: none; }

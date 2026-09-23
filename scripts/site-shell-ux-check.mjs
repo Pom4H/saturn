@@ -58,7 +58,7 @@ export async function checkShellUx(page, { evidence = 'test-results/release-shel
   assert.equal(await page.locator('[data-catalog-kind]').count(), 0);
   await page.locator('#equipment-search').fill('насос');
   assert.equal(await page.locator('[data-catalog-kind]').count(), 1);
-  assert.equal(await page.locator('[data-catalog-kind="pump"]').getAttribute('aria-label'), 'Добавить: Насос');
+  assert.equal(await page.locator('[data-catalog-kind="plant_pump"]').getAttribute('aria-label'), 'Добавить: Циркуляционный насос');
   await page.keyboard.press('Escape');
   assert(!await page.locator('#equipment-browser').isVisible());
   assert(await page.locator('#equipment-toggle').evaluate(node => node === document.activeElement), 'Escape returns focus to Add');
@@ -66,7 +66,7 @@ export async function checkShellUx(page, { evidence = 'test-results/release-shel
   // An ordinary catalog click is one reversible source edit, not an installation.
   await page.locator('#equipment-toggle').click();
   const count = await page.locator('#studio-svg [data-node]').count();
-  await page.locator('[data-catalog-kind="pump"]').click();
+  await page.locator('[data-catalog-kind="plant_pump"]').click();
   assert.equal(await page.locator('#studio-svg [data-node]').count(), count + 1);
   assert(!await page.locator('#equipment-browser').isVisible());
   assert.notEqual(await source.innerText(), original);

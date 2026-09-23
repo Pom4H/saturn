@@ -17,13 +17,23 @@ export function sourceObjects(files: Record<string, string>) {
   for (const [path, text] of Object.entries(files)) {
     if (!path.endsWith('.ts')) continue;
     const source = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true);
+    const names = new Map<string, string>(), namespaces = new Set<string>();
+    for (const statement of source.statements) {
+      if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier) || statement.moduleSpecifier.text !== '@saturn/core') continue;
+      const bindings = statement.importClause?.namedBindings;
+      if (bindings && ts.isNamedImports(bindings)) for (const item of bindings.elements) names.set(item.name.text, item.propertyName?.text ?? item.name.text);
+      if (bindings && ts.isNamespaceImport(bindings)) namespaces.add(bindings.name.text);
+    }
     const visit = (n: ts.Node) => {
-      if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && ['simulation', 'equipment', 'plc'].includes(n.expression.text) && n.arguments[0] && ts.isStringLiteral(n.arguments[0])) {
-        const options = n.arguments[n.expression.text === 'plc' ? 1 : 2];
+      const name = ts.isCallExpression(n) ? ts.isIdentifier(n.expression) ? names.get(n.expression.text)
+        : ts.isPropertyAccessExpression(n.expression) && ts.isIdentifier(n.expression.expression) && namespaces.has(n.expression.expression.text) ? n.expression.name.text : undefined : undefined;
+      if (ts.isCallExpression(n) && name && ['simulation', 'equipment', 'plc'].includes(name) && n.arguments[0] && ts.isStringLiteral(n.arguments[0])) {
+        const options = n.arguments[name === 'plc' ? 1 : 2];
         if (options && ts.isObjectLiteralExpression(options)) {
           const fields = options.properties.flatMap(p => {
             if (!ts.isPropertyAssignment(p) || !ts.isIdentifier(p.name) || !ts.isObjectLiteralExpression(p.initializer)) return [];
             if (p.name.text === 'at') return addFields(p.initializer, source, ['x', 'y']);
+            if (p.name.text === 'inputs') return addFields(p.initializer, source, p.initializer.properties.filter(ts.isPropertyAssignment).map(x => x.name.getText(source)), 'inputs.');
             if (p.name.text === 'parameters') return addFields(p.initializer, source, p.initializer.properties.filter(ts.isPropertyAssignment).map(x => x.name.getText(source)), 'parameters.');
             return [];
           });

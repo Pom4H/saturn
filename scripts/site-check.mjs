@@ -60,14 +60,16 @@ try {
 // The landing Shell must keep example drafts and promoted projects independent.
 const shell = await loadSiteModule('shell-projects');
 const workspace = shell.createWorkspace();
-const modified = workspace.drafts.pump.replace('rpm: 1850', 'rpm: 2100');
+const modified = workspace.drafts.pump.replace('inertia: 1.6', 'inertia: 2.1');
 shell.updateSource(workspace, modified);
 shell.createProject(workspace, 'Станция Север', modified, 'project-1');
-shell.updateSource(workspace, modified.replace('rpm: 2100', 'rpm: 2300'));
-assert(workspace.drafts.pump.includes('rpm: 2100'));
-assert(shell.currentDocument(workspace).source.includes('rpm: 2300'));
+shell.updateSource(workspace, modified.replace('inertia: 2.1', 'inertia: 2.3'));
+assert(workspace.drafts.pump.includes('inertia: 2.1'));
+assert(shell.currentDocument(workspace).source.includes('inertia: 2.3'));
 assert.equal(shell.parseWorkspace(JSON.stringify(workspace)).projects[0].title, 'Станция Север');
 assert.throws(() => shell.parseWorkspace(JSON.stringify({ ...workspace, projects: [...workspace.projects, ...workspace.projects] })));
 assert.throws(() => shell.parseWorkspace(JSON.stringify({ ...workspace, active: { kind: 'project', id: 'missing' } })));
 assert.throws(() => shell.createProject(workspace, '   ', modified));
 console.log('PASS: promoted projects preserve exact source and remain independent of example drafts; workspace validation rejects invalid references.');
+
+await import('./canonical-source-check.mjs');
