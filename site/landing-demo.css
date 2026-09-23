@@ -1,6 +1,5 @@
 /* The landing uses the real editor/renderer, with a deliberately smaller surface. */
 .shell[data-demo=true] { --canvas-bg: var(--bg); --overlay-bg: var(--panel); --overlay-border: var(--line); --overlay-text: var(--text); --overlay-hover: var(--shell-hover); --overlay-active: var(--shell-hover); }
-.shell[data-demo=true] #studio-svg .object-label text { fill: var(--muted); }
 .shell-frame:has(.shell[data-demo=true]) { height: clamp(520px, calc(100svh - 260px), 640px); }
 .shell[data-demo=true] :is(.shell-topbar,.shell-contextbar,#file-browser,#equipment-browser,.studio-inspector,.shell-content,.canvas-view,.canvas-zoom,#equipment-toggle,#studio-connect,#studio-redo,.toolbar-divider,#file-tabs,#file-path,#empty-canvas) { display: none!important; }
 .shell[data-demo=true] .shell-status { display: none; }

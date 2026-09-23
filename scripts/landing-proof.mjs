@@ -9,6 +9,24 @@ import { randomBytes } from 'node:crypto';
 import { writeSiteCache } from './site-build.mjs';
 
 /** Capture the actual authenticated shell, not a marketing reconstruction. */
+async function checkDiagramContrast(page) {
+  const ratio = await page.locator('#studio-svg').evaluate(svg => {
+    const label = svg.querySelector('[data-node] .object-label text');
+    const plate = svg.querySelector('[data-group] > [data-outline]');
+    if (!label || !plate) throw new Error('The demonstrated diagram must contain equipment and its group surface');
+    const luminance = element => {
+      const color = getComputedStyle(element).fill;
+      const values = color.match(/[\d.]+/g)?.map(Number);
+      if (!color.startsWith('rgb(') || values?.length !== 3) throw new Error(`Unexpected computed diagram color: ${color}`);
+      const linear = values.map(value => { const c = value / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+      return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+    };
+    const a = luminance(label), b = luminance(plate);
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  });
+  assert(ratio >= 4.5, `Equipment labels must remain readable on their actual backplate: ${ratio.toFixed(2)}:1`);
+}
+
 export async function captureLandingProof(browser, siteDir) {
   const out = 'test-results/release-shell/product';
   await mkdir(out, { recursive: true });
@@ -61,6 +79,7 @@ export async function captureLandingProof(browser, siteDir) {
     await page.locator('#shell-toast').waitFor({ state: 'hidden' });
     for (const scheme of ['light', 'dark']) {
       await page.emulateMedia({ colorScheme: scheme });
+      await checkDiagramContrast(page);
       const file = `proof-${role}${variant}-${scheme}.png`;
       await page.locator('#studio-shell').screenshot({ path: join(out, file) });
       await copyFile(join(out, file), `${siteDir}/assets/${file}`);
@@ -221,6 +240,7 @@ export async function checkLandingStory(browser, origin) {
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
     for (const theme of ['light', 'dark']) {
       await page.emulateMedia({ colorScheme: theme });
+      await checkDiagramContrast(page);
       await page.waitForFunction(theme => document.querySelector('.operator-proof img')?.currentSrc.endsWith(`proof-operator-${theme}.png`), theme);
       await page.locator('.operator-proof img').evaluate(image => image.decode());
       assert((await page.locator('.operator-proof img').evaluate(image => image.currentSrc)).endsWith(`proof-operator-${theme}.png`));

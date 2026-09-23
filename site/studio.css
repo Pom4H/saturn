@@ -23,6 +23,8 @@
 #studio-flat { opacity: var(--studio-progress); }
 #studio-flat[inert], #studio-spatial[inert] { pointer-events: none; }
 #studio-svg { display: block; width: 100%; height: 100%; fill: none; stroke: none; overflow: hidden; touch-action: pan-y; }
+/* Group backplates retain the renderer's light cool-metal palette in either shell theme. */
+#studio-svg:has([data-group]) { --canvas-label-text: #224f63; }
 #studio-svg .object-label text { fill: var(--canvas-label-text); font-family: var(--mono); }
 #studio-svg .selection { display: none; }
 #studio-svg .node.selected .selection { display: block; stroke: var(--accent); }
