@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0d1115"><title>Saturn — инженерная IDE для физических систем</title>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark"><meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#111315" media="(prefers-color-scheme: dark)"><title>Saturn — инженерная IDE для физических систем</title>
   <meta name="description" content="Open-source инженерная IDE и runtime: TypeScript-модель, HMI, телеметрия, история, отчёты, PLC и развёртывание в одном проекте.">
   <link rel="icon" href="./site/assets/mark.svg" type="image/svg+xml"><link rel="manifest" href="./site/assets/manifest.json"><link rel="apple-touch-icon" href="./site/assets/icon-192.png">
   <link rel="stylesheet" href="./site/assets/site.css"><script type="module" src="./site/assets/site.js"></script>
@@ -24,6 +24,12 @@
   <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol>
   <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+  <symbol id="i-platform-browser" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="3"/><path d="M2 8h20M6 5.5h.01M9 5.5h.01"/></symbol>
+  <symbol id="i-platform-desktop" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="15" rx="2"/><path d="M8 22h8m-4-4v4"/></symbol>
+  <symbol id="i-platform-operator" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="3"/><path d="M6 7h12M6 11h5v7H6zm9 1h3m-3 4h3"/></symbol>
+  <symbol id="i-platform-server" viewBox="0 0 24 24"><rect x="3" y="2" width="18" height="9" rx="2"/><rect x="3" y="13" width="18" height="9" rx="2"/><path d="M7 6.5h.01M7 17.5h.01M11 6.5h7M11 17.5h7"/></symbol>
+  <symbol id="i-platform-editor" viewBox="0 0 24 24"><path d="m4 8 7-5 9-2v22l-9-2-7-5V8Zm0 0 10 4-10 4m10-4 6-7"/></symbol>
+  <symbol id="i-platform-runtime" viewBox="0 0 24 24"><path d="m12 2 9 5v10l-9 5-9-5V7l9-5Zm-4 8 4 2 4-2m-4 2v5"/></symbol>
 <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol><symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.2 2.4c-.7.3-.7 1-.7 1.6M12 16h.01"/></symbol><symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></symbol><symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol><symbol id="i-undo" viewBox="0 0 24 24"><path d="m8 4-5 5 5 5M3 9h11a6 6 0 0 1 0 12"/></symbol><symbol id="i-redo" viewBox="0 0 24 24"><path d="m16 4 5 5-5 5m5-5H10a6 6 0 0 0 0 12"/></symbol><symbol id="i-link" viewBox="0 0 24 24"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M5 8v4h14v4"/></symbol><symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></symbol><symbol id="i-play" viewBox="0 0 24 24"><path d="m7 4 14 8-14 8Z"/></symbol><symbol id="i-fit" viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><rect x="8" y="8" width="8" height="8" rx="1"/></symbol><symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol><symbol id="i-inspector" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M18 8h.01M18 12h.01"/></symbol></defs></svg>
 <a class="skip-link" href="#studio-shell">К редактору</a>
 <header class="site-header"><a class="brand" href="#top"><img src="./site/assets/saturn-icon.png" alt="" width="30" height="30">Saturn</a><div><a href="https://github.com/Pom4H/saturn" target="_blank" rel="noopener">GitHub ↗</a><button data-install-studio>Установить</button></div></header>
@@ -121,11 +127,11 @@
       <div class="projection-tree" aria-label="Проекции одного Saturn проекта">
         <div class="projection-source"><span>source</span><strong>plant.ts</strong><code>@saturn/core</code></div>
         <div class="projection-branches" aria-hidden="true"></div>
-        <div class="capability-row"><span>01</span><strong>Diagram</strong><p>2D / 3D · visual ↔ source · equipment · topology</p></div>
-        <div class="capability-row"><span>02</span><strong>Runtime</strong><p>telemetry · controls · alarms · historian · replay</p></div>
-        <div class="capability-row"><span>03</span><strong>Operator HMI</strong><p>live state · commands · navigation · Presentation IR</p></div>
-        <div class="capability-row"><span>04</span><strong>Reports</strong><p>history queries · tables · charts · A4 · schedules</p></div>
-        <div class="capability-row"><span>05</span><strong>PLC targets</strong><p>bindings · 320×240 projection · target providers</p></div>
+        <div class="capability-row"><span>01</span><strong>Diagram</strong><p>Оборудование и связи в 2D и 3D. Переход между схемой и кодом.</p></div>
+        <div class="capability-row"><span>02</span><strong>Runtime</strong><p>Телеметрия, управление, алармы, история и воспроизведение.</p></div>
+        <div class="capability-row"><span>03</span><strong>Operator HMI</strong><p>Состояние и команды в интерфейсе оператора.</p></div>
+        <div class="capability-row"><span>04</span><strong>Reports</strong><p>Запросы к истории, таблицы, графики и отчёты A4.</p></div>
+        <div class="capability-row"><span>05</span><strong>PLC targets</strong><p>Привязки сигналов и проекция 320×240 для PLC/HMI.</p></div>
       </div>
     </div>
   </section>
@@ -156,12 +162,12 @@
       <div class="extension-code" aria-label="Добавление проектного building block">
         <div class="code-window-head"><span>registry</span><span>project-owned source</span></div>
         <pre><code><span class="code-muted">$</span> saturn add pump
-<span class="code-muted">→</span> src/equipment/pump.ts
+<span class="code-comment"># src/equipment/pump.ts</span>
 
-<span class="code-muted">import</span> { simulation } <span class="code-muted">from</span> '@saturn/core'
+<span class="code-keyword">import</span> { <span class="code-function">simulation</span> } <span class="code-keyword">from</span> <span class="code-string">'@saturn/core'</span>
 
-<span class="code-muted">export function</span> <b>pump</b>(id, system, at) {
-  <span class="code-muted">return</span> simulation(id, 'pump', { system, at })
+<span class="code-keyword">export function</span> <span class="code-function">pump</span>(id, system, at) {
+  <span class="code-keyword">return</span> <span class="code-function">simulation</span>(id, <span class="code-string">'pump'</span>, { system, at })
 }</code></pre>
         <div class="extension-install-line"><span>git</span><code>diff src/equipment/pump.ts</code></div>
       </div>
@@ -180,7 +186,7 @@
     </div>
     <div class="ecosystem-line">
       <span>Следующие точки расширения</span>
-      <p>TIA / CODESYS / WinCC import · Timescale / Influx · MQTT / webhooks · commissioning packs · simulation packs · OIDC / LDAP</p>
+      <p>Импорт TIA, CODESYS и WinCC. История в Timescale или Influx, события через MQTT и webhooks. Пакеты для наладки и симуляции, вход через OIDC или LDAP.</p>
       <a href="https://github.com/Pom4H/saturn/blob/main/docs/adr/0008-conventions-first-artifact-runtime.md" target="_blank" rel="noopener">Architecture ↗</a>
     </div>
   </section>
@@ -191,12 +197,12 @@
       <a href="https://github.com/Pom4H/saturn/releases/latest" target="_blank" rel="noopener">Download ↗</a>
     </div>
     <div class="distribution-list">
-      <span class="distribution-item"><strong>Browser / PWA</strong><small>installable · offline</small></span>
-      <span class="distribution-item"><strong>Standalone</strong><small>Windows · Linux · macOS</small></span>
-      <span class="distribution-item"><strong>Operator</strong><small>kiosk HMI</small></span>
-      <span class="distribution-item"><strong>Server</strong><small>Bun · SQLite · SSE</small></span>
-      <span class="distribution-item"><strong>VS Code</strong><small>native host</small></span>
-      <span class="distribution-item"><strong>Production</strong><small>artifact runtime</small></span>
+      <span class="distribution-item"><svg aria-hidden="true"><use href="#i-platform-browser"/></svg><span><strong>Browser / PWA</strong><small>Установка и работа офлайн</small></span></span>
+      <span class="distribution-item"><svg aria-hidden="true"><use href="#i-platform-desktop"/></svg><span><strong>Standalone</strong><small>Windows, Linux, macOS</small></span></span>
+      <span class="distribution-item"><svg aria-hidden="true"><use href="#i-platform-operator"/></svg><span><strong>Operator</strong><small>Режим киоска для HMI</small></span></span>
+      <span class="distribution-item"><svg aria-hidden="true"><use href="#i-platform-server"/></svg><span><strong>Server</strong><small>Bun, SQLite, SSE</small></span></span>
+      <span class="distribution-item"><svg aria-hidden="true"><use href="#i-platform-editor"/></svg><span><strong>VS Code</strong><small>Расширение редактора</small></span></span>
+      <span class="distribution-item"><svg aria-hidden="true"><use href="#i-platform-runtime"/></svg><span><strong>Production</strong><small>Запуск собранного проекта</small></span></span>
     </div>
     <div class="distribution-command"><span>$</span><code>npm run saturn -- pack --target windows-x64</code></div>
   </section>

@@ -3,6 +3,18 @@ import { mkdir } from 'node:fs/promises';
 
 /** Integrated Shell checks. Notification APIs are intercepted before application code runs. */
 export async function checkShell(browser, origin) {
+  for (const scheme of ['light', 'dark']) {
+    const fresh = await browser.newContext({ colorScheme: scheme, viewport: { width: 390, height: 844 } });
+    try {
+      const landing = await fresh.newPage();
+      await landing.goto(origin);
+      await landing.waitForFunction(() => document.documentElement.dataset.theme === 'system');
+      assert.equal(await landing.locator('html').evaluate(node => getComputedStyle(node).colorScheme), scheme, 'Fresh visit follows the system theme');
+      assert.equal(await landing.locator('.distribution-item svg').count(), 6, 'Every platform has an icon');
+      assert(await landing.locator('.distribution-list').evaluate(node => node.scrollWidth <= node.clientWidth + 1), 'Platform list fits a phone viewport');
+      assert.notEqual(await landing.locator('.code-keyword').first().evaluate(node => getComputedStyle(node).color), await landing.locator('.code-string').first().evaluate(node => getComputedStyle(node).color), 'TypeScript tokens have distinct colors');
+    } finally { await fresh.close(); }
+  }
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce', acceptDownloads: true });
   const errors = [];
   try {
