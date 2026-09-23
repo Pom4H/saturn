@@ -3,6 +3,7 @@ import type { SaturnLocale } from './diagnostics';
 export const textCatalog = {
   'model.supply': { en:'Power supply', ru:'Электропитание' },
   'model.pump': { en:'Circulation pump', ru:'Циркуляционный насос' },
+  'model.flowmeter': { en:'Flow meter', ru:'Расходомер' },
   'model.feedback-source': { en:'Active core · aggregate', ru:'Активная зона · агрегат' },
   'model.channel': { en:'Fuel channel', ru:'Топливный канал' },
   'model.separator': { en:'Drum separator', ru:'Барабан-сепаратор' },
