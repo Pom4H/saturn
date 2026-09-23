@@ -28,7 +28,7 @@ Each behavior is registered by kind in an installed server registry. It owns mod
 
 ## Source and representations
 
-The existing `@scada/core` factories remain valid. `runtime({server, project, run?})` is optional declarative metadata. It cannot contain credentials. `component(type, id, properties)` instantiates an installed metadata definition without a new compiler case. Both SVG and 3D use the same `RuntimeFrame`; `setRuntime(null)` selects the legacy local preview. Three.js is dynamically imported only when 3D is selected.
+The existing `@saturn/core` factories remain valid. `runtime({server, project, run?})` is optional declarative metadata. It cannot contain credentials. `component(type, id, properties)` instantiates an installed metadata definition without a new compiler case. Both SVG and 3D use the same `RuntimeFrame`; `setRuntime(null)` selects the legacy local preview. Three.js is dynamically imported only when 3D is selected.
 
 ## Ownership during this implementation
 
