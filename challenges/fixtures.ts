@@ -1,21 +1,21 @@
 /** All fixtures stay inside the documented DSL, range and 48-element limits. */
-export const nestedTap = `import { pump, valve, connect, tap, pressure } from "@scada/core";
+export const nestedTap = `import { pump, valve, pipe, tap, pressure } from "@saturn/core";
 const p = pump("P", { x: 0, y: 220 });
 const v = valve("V", { x: 500, y: 0 });
-tap(connect(p.outlet, v.inlet), pressure("PT", { at: 0.5, offset: 110 }));
+tap(pipe("PIPE-PV", p.outlet, v.inlet), pressure("PT", { at: 0.5, offset: 110 }));
 `;
 
-export const collidingImport = `import { pump } from "@scada/core";
+export const collidingImport = `import { pump } from "@saturn/core";
 const tank = 20;
 const p = pump("P", { x: tank, y: 100 });
 `;
 
-export const stackedTaps = `import { tank, pump, outlet, connect, tap, pressure, temperature } from "@scada/core";
+export const stackedTaps = `import { tank, pump, outlet, pipe, tap, pressure, temperature } from "@saturn/core";
 const t = tank("T", { x: 0, y: 100 });
 const p = pump("P", { x: 500, y: 188 });
 const o = outlet("O", { x: 1000, y: 80 });
-const inlet = connect(t.outlet, p.inlet);
-connect(p.outlet, o.inlet);
+const inlet = pipe("PIPE-IN", t.outlet, p.inlet);
+pipe("PIPE-OUT", p.outlet, o.inlet);
 tap(inlet, pressure("PT", { at: 0.5, offset: 110 }));
 tap(inlet, temperature("TT", { at: 0.5, offset: 110 }));
 `;
@@ -39,11 +39,11 @@ export function crowdedCircuit(count: number, seed = 42): string {
     const j = Math.floor(random() * (i + 1));
     [slots[i], slots[j]] = [slots[j], slots[i]];
   }
-  const lines = ['import { tank, pump, valve, outlet, connect } from "@scada/core";'];
+  const lines = ['import { tank, pump, valve, outlet, pipe } from "@saturn/core";'];
   for (let i = 0; i < count; i++) {
     const kind = i === 0 ? 'tank' : i === 1 ? 'pump' : i === count - 1 ? 'outlet' : 'valve';
     lines.push(`const n${i} = ${kind}("N${i}", ${JSON.stringify(slots[i])});`);
   }
-  for (let i = 1; i < count; i++) lines.push(`connect(n${i - 1}.outlet, n${i}.inlet);`);
+  for (let i = 1; i < count; i++) lines.push(`pipe("PIPE-${i}", n${i - 1}.outlet, n${i}.inlet);`);
   return lines.join('\n') + '\n';
 }
