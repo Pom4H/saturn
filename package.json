@@ -28,6 +28,8 @@
     "plant:test": "node scripts/plant-test.mjs",
     "plant:test:browser": "bun scripts/plant-e2e.mjs",
     "plant:check": "npm run plant:build && npm run plant:typecheck && npm run plant:test && bun run plant/tests/bun-smoke.ts",
+    "check:release": "npm run check && npm run site:check && npm run authoring:typecheck && npm run authoring:test && npm run site:test:release && npm audit --audit-level=high",
+    "site:test:release": "node scripts/site-release-check.mjs --built",
     "site:test:browser": "node scripts/site-studio-check.mjs",
     "saturn": "node scripts/saturn.mjs",
     "standalone:pack": "bun run scripts/standalone-pack.ts",

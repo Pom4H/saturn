@@ -54,11 +54,10 @@ export async function checkInteractions(browser, origin) {
     await page.locator('#object-source').click(); assert(await page.locator('#studio-editor-pane').isVisible());
     await page.locator('#inspector-close').click();
     await page.locator('#equipment-toggle').click();
-    await page.locator('#studio-catalog').selectOption('pump');
     const count = await page.locator('#studio-svg [data-node]').count();
-    await page.locator('#studio-add').click(); assert.equal(await page.locator('#studio-svg [data-node]').count(), count + 1);
+    await page.locator('[data-catalog-kind="pump"]').click(); assert.equal(await page.locator('#studio-svg [data-node]').count(), count + 1);
     await page.locator('.studio-delete').click(); assert.equal(await page.locator('#studio-svg [data-node]').count(), count);
-    await page.locator('#equipment-close').click();
+    assert(!await page.locator('#equipment-browser').isVisible(), 'Insertion closes the catalog');
     await page.locator('#studio-connect').click(); assert.equal(await page.locator('#studio-connect').getAttribute('aria-pressed'), 'true');
     await page.locator('#studio-connect').click(); assert.equal(await page.locator('#studio-connect').getAttribute('aria-pressed'), 'false');
 

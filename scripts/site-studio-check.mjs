@@ -109,11 +109,13 @@ try {
   await page.locator('#project-form button[type=submit]').click();
   assert.equal(await page.locator('#studio-svg [data-node]').count(), 0);
   await page.locator('#equipment-toggle').click();
-  await page.locator('#studio-catalog').selectOption('tank'); await page.locator('#studio-add').click();
+  await page.locator('#equipment-toggle').evaluate(button => { if (button.getAttribute('aria-expanded') !== 'true') button.click(); });
+  await page.locator('[data-catalog-kind=\"tank\"]').click();
   const tankId = await page.locator('#studio-selected').textContent();
   const tankX = page.getByRole('spinbutton', { name: `${tankId}: X`, exact: true }); await tankX.fill('40'); await tankX.press('Tab');
   const tankY = page.getByRole('spinbutton', { name: `${tankId}: Y`, exact: true }); await tankY.fill('180'); await tankY.press('Tab');
-  await page.locator('#studio-catalog').selectOption('pump'); await page.locator('#studio-add').click();
+  await page.locator('#equipment-toggle').evaluate(button => { if (button.getAttribute('aria-expanded') !== 'true') button.click(); });
+  await page.locator('[data-catalog-kind=\"pump\"]').click();
   const pumpId = await page.locator('#studio-selected').textContent();
   const pumpX = page.getByRole('spinbutton', { name: `${pumpId}: X`, exact: true }); await pumpX.fill('330'); await pumpX.press('Tab');
   const pumpY = page.getByRole('spinbutton', { name: `${pumpId}: Y`, exact: true }); await pumpY.fill('268'); await pumpY.press('Tab');

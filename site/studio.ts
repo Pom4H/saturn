@@ -475,7 +475,7 @@ export async function mountStudio() {
       if (path === documents.active) editor.dispatch(spec); else documents.states.set(path, state.update(spec).state);
       renderInspector(); clearConnection();
     }
-    $('studio-add').toggleAttribute('disabled', error || isPlant() || runtimeOnly);
+    $('equipment-catalog-list').querySelectorAll<HTMLButtonElement>('button').forEach(button => button.disabled = error || isPlant() || runtimeOnly);
     $('studio-connect').toggleAttribute('disabled', error || isPlant() || runtimeOnly || progress < .72);
     renderFiles(); updatePause();
     if (save) persist();
@@ -530,10 +530,10 @@ export async function mountStudio() {
     try { editor.dispatch({ changes: removeObject(editor.state.doc.toString(), selected), annotations: isolateHistory.of('full'), userEvent: 'delete' }); }
     catch (e) { toast(e instanceof Error ? e.message : String(e)); }
   }
-  const categoryTitle:Record<string,string>={process:'Process',instrumentation:'Instrumentation',electrical:'Electrical',mechanical:'Mechanical',control:'Control',structure:'Structure',generic:'Other'};
+  const categoryTitle:Record<string,string>={process:'Технологическое',instrumentation:'Измерительные приборы',electrical:'Электрика',mechanical:'Механика',control:'Управление',structure:'Конструкции',generic:'Другое'};
   function renderEquipmentCatalog() {
-    const select=$<HTMLSelectElement>('studio-catalog'), host=$('equipment-catalog-list'), query=$<HTMLInputElement>('equipment-search').value.trim().toLocaleLowerCase();
-    const previous=select.value; select.replaceChildren(); host.replaceChildren();
+    const host=$('equipment-catalog-list'), query=$<HTMLInputElement>('equipment-search').value.trim().toLocaleLowerCase();
+    host.replaceChildren();
     const entries=Object.entries(catalog).filter(([,definition])=>!query || (definition.label+' '+definition.visual?.geometry).toLocaleLowerCase().includes(query));
     const groups=new Map<string,typeof entries>();
     for(const entry of entries){const category=entry[1].visual?.category??'generic';const list=groups.get(category)??[];list.push(entry);groups.set(category,list);}
@@ -541,16 +541,18 @@ export async function mountStudio() {
       const section=document.createElement('section');section.className='equipment-catalog-group';
       const heading=document.createElement('h3');heading.textContent=categoryTitle[category]??category;section.append(heading);
       for(const [kind,definition] of items.sort((a,b)=>a[1].label.localeCompare(b[1].label))){
-        const option=document.createElement('option');option.value=kind;option.textContent=definition.label;select.append(option);
         const button=document.createElement('button');button.type='button';button.className='equipment-catalog-item';button.dataset.catalogKind=kind;
         button.append(createGlyphSvg(document,definition.visual?.glyph??'generic.element','equipment-glyph'));
-        const copy=document.createElement('span'),title=document.createElement('strong'),meta=document.createElement('small');
-        title.textContent=definition.label;meta.textContent=definition.visual?.geometry??kind;copy.append(title,meta);button.append(copy);
-        button.onclick=()=>{select.value=kind;$('studio-add').click();};section.append(button);
+        const copy=document.createElement('span'),title=document.createElement('strong');
+        title.textContent=definition.label;copy.append(title);button.append(copy);
+        button.title=definition.visual?.geometry??kind;
+        button.setAttribute('aria-label', `Добавить: ${definition.label}`);
+        button.disabled=error || isPlant() || runtimeOnly;
+        button.onclick=()=>addEquipment(kind);section.append(button);
       }
       host.append(section);
     }
-    if(previous&&[...select.options].some(o=>o.value===previous))select.value=previous;
+    $('equipment-empty').hidden=entries.length>0;
   }
   function renderTree() {
     const tree = $('studio-tree'); tree.replaceChildren();
@@ -667,7 +669,17 @@ export async function mountStudio() {
     requestAnimationFrame(() => { editor.requestMeasure(); capPlantScale(); });
   }
   function toggleCode() { if (surface !== 'scene') { codeVisible = true; mobilePane = 'source'; setSurface('scene'); } else if (compact.matches) mobilePane = mobilePane === 'source' ? 'scene' : 'source'; else codeVisible = !codeVisible; syncPanels(); saveLayout(); }
-  function toggleEquipment(open = $('equipment-browser').hidden) { $('equipment-browser').hidden = !open; $('equipment-toggle').setAttribute('aria-expanded', String(open)); }
+  function toggleEquipment(open = $('equipment-browser').hidden) {
+    const browser = $('equipment-browser');
+    const restoreFocus = browser.contains(document.activeElement);
+    browser.hidden = !open;
+    $('equipment-toggle').setAttribute('aria-expanded', String(open));
+    if (open) {
+      filesVisible = false; syncPanels(); renderEquipmentCatalog();
+      $<HTMLInputElement>('equipment-search').focus({ preventScroll: true });
+    } else if (restoreFocus) $('equipment-toggle').focus({ preventScroll: true });
+    requestAnimationFrame(() => editor.requestMeasure());
+  }
   function setSurface(next: Surface) {
     if (next === 'source') { codeVisible = true; mobilePane = 'source'; next = 'scene'; }
     if (next === 'equipment') { toggleEquipment(true); next = 'scene'; }
@@ -766,7 +778,7 @@ export async function mountStudio() {
     drag.element.setAttribute('transform', `translate(${drag.dx} ${drag.dy}) ${drag.transform}`);
     view.previewMove(drag.id, drag.x + drag.dx, drag.y + drag.dy);
   });
-  canvas.addEventListener('pointerup', () => { pan = null; if (!drag) return; const d = drag; drag = null; d.element.setAttribute('transform', d.transform); if (Math.hypot(d.dx, d.dy) > 2) fields(d.id, { x: Math.round(d.x + d.dx), y: Math.round(d.y + d.dy) }); else renderInspector(); });
+  canvas.addEventListener('pointerup', () => { pan = null; if (!drag) return; const d = drag; drag = null; d.element.setAttribute('transform', d.transform); if (Math.hypot(d.dx, d.dy) > 2) fields(d.id, { x: Math.round(d.x + d.dx), y: Math.round(d.y + d.dy) }); else { view.previewMove(d.id, d.x, d.y); renderInspector(); } });
   canvas.addEventListener('pointercancel', () => { pan = null; if (drag) { drag.element.setAttribute('transform', drag.transform); view.previewMove(drag.id, drag.x, drag.y); } drag = null; });
   canvas.addEventListener('wheel', event => { if (!fullscreen && !event.ctrlKey && !event.metaKey) return; event.preventDefault(); const before = view.point(event.clientX, event.clientY); view.zoom(Math.exp(event.deltaY * .0015)); const after = view.point(event.clientX, event.clientY); view.setCamera({ ...view.camera, x: view.camera.x + before.x - after.x, y: view.camera.y + before.y - after.y }); }, { passive: false });
   function clearConnection() { connecting = null; shell.classList.remove('connecting'); $('studio-connect').setAttribute('aria-pressed', 'false'); $('studio-mode-note').textContent = ''; $('studio-mode-note').hidden = true; }
@@ -788,7 +800,7 @@ export async function mountStudio() {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'b') { event.preventDefault(); showFiles(true); return; }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'p') { event.preventDefault(); showFiles(); $('file-search').focus(); return; }
     if (event.key === 'Escape' && projectMenu.open) { event.preventDefault(); projectMenu.open = false; projectMenu.querySelector('summary')?.focus(); return; }
-    if (event.key === 'Escape') { if (connecting) clearConnection(); else if (filesVisible) { filesVisible = false; syncPanels(); } else if (!$('equipment-browser').hidden) toggleEquipment(false); else if (selected) select(null); else setFullscreen(false); return; }
+    if (event.key === 'Escape') { if (connecting) clearConnection(); else if (!$('equipment-browser').hidden) { event.preventDefault(); toggleEquipment(false); } else if (filesVisible) { filesVisible = false; syncPanels(); } else if (selected) select(null); else setFullscreen(false); return; }
     if ((event.target as Element).closest('input,select,textarea,.cm-editor')) return;
     if (!fullscreen && !shell.contains(document.activeElement)) return;
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); event.shiftKey ? redo(editor) : undo(editor); }
@@ -804,9 +816,9 @@ export async function mountStudio() {
   $('studio-fit').onclick = () => { fitScene(); spatial?.fit(); };
   $('studio-plus').onclick = () => { if (progress < .72) spatial?.zoom(.8); else view.zoom(.8); };
   $('studio-minus').onclick = () => { if (progress < .72) spatial?.zoom(1.25); else view.zoom(1.25); };
-  $('studio-add').onclick = () => {
-    if (error || runtimeOnly) return;
-    try { const kind = $<HTMLSelectElement>('studio-catalog').value; const source = kind === 'pressure' || kind === 'temperature' ? appendTap(editor.state.doc.toString(), selected ?? '', kind) : appendEquipment(editor.state.doc.toString(), kind, 450, 480); editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: source }, annotations: isolateHistory.of('full'), userEvent: 'input' }); fitScene(); spatial?.fit(); select(compiled.scene.nodes.at(-1)?.id ?? null); }
+  function addEquipment(kind: string) {
+    if (error || isPlant() || runtimeOnly) return;
+    try { const source = kind === 'pressure' || kind === 'temperature' ? appendTap(editor.state.doc.toString(), selected ?? '', kind) : appendEquipment(editor.state.doc.toString(), kind, 450, 480); editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: source }, annotations: isolateHistory.of('full'), userEvent: 'input' }); toggleEquipment(false); fitScene(); spatial?.fit(); select(compiled.scene.nodes.at(-1)?.id ?? null); }
     catch (e) { toast(e instanceof Error ? e.message : String(e)); }
   };
   function animateState() { const active = (visible || fullscreen) && !document.hidden && !['signals', 'controls', 'alarms', 'projects'].includes(surface); const stopped = isPlant() || runtimeOnly ? shell.dataset.telemetry !== 'live' : paused; view.paused = stopped || !active; if (spatial) spatial.paused = stopped || !active || progress >= 1; }
@@ -858,6 +870,12 @@ export async function mountStudio() {
     spatialHost.inert = flat; $('studio-flat').inert = !flat; spatialHost.style.visibility = progress >= 1 ? 'hidden' : 'visible';
     spatial?.fit(); animateState();
   }
+  function syncCanvasTheme() {
+    const style = getComputedStyle(shell);
+    spatial?.setAppearance(style.getPropertyValue('--canvas-bg').trim(), style.getPropertyValue('--canvas-grid').trim());
+  }
+  window.addEventListener('saturn-theme-change', syncCanvasTheme);
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncCanvasTheme);
   window.addEventListener('resize', () => { spatial?.fit(); syncPanels(); });
   const observer = new IntersectionObserver(entries => { visible = entries[0].isIntersecting; animateState(); }, { rootMargin: '80px' }); observer.observe(stage);
   window.addEventListener('pagehide', persist);
@@ -872,7 +890,7 @@ export async function mountStudio() {
   view.render(compiled.scene); refresh(false); fitScene(); updatePause(); renderMeta();
   message(storageAvailable ? '' : 'Хранилище недоступно');
   try {
-    const { SceneView3D } = await import('../src/view3d'); spatial = new SceneView3D(spatialHost, { landing: true }); spatial.onSelect = select;
+    const { SceneView3D } = await import('../src/view3d'); spatial = new SceneView3D(spatialHost, { landing: true }); syncCanvasTheme(); spatial.onSelect = select;
     spatial.canMove = canMoveNode;
     spatial.onMove = (id, x, y, commit) => commit ? commitPosition(id, x, y) : previewPosition(id, x, y);
     spatial.render(compiled.scene); spatial.setRuntime(observedRuntime ?? plant?.runtime ?? null); spatial.select(selected); setMode(explicit);

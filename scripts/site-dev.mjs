@@ -3,8 +3,9 @@ import { request as httpsRequest } from 'node:https';
 import { readFile, stat } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { buildSite } from './site-build.mjs';
-await buildSite();
-const root = resolve('dist/site'), port = Number(process.env.PORT ?? 4190);
+// Release checks serve the already-built deployable app, never rebuild it.
+if (!process.env.SATURN_SITE_DIR) await buildSite();
+const root = resolve(process.env.SATURN_SITE_DIR ?? 'dist/site'), port = Number(process.env.PORT ?? 4190);
 const target = new URL(process.env.SATURN_PREVIEW_TARGET ?? 'http://127.0.0.1:4177');
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.txt': 'text/plain', '.md': 'text/plain; charset=utf-8' };
 createServer(async (req, res) => {
