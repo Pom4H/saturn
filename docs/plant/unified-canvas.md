@@ -30,7 +30,7 @@ This is **not a complete inventory, surveyed layout, or validated digital twin o
 
 ## Isolated recovery exercise
 
-`plant/demo/training.ts` declares a separate fictional thermal lab on the same canvas. It has no signal paths to or from the historical reactor. The user changes bounded heat demand and cooling demand. Motor inertia, cooler lag, a calorimeter and a lagging temperature measurement make those commands take effect gradually.
+`examples/plant/training.ts` declares a separate fictional thermal lab on the same canvas. It has no signal paths to or from the historical reactor. The user changes bounded heat demand and cooling demand. Motor inertia, cooler lag, a calorimeter and a lagging temperature measurement make those commands take effect gradually.
 
 The calorimeter uses an explicit stored-energy balance: generated heat minus removed heat changes stored energy, which determines temperature. Normalized positive feedback depends on its local temperature. Accumulated damage depends on sustained excess temperature and does not disappear after cooling. These equations contain no incident timestamp, scenario label, scheduled failure, or difficulty switch.
 

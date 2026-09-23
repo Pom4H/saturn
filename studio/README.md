@@ -63,7 +63,7 @@ The flow runtime is an explicitly limited educational model: reachable tank-to-o
 - `src/router.ts`: obstacle-aware rectilinear routing and rounded SVG paths.
 - `src/runtime.ts`: bounded illustrative flow traversal.
 - `src/render.ts`: SVG components and animation lifecycle.
-- `src/main.ts`: CodeMirror, inspector, pointer gestures, import/export and sharing.
+- `examples/diagram/main.ts`: CodeMirror, inspector, pointer gestures, import/export and sharing.
 - `tests`: source round-trip, routing, runtime and real-browser interaction checks.
 
 Only TypeScript source is persisted. Selection, camera and in-progress drag geometry are transient editor state. Syntax errors keep the last valid preview visible and disable visual edits until the source is valid again.

@@ -3,13 +3,13 @@ import { groupFill, groupStroke, groupAccent, groupTitleLines } from './group-st
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { catalog, type Equipment, type Scene, type SceneGroup } from './core';
+import { componentRegistry, type Equipment, type Scene, type SceneGroup } from './core';
 import { layout, tapPoint } from './geometry';
 import { numeric, type RuntimeFrame } from './runtime/protocol';
 import { get3dRenderer, observation, observationAlarm, observationQuality, observedFlows, type EquipmentModel3D, type Renderer3D, type Renderer3DContext } from './view';
 import { createModel, materials, tubeBetween } from './elements/models3d';
 import { registry } from './elements/core-elements';
-import type { Signals } from './next/model';
+import type { Signals } from "./elements/model";
 
 const v = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const primarySignal: Record<string, string> = { tank: 'level', pump: 'rpm', valve: 'opening', pressure: 'value', temperature: 'value', exchanger: 'temperature' };
@@ -19,7 +19,7 @@ function addMesh(root: THREE.Object3D, geometry: THREE.BufferGeometry, material:
   const mesh = new THREE.Mesh(geometry, material); mesh.position.copy(position); mesh.castShadow = true; mesh.receiveShadow = true; root.add(mesh); return mesh;
 }
 function primitiveModel(context: Renderer3DContext, kind: string): EquipmentModel3D {
-  const root = new THREE.Group(), definition = catalog[context.equipment.kind], width = Math.max(.55, definition.width / 110);
+  const root = new THREE.Group(), definition = componentRegistry.schematic(context.equipment.kind), width = Math.max(.55, definition.width / 110);
   const ports = new Map<string, THREE.Vector3>();
   for (const [key, spec] of Object.entries(definition.ports)) {
     const p = spec.direction === 'up' ? v(0, 0, 1.4) : spec.direction === 'down' ? v(0, 0, .1) : v(spec.direction === 'left' ? -width / 2 : width / 2, 0, .75);
@@ -49,7 +49,9 @@ function primitiveModel(context: Renderer3DContext, kind: string): EquipmentMode
   } else root.userData.representation = 'generic';
   return { root, ports, labelAnchor: v(0, 0, 1.55), update: () => {} };
 }
-function procedural(type: string, portNames: Record<string, string>): Renderer3D {
+function procedural(kind: string): Renderer3D {
+  const definition = componentRegistry.get(kind), type = definition.type;
+  const portNames = Object.fromEntries(Object.entries(definition.schematic?.anchors ?? {}).map(([name, anchor]) => [anchor.port, name]));
   return context => {
     const asset = registry.create(type, context.equipment.id), model = createModel(asset);
     const ports = new Map<string, THREE.Vector3>(), portNormals = new Map<string, THREE.Vector3>();
@@ -70,11 +72,11 @@ function procedural(type: string, portNames: Record<string, string>): Renderer3D
   };
 }
 const builtins = new Map<string, Renderer3D>([
-  ['tank', procedural('process.tank.vertical', { OUT: 'outlet' })],
-  ['pump', procedural('process.pump.centrifugal', { IN: 'inlet', OUT: 'outlet' })],
-  ['valve', procedural('process.valve.control', { IN: 'inlet', OUT: 'outlet' })],
-  ['flowmeter', procedural('instrumentation.flowmeter.inline', { IN: 'inlet', OUT: 'outlet' })],
-  ['exchanger', procedural('process.heat-exchanger.plate', { IN: 'inlet', OUT: 'outlet' })],
+  ['tank', procedural('tank')],
+  ['pump', procedural('pump')],
+  ['valve', procedural('valve')],
+  ['flowmeter', procedural('flowmeter')],
+  ['exchanger', procedural('exchanger')],
   ...['pressure', 'temperature', 'outlet'].map(kind => [kind, (context: Renderer3DContext) => primitiveModel(context, kind)] as const),
 ]);
 interface Rendered { equipment: Equipment; model: EquipmentModel3D; label: HTMLButtonElement; text: HTMLElement; state: HTMLElement; leader: SVGLineElement }
@@ -82,6 +84,7 @@ interface FlowTrack { id: string; curve: THREE.CurvePath<THREE.Vector3>; particl
 
 /** A schematic spatial view. Positions are derived from the drawing, not claimed as surveyed plant coordinates. */
 export class SceneView3D {
+  private preview?: import('./view').PreviewProvider;
   scene: Scene = { nodes: [], links: [] };
   paused = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   selected: string | null = null;
@@ -125,7 +128,8 @@ export class SceneView3D {
   private raycaster = new THREE.Raycaster();
   private ground = new THREE.Plane(v(0, 0, 1), 0);
   private down: { x: number; y: number; id: string | null; moved: boolean; offset?: THREE.Vector3; orbitEnabled?: boolean; originalX?: number; originalY?: number } | null = null;
-  constructor(public host: HTMLElement, options: { landing?: boolean } = {}) {
+  constructor(public host: HTMLElement, options: { landing?: boolean; preview?: import('./view').PreviewProvider } = {}) {
+    this.preview = options.preview;
     host.classList.add('scene3d');
     this.canvas = document.createElement('canvas'); this.canvas.tabIndex = 0;
     this.canvas.setAttribute('aria-label', '3D схема. Стрелки меняют ракурс, плюс и минус — масштаб, F — вписать. Оборудование можно выбрать клавишей Tab.');
@@ -184,7 +188,7 @@ export class SceneView3D {
       const point = this.groundPoint(e.clientX, e.clientY), object = this.objects.get(drag.id);
       if (!point || !object) return;
       drag.moved = true;
-      const world = point.add(drag.offset), definition = catalog[object.equipment.kind], centered = !!this.scene.groups?.length;
+      const world = point.add(drag.offset), definition = componentRegistry.schematic(object.equipment.kind), centered = !!this.scene.groups?.length;
       const x = world.x * 100 - (centered ? definition.width / 2 : 0);
       const y = -world.y * 100 - (centered ? definition.height / 2 : 0);
       this.onMove?.(drag.id, Math.round(x), Math.round(y), false);
@@ -199,7 +203,7 @@ export class SceneView3D {
         if (drag.moved && drag.id) {
           const point = this.groundPoint(e.clientX, e.clientY), object = this.objects.get(drag.id);
           if (point && object) {
-            const world = point.add(drag.offset), definition = catalog[object.equipment.kind], centered = !!this.scene.groups?.length;
+            const world = point.add(drag.offset), definition = componentRegistry.schematic(object.equipment.kind), centered = !!this.scene.groups?.length;
             const x = world.x * 100 - (centered ? definition.width / 2 : 0);
             const y = -world.y * 100 - (centered ? definition.height / 2 : 0);
             this.onMove?.(drag.id, Math.round(x), Math.round(y), true);
@@ -260,7 +264,7 @@ export class SceneView3D {
     };
   }
   render(scene: Scene) {
-    this.scene = scene; this.flows = observedFlows(scene, this.frame); this.renderGroups();
+    this.scene = scene; this.flows = observedFlows(scene, this.frame, this.frame ? undefined : this.preview?.(scene)); this.renderGroups();
     const geometryKey = JSON.stringify([scene.nodes.map(n => [n.id, n.kind, n.props.x, n.props.y, n.tap, n.props.at, n.props.offset]), scene.links, scene.connections, !!scene.groups?.length]);
     if (geometryKey === this.geometryKey) { for (const n of scene.nodes) this.objects.get(n.id)!.equipment.props = { ...n.props }; this.advance(0); this.draw(); return; }
     this.geometryKey = geometryKey;
@@ -272,7 +276,7 @@ export class SceneView3D {
       let object = previous.get(original.id);
       if (object?.equipment.kind !== original.kind) object = undefined;
       if (object) previous.delete(original.id);
-      const equipment = object?.equipment ?? { ...original, props: { ...original.props } }, definition = catalog[equipment.kind];
+      const equipment = object?.equipment ?? { ...original, props: { ...original.props } }, definition = componentRegistry.schematic(equipment.kind);
       equipment.props = { ...original.props }; equipment.tap = original.tap;
       const context = this.context(equipment), model = object?.model ?? (get3dRenderer(equipment.kind) ?? builtins.get(equipment.kind) ?? (ctx => primitiveModel(ctx, 'generic')))(context);
       // Grouped drawings use the center of the authored SVG footprint in both views.
@@ -309,7 +313,7 @@ export class SceneView3D {
       const a = this.objects.get(edge.from.node), b = this.objects.get(edge.to.node);
       const start = a?.model.ports.get(edge.from.port)?.clone().add(a.model.root.position), end = b?.model.ports.get(edge.to.port)?.clone().add(b.model.root.position);
       if (!start || !end) continue;
-      const normal = (object: Rendered, port: string) => object.model.portNormals?.get(port)?.clone() ?? ({ left: v(-1, 0, 0), right: v(1, 0, 0), up: v(0, 0, 1), down: v(0, 0, -1) })[catalog[object.equipment.kind].ports[port].direction];
+      const normal = (object: Rendered, port: string) => object.model.portNormals?.get(port)?.clone() ?? ({ left: v(-1, 0, 0), right: v(1, 0, 0), up: v(0, 0, 1), down: v(0, 0, -1) })[componentRegistry.schematic(object.equipment.kind).ports[port].direction];
       const startLead = start.clone().addScaledVector(normal(a!, edge.from.port), .30), endLead = end.clone().addScaledVector(normal(b!, edge.to.port), .30);
       const curve = new THREE.CurvePath<THREE.Vector3>(), high = Math.max(startLead.z, endLead.z), middleX = (startLead.x + endLead.x) / 2;
       const points = [start, startLead, v(startLead.x, startLead.y, high), v(middleX, startLead.y, high), v(middleX, endLead.y, high), v(endLead.x, endLead.y, high), endLead, end], body: THREE.Mesh[] = [];
@@ -333,7 +337,7 @@ export class SceneView3D {
   }
   setRuntime(frame: RuntimeFrame | null) {
     if (frame?.runId !== this.frame?.runId) { this.smoothed.clear(); this.phases.clear(); for (const track of this.tracks) track.phase = 0; for (const { model } of this.objects.values()) model.reset?.(); }
-    this.frame = frame; this.flows = observedFlows(this.scene, frame);
+    this.frame = frame; this.flows = observedFlows(this.scene, frame, frame ? undefined : this.preview?.(this.scene));
     this.host.dataset.runId = frame?.runId ?? ''; this.host.dataset.sequence = String(frame?.seq ?? '');
     this.advance(0); this.draw();
   }
@@ -342,7 +346,7 @@ export class SceneView3D {
     for (const { equipment, model, label, text, state } of this.objects.values()) {
       model.update(dt);
       const quality = observationQuality(this.scene, this.frame, equipment.id), alarm = observationAlarm(this.scene, this.frame, equipment.id);
-      const key = model.readout ?? primarySignal[equipment.kind] ?? Object.keys(catalog[equipment.kind].signals ?? {})[0] ?? 'flow';
+      const key = model.readout ?? primarySignal[equipment.kind] ?? Object.keys(componentRegistry.schematic(equipment.kind).signals ?? {})[0] ?? 'flow';
       const sample = observation(this.scene, this.frame, equipment.id, key), value = key === 'flow' ? this.flows.get(equipment.id) ?? null : numeric(sample);
       text.textContent = value === null ? '—' : `${value.toFixed(key === 'rpm' || key === 'level' ? 0 : 1)} ${unitLabel(sample?.unit ?? (key === 'flow' ? 'm3/h' : ''))}`;
       state.textContent = [alarmLabel[alarm], quality !== 'good' ? 'Нет данных' : ''].filter(Boolean).join(' · ');

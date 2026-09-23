@@ -1,0 +1,715 @@
+{
+  "tank": {
+    "label": "Резервуар",
+    "width": 170,
+    "height": 230,
+    "fields": {
+      "x": {
+        "label": "X",
+        "default": 100,
+        "min": -3000,
+        "max": 6000,
+        "step": 1,
+        "unit": "",
+        "scope": "layout"
+      },
+      "y": {
+        "label": "Y",
+        "default": 100,
+        "min": -3000,
+        "max": 6000,
+        "step": 1,
+        "unit": "",
+        "scope": "layout"
+      },
+      "level": {
+        "label": "Уровень",
+        "default": 64,
+        "min": 0,
+        "max": 100,
+        "step": 1,
+        "unit": "%"
+      },
+      "quality": {
+        "label": "Качество",
+        "default": "good",
+        "choices": [
+          "good",
+          "stale",
+          "bad"
+        ]
+      },
+      "alarm": {
+        "label": "Состояние",
+        "default": "none",
+        "choices": [
+          "none",
+          "warning",
+          "trip"
+        ]
+      }
+    },
+    "ports": {
+      "outlet": {
+        "x": 170,
+        "y": 184,
+        "direction": "right",
+        "role": "out"
+      }
+    },
+    "version": "1.0.0",
+    "signals": {
+      "level": {
+        "label": "Уровень",
+        "type": "number",
+        "unit": "%"
+      }
+    }
+  },
+  "pump": {
+    "label": "Насос",
+    "width": 220,
+    "height": 170,
+    "fields": {
+      "x": {
+        "label": "X",
+        "default": 100,
+        "min": -3000,
+        "max": 6000,
+        "step": 1,
+        "unit": "",
+        "scope": "layout"
+      },
+      "y": {
+        "label": "Y",
+        "default": 100,
+        "min": -3000,
+        "max": 6000,
+        "step": 1,
+        "unit": "",
+        "scope": "layout"
+      },
+      "rpm": {
+        "label": "Обороты",
+        "default": 1500,
+        "min": -3000,
+        "max": 3000,
+        "step": 50,
+        "unit": "об/мин"
+      },
+      "temperature": {
+        "label": "Температура",
+        "default": 48,
+        "min": -40,
+        "max": 150,
+        "step": 1,
+        "unit": "°C"
+      },
+      "vibration": {
+        "label": "Вибрация",
+        "default": 1.8,
+        "min": 0,
+        "max": 20,
+        "step": 0.1,
+        "unit": "мм/с"
+      },
+      "quality": {
+        "label": "Качество",
+        "default": "good",
+        "choices": [
+          "good",
+          "stale",
+          "bad"
+        ]
+      },
+      "alarm": {
+        "label": "Состояние",
+        "default": "none",
+        "choices": [
+          "none",
+          "warning",
+          "trip"
+        ]
+      },
+      "nominalFlow": {
+        "label": "Номинальный расход",
+        "default": 12,
+        "min": 0,
+        "max": 100,
+        "step": 0.1,
+        "unit": "м³/ч"
+      },
+      "degradationRate": {
+        "label": "Скорость износа в сценарии",
+        "default": 0.008,
+        "min": 0,
+        "max": 0.1,
+        "step": 0.001,
+        "unit": "1/с"
+      },
+      "startDelay": {
+        "label": "Задержка запуска",
+        "default": 1,
+        "min": 0,
+        "max": 30,
+        "step": 0.1,
+        "unit": "с"
+      },
+      "maintenanceSeconds": {
+        "label": "Длительность обслуживания",
+        "default": 3,
+        "min": 0.1,
+        "max": 60,
+        "step": 0.1,
+        "unit": "с"
+      }
+    },
+    "ports": {
+      "inlet": {
+        "x": 0,
+        "y": 96,
+        "direction": "left",
+        "role": "in"
+      },
+      "outlet": {
+        "x": 76,
+        "y": 0,
+        "direction": "up",
+        "role": "out"
+      }
+    },
+    "version": "1.0.0",
+    "signals": {
+      "rpm": {
+        "label": "Обороты двигателя",
+        "type": "number",
+        "unit": "rpm"
+      },
+      "flow": {
+        "label": "Расход",
+        "type": "number",
+        "unit": "m3/h"
+      },
+      "temperature": {
+        "label": "Температура",
+        "type": "number",
+        "unit": "°C"
+      },
+      "vibration": {
+        "label": "Вибрация",
+        "type": "number",
+        "unit": "mm/s"
+      }
+    },
+    "commands": {
+      "start": {
+        "label": "Запустить"
+      },
+      "stop": {
+        "label": "Остановить"
+      },
+      "setSpeed": {
+        "label": "Задать обороты",
+        "valueType": "number",
+        "min": -3000,
+        "max": 3000
+      },
+      "service": {
+        "label": "Обслужить"
+      },
+      "replace": {
+        "label": "Заменить экземпляр"
+      }
+    }
+  },
+  "valve": {
+    "label": "Клапан",
+    "width": 160,
+    "height": 164,
+    "fields": {
+      "x": {
+        "label": "X",
+        "default": 100,
+        "min": -3000,
+        "max": 6000,
+        "step": 1,
+        "unit": "",
+        "scope": "layout"
+      },
+      "y": {
+        "label": "Y",
+        "default": 100,
+        "min": -3000,
+        "max": 6000,
+        "step": 1,
+        "unit": "",
+        "scope": "layout"
+      },
+      "opening": {
+        "label": "Открытие",
+        "default": 76,
+        "min": 0,
+        "max": 100,
+        "step": 1,
+        "unit": "%"
+      },
+      "quality": {
+        "label": "Качество",
+        "default": "good",
+        "choices": [
+          "good",
+          "stale",
+          "bad"
+        ]
+      },
+      "alarm": {
+        "label": "Состояние",
+        "default": "none",
+        "choices": [
+          "none",
+          "warning",
+          "trip"
+        ]
+      }
+    },
+    "ports": {
+      "inlet": {
+        "x": 0,
+        "y": 102,
+        "direction": "left",
+        "role": "in"
+      },
+      "outlet": {
+        "x": 160,
+        "y": 102,
+        "direction": "right",
+        "role": "out"
+      }
+    },
+    "version": "1.0.0",
+    "signals": {
+      "opening": {
+        "label": "Открытие",
+        "type": "number",
+        "unit": "%"
+      },
+      "flow": {
+        "label": "Расход",
+        "type": "number",
+        "unit": "m3/h"
+      }
+    },
+    "commands": {
+      "setOpening": {
+        "label": "Открытие клапана",
+        "valueType": "number",
+        "min": 0,
+        "max": 100
+      }
+    }
+  },
+  "flowmeter": {
+    "label": "Расходомер",
+    "width": 96,
+    "height": 76,
+    "fields": {
+      "x": {
+        "label": "X",
+        "default": 100,
+        "min": -3000,
+        "max": 6000,
+        "step": 1,
+        "unit": "",
+        "scope": "layout"
+      },
+      "y": {
+        "label": "Y",
+        "default": 100,
+        "min": -3000,
+        "max": 6000,
+        "step": 1,
+        "unit": "",
+        "scope": "layout"
+      },
+      "quality": {
+        "label": "Качество",
+        "default": "good",
+        "choices": [
+          "good",
+          "stale",
+          "bad"
+        ]
+      },
+      "alarm": {
+        "label": "Состояние",
+        "default": "none",
+        "choices": [
+          "none",
+          "warning",
+          "trip"
+        ]
+      }
+    },
+    "ports": {
+      "inlet": {
+        "x": 0,
+        "y": 38,
+        "direction": "left",
+        "role": "in"
+      },
+      "outlet": {
+        "x": 96,
+        "y": 38,
+        "direction": "right",
+        "role": "out"
+      }
+    },
+    "version": "1.0.0",
+    "signals": {
+      "flow": {
+        "label": "Расход",
+        "type": "number",
+        "unit": "m3/h"
+      }
+    }
+  },
+  "exchanger": {
+    "label": "Теплообменник",
+    "width": 170,
+    "height": 170,
+    "fields": {
+      "x": {
+        "label": "X",
+        "default": 100,
+        "min": -3000,
+        "max": 6000,
+        "step": 1,
+        "unit": "",
+        "scope": "layout"
+      },
+      "y": {
+        "label": "Y",
+        "default": 100,
+        "min": -3000,
+        "max": 6000,
+        "step": 1,
+        "unit": "",
+        "scope": "layout"
+      },
+      "temperature": {
+        "label": "Температура",
+        "default": 72,
+        "min": -40,
+        "max": 150,
+        "step": 1,
+        "unit": "°C"
+      },
+      "quality": {
+        "label": "Качество",
+        "default": "good",
+        "choices": [
+          "good",
+          "stale",
+          "bad"
+        ]
+      },
+      "alarm": {
+        "label": "Состояние",
+        "default": "none",
+        "choices": [
+          "none",
+          "warning",
+          "trip"
+        ]
+      }
+    },
+    "ports": {
+      "inlet": {
+        "x": 0,
+        "y": 85,
+        "direction": "left",
+        "role": "in"
+      },
+      "outlet": {
+        "x": 170,
+        "y": 85,
+        "direction": "right",
+        "role": "out"
+      }
+    },
+    "version": "1.0.0",
+    "signals": {
+      "flow": {
+        "label": "Расход",
+        "type": "number",
+        "unit": "m3/h"
+      },
+      "temperature": {
+        "label": "Температура",
+        "type": "number",
+        "unit": "°C"
+      }
+    }
+  },
+  "outlet": {
+    "label": "В систему",
+    "width": 44,
+    "height": 40,
+    "fields": {
+      "x": {
+        "label": "X",
+        "default": 100,
+        "min": -3000,
+        "max": 6000,
+        "step": 1,
+        "unit": "",
+        "scope": "layout"
+      },
+      "y": {
+        "label": "Y",
+        "default": 100,
+        "min": -3000,
+        "max": 6000,
+        "step": 1,
+        "unit": "",
+        "scope": "layout"
+      },
+      "quality": {
+        "label": "Качество",
+        "default": "good",
+        "choices": [
+          "good",
+          "stale",
+          "bad"
+        ]
+      },
+      "alarm": {
+        "label": "Состояние",
+        "default": "none",
+        "choices": [
+          "none",
+          "warning",
+          "trip"
+        ]
+      }
+    },
+    "ports": {
+      "inlet": {
+        "x": 0,
+        "y": 20,
+        "direction": "left",
+        "role": "in"
+      }
+    },
+    "version": "1.0.0",
+    "signals": {
+      "flow": {
+        "label": "Расход",
+        "type": "number",
+        "unit": "m3/h"
+      }
+    }
+  },
+  "pressure": {
+    "label": "Манометр",
+    "width": 66,
+    "height": 90,
+    "instrument": true,
+    "fields": {
+      "value": {
+        "label": "Давление",
+        "default": 5.8,
+        "min": 0,
+        "max": 16,
+        "step": 0.1,
+        "unit": "бар"
+      },
+      "at": {
+        "label": "Точка отвода",
+        "default": 0.6,
+        "min": 0.1,
+        "max": 0.9,
+        "step": 0.05,
+        "unit": "",
+        "scope": "layout"
+      },
+      "offset": {
+        "label": "Отступ",
+        "default": 100,
+        "min": 80,
+        "max": 240,
+        "step": 10,
+        "unit": "",
+        "scope": "layout"
+      },
+      "quality": {
+        "label": "Качество",
+        "default": "good",
+        "choices": [
+          "good",
+          "stale",
+          "bad"
+        ]
+      },
+      "alarm": {
+        "label": "Состояние",
+        "default": "none",
+        "choices": [
+          "none",
+          "warning",
+          "trip"
+        ]
+      }
+    },
+    "ports": {},
+    "version": "1.0.0",
+    "signals": {
+      "value": {
+        "label": "Давление",
+        "type": "number",
+        "unit": "bar"
+      }
+    }
+  },
+  "temperature": {
+    "label": "Термометр",
+    "width": 70,
+    "height": 70,
+    "instrument": true,
+    "fields": {
+      "value": {
+        "label": "Температура",
+        "default": 72,
+        "min": -40,
+        "max": 150,
+        "step": 1,
+        "unit": "°C"
+      },
+      "at": {
+        "label": "Точка отвода",
+        "default": 0.5,
+        "min": 0.1,
+        "max": 0.9,
+        "step": 0.05,
+        "unit": "",
+        "scope": "layout"
+      },
+      "offset": {
+        "label": "Отступ",
+        "default": 95,
+        "min": 80,
+        "max": 240,
+        "step": 10,
+        "unit": "",
+        "scope": "layout"
+      },
+      "quality": {
+        "label": "Качество",
+        "default": "good",
+        "choices": [
+          "good",
+          "stale",
+          "bad"
+        ]
+      },
+      "alarm": {
+        "label": "Состояние",
+        "default": "none",
+        "choices": [
+          "none",
+          "warning",
+          "trip"
+        ]
+      }
+    },
+    "ports": {},
+    "version": "1.0.0",
+    "signals": {
+      "value": {
+        "label": "Температура",
+        "type": "number",
+        "unit": "°C"
+      }
+    }
+  },
+  "filter": {
+    "version": "1.0.0",
+    "label": "Фильтр",
+    "prefix": "FLT",
+    "width": 130,
+    "height": 100,
+    "fields": {
+      "x": {
+        "scope": "layout",
+        "label": "X",
+        "default": 100,
+        "min": -3000,
+        "max": 6000
+      },
+      "y": {
+        "scope": "layout",
+        "label": "Y",
+        "default": 100,
+        "min": -3000,
+        "max": 6000
+      },
+      "resistance": {
+        "label": "Сопротивление",
+        "default": 0.1,
+        "min": 0,
+        "max": 1,
+        "step": 0.01,
+        "unit": "доля"
+      },
+      "quality": {
+        "label": "Качество",
+        "default": "good",
+        "choices": [
+          "good",
+          "stale",
+          "bad"
+        ]
+      },
+      "alarm": {
+        "label": "Состояние",
+        "default": "none",
+        "choices": [
+          "none",
+          "warning",
+          "trip"
+        ]
+      }
+    },
+    "ports": {
+      "IN": {
+        "x": 0,
+        "y": 44.35483870967742,
+        "direction": "left",
+        "role": "in"
+      },
+      "OUT": {
+        "x": 130,
+        "y": 44.35483870967742,
+        "direction": "right",
+        "role": "out"
+      }
+    },
+    "signals": {
+      "flow": {
+        "label": "Расход",
+        "type": "number",
+        "unit": "m3/h"
+      },
+      "differentialPressure": {
+        "label": "Перепад давления",
+        "type": "number",
+        "unit": "bar"
+      }
+    },
+    "commands": {
+      "clean": {
+        "label": "Очистить фильтр"
+      }
+    }
+  }
+}

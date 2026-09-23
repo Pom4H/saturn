@@ -44,3 +44,5 @@ export {
   coreElementPack,
   registry as coreElementRegistry,
 } from '../../src/elements/core-elements';
+
+export { defineSchematicElement, type SchematicSpec, type ComponentProjection, type Field, type CommandDefinition, type SignalDefinition } from '../../src/elements/model';

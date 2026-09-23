@@ -35,7 +35,7 @@ async function inspect(file) {
   function visit(node) {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
       const specifier = node.moduleSpecifier.text;
-      if (rel.startsWith('src/') && specifier.includes('lab3d/'))
+      if (rel.startsWith('src/') && specifier.includes('examples/elements-lab/'))
         report(source,file,node,'production-elements-own-geometry','Production source must import canonical element geometry from src/elements, never from the visual lab.');
       if (rel === 'packages/core/index.ts' && specifier.includes('elements'))
         report(source,file,node,'trusted-element-api-subpath','Trusted element/device-pack APIs belong to @saturn/core/elements, not the declarative project DSL root.');

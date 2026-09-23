@@ -1,5 +1,5 @@
 import { defineConfig } from '@playwright/test';
-import baseline from './playwright.config';
+import baseline from "./playwright.config.ts";
 
 export default defineConfig({
   ...baseline,

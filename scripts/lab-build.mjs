@@ -5,8 +5,8 @@ import { serveLab } from './lab-server.mjs';
 
 export async function buildLab() {
   await mkdir('.lab-dist', { recursive: true });
-  await build({ entryPoints: ['lab3d/main.ts'], outfile: '.lab-dist/lab.js', bundle: true, format: 'iife', target: 'es2022', minify: true, legalComments: 'inline' });
-  await copyFile('lab3d/index.html', '.lab-dist/index.html');
+  await build({ entryPoints: ['examples/elements-lab/main.ts'], outfile: '.lab-dist/lab.js', bundle: true, format: 'iife', target: 'es2022', minify: true, legalComments: 'inline' });
+  await copyFile('examples/elements-lab/index.html', '.lab-dist/index.html');
   const [html, js, css] = await Promise.all(['index.html', 'lab.js', 'lab.css'].map(file => readFile(`.lab-dist/${file}`, 'utf8')));
   await writeFile('.lab-dist/standalone.html', html.replace('<link rel="stylesheet" href="./lab.css">', () => `<style>${css}</style>`).replace('<script type="module" src="./lab.js"></script>', () => `<script>${js.replaceAll('</script', '<\\/script')}</script>`));
 }

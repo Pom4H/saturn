@@ -1,3 +1,4 @@
+import { simulate } from "./simulation";
 import { EditorState, Transaction, type Annotation } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab, undo, redo, isolateHistory } from '@codemirror/commands';
@@ -6,21 +7,21 @@ import { tags } from '@lezer/highlight';
 import { javascript } from '@codemirror/lang-javascript';
 import { autocompletion, closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { setDiagnostics } from '@codemirror/lint';
-import { catalog, type Kind, type Endpoint, type Value } from './core';
-import { compile, patchFields, applyChanges, editable, removeObject, appendEquipment, appendConnection, appendTap, formatSource, SourceError, type Compiled, type Change } from './source';
-import { SceneView, el } from './view';
-import './visual-components';
-import { ProjectWorkspace } from './runtime/project-workspace';
-import { dslCompletions } from './completion';
-import { RuntimeWorkspace } from './runtime/workspace';
-import type { SceneView3D } from './view3d';
-import type { RuntimeFrame } from './runtime/protocol';
-import { examples, booster } from './examples';
-import standaloneCode from '../generated/runtime';
-import './style.css';
+import { componentRegistry, type Kind, type Endpoint, type Value } from "../../src/core";
+import { compile, patchFields, applyChanges, editable, removeObject, appendEquipment, appendConnection, appendTap, formatSource, SourceError, type Compiled, type Change } from "../../src/source";
+import { SceneView, el } from "../../src/view";
+import "../../src/visual-components";
+import { ProjectWorkspace } from "../../src/runtime/project-workspace";
+import { dslCompletions } from "../../src/completion";
+import { RuntimeWorkspace } from "../../src/runtime/workspace";
+import type { SceneView3D } from "../../src/view3d";
+import type { RuntimeFrame } from "../../src/runtime/protocol";
+import { examples, booster } from "./projects";
+import standaloneCode from "../../generated/runtime";
+import "../../src/style.css";
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => { const e = document.getElementById(id); if (!e) throw new Error(`Missing UI element: ${id}`); return e as T; };
 const svg = document.getElementById('scene') as unknown as SVGSVGElement;
-const sceneView = new SceneView(svg);
+const sceneView = new SceneView(svg, simulate);
 let spatialView: SceneView3D | null = null, spatialMode = false, runtimeUI: RuntimeWorkspace | undefined;
 let projectUI: ProjectWorkspace | undefined;
 let displayedRuntime: RuntimeFrame | null = null;
@@ -29,8 +30,8 @@ async function setSpatial(enabled: boolean) {
   if (enabled && !spatialView) {
     try {
       $('scene3d').hidden = false;
-      const { SceneView3D } = await import('./view3d');
-      spatialView = new SceneView3D($('scene3d'));
+      const { SceneView3D } = await import("../../src/view3d");
+      spatialView = new SceneView3D($('scene3d'), { preview: simulate });
       spatialView.onSelect = id => select(id);
       if (compiled) spatialView.render(compiled.scene);
       spatialView.setRuntime(displayedRuntime); spatialView.select(selected); spatialView.paused = sceneView.paused;
@@ -165,10 +166,10 @@ function renderInspector() {
       p.append(title, 'Нажмите на оборудование или трубопровод. Параметры, положение и состояние редактируются прямо в TypeScript.'); root.append(p); return;
     }
     const title = document.createElement('h2'); title.className = 'inspector-id'; title.textContent = item?.id ?? 'Трубопровод'; root.append(title);
-    const kind = document.createElement('div'); kind.className = 'inspector-kind'; kind.textContent = item ? catalog[item.kind].label : `${edge!.from.node} → ${edge!.to.node}`; root.append(kind);
+    const kind = document.createElement('div'); kind.className = 'inspector-kind'; kind.textContent = item ? componentRegistry.schematic(item.kind).label : `${edge!.from.node} → ${edge!.to.node}`; root.append(kind);
     if (item) {
       const coordinates = document.createElement('div'); coordinates.className = 'coordinates';
-      for (const [name, definition] of Object.entries(catalog[item.kind].fields)) {
+      for (const [name, definition] of Object.entries(componentRegistry.schematic(item.kind).fields)) {
         const row = document.createElement('div'); row.className = 'field';
         const label = document.createElement('label'); label.htmlFor = `field-${name}`; label.textContent = definition.label;
         const unit = document.createElement('span'); unit.className = 'field-unit'; unit.textContent = definition.unit ?? ''; label.append(unit); row.append(label);
@@ -218,7 +219,7 @@ function deleteSelected() { if (!selected || currentError) return; const changes
 function clearConnect() { connecting = null; svg.classList.remove('connecting'); $('connect-mode').setAttribute('aria-pressed', 'false'); $('hint').textContent = 'Перетаскивайте элементы. Нажмите на объект, чтобы изменить свойства.'; }
 function choosePort(owner: string, port: string) {
   const n = compiled?.scene.nodes.find(n => n.id === owner); if (!n || currentError) return;
-  const spec = catalog[n.kind].ports[port];
+  const spec = componentRegistry.schematic(n.kind).ports[port];
   if (!connecting || connecting === 'choose') {
     if (spec.role !== 'out') { toast('Сначала выберите выходной порт.'); return; }
     connecting = { node: owner, port }; svg.classList.add('connecting'); $('hint').textContent = `${owner}.${port} → выберите входной порт`; return;
@@ -238,7 +239,7 @@ svg.addEventListener('pointerdown', event => {
   if (node && !spaceHeld && event.button === 0) {
     const id = node.dataset.node!, item = compiled!.scene.nodes.find(n => n.id === id)!;
     select(id, true);
-    if (catalog[item.kind].instrument) { toast('Отвод перемещается вместе с трубой. Точку и отступ можно изменить в свойствах.'); return; }
+    if (componentRegistry.schematic(item.kind).instrument) { toast('Отвод перемещается вместе с трубой. Точку и отступ можно изменить в свойствах.'); return; }
     if (!editable(compiled!, id, 'x') || !editable(compiled!, id, 'y')) { toast('Координаты вычисляются выражением. Отредактируйте формулу в TypeScript.'); return; }
     drag = { id, initialX: Number(item.props.x), initialY: Number(item.props.y), screenX: event.clientX, screenY: event.clientY, scale, x: 0, y: 0, moved: false, pointer: event.pointerId };
     (gestureAt = Date.now(), editor.dispatch({ annotations: isolateHistory.of('before') }));
@@ -283,7 +284,7 @@ $('help').onclick = () => { const dialog = $('guide') as HTMLDialogElement; dial
 $('guide-close').addEventListener('click', () => ($('guide') as HTMLDialogElement).close());
 document.querySelectorAll<HTMLButtonElement>('button[data-tab]').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab!)));
 $('add').addEventListener('click', () => $('palette').hidden = !$('palette').hidden);
-for (const [kind, spec] of Object.entries(catalog)) {
+for (const [kind, spec] of componentRegistry.schematicEntries()) {
   const button = document.createElement('button'); button.textContent = spec.label;
   const code = document.createElement('span'); code.textContent = kind; button.append(code);
   button.addEventListener('click', () => safely(() => {
@@ -291,8 +292,8 @@ for (const [kind, spec] of Object.entries(catalog)) {
       if (!compiled?.scene.links.some(l => l.id === selected)) throw new Error('Сначала выберите трубу для подключения прибора.');
       replaceSource(appendTap(source(), selected!, kind as 'pressure' | 'temperature'));
     } else {
-      const physical = compiled?.scene.nodes.filter(n => !catalog[n.kind].instrument) ?? [];
-      const x = physical.length ? Math.ceil(Math.max(...physical.map(n => Number(n.props.x) + catalog[n.kind].width)) / 10) * 10 + 90 : 200;
+      const physical = compiled?.scene.nodes.filter(n => !componentRegistry.schematic(n.kind).instrument) ?? [];
+      const x = physical.length ? Math.ceil(Math.max(...physical.map(n => Number(n.props.x) + componentRegistry.schematic(n.kind).width)) / 10) * 10 + 90 : 200;
       replaceSource(appendEquipment(source(), kind as Kind, Math.min(5900, x), 240));
       select(compiled!.scene.nodes.at(-1)!.id, true);
     }
@@ -341,7 +342,7 @@ window.addEventListener('keydown', event => {
   if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); safely(deleteSelected); }
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); event.shiftKey ? redo(editor) : undo(editor); }
   if (selected && /^Arrow/.test(event.key)) {
-    const item = compiled?.scene.nodes.find(n => n.id === selected); if (!item || catalog[item.kind].instrument) return;
+    const item = compiled?.scene.nodes.find(n => n.id === selected); if (!item || componentRegistry.schematic(item.kind).instrument) return;
     event.preventDefault(); const step = event.shiftKey ? 1 : 10; const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0, dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0;
     safely(() => updateFields(item.id, { x: Number(item.props.x) + dx, y: Number(item.props.y) + dy }, 'input.move', 'full'));
   }
@@ -380,7 +381,7 @@ Object.defineProperty(window, '__scada', { value: {
   get source() { return source(); }, get scene() { return compiled ? structuredClone(compiled.scene) : undefined; }, get error() { return currentError?.message ?? null; }, get warnings() { return sceneView.warnings; },
   get view3d() { return spatialView?.inspect() ?? null; },
   runtime: { get status() { return runtimeUI!.status; }, get frame() { return runtimeUI!.displayedFrame ? structuredClone(runtimeUI!.displayedFrame) : null; }, get liveFrame() { return runtimeUI!.frame ? structuredClone(runtimeUI!.frame) : null; }, get runId() { return runtimeUI!.runId; }, get mode() { return runtimeUI!.mode; },
-    connect: (config: import('./runtime/protocol').RuntimeConfig, token: string) => runtimeUI!.connect(config, token), disconnect: () => runtimeUI!.disconnect(),
+    connect: (config: import('../../src/runtime/protocol').RuntimeConfig, token: string) => runtimeUI!.connect(config, token), disconnect: () => runtimeUI!.disconnect(),
     createRun: (scenario: 'normal' | 'degradation') => runtimeUI!.createRun(scenario), selectRun: (id: string) => runtimeUI!.selectRun(id),
     command: (id: string, name: string, value?: number | string | boolean) => runtimeUI!.command(id, name, value),
     loadHistory: () => runtimeUI!.loadHistory(), replay: (seq: number) => runtimeUI!.replay(seq), live: () => runtimeUI!.live(),

@@ -11,7 +11,7 @@ async function signature() {
     if (info.isDirectory()) for (const entry of (await readdir(path)).sort()) await scan(`${path}/${entry}`);
     else { hash.update(path); hash.update(await readFile(path)); }
   }
-  for (const path of ['src', 'public', 'index.html', 'scripts/build.mjs']) await scan(path);
+  for (const path of ['src', 'examples', 'public', 'examples/diagram/index.html', 'scripts/build.mjs']) await scan(path);
   return hash.digest('hex');
 }
 function build() {

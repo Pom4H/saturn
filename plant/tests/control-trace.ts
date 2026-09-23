@@ -1,5 +1,5 @@
 import { compileProject } from '../compiler';
-import { demoFiles } from '../demo/files';
+import { demoFiles } from "../../examples/plant/files";
 import { Kernel } from '../kernel';
 /** Portable operator trace on the fictional water/ventilation loop only. */
 export function runControlTrace() {

@@ -1,0 +1,25 @@
+{
+  "id": "EXP-canonical-elements-examples",
+  "hypothesis": "One canonical component registry preserves existing geometry and source edits while eliminating separately authored metadata; examples can move without changing public routes.",
+  "status": "candidate",
+  "changeId": "canonical-elements-examples-20260923",
+  "scope": [
+    "src",
+    "examples",
+    "plant/equipment.ts",
+    "site",
+    "tests",
+    "scripts",
+    "packages/core/elements.ts"
+  ],
+  "oracle": [
+    "npm run check:release",
+    "npm run test:e2e",
+    "npm run challenge:browser"
+  ],
+  "negativeKnowledge": [
+    "plant/ is product implementation, not a demo directory",
+    "usegit context is unavailable in the current usegit command set"
+  ],
+  "evidence": []
+}

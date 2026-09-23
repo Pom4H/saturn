@@ -6,7 +6,7 @@ import { projectPresentation, presentationTargets } from '../presentation-target
 import { ControllerVM, compileController } from '../controller';
 import { Kernel } from '../kernel';
 import { compileProject, validateProject } from '../compiler';
-import { demoFiles } from '../demo/files';
+import { demoFiles } from "../../examples/plant/files";
 import { executeReport } from '../workflows';
 import { NodeSql } from '../adapters/node-sql';
 import type { ReportTask } from '../types';

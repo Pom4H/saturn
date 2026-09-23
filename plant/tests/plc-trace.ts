@@ -1,5 +1,5 @@
 import {compileProject} from '../compiler';
-import {demoFiles} from '../demo/files';
+import {demoFiles} from "../../examples/plant/files";
 import {Kernel} from '../kernel';
 const project=()=>compileProject(demoFiles);
 export function runPlcTrace(){

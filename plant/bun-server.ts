@@ -11,7 +11,7 @@ import { Service } from './service';
 import { requireRole } from './types';
 import { AppError, failCode } from './diagnostics';
 import { commandValue, nullableStringValue, numberMapValue, objectValue, stringValue, type JsonObject } from './http-input';
-import { demoFiles } from './demo/files';
+import { demoFiles } from "../examples/plant/files";
 import { buildArtifact, type BuildArtifact } from './artifact';
 
 const prefix = '/plant';

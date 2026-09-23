@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 // Keep build scripts compatible with Node 22.16 as declared by the project.
 export async function loadSiteModule(name) {
-  const result = await build({ entryPoints: [`site/${name}.ts`], bundle: true, format: 'esm', platform: 'node', target: 'es2022', write: false });
+  const result = await build({ entryPoints: [({ starter: "examples/pumping/files.ts", "typescript-example": "examples/pump-bank/files.ts", model: "examples/hydraulic-loop/model.ts", "project-context": "examples/pump-bank/context.ts" })[name] ?? `site/${name}.ts`], bundle: true, format: 'esm', platform: 'node', target: 'es2022', write: false });
   return import('data:text/javascript;base64,' + Buffer.from(result.outputFiles[0].contents).toString('base64'));
 }
 
@@ -19,7 +19,7 @@ export async function buildSite(outdir = 'dist/site', mode = 'demo') {
   if (extensionId && !/^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+$/.test(extensionId)) throw new Error('SATURN_VSCODE_EXTENSION_ID must be publisher.extension');
   await rm(`${outdir}/assets`, { recursive: true, force: true });
   await mkdir(`${outdir}/assets`, { recursive: true });
-  await build({ entryPoints: ['src/standalone.ts'], outfile: `${outdir}/assets/standalone.js`, bundle: true, format: 'iife', platform: 'browser', minify: true, target: 'es2022' });
+  await build({ entryPoints: ['examples/diagram/standalone.ts'], outfile: `${outdir}/assets/standalone.js`, bundle: true, format: 'iife', platform: 'browser', minify: true, target: 'es2022' });
   const bundle = await build({ entryPoints: { site: 'site/main.ts' }, metafile: true, entryNames: '[name]-[hash]', bundle: true, splitting: true, format: 'esm', platform: 'browser', target: 'es2022', minify: true,
     outdir: `${outdir}/assets`, chunkNames: '[name]-[hash]', legalComments: 'linked', define: { __VSCODE_EXTENSION__: JSON.stringify(extensionId) } });
   const [entry, metadata] = Object.entries(bundle.metafile.outputs).find(([, metadata]) => metadata.entryPoint === 'site/main.ts');

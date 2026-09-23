@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { booster } from '../../src/examples';
+import { booster } from "../../examples/diagram/projects";
 import { nestedTap, stackedTaps } from '../fixtures';
 
 declare global {

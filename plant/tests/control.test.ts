@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { compileProject, validateProject } from '../compiler';
-import { demoFiles } from '../demo/files';
+import { demoFiles } from "../../examples/plant/files";
 import { runControlTrace } from './control-trace';
 import { Kernel } from '../kernel';
 import { Service } from '../service';

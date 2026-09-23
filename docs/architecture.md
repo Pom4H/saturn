@@ -19,7 +19,7 @@ flowchart TD
 
 | Layer | Source of truth | Files |
 |---|---|---|
-| Authored configuration | Exact TS, shared by code/drag/inspector/undo | `src/source.ts`, `src/main.ts` |
+| Authored configuration | Exact TS, shared by code/drag/inspector/undo | `src/source.ts`, `examples/diagram/main.ts` |
 | Component metadata | Installed definitions: fields, ports, signal units and commands | `src/core.ts`, `src/components/*/definition.ts` |
 | Behavior | Fixed-step installed server modules | `server/behavior.ts`, `server/models.ts`, component `behavior.ts` |
 | Installation | Explicit generic series rule connects published outputs | `server/engine.ts` |
@@ -38,7 +38,7 @@ The diagnostic boundary is the public observation stream: measured signals, qual
 
 The running editor includes `filter` as a complete small extension, separate from the eight legacy components:
 
-1. `src/components/filter/definition.ts` calls `registerComponent('filter', definition)` with versioned fields, physical port roles, units and command schemas.
+1. `src/elements/core-elements.ts` declares the filter once in `ComponentDefinition` with versioned fields, physical port roles, units and command schemas.
 2. `src/components/filter/behavior.ts` exports a behavior module with `initialize`, `advance`, `output` and `command`. Outputs participate in the generic installation through `process.conductance`.
 3. `src/components/filter/visual.ts` registers both `registerSvgRenderer` and `register3dRenderer`. The 3D factory receives Three through its context; type-only imports keep Three out of the initial bundle.
 4. Composition roots import metadata (`src/components/installed.ts`), visuals (`src/visual-components.ts`) and register behavior (`server/models.ts`). These are installation lists, not compiler or renderer branches.

@@ -1,4 +1,4 @@
-import { catalog } from '../core';
+import { componentRegistry } from '../core';
 import { compile, setRuntimeConfiguration, type Compiled } from '../source';
 import { RuntimeClient, offlineFrame, validateDestination, isFrame } from './client';
 import { configurationJSON, numeric, type RunSummary, type RuntimeConfig, type RuntimeFrame, type TrendSelection, type TrendSeries, type TrendPoint } from './protocol';
@@ -292,7 +292,7 @@ export class RuntimeWorkspace {
     choose('compare-run').replaceChildren(option('', 'Сравнить с…'), ...this.runs.filter(r => r.id !== this.runId).map(r => option(r.id, r.label)));
     choose('compare-run').value = previous;
   }
-  private target() { const nodes = this.host.compiled()?.scene.nodes ?? []; return nodes.find(n => n.id === this.host.selected())?.id ?? nodes.find(n => Object.keys(catalog[n.kind].commands ?? {}).length)?.id ?? null; }
+  private target() { const nodes = this.host.compiled()?.scene.nodes ?? []; return nodes.find(n => n.id === this.host.selected())?.id ?? nodes.find(n => Object.keys(componentRegistry.schematic(n.kind).commands ?? {}).length)?.id ?? null; }
   selectionChanged() {
     this.commandSignature = ''; this.trendChoiceKey = ''; this.graphKey = ''; this.updateControls();
     if (this.displayed) this.display(this.displayed);
@@ -309,7 +309,7 @@ export class RuntimeWorkspace {
     const key = `${isLink ? selected : node?.id}:${node?.kind}`;
     if (key === this.trendChoiceKey) return;
     this.trendChoiceKey = key;
-    const fields = isLink ? { flow: { label: 'Расход', type: 'number', unit: 'm3/h' } } : node ? catalog[node.kind].signals ?? {} : {};
+    const fields = isLink ? { flow: { label: 'Расход', type: 'number', unit: 'm3/h' } } : node ? componentRegistry.schematic(node.kind).signals ?? {} : {};
     const available = Object.entries(fields).filter(([, s]) => s.type === 'number');
     choose('trend-signal').replaceChildren(...available.map(([name, s]) => option(name, `${s.label} · ${s.unit}`)));
     choose('trend-signal').value = available.some(([name]) => name === 'flow') ? 'flow' : available[0]?.[0] ?? '';
@@ -328,7 +328,7 @@ export class RuntimeWorkspace {
     button('replay-play').disabled = !this.history.length; input('replay-position').disabled = !this.history.length;
     button('replay-live').disabled = !selected || !this.replaying;
     $('run-label').textContent = this.currentRun ? `${this.currentRun.label}${this.currentRun.projectRevision ? ' · Git ' + this.currentRun.projectRevision.slice(0, 8) : ''} · ${this.replaying ? 'запись' : this.currentRun.status === 'completed' ? 'завершён' : this.currentRun.status === 'failed' ? 'ошибка модели' : 'эфир'} · синтетика` : 'Синтетические данные';
-    const target = this.target(), node = this.host.compiled()?.scene.nodes.find(n => n.id === target), commands = node ? catalog[node.kind].commands ?? {} : {};
+    const target = this.target(), node = this.host.compiled()?.scene.nodes.find(n => n.id === target), commands = node ? componentRegistry.schematic(node.kind).commands ?? {} : {};
     const disabled = this.role === 'view' || !this.sourceValid || !connected || !selected || this.replaying || this.currentRun?.status !== 'running';
     button('complete-run').disabled = disabled;
     $('command-target').textContent = target ?? 'Выберите оборудование';
@@ -366,7 +366,7 @@ export class RuntimeWorkspace {
       for (const [name, signal] of Object.entries(equipment.signals)) {
         const field = document.createElement('span'); field.className = 'signal-value'; field.dataset.signal = name; field.dataset.quality = signal.quality;
         const value = signal.quality !== 'good' || signal.value === null ? '—' : typeof signal.value === 'number' ? signal.value.toFixed(signal.unit === 'rpm' ? 0 : 2) : typeof signal.value === 'boolean' ? signal.value ? 'Да' : 'Нет' : String(signal.value);
-        const label = definition ? catalog[definition.kind].signals?.[name]?.label ?? name : name;
+        const label = definition ? componentRegistry.schematic(definition.kind).signals?.[name]?.label ?? name : name;
         field.textContent = `${label}: ${value} ${units[signal.unit] ?? signal.unit}${signal.quality !== 'good' ? ` · ${qualities[signal.quality]}` : ''}`; $('runtime-metrics').append(field);
       }
     }

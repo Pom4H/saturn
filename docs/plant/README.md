@@ -35,7 +35,7 @@ Do not expose plaintext HTTP remotely. Terminate TLS before the server and set `
 
 ## PWA and persistence
 
-`npm run build` builds the old editor **and** `dist/plant/`. `npm run plant:build` builds only the new workbench/server. The public demo can be served by an ordinary static HTTP server, including below `/scada/plant/demo/` on Pages. It requires no application backend or CDN. Do not open it with `file://`.
+`npm run build` builds the old editor **and** `dist/plant/`. `npm run plant:build` builds only the new workbench/server. The public demo can be served by an ordinary static HTTP server, including below `/scada/examples/plant/` on Pages. It requires no application backend or CDN. Do not open it with `file://`.
 
 The service worker precaches an explicit list of public demo HTML, JavaScript, WASM, CSS and icons. It never caches authenticated application HTML, API responses, project sources fetched from the server, report artifacts, or login responses. An installed update waits for explicit confirmation. The browser never falls back from a disconnected server to synthetic data.
 
