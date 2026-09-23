@@ -31,6 +31,10 @@ async function inspect(file) {
   const source = ts.createSourceFile(file,text,ts.ScriptTarget.Latest,true,
     file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const rel = relative(root,file).replaceAll('\\','/');
+  if (text.includes('@scada/core'))
+    violations.push(`${rel} [canonical-package] @scada/core is legacy; authored projects import @saturn/core only.`);
+  if (['src/core.ts','src/source.ts','src/examples.ts','site/shell-projects.ts','challenges/fixtures.ts'].includes(rel) && /\\bconnect\\s*\\(/.test(text))
+    violations.push(`${rel} [physical-topology] Generic connect() is forbidden in authored topology; use pipe()/cable().`);
 
   function visit(node) {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
