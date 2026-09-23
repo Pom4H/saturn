@@ -21,10 +21,10 @@ const motor = simulation("P-01", "pump", {
   parameters: { nominalFlow: 1.2 },
 });
 
-const meter = simulation("FT-01", "strainer", {
+const meter = simulation("FT-01", "flowmeter", {
   system: water.id,
   at: { x: 620, y: 160 },
-  inputs: { flow: motor.flow, impurity: 0.02, flush: 0 },
+  inputs: { flow: motor.flow },
 });
 
 const gate = simulation("V-01", "motor-valve", {
