@@ -25,7 +25,13 @@ export async function checkLandingDemo(browser, origin) {
     await page.goto(origin);
     await page.locator('#studio-svg [data-node="P-01"]').waitFor({ state: 'attached' });
     const shell = page.locator('#studio-shell'), content = page.locator('#studio-editor .cm-content');
-    const source = () => content.innerText();
+    // CodeMirror virtualizes the DOM: innerText is not the authored document.
+    // This test-only bridge targets the pinned view package; no production globals.
+    const source = () => content.evaluate(node => {
+      const view = node.cmTile?.view;
+      if (!view?.state?.doc) throw new Error('Mounted CodeMirror document is unavailable');
+      return view.state.doc.toString();
+    });
     const initial = await source();
     assert.match(initial, /from '@saturn\/core'/, 'Landing authors the canonical Saturn package');
     assert.match(initial, /pipe\('suction'/, 'Fluid topology is authored as pipe()');
@@ -108,7 +114,7 @@ export async function checkLandingDemo(browser, origin) {
     assert.equal(await page.locator('.demo-header').count(), 0);
     assert(await page.locator('.shell-topbar').isVisible(), 'Full IDE retains its tools');
     assert(await page.locator('#file-browser').isVisible(), 'Full IDE restores saved layout');
-    assert.match(await content.innerText(), /rpm: 2111/, 'Full IDE restores the saved project, not disposable demo edits');
+    assert.match(await source(), /rpm: 2111/, 'Full IDE restores the saved project, not disposable demo edits');
     assert.deepEqual(errors, []);
     console.log('PASS: canonical @saturn/core landing; pipe/cable authoring; live rerouting; two-way editing; storage isolation; mobile; full IDE handoff.');
   } finally { await context.close(); }
