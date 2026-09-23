@@ -38,7 +38,7 @@ export function dslCompletions(source: string, position: number, scene?: Scene):
     }
   }
   return [
-    ...[...Object.keys(catalog), 'component', 'runtime', 'connect', 'tap'].map(label => ({ label, type: 'function', detail: '@scada/core' })),
+    ...[...Object.keys(catalog), 'component', 'runtime', 'pipe', 'tap'].map(label => ({ label, type: 'function', detail: '@saturn/core' })),
     ...(scene?.nodes ?? []).filter(n => n.variable).map(n => ({ label: n.variable, type: 'variable', detail: n.id })),
   ];
 }
