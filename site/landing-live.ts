@@ -13,7 +13,7 @@ export function mountLandingLive(): void {
 
   function load(role: keyof typeof frames): void {
     const frame = frames[role];
-    if (!frame || frame.src) return;
+    if (!frame || frame.hasAttribute('src')) return;
     const source = frame.dataset.liveSrc;
     if (!source) return;
     frame.src = source;
