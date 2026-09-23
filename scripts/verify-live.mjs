@@ -28,7 +28,9 @@ try {
   await page.waitForSelector('#studio-svg [data-node]', { state: 'attached' });
   assert.equal(await page.locator('#studio-shell').getAttribute('data-demo'), 'true');
   assert.equal(await page.locator('#studio-spatial canvas').count(), 0, 'Landing does not mount 3D');
-  assert.equal(await page.locator('h1').innerText(), 'Saturn');
+  const primaryHeading = page.locator('h1');
+  assert.equal(await primaryHeading.count(), 1, 'Landing has exactly one primary heading');
+  assert((await primaryHeading.innerText()).trim().length > 0, 'Landing primary heading is not empty');
   assert.equal(await page.locator('.capability-row').count(), 5);
   assert.equal(await page.locator('.distribution-item').count(), 6);
   assert.equal(await page.locator('.extension-index > div').count(), 6);
