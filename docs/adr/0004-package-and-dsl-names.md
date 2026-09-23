@@ -36,7 +36,7 @@ The DSL is grouped by domain rather than by renderer:
 
 ### Physical topology
 
-`pipe()` is the preferred process-topology abstraction. A project declares that two typed ports are connected by a pipe; routing geometry, 2D/3D rendering and runtime topology consume the resulting `Connection`.
+`pipe()` is the process-topology abstraction. A project declares that two typed ports are connected by a pipe; routing geometry, 2D/3D rendering and runtime topology consume the resulting `Connection`.
 
 ~~~ts
 const suction = pipe(
@@ -46,7 +46,9 @@ const suction = pipe(
 )
 ~~~
 
-`simulation()` and `plc()` expose typed `ports`; authored code should prefer those structural refs. `port(id, name)` remains only for dynamic/generated editor operations.\n\n`cable()` represents explicit electrical, control and bus media. A generic untyped `connect()` must not become the canonical installation API.
+`simulation()` and `plc()` expose typed `ports`; authored code should prefer those structural refs. `port(id, name)` remains only for dynamic/generated editor operations.
+
+`cable()` represents explicit electrical, control and bus media. A generic untyped `connect()` is not part of the authored installation API.
 
 ### Signals
 
@@ -62,4 +64,4 @@ The engineering shell includes a **DSL** section generated from the canonical Sa
 - New authored examples use `@saturn/core`.
 - Package/application identity no longer depends on the historical `@scada/*` namespace.
 - Legacy project module aliases are rejected before production; migrations must update source explicitly.
-- New topology work should prefer `pipe()` / `cable()` over the legacy scene-level `connect()`.
+- Authored topology uses `pipe()` / `cable()` only; generic scene-level `connect()` is rejected by architecture checks.
