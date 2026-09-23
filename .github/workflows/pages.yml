@@ -63,7 +63,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Saturn shell integration
-        run: npm run site:test:browser
+        run: node scripts/site-release-check.mjs
 
       - run: npm audit --audit-level=high
 
