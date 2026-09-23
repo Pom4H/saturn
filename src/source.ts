@@ -77,7 +77,7 @@ export function compile(source: string): Compiled {
     }
     if (ts.isCallExpression(n) && ts.isIdentifier(n.expression)) {
       const name = imports.get(n.expression.text);
-      if (!name) fail(n.expression, 'Вызов должен быть импортирован из "@scada/core".');
+      if (!name) fail(n.expression, 'Вызов должен быть импортирован из "@saturn/core".');
       if (name === 'runtime') {
         if (runtime) fail(n, 'В проекте допускается одна настройка runtime.');
         if (n.arguments.length !== 1 || !ts.isObjectLiteralExpression(n.arguments[0])) fail(n, 'runtime({ server, project, run? }) ожидает объект настроек.');
@@ -97,25 +97,27 @@ export function compile(source: string): Compiled {
         runtime = { server: config.server.replace(/\/$/, ''), project: config.project, ...(config.run ? { run: config.run } : {}) };
         return runtime;
       }
-      if (name === 'connect') {
-        if (n.arguments.length !== 2) fail(n, 'connect(from.outlet, to.inlet) принимает два порта.');
-        const from = ev(n.arguments[0]), to = ev(n.arguments[1]);
-        if (!isEndpoint(from) || !isEndpoint(to)) fail(n, 'Соединяйте порты: connect(pump.outlet, valve.inlet).');
+      if (name === 'pipe') {
+        if (n.arguments.length !== 3) fail(n, 'pipe("ID", from.outlet, to.inlet) принимает ID и два порта.');
+        const pipeId = ev(n.arguments[0]), from = ev(n.arguments[1]), to = ev(n.arguments[2]);
+        if (typeof pipeId !== 'string' || !/^[\\p{L}\\p{N}_.-]{1,48}$/u.test(pipeId)) fail(n.arguments[0], 'ID трубы: 1–48 букв, цифр, точек, дефисов или подчёркиваний.');
+        if (objects.has(pipeId) || scene.links.some(link => link.id === pipeId)) fail(n, `Повторный ID: ${pipeId}.`);
+        if (!isEndpoint(from) || !isEndpoint(to)) fail(n, 'Соединяйте порты: pipe("P-101", pump.outlet, valve.inlet).');
         if (from.node === to.node) fail(n, 'Нельзя соединить элемент с самим собой.');
         for (const [endpoint, role] of [[from, 'out'], [to, 'in']] as const) {
           const node = scene.nodes.find(v => v.id === endpoint.node)!;
-          if (catalog[node.kind].ports[endpoint.port].role !== role) fail(n, 'Соединение должно идти от выхода ко входу.');
+          if (catalog[node.kind].ports[endpoint.port].role !== role) fail(n, 'Труба должна идти от выхода ко входу.');
           if (scene.links.some(l => [l.from, l.to].some(p => p.node === endpoint.node && p.port === endpoint.port))) fail(n, `Порт ${endpoint.node}.${endpoint.port} уже занят.`);
         }
         const assigned = ts.isVariableStatement(statement) && statement.declarationList.declarations[0].initializer === n;
-        const edge: Link = { id: `${from.node}.${from.port}:${to.node}.${to.port}`, from, to, variable: assigned ? variable : undefined };
+        const edge: Link = { id: pipeId, from, to, variable: assigned ? variable : undefined };
         linkExpressions.set(edge.id, n);
         scene.links.push(edge); statements.set(edge.id, statement); return edge;
       }
       if (name === 'tap') {
         if (n.arguments.length !== 2) fail(n, 'tap(line, instrument) принимает линию и прибор.');
         const line = ev(n.arguments[0]); const instrument = ev(n.arguments[1]);
-        if (!isLink(line) || !isEquipment(instrument) || !catalog[instrument.kind].instrument) fail(n, 'tap ожидает connect(...) и pressure(...) или temperature(...).');
+        if (!isLink(line) || !isEquipment(instrument) || !catalog[instrument.kind].instrument) fail(n, 'tap ожидает pipe(...) и pressure(...) или temperature(...).');
         if (instrument.tap) fail(n, 'Прибор уже подключён к линии.');
         instrument.tap = line.id; tapExpressions.set(instrument.id, n); statements.set(`tap:${instrument.id}`, statement); return instrument;
       }
@@ -155,12 +157,12 @@ export function compile(source: string): Compiled {
   for (const s of file.statements) {
     statement = s; variable = '';
     if (ts.isImportDeclaration(s)) {
-      if (!ts.isStringLiteral(s.moduleSpecifier) || s.moduleSpecifier.text !== '@scada/core') fail(s, 'Разрешён только импорт из "@scada/core".');
+      if (!ts.isStringLiteral(s.moduleSpecifier) || s.moduleSpecifier.text !== '@saturn/core') fail(s, 'Разрешён только импорт из "@saturn/core".');
       const binding = s.importClause?.namedBindings;
-      if (!binding || !ts.isNamedImports(binding)) fail(s, 'Используйте именованные импорты: import { pump } from "@scada/core".');
+      if (!binding || !ts.isNamedImports(binding)) fail(s, 'Используйте именованные импорты: import { pump } from "@saturn/core".');
       for (const item of binding.elements) {
         const remote = item.propertyName?.text ?? item.name.text;
-        if (!has(catalog, remote) && !['connect', 'tap', 'component', 'runtime'].includes(remote)) fail(item, `Неизвестный экспорт: ${remote}.`);
+        if (!has(catalog, remote) && !['pipe', 'tap', 'component', 'runtime'].includes(remote)) fail(item, `Неизвестный экспорт: ${remote}.`);
         if (imports.has(item.name.text) || values.has(item.name.text)) fail(item, 'Повторное имя импорта.');
         imports.set(item.name.text, remote);
       }
@@ -172,11 +174,11 @@ export function compile(source: string): Compiled {
       if (values.has(variable) || imports.has(variable)) fail(d.name, `Повторное имя: ${variable}.`);
       values.set(variable, evaluate(d.initializer));
     } else if (ts.isExpressionStatement(s)) {
-      if (!ts.isCallExpression(s.expression)) fail(s, 'Здесь ожидается connect(...) или tap(...).');
+      if (!ts.isCallExpression(s.expression)) fail(s, 'Здесь ожидается pipe(...) или tap(...).');
       evaluate(s.expression);
-    } else if (s.kind !== ts.SyntaxKind.EmptyStatement) fail(s, 'Поддерживаются import, const, connect и tap.');
+    } else if (s.kind !== ts.SyntaxKind.EmptyStatement) fail(s, 'Поддерживаются import, const, pipe и tap.');
   }
-  for (const item of scene.nodes) if (catalog[item.kind].instrument && !item.tap) throw new SourceError(`${item.id}: подключите прибор через tap(line, ...).`, objects.get(item.id)!.span.from, objects.get(item.id)!.span.to);
+  for (const item of scene.nodes) if (catalog[item.kind].instrument && !item.tap) throw new SourceError(`${item.id}: подключите прибор через tap(pipe, ...).`, objects.get(item.id)!.span.from, objects.get(item.id)!.span.to);
   return { scene, runtime, file, objects, statements, imports, linkExpressions, tapExpressions };
 }
 export function editable(compiled: Compiled, id: string, key: string): boolean { const p = compiled.objects.get(id)?.fields.get(key); return !p || literal(p); }
@@ -230,7 +232,7 @@ export function ensureImport(source: string, names: string[]): string {
   const used = new Set([...c.imports.keys()]);
   for (const s of c.file.statements) if (ts.isVariableStatement(s)) for (const d of s.declarationList.declarations) if (ts.isIdentifier(d.name)) used.add(d.name.text);
   const bindings = missing.map(name => { let local = name, index = 1; while (used.has(local)) local = `${name}Factory${index++}`; used.add(local); return local === name ? name : `${name} as ${local}`; });
-  return `import { ${bindings.join(', ')} } from "@scada/core";\n` + source;
+  return `import { ${bindings.join(', ')} } from "@saturn/core";\n` + source;
 }
 export function appendEquipment(source: string, kind: Kind, x: number, y: number): string {
   const c = compile(source); let i = 1; const prefix = catalog[kind].prefix ?? ({ tank: 'T', pump: 'P', valve: 'V', flowmeter: 'F', exchanger: 'HX', outlet: 'OUT', pressure: 'PT', temperature: 'TT' } as Record<string, string>)[kind] ?? kind.toUpperCase();
@@ -245,10 +247,10 @@ export function appendEquipment(source: string, kind: Kind, x: number, y: number
 export function appendConnection(source: string, from: Endpoint, to: Endpoint): string {
   const c = compile(source); const a = c.objects.get(from.node)?.variable, b = c.objects.get(to.node)?.variable;
   if (!a || !b) throw new SourceError('Для соединения у элементов должны быть имена const.');
-  const imported = ensureImport(source, ['connect']);
-  const fn = [...compile(imported).imports].find(([, remote]) => remote === 'connect')![0];
-  let i = 1; while (new RegExp(`\\bline${i}\\b`).test(source)) i++;
-  const result = imported + `\nconst line${i} = ${fn}(${a}.${from.port}, ${b}.${to.port});\n`;
+  const imported = ensureImport(source, ['pipe']);
+  const fn = [...compile(imported).imports].find(([, remote]) => remote === 'pipe')![0];
+  let i = 1; while (new RegExp(`\\bpipe${i}\\b`).test(source) || c.scene.links.some(link => link.id === `PIPE-${100 + i}`)) i++;
+  const result = imported + `\nconst pipe${i} = ${fn}("PIPE-${100 + i}", ${a}.${from.port}, ${b}.${to.port});\n`;
   compile(result); return result;
 }
 export function appendTap(source: string, lineId: string, kind: 'pressure' | 'temperature'): string {
