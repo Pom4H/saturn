@@ -1,0 +1,34 @@
+name: Temporary PR72 conflict workbench
+on:
+  push:
+    branches: [workbench/pr72-conflict-resolve]
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Merge current main and preserve conflict state
+        shell: bash
+        run: |
+          git config user.name "Saturn conflict workbench"
+          git config user.email "saturn-conflict@users.noreply.github.com"
+          git fetch origin main
+          set +e
+          git merge --no-commit --no-ff origin/main
+          status=$?
+          set -e
+          echo "merge_status=$status" > /tmp/merge-status.txt
+          git status --short >> /tmp/merge-status.txt
+          tar -czf /tmp/saturn-pr72-merge-worktree.tgz --exclude=node_modules .
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: pr72-merge-worktree
+          path: |
+            /tmp/saturn-pr72-merge-worktree.tgz
+            /tmp/merge-status.txt
+          retention-days: 1
