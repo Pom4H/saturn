@@ -30,12 +30,15 @@ import { fetchServerSession, serverPost, commandPayload, type ServerSession } fr
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 type Surface = 'scene' | 'equipment' | 'source' | 'signals' | 'controls' | 'alarms' | 'projects';
 export async function mountStudio() {
+  const embedded = new URLSearchParams(location.search).get('embed') === 'shell';
+  const activeWorkspaceKey = embedded ? 'saturn.shell.embed.workspace.v1' : workspaceKey;
+  const layoutKey = embedded ? 'saturn.shell.embed.layout.v1' : 'saturn.shell.layout.v1';
   const stage = $('studio'), shell = $('studio-shell'), spatialHost = $('studio-spatial');
   const canvas = document.getElementById('studio-svg') as unknown as SVGSVGElement;
   const inspector = shell.querySelector<HTMLElement>('.studio-inspector')!;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)'), compact = matchMedia('(max-width:520px)');
   let workspace: WorkspaceState = createWorkspace(), storageAvailable = true;
-  try { const raw = localStorage.getItem(workspaceKey); if (raw) workspace = parseWorkspace(raw); }
+  try { const raw = localStorage.getItem(activeWorkspaceKey); if (raw) workspace = parseWorkspace(raw); }
   catch { storageAvailable = false; }
   let shared = false;
   try { const source = readSharedSource(location.hash); if (source) { compile(source); createProject(workspace, 'Проект по ссылке', source); shared = true; } } catch { storageAvailable = false; }
@@ -452,7 +455,7 @@ export async function mountStudio() {
     documents.capture(editor.state);
     if (workspaceSnapshot) { message(documents.dirty() ? 'Черновик в памяти' : 'Без изменений'); renderFiles(); return true; }
     if (isPlant()) updateFiles(workspace, documents.files); else updateSource(workspace, documents.files['station.ts']);
-    try { localStorage.setItem(workspaceKey, JSON.stringify(workspace)); storageAvailable = true; message('Сохранено'); return true; }
+    try { localStorage.setItem(activeWorkspaceKey, JSON.stringify(workspace)); storageAvailable = true; message('Сохранено'); return true; }
     catch { storageAvailable = false; message('Не сохранено · скачайте .ts'); return false; }
   }
   function refresh(save: boolean) {
@@ -666,7 +669,7 @@ export async function mountStudio() {
     setMode(explicit);
     revealShell();
   }
-  function saveLayout() { try { localStorage.setItem('saturn.shell.layout.v1', JSON.stringify({ filesVisible, codeVisible, sourceWidth: shell.style.getPropertyValue('--source-width'), navigatorWidth: shell.style.getPropertyValue('--navigator-width') })); } catch {} }
+  function saveLayout() { try { localStorage.setItem(layoutKey, JSON.stringify({ filesVisible, codeVisible, sourceWidth: shell.style.getPropertyValue('--source-width'), navigatorWidth: shell.style.getPropertyValue('--navigator-width') })); } catch {} }
   function syncPanels() {
     const mobile = compact.matches;
     if (!selected && mobilePane === 'properties') mobilePane = 'scene';
@@ -900,7 +903,7 @@ export async function mountStudio() {
     if (!storageAvailable || workspaceSnapshot && documents.dirty() || workspaceDraft?.documents.dirty()) event.preventDefault();
   });
   window.addEventListener('beforeunload', event => { if (workspaceSnapshot && documents.dirty() || workspaceDraft?.documents.dirty()) { event.preventDefault(); event.returnValue = ''; } });
-  try { const layout = JSON.parse(localStorage.getItem('saturn.shell.layout.v1') ?? '{}'); filesVisible = layout.filesVisible === true; if (typeof layout.codeVisible === 'boolean') codeVisible = layout.codeVisible; if (/^\d+(\.\d+)?px$/.test(layout.navigatorWidth ?? '')) shell.style.setProperty('--navigator-width', layout.navigatorWidth); if (/^\d+(\.\d+)?px$/.test(layout.sourceWidth ?? '')) shell.style.setProperty('--source-width', layout.sourceWidth); } catch {}
+  try { const layout = JSON.parse(localStorage.getItem(layoutKey) ?? '{}'); filesVisible = layout.filesVisible === true; if (typeof layout.codeVisible === 'boolean') codeVisible = layout.codeVisible; if (/^\d+(\.\d+)?px$/.test(layout.navigatorWidth ?? '')) shell.style.setProperty('--navigator-width', layout.navigatorWidth); if (/^\d+(\.\d+)?px$/.test(layout.sourceWidth ?? '')) shell.style.setProperty('--source-width', layout.sourceWidth); } catch {}
   if (isPlant()) await ensurePlant();
   renderEquipmentCatalog();
   view.render(compiled.scene); refresh(false); fitScene(); updatePause(); renderMeta();
