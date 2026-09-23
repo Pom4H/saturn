@@ -858,8 +858,17 @@ export async function mountStudio() {
     try {
       if (/\.json$/i.test(file.name)) { await ensurePlant(); const files = JSON.parse(await file.text()); plantTools!.validateFiles(files); plantTools!.plantProjection(files); persist(); const oldServer = workspaceSnapshot; createProject(workspace, file.name.replace(/\.json$/i, '').slice(0,80), files['plant.ts']); if (oldServer) workspaceDraft = { snapshot: oldServer, documents }; workspaceSnapshot = null; pendingWorkspaceSnapshot = null; updateFiles(workspace, files); switchDocument(workspace.active, false); filesVisible = true; syncPanels(); input.value = ''; return; }
       if (file.size > 120000) throw new Error('Размер файла должен быть меньше 120 КБ');
-      const source = await file.text(); compile(source); persist(); if (workspaceSnapshot) workspaceDraft = { snapshot: workspaceSnapshot, documents }; createProject(workspace, file.name.replace(/\.ts$/i, '').slice(0, 80) || 'Импорт', source);
-      workspaceSnapshot = null; pendingWorkspaceSnapshot = null; documents = new Documents({ 'station.ts': source }, editorState, 'station.ts'); editor.setState(documents.state); selected = null; refresh(false); fitScene(); persist(); renderMeta(); setSurface('scene'); setMode('2d'); toast('Исходник импортирован в новый проект');
+      await ensurePlant();
+      const source = await file.text(), files = { 'plant.ts': source };
+      plantTools!.plantProjection(files);
+      persist();
+      const oldServer = workspaceSnapshot;
+      if (oldServer) workspaceDraft = { snapshot: oldServer, documents };
+      createProject(workspace, file.name.replace(/\.ts$/i, '').slice(0, 80) || 'Импорт', source);
+      workspaceSnapshot = null; pendingWorkspaceSnapshot = null;
+      updateFiles(workspace, files);
+      switchDocument(workspace.active, false);
+      filesVisible = true; syncPanels(); setMode('2d'); toast('Проект импортирован');
     } catch (e) { toast(e instanceof Error ? e.message : String(e)); }
     input.value = '';
   };
