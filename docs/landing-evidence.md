@@ -29,3 +29,7 @@ The browser gate checks anonymous rejection, operator rejection, no-store author
 Keep the existing two-way editing, pipe preview, undo/reset, invalid-source, storage isolation and full-IDE checks. New checks cover real authenticated publication and operation, current-build image provenance, light/dark images, keyboard switching, mobile overflow and working internal links. Inspect `landing-light.png`, `landing-dark.png`, `landing-mobile.png` and the individual product captures from `shell-evidence` before accepting the experiment.
 
 These checks establish reproducible behavior of the demonstrated software. They do not establish physical equipment compatibility, industrial certification, uptime, conversion uplift or customer adoption.
+
+## Integration with canonical component registry
+
+PR #73 is merged into `main`. The landing branch now contains that merge: component metadata remains owned by the canonical `ComponentRegistry`, moved examples remain under `examples/`, while the original Saturn SVG anatomy and typed hover stay layered on that architecture. The resolved tree passed the complete `check:release` gate before it was pushed back to the PR branch.
