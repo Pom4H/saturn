@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { rawText } from './esbuild-raw-text.mjs';
-import { mkdtemp, mkdir, rm, copyFile, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomBytes } from 'node:crypto';
-import { writeSiteCache } from './site-build.mjs';
 
 /** Capture the actual authenticated shell, not a marketing reconstruction. */
 async function checkDiagramContrast(page) {
@@ -82,7 +81,6 @@ export async function captureLandingProof(browser, siteDir) {
       await checkDiagramContrast(page);
       const file = `proof-${role}${variant}-${scheme}.png`;
       await page.locator('#studio-shell').screenshot({ path: join(out, file) });
-      await copyFile(join(out, file), `${siteDir}/assets/${file}`);
     }
   }
   const errors = [];
@@ -193,9 +191,7 @@ export async function captureLandingProof(browser, siteDir) {
     await capture(operator, 'operator', '-mobile');
     assert.deepEqual(errors, [], 'Authenticated capture has no browser exceptions');
     const manifest = JSON.stringify({ available: true, revision, source: 'authenticated-server-simulation', roles: ['engineer', 'operator'], applied, project: 'operator-pump', mobileOperator: true, checks: ['publish', 'independent-operator', 'command', 'observed-flow', 'alarm-raised', 'acknowledged-active', 'condition-cleared'] }, null, 2);
-    await writeFile(`${siteDir}/assets/landing-proof.json`, manifest);
     await writeFile(join(out, 'landing-proof.json'), manifest);
-    await writeSiteCache(siteDir); // Generated evidence is part of this build's offline cache identity.
     console.log('PASS: real engineer publication -> independent operator session; roles, scoped authoring CSP, command -> measured model response -> active alarm -> acknowledgement -> recovery; light/dark screenshots.');
   } catch (error) {
     for (const [index, context] of contexts.entries()) for (const page of context.pages()) {
