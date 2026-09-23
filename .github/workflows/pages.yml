@@ -18,13 +18,15 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - name: Apply exact locally verified bytes and remove audit tooling
+      - name: Apply exact checked product bytes without changing workflows
         run: |
+          cp .github/workflows/pages.yml /tmp/shell-apply-workflow.yml
           git show 9eea2d64508c6f09a61a87af333044cbace199d2:.github/workflows/pages.yml > .github/workflows/pages.yml
           python scripts/.shell-ux-apply.py
+          cp /tmp/shell-apply-workflow.yml .github/workflows/pages.yml
           git rm scripts/.shell-ux-apply.py scripts/.shell-ux-final-ci.yml
           git diff --check
-          git add .github/workflows/pages.yml package.json scripts/site-dev.mjs scripts/site-interaction-check.mjs scripts/site-release-check.mjs scripts/site-shell-ux-check.mjs scripts/site-studio-check.mjs site/index.html site/studio.css site/studio.ts site/styles.css src/view3d.ts
+          git add package.json scripts/site-dev.mjs scripts/site-interaction-check.mjs scripts/site-release-check.mjs scripts/site-shell-ux-check.mjs scripts/site-studio-check.mjs site/index.html site/studio.css site/studio.ts site/styles.css src/view3d.ts
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'fix: unify shell themes and simplify equipment catalog' -m 'Usegit-Change-Id: shell-ux-issue-sweep-20260923
