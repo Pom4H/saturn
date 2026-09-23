@@ -44,7 +44,7 @@
     <div class="hero-actions"><a class="landing-button" href="?mode=ide#workspace">Начать в браузере <svg aria-hidden="true"><use href="#i-arrow"/></svg></a><a class="landing-text-link" href="#studio">Посмотреть пример <span aria-hidden="true">↓</span></a></div>
     <p class="hero-note">Без регистрации и установки. MIT — исходный код открыт.</p>
   </section>
-  <section class="shell-stage" id="studio" aria-label="SCADA-редактор" data-example>
+  <section class="shell-stage" id="studio" aria-label="SCADA-редактор">
     <div class="shell-frame">
       <div class="shell" id="studio-shell" data-mode="3d" data-surface="scene" style="--studio-progress:0">
         <header class="shell-topbar">
@@ -132,7 +132,7 @@
   <p class="demo-takeaway">Схема и код меняют один проект. Исходники остаются у вас — их можно сравнить, сохранить в Git и передать другому инженеру.</p>
 
   <section class="landing-section workflow-section" id="workflow" aria-labelledby="workflow-title">
-    <div class="section-heading"><p class="eyebrow"><span class="section-number">02</span> Разработка и эксплуатация</p><h2 id="workflow-title">Один объект.<br>Два рабочих места.</h2><p>Инженер готовит и проверяет проект. Оператор видит состояние оборудования и доступные ему действия.</p></div>
+    <div class="section-heading"><h2 id="workflow-title">Один объект.<br>Два рабочих места.</h2><p>Инженер готовит и проверяет проект. Оператор видит состояние оборудования и доступные ему действия.</p></div>
     <div class="proof-switcher" role="group" aria-label="Рабочее место Saturn">
       <input class="proof-radio" type="radio" name="landing-role" id="proof-engineer" value="engineer" checked>
       <label for="proof-engineer"><svg aria-hidden="true"><use href="#i-code"/></svg>IDE</label>
@@ -153,7 +153,7 @@
   </section>
 
   <section class="landing-section change-section" id="changes" aria-labelledby="changes-title">
-    <div class="section-heading"><p class="eyebrow"><span class="section-number">03</span> Изменения под контролем</p><h2 id="changes-title">Знайте, какая версия<br>работает на объекте.</h2><p>Можно продолжать разработку, пока runtime исполняет применённую версию. Публикация и применение — отдельные состояния.</p></div>
+    <div class="section-heading"><h2 id="changes-title">Знайте, какая версия<br>работает на объекте.</h2><p>Можно продолжать разработку, пока runtime исполняет применённую версию. Публикация и применение — отдельные состояния.</p></div>
     <ol class="change-path" aria-label="Путь изменения проекта">
       <li><span class="change-step">01 / SOURCE</span><h3>Черновик</h3><p>Редактируйте схему и обычные файлы проекта. Git сохраняет историю изменений.</p></li>
       <li><span class="change-step">02 / BUILD</span><h3>Проверка</h3><p>Сборка проверяет проект и создаёт артефакт с привязкой к исходной версии.</p></li>
@@ -164,7 +164,7 @@
   </section>
 
   <section class="landing-section readiness-section" id="readiness" aria-labelledby="readiness-title">
-    <div class="section-heading"><p class="eyebrow"><span class="section-number">04</span> Проверка на вашей задаче</p><h2 id="readiness-title">Начните со стенда.<br>Проверьте весь путь.</h2><p>Saturn активно развивается. До выбора для действующего объекта проверьте конкретное оборудование, связь и восстановление вашей конфигурации.</p></div>
+    <div class="section-heading"><h2 id="readiness-title">Начните со стенда.<br>Проверьте весь путь.</h2><p>Saturn активно развивается. До выбора для действующего объекта проверьте конкретное оборудование, связь и восстановление вашей конфигурации.</p></div>
     <div class="readiness-table" role="table" aria-label="Возможности и границы Saturn">
       <div class="readiness-row table-heading" role="row"><span role="columnheader">Что проверяем</span><span role="columnheader">С чего начать</span></div>
       <div class="readiness-row" role="row"><h3 role="rowheader">Разработка проекта</h3><p role="cell">Откройте пример в браузере. Измените схему и исходник, проверьте диагностику, сохраните свою копию.<a href="?mode=ide#workspace">Открыть IDE ↗</a></p></div>
@@ -176,7 +176,7 @@
   </section>
 
   <section class="landing-section ownership-section" aria-labelledby="ownership-title">
-    <div class="section-heading"><p class="eyebrow">Ваш проект остаётся вашим</p><h2 id="ownership-title">Повторно используйте<br>инженерную работу.</h2><p>Храните типовые узлы и отчёты в исходниках. Адаптируйте их под следующий объект, проверяйте изменения и передавайте проект вместе с историей.</p></div>
+    <div class="section-heading"><h2 id="ownership-title">Повторно используйте<br>инженерную работу.</h2><p>Храните типовые узлы и отчёты в исходниках. Адаптируйте их под следующий объект, проверяйте изменения и передавайте проект вместе с историей.</p></div>
     <div class="ownership-details"><h3>Открытый код. Обычные файлы.</h3><p>TypeScript-проект доступен вам и вашим инструментам: редактору, Git и кодовым агентам. Визуальные правки меняют тот же исходник.</p><a href="https://github.com/Pom4H/saturn/blob/main/docs/developer/element-packs.md" target="_blank" rel="noopener">Собственные компоненты и шаблоны ↗</a><h3>Работа на вашей инфраструктуре.</h3><p>Инженерное рабочее место и runtime можно запускать отдельно. Для локального развёртывания облачный аккаунт Saturn не нужен.</p><a href="https://github.com/Pom4H/saturn/blob/main/docs/standalone.md" target="_blank" rel="noopener">Развёртывание Saturn ↗</a></div>
   </section>
 
