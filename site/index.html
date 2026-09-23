@@ -31,7 +31,7 @@
   <section class="hero" aria-labelledby="hero-title"><h1 id="hero-title">Saturn</h1><p>Один TypeScript-проект — схема, runtime, HMI, история, отчёты и PLC.</p></section>
   <section class="shell-stage" id="studio" aria-label="SCADA-редактор">
     <div class="shell-frame">
-      <div class="shell" id="studio-shell" data-mode="3d" data-view="scene" style="--studio-progress:0">
+      <div class="shell" id="studio-shell" data-mode="3d" data-surface="scene" style="--studio-progress:0">
         <header class="shell-topbar">
           <div class="shell-project-context">
             <button id="files-toggle" class="icon-button" aria-label="Файлы · Ctrl/⌘ B" title="Файлы · Ctrl/⌘ B" aria-expanded="false"><svg aria-hidden="true"><use href="#i-panel"/></svg></button>
@@ -132,15 +132,17 @@
 
   <section class="lifecycle-section" aria-labelledby="lifecycle-title">
     <div class="section-heading lifecycle-heading">
-      <h2 id="lifecycle-title">Source, published и applied — разные состояния.</h2>
-      <p>Новая инженерная ревизия не должна незаметно стать работающей конфигурацией. Saturn показывает переход до runtime явно.</p>
+      <h2 id="lifecycle-title">Source, build, published и applied — разные состояния.</h2>
+      <p>Исходник сначала становится проверенным immutable artifact. Только потом он может быть опубликован и применён к runtime.</p>
     </div>
     <div class="release-flow" aria-label="Жизненный цикл Saturn проекта">
       <article><span>01</span><small>SOURCE</small><strong>HEAD</strong><p>Инженер редактирует обычные файлы. Git хранит историю и review.</p></article>
       <i>→</i>
-      <article><span>02</span><small>PUBLISHED</small><strong>production</strong><p>Ревизия выбрана для установки после validation / CI.</p></article>
+      <article><span>02</span><small>BUILD</small><strong>sha256:…</strong><p>Trusted build создаёт immutable artifact с provenance исходников и зависимостей.</p></article>
       <i>→</i>
-      <article><span>03</span><small>APPLIED</small><strong>Plant-01</strong><p>Runtime работает на конкретной проверенной ревизии.</p></article>
+      <article><span>03</span><small>PUBLISHED</small><strong>target</strong><p>Artifact выбран для конкретного Environment, но ещё может не быть применён.</p></article>
+      <i>→</i>
+      <article><span>04</span><small>APPLIED</small><strong>Plant-01</strong><p>Runtime работает на конкретном проверенном artifact.</p></article>
     </div>
     <div class="release-invariant"><code>invalid published ≠ applied</code><p>Если новая ревизия невалидна, последняя рабочая конфигурация продолжает работать.</p></div>
   </section>
@@ -148,33 +150,28 @@
   <section class="extensions-section" aria-labelledby="extensions-title">
     <div class="section-heading extensions-heading">
       <h2 id="extensions-title">Если Saturn не знает ваше оборудование — расширьте его доменную модель.</h2>
-      <p>Extension — обычный self-contained npm package с явным Saturn manifest. Installer проверяет sha512 и не запускает lifecycle scripts.</p>
+      <p>Registry копирует типизированный source прямо в проект. После этого это обычный код проекта: его видно, можно менять, тестировать и версионировать в Git.</p>
     </div>
     <div class="extensions-layout">
-      <div class="extension-code" aria-label="Реальный контракт расширения Saturn">
-        <div class="code-window-head"><span>package.json</span><span>@factory/equipment</span></div>
-        <pre><code>{
-  <span class="code-muted">"name"</span>: "@factory/equipment",
-  <span class="code-muted">"version"</span>: "1.0.0",
-  <b>"saturn"</b>: {
-    <span class="code-muted">"api"</span>: 1,
-    <span class="code-muted">"entry"</span>: "dist/index.js",
-    <span class="code-muted">"capabilities"</span>: [
-      "elements", "protocol",
-      "datasource", "panel",
-      "report", "command"
-    ]
-  }
+      <div class="extension-code" aria-label="Добавление проектного building block">
+        <div class="code-window-head"><span>registry</span><span>project-owned source</span></div>
+        <pre><code><span class="code-muted">$</span> saturn add pump
+<span class="code-muted">→</span> src/equipment/pump.ts
+
+<span class="code-muted">import</span> { simulation } <span class="code-muted">from</span> '@saturn/core'
+
+<span class="code-muted">export function</span> <b>pump</b>(id, system, at) {
+  <span class="code-muted">return</span> simulation(id, 'pump', { system, at })
 }</code></pre>
-        <div class="extension-install-line"><span>$</span><code>saturn extension add @factory/equipment</code></div>
+        <div class="extension-install-line"><span>git</span><code>diff src/equipment/pump.ts</code></div>
       </div>
       <div class="extension-index">
-        <div><code>elements</code><p>Оборудование, порты, сигналы, SVG / 3D и доменная семантика.</p></div>
-        <div><code>protocol</code><p>Промышленные и vendor-specific протоколы.</p></div>
-        <div><code>datasource</code><p>Историки, БД и внешняя телеметрия.</p></div>
-        <div><code>panel</code><p>Пусконаладка, диагностика и сервисные рабочие места.</p></div>
-        <div><code>report</code><p>Отраслевые формы, расчёты и экспорт.</p></div>
-        <div><code>command</code><p>Калибровка, обслуживание и ограниченные workflow.</p></div>
+        <div><code>equipment</code><p>Типизированные фабрики оборудования, порты, сигналы и topology.</p></div>
+        <div><code>reports</code><p>Отраслевые формы, SQL-запросы, таблицы и графики.</p></div>
+        <div><code>targets</code><p>PLC/HMI target providers и правила сборки для конкретного оборудования.</p></div>
+        <div><code>templates</code><p>Готовые фрагменты инженерного проекта без скрытого runtime state.</p></div>
+        <div><code>packages</code><p>Обычные dependencies остаются для кода с действительно независимым lifecycle.</p></div>
+        <div><code>Git</code><p>После копирования история building block принадлежит самому проекту.</p></div>
       </div>
     </div>
     <div class="target-flow">
@@ -184,7 +181,7 @@
     <div class="ecosystem-line">
       <span>Следующие точки расширения</span>
       <p>TIA / CODESYS / WinCC import · Timescale / Influx · MQTT / webhooks · commissioning packs · simulation packs · OIDC / LDAP</p>
-      <a href="https://github.com/Pom4H/saturn/blob/main/docs/adr/0002-extension-packages.md" target="_blank" rel="noopener">API ↗</a>
+      <a href="https://github.com/Pom4H/saturn/blob/main/docs/adr/0008-conventions-first-artifact-runtime.md" target="_blank" rel="noopener">Architecture ↗</a>
     </div>
   </section>
 
@@ -199,7 +196,7 @@
       <span class="distribution-item"><strong>Operator</strong><small>kiosk HMI</small></span>
       <span class="distribution-item"><strong>Server</strong><small>Bun · SQLite · SSE</small></span>
       <span class="distribution-item"><strong>VS Code</strong><small>native host</small></span>
-      <span class="distribution-item"><strong>Production</strong><small>Git-managed</small></span>
+      <span class="distribution-item"><strong>Production</strong><small>artifact runtime</small></span>
     </div>
     <div class="distribution-command"><span>$</span><code>npm run saturn -- pack --target windows-x64</code></div>
   </section>

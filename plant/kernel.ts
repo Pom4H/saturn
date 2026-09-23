@@ -143,7 +143,7 @@ export class Kernel {
                 let healthy=powered&&common!==null&&minus!==null&&Math.abs(common-minus)<.001;
                 for(const name of vm.artifact.inputs){const v=read(name);if(v===null||!Number.isFinite(v)||v< -2147483648||v>2147483647)healthy=false;else inputs[name]=Math.round(v);}
                 if(!powered&&this.state.plc![c.id].powered)vm.reset();
-                const scan=healthy?vm.scan(inputs,this.project.stepMs):{outputs:Object.fromEntries(Object.keys(c.outputs).map(k=>[k,0])),hmi:[]};
+                const scan=healthy?vm.scan(inputs,this.project.stepMs,(this.state.seq+1)*this.project.stepMs):{outputs:Object.fromEntries(Object.keys(c.outputs).map(k=>[k,0])),hmi:[]};
                 this.state.plc![c.id]={inputs,outputs:scan.outputs,display:scan.hmi,healthy,powered,snapshot:vm.snapshot()};
             }
             this.bad = bad;

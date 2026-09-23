@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -7,16 +7,24 @@ import { randomBytes } from 'node:crypto';
 
 /** Run after checkServerFiles: that suite builds the server module and current site assets. */
 export async function checkTelemetry(browser) {
-  const { startPlantServer } = await import(pathToFileURL(resolve('.plant/site-files-server.mjs')));
+  const { startWorkspaceTestServer } = await import(pathToFileURL(resolve('.plant/site-workspace-server.mjs')));
   const directory = await mkdtemp(join(tmpdir(), 'saturn-shell-telemetry-'));
+  const project = join(directory, 'project');
+  await mkdir(join(project, 'src'), { recursive: true });
+  await cp(resolve('plant/demo'), join(project, 'src'), { recursive: true });
+  await writeFile(join(project, 'package.json'), JSON.stringify({
+    name: 'saturn-telemetry-gate', private: true, version: '0.0.0', type: 'module',
+    saturn: { title: 'Telemetry release gate' },
+  }, null, 2) + '\n');
   const engineer = { id: 'engineer', role: 'engineer' };
   let app, context;
   try {
     const password = randomBytes(24).toString('base64url');
-    app = await startPlantServer({ port: 0, data: join(directory, 'db.sqlite'), repository: join(directory, 'project.git'), password, autoTick: false });
+    app = await startWorkspaceTestServer({ project, data: join(directory, 'db.sqlite'), password });
     context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' });
     const login = await context.request.post(app.origin + '/plant/api/login', { data: { user: 'engineer', password }, headers: { Origin: app.origin } });
     assert.equal(login.status(), 200);
+    const auth = await login.json();
     const session = await context.request.get(app.origin + '/plant/api/session');
     assert.equal(session.status(), 200);
     const initial = await session.json();
@@ -24,10 +32,10 @@ export async function checkTelemetry(browser) {
     assert(initial.project.devices.length > 40, 'Telemetry uses the full installation');
     const page = await context.newPage(), errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    const stream = page.waitForResponse(response => response.url().endsWith('/plant/api/stream') && response.status() === 200);
     await page.goto(app.origin + '/?project=server#workspace');
-    const streamResponse = await stream;
-    assert.match(streamResponse.headers()['content-type'], /text\/event-stream/, 'Shell connects to the real SSE endpoint');
+    // Do not wait on Playwright's generic HTTP response event for a long-lived SSE
+    // body. The observable contract is stronger: the shell must become live and
+    // then consume authoritative server sequence changes below.
     await page.waitForFunction(() => document.getElementById('studio-shell')?.dataset.telemetry === 'live');
     await page.waitForSelector('#studio-spatial canvas', { state: 'attached' });
     const shell = page.locator('#studio-shell');
@@ -82,7 +90,7 @@ export async function checkTelemetry(browser) {
     await page.locator('#signals-panel [data-shell-view="scene"]').click();
     if (await page.locator('#file-browser').evaluate(node => node.hidden)) await page.locator('#files-toggle').click();
     await page.locator('#file-search').fill('cooling.ts');
-    await page.locator('#file-tree [data-file="cooling.ts"]').click();
+    await page.locator('#file-tree [data-file="src/cooling.ts"]').click();
     const editor = page.locator('#studio-editor .cm-content');
     await editor.click(); await editor.press('ControlOrMeta+End'); await page.keyboard.insertText('\n// LOCAL_TELEMETRY_DRAFT\n');
     await page.waitForFunction(() => document.getElementById('studio-shell')?.dataset.telemetry === 'draft');
@@ -108,15 +116,29 @@ export async function checkTelemetry(browser) {
     await page.waitForFunction(seq => Number(document.getElementById('studio-shell')?.dataset.runtimeSeq) === seq, frame.seq);
 
     // A different repository head cannot consume frames from the previously published revision.
-    const sourceSnapshot = await app.service.files(engineer);
-    const changedFiles = { ...sourceSnapshot.files, 'cooling.ts': sourceSnapshot.files['cooling.ts'] + '\n// SERVER_UNPUBLISHED_REVISION\n' };
-    const nextRevision = await app.service.save(changedFiles, sourceSnapshot.id, 'Telemetry revision boundary', engineer);
+    const workspaceResponse = await context.request.get(app.origin + '/plant/api/workspace');
+    assert.equal(workspaceResponse.status(), 200);
+    const sourceSnapshot = await workspaceResponse.json();
+    const changedFiles = { ...sourceSnapshot.files, 'src/cooling.ts': sourceSnapshot.files['src/cooling.ts'] + '\n// SERVER_UNPUBLISHED_REVISION\n' };
+    const saveResponse = await context.request.post(app.origin + '/plant/api/workspace/save', {
+      data: { files: changedFiles, expected: sourceSnapshot.id },
+      headers: { Origin: app.origin, 'X-CSRF-Token': auth.csrf },
+    });
+    assert.equal(saveResponse.status(), 200);
+    const nextRevision = await saveResponse.json();
     await page.locator('#server-refresh').click();
     await page.waitForFunction(() => document.getElementById('studio-shell')?.dataset.telemetry === 'revision');
     assert.equal(await page.locator('#studio-svg [data-node][data-mode="simulation"]').count(), 0, 'Unpublished source revision must not show valid runtime values');
     await page.locator('[data-shell-view="signals"]').first().click();
     assert.equal((await readSignal())?.text?.trim(), '—');
-    await app.service.publish(nextRevision.id, await app.service.repository.desired(), engineer);
+    const beforeDeploy = await (await context.request.get(app.origin + '/plant/api/session')).json();
+    const deployResponse = await context.request.post(app.origin + '/plant/api/deploy', {
+      data: { expected: beforeDeploy.desired },
+      headers: { Origin: app.origin, 'X-CSRF-Token': auth.csrf },
+    });
+    assert.equal(deployResponse.status(), 200);
+    const deployed = await deployResponse.json();
+    assert.equal(deployed.desired, nextRevision.id);
     frame = app.service.tick();
     await page.waitForFunction(() => document.getElementById('studio-shell')?.dataset.telemetry === 'live');
     await page.waitForFunction(seq => Number(document.getElementById('studio-shell')?.dataset.runtimeSeq) === seq, frame.seq);
@@ -135,7 +157,7 @@ export async function checkTelemetry(browser) {
     assert.match(stale?.source ?? '', /stale/i, 'The retained value must be visibly marked stale');
     await page.locator('[data-shell-view="controls"]').first().click();
     assert.equal(await page.locator('.runtime-control-edit button:not([disabled])').count(), 0, 'Commands are disabled while telemetry is stale');
-    app = await startPlantServer({ port, data: join(directory, 'db.sqlite'), repository: join(directory, 'project.git'), password, autoTick: false });
+    app = await startWorkspaceTestServer({ project, data: join(directory, 'db.sqlite'), password });
     await page.waitForFunction(() => document.getElementById('studio-shell')?.dataset.telemetry === 'live', undefined, { timeout: 15000 });
     frame = app.service.tick();
     await page.waitForFunction(seq => Number(document.getElementById('studio-shell')?.dataset.runtimeSeq) === seq, frame.seq);

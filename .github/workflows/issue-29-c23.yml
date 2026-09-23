@@ -1,0 +1,136 @@
+name: Saturn C23 target gate
+# Compiles source emitted from the canonical TypeScript demo; no handwritten HMI fixture.
+
+# Heavy vendor-toolchain evidence for post-v0.1 issue #29.
+# The canonical PR gate already validates generated C23 source deterministically;
+# run the official Windows SDK/emulator oracle only when explicitly requested.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: saturn-c23-target-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  vendor-sdk:
+    runs-on: [self-hosted, windows]
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File "{0}"
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Generate C23 target from canonical demo project
+        run: |
+          node scripts/saturn-c23-source.mjs issue29-generated SATURN-1
+          Get-ChildItem issue29-generated -File | Sort-Object Name | Format-Table Name,Length -AutoSize
+          Get-Content issue29-generated\manifest.json
+
+      - name: Extract official Saturn toolchain without installer UI
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force issue29-evidence | Out-Null
+          $gccInstaller = Join-Path $env:RUNNER_TEMP 'risc-v-gcc13.2.0.exe'
+          $sdkInstaller = Join-Path $env:RUNNER_TEMP 'sat-sdk-setup.exe'
+          $innoZip = Join-Path $env:RUNNER_TEMP 'innoextract.zip'
+          $innoDir = Join-Path $env:RUNNER_TEMP 'innoextract'
+          $gccDir = Join-Path $env:RUNNER_TEMP 'saturn-riscv'
+          $sdkDir = Join-Path $env:RUNNER_TEMP 'saturn-sdk'
+          curl.exe -fL --retry 3 https://www.mnppsaturn.ru/update/satsdk/risc-v-gcc13.2.0.exe -o $gccInstaller
+          curl.exe -fL --retry 3 https://www.mnppsaturn.ru/update/satsdk/sat-sdk-setup.exe -o $sdkInstaller
+          curl.exe -fL --retry 3 https://github.com/dscharrer/innoextract/releases/download/1.9/innoextract-1.9-windows.zip -o $innoZip
+          Remove-Item $innoDir,$gccDir,$sdkDir -Recurse -Force -ErrorAction SilentlyContinue
+          Expand-Archive $innoZip -DestinationPath $innoDir
+          $inno = Get-ChildItem $innoDir -File -Recurse -Filter innoextract.exe | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $inno) { throw 'innoextract.exe not found' }
+          & $inno -d $gccDir $gccInstaller
+          if ($LASTEXITCODE -ne 0) { throw "innoextract GCC exited $LASTEXITCODE" }
+          & $inno -d $sdkDir $sdkInstaller
+          if ($LASTEXITCODE -ne 0) { throw "innoextract SDK exited $LASTEXITCODE" }
+          "GCC_DIR=$gccDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "SDK_DIR=$sdkDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "GCC_DIR=$gccDir" | Out-File issue29-evidence\toolchain.txt -Encoding utf8
+          "SDK_DIR=$sdkDir" | Out-File issue29-evidence\toolchain.txt -Encoding utf8 -Append
+          Get-FileHash $gccInstaller,$sdkInstaller,$inno -Algorithm SHA256 | Format-Table -AutoSize | Out-String -Width 500 | Out-File issue29-evidence\toolchain-sha256.txt -Encoding utf8
+
+      - name: Inventory exact SDK build surface
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $gcc = Get-ChildItem $env:GCC_DIR -File -Recurse -Filter '*gcc*.exe' | Sort-Object FullName
+          $headers = Get-ChildItem $env:SDK_DIR -File -Recurse | Where-Object { $_.Name -match '^(satgui|satmio|satkbd|satplc|satscr).*\.h$' } | Sort-Object FullName
+          $build = Get-ChildItem $env:SDK_DIR -File -Recurse | Where-Object { $_.Name -match '^(Makefile|tasks\.json|c_cpp_properties\.json|.*\.bat|.*\.cmd)$' } | Sort-Object FullName
+          $libs = Get-ChildItem $env:SDK_DIR -File -Recurse | Where-Object { $_.Extension -in '.a','.ld' } | Sort-Object FullName
+          $gcc | Select-Object FullName,Length | Format-Table -AutoSize | Out-String -Width 500 | Tee-Object -FilePath issue29-evidence\gcc-paths.txt
+          $headers | Select-Object FullName,Length | Format-Table -AutoSize | Out-String -Width 500 | Tee-Object -FilePath issue29-evidence\headers.txt
+          $build | Select-Object FullName,Length | Format-Table -AutoSize | Out-String -Width 500 | Tee-Object -FilePath issue29-evidence\build-files.txt
+          $libs | Select-Object FullName,Length | Format-Table -AutoSize | Out-String -Width 500 | Tee-Object -FilePath issue29-evidence\libraries.txt
+          foreach ($file in $headers) {
+            "===== $($file.FullName) =====" | Out-File issue29-evidence\sdk-surface.txt -Encoding utf8 -Append
+            Get-Content $file.FullName | Out-File issue29-evidence\sdk-surface.txt -Encoding utf8 -Append
+          }
+          $satguiExamples = Get-ChildItem $env:SDK_DIR -File -Recurse -Filter '*.c' | Where-Object { $_.FullName -match '\\examples\\satgui\\' } | Sort-Object FullName
+          foreach ($file in $satguiExamples) {
+            "===== $($file.FullName) =====" | Out-File issue29-evidence\satgui-examples.txt -Encoding utf8 -Append
+            Get-Content $file.FullName | Out-File issue29-evidence\satgui-examples.txt -Encoding utf8 -Append
+          }
+          foreach ($file in ($build | Select-Object -First 40)) {
+            "===== $($file.FullName) =====" | Out-File issue29-evidence\build-surface.txt -Encoding utf8 -Append
+            Get-Content $file.FullName -ErrorAction SilentlyContinue | Select-Object -First 260 | Out-File issue29-evidence\build-surface.txt -Encoding utf8 -Append
+          }
+          Get-Content issue29-evidence\gcc-paths.txt
+          Get-Content issue29-evidence\headers.txt
+          Get-Content issue29-evidence\build-files.txt
+          Get-Content issue29-evidence\libraries.txt
+
+      - name: Compile canonical demo with official Saturn toolchain
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $prefix = Join-Path $env:GCC_DIR 'app\risc-v\bin\riscv32-unknown-elf'
+          $sdk = Join-Path $env:SDK_DIR 'app'
+          $src = Resolve-Path issue29-generated
+          $include = Join-Path $sdk 'include'
+          $lib = Join-Path $sdk 'lib'
+          $cflags = @('-g','-ggdb','-nostdlib','-nostdinc','-ffreestanding','-march=rv32imaf','-mabi=ilp32f','-Wall','-Werror','-std=c2x','-fmax-errors=10',('-I'+$src),('-I'+$include))
+          Push-Location issue29-generated
+          try {
+            $objects = @()
+            foreach ($file in @('controller.c','hmi.c','shell.c','main.c')) {
+              $obj = [IO.Path]::GetFileNameWithoutExtension($file) + '.o'
+              & ($prefix + '-gcc.exe') @cflags -c $file -o $obj
+              if ($LASTEXITCODE -ne 0) { throw "compile failed: $file" }
+              $objects += $obj
+            }
+            & ($prefix + '-ld.exe') '-L' $lib '-T' 'satplc.ld' '-nostdlib' '-m' 'elf32lriscv' '-Map' 'main.map' '-o' 'main.out' @objects '-lsatstd++' '-lsatstd'
+            if ($LASTEXITCODE -ne 0) { throw 'link failed' }
+            & ($prefix + '-objcopy.exe') '-O' 'binary' 'main.out' 'main.bin'
+            if ($LASTEXITCODE -ne 0) { throw 'objcopy failed' }
+            & ($prefix + '-objdump.exe') '-drlS' 'main.out' | Out-File main.lst -Encoding ascii
+            if ($LASTEXITCODE -ne 0) { throw 'objdump failed' }
+            Get-Item main.bin,main.out,main.map,main.lst | Select-Object Name,Length | Format-Table -AutoSize
+            Get-FileHash main.bin -Algorithm SHA256 | Format-List | Out-File ..\issue29-evidence\main-bin-sha256.txt -Encoding utf8
+            & ($prefix + '-gcc.exe') --version | Select-Object -First 1 | Out-File ..\issue29-evidence\compiler-version.txt -Encoding utf8
+          } finally {
+            Pop-Location
+          }
+
+      - name: Run exact main.bin in official Saturn emulator
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/saturn-c23-emulator.ps1
+
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: saturn-c23-sdk-evidence
+          path: |
+            issue29-evidence/
+            issue29-generated/
+          retention-days: 7

@@ -32,6 +32,12 @@ jobs:
 
       - run: npm ci
 
+      # Capture the focused product evidence first: it is a short, objective
+      # browser oracle and should not wait behind the broader release suite.
+      - run: npx playwright install --with-deps chromium
+      - name: Capture PLC HMI video
+        run: node scripts/hmi-video-evidence.mjs
+
       # One canonical PR gate. This already covers build, TypeScript, unit/core
       # tests, plant tests, Bun smoke, authoring, consumer and VS Code checks.
       - name: Core release checks
@@ -40,12 +46,24 @@ jobs:
       - name: Landing static checks
         run: npm run site:check
 
-      # The release shell integration suite uses Chromium only. WebKit,
-      # adversarial browser suites and full plant browser evidence are manual
-      # diagnostics rather than duplicate per-commit gates.
-      - run: npx playwright install --with-deps chromium
+      - name: Convert HMI video to MP4
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+          ffmpeg -y -i plant-test-results/saturn-wasm-hmi.webm -an -c:v libx264 -pix_fmt yuv420p -movflags +faststart plant-test-results/saturn-wasm-hmi.mp4
+
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: hmi-evidence
+          path: plant-test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Saturn shell integration
-        run: npm run site:test:browser
+        run: node scripts/site-release-check.mjs
 
       - run: npm audit --audit-level=high
 

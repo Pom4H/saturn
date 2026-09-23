@@ -1,151 +1,81 @@
-# Element and device packs
+# Project-owned equipment and registry items
 
-Saturn elements separate engineering semantics from their visual projections. Use this API for new equipment instead of adding renderer branches to the Shell.
+Saturn extends the engineering domain primarily by adding ordinary typed source to the project. The registry is a distribution convenience, not an extension runtime.
 
-## Minimal pack
+## Add an item
 
-~~~ts
-import {
-  defineElementPack,
-  type ElementDefinition,
-} from '@saturn/core/elements'
-
-const pump: ElementDefinition = {
-  type: 'acme.pump.mx',
-  version: 1,
-  label: 'ACME MX pump',
-  parameters: {
-    scale: { default: 1, min: 0.8, max: 1.2, unit: 'ratio' },
-  },
-  signals: {
-    rpm: { unit: 'rpm', meaning: 'Measured drive speed' },
-    flow: { unit: 'm3/h', meaning: 'Measured process flow' },
-  },
-  ports: p => [
-    { id: 'IN', position: [-0.9 * p.scale, 0, 0.6], normal: [-1, 0, 0], medium: 'water', role: 'in' },
-    { id: 'OUT', position: [0.6 * p.scale, 0, 0.8], normal: [1, 0, 0], medium: 'water', role: 'out' },
-  ],
-  references: [],
-  visual: {
-    glyph: 'process.pump.centrifugal',
-    category: 'process',
-    geometry: 'acme.pump.mx',
-    envelope: { min: [-1, -0.5, 0], max: [0.8, 0.5, 1.4] },
-    materials: ['steel', 'paintedIndustrial'],
-    fluids: [{ id: 'process-flow', medium: 'water', role: 'flow', signal: 'flow' }],
-  },
-}
-
-export default defineElementPack({
-  id: '@acme/equipment',
-  version: '1.0.0',
-  title: 'ACME equipment',
-  elements: [pump],
-})
+~~~sh
+saturn registry list
+saturn add pump --project ./pump-station
 ~~~
 
-This code is trusted installed application code. It is not valid project DSL and must never be executed from an uploaded project.
-
-## Glyphs
-
-Prefer an existing generic engineering glyph when a vendor model has the same engineering meaning:
+For example, the built-in pump item copies a project-owned factory similar to:
 
 ~~~ts
-visual: {
-  glyph: 'process.pump.centrifugal',
-  geometry: 'acme.pump.mx',
-  // ...
+import { simulation, type Layout } from '@saturn/core'
+
+export function pump<const ID extends string>(
+  id: ID,
+  system: string,
+  at: Layout,
+) {
+  return simulation(id, 'pump', { system, at })
 }
 ~~~
 
-Only register a new glyph when the semantic class is genuinely new.
+After `saturn add`, the source is yours. Edit it, type-check it, test it and commit it. There is no activation lifecycle or hidden uninstall state.
+
+## When to use a package
+
+Use a normal package dependency when the code intentionally has an independent lifecycle shared by many projects. Package resolution happens at a trusted engineering/build boundary; runtime consumes the validated BuildArtifact and does not execute project TypeScript.
+
+Offline PWA projects should remain self-contained: built-ins plus copied registry source.
+
+## Canonical element semantics
+
+Equipment definitions must preserve one semantic identity across projections:
+
+- stable equipment type/ID;
+- typed parameters and signals with units;
+- canonical ports and topology;
+- engineering glyph;
+- optional spatial geometry/material identity;
+- explicit stale/offline/quality behavior.
+
+2D, 3D, HMI and PLC projections consume those semantics rather than creating their own equipment model.
+
+For trusted renderer/domain infrastructure inside Saturn itself, use the canonical element APIs under `@saturn/core/elements`. Project registry items should normally build on the public project DSL from `@saturn/core`.
+
+## Registry item contract
+
+A registry item declares:
 
 ~~~ts
-import { registerGlyph } from '@saturn/core/elements'
-
-registerGlyph({
-  id: 'factory.special-separator',
-  label: 'Special separator',
-  primitives: [
-    { kind: 'rect', x: 6, y: 3, width: 12, height: 18, rx: 5 },
-  ],
-})
-~~~
-
-Do not put raw SVG in the extension manifest. The manifest may advertise a glyph ID for safe catalog discovery; trusted extension code registers custom artwork.
-
-## Deriving schematic ports
-
-Do not manually maintain a second physical port map.
-
-~~~ts
-import { deriveSchematicProjection } from '@saturn/core/elements'
-
-const projection = deriveSchematicProjection(pump, {}, {
-  width: 180,
-  height: 120,
-  padding: 12,
-})
-~~~
-
-The result maps canonical metre-space port positions/normals onto 2D boundary anchors. A custom SCADA drawing may simplify the pump body, but it should use these connectors.
-
-## Materials and fluids
-
-Use the shared semantic identities:
-
-~~~ts
-import { materialPresets, mediumPresets } from '@saturn/core/elements'
-
-materialPresets.paintedIndustrial
-mediumPresets.water
-~~~
-
-Do not copy the current RGB values into device packs. Renderers are free to improve shading while the material identity stays stable.
-
-Water is currently the first core medium. New media should define their physical and schematic identity explicitly rather than reusing water with a different color.
-
-## Custom 3D renderer
-
-The existing trusted renderer hook remains supported. New material handles are additive: a renderer only needs the original `steel`, `dark`, `teal` and `fluid` handles, while newer hosts may additionally provide physical water/surface/shell handles.
-
-The project compiler does not import or execute this renderer. Composition roots load installed visual packages.
-
-## Extension manifest discovery
-
-An extension with the `elements` capability may expose safe catalog metadata:
-
-~~~json
-{
-  "saturn": {
-    "api": 1,
-    "entry": "dist/index.js",
-    "capabilities": ["elements"],
-    "elements": [
-      {
-        "type": "acme.pump.mx",
-        "title": "ACME MX pump",
-        "tag": "acme-pump",
-        "glyph": "process.pump.centrifugal",
-        "category": "process"
-      }
-    ]
-  }
+interface RegistryItem {
+  name: string
+  title: string
+  kind: 'equipment' | 'report' | 'target' | 'template'
+  description: string
+  tags: readonly string[]
+  files: Readonly<Record<string, string>>
+  dependencies?: Readonly<Record<string, string>>
 }
 ~~~
 
-This is discovery metadata, not the complete element definition.
+`files` are copied into the project. Optional dependencies are merged into the project's `package.json`.
+
+Registry operations refuse to overwrite existing files. That keeps copied source explicit instead of silently mutating project-owned code.
 
 ## Review checklist
 
-Before adding a new element:
+Before adding equipment or another registry item:
 
-- canonical ports/normals are defined in metres;
-- generic engineering identity/glyph is chosen;
-- vendor geometry is not confused with the glyph;
-- SCADA 2D topology derives from canonical ports;
-- operational state is represented semantically, not only by color;
-- fluid zones name a medium;
-- quality/stale/offline have an explicit behavior;
-- HMI keeps only task-relevant information;
-- renderer code is trusted installed code, not project source.
+- it extends the canonical project model instead of inventing a parallel schema;
+- signals and units are typed;
+- ports/topology have stable semantic identities;
+- 2D/3D/HMI projections reuse those identities;
+- generated files are minimal and project-owned;
+- no runtime-only state is written into source;
+- external dependencies are used only when an independent shared lifecycle is intentional.
+
+See [ADR-0008](../adr/0008-conventions-first-artifact-runtime.md) for the ownership boundary and [ADR-0007](../adr/0007-element-visual-system.md) for visual semantics.

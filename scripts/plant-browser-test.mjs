@@ -18,7 +18,7 @@ const page = await context.newPage(), errors = [], checks = [];
 page.on('pageerror', e => errors.push(e.message));
 let evidencePage=page, manualReportId='';
 const base = process.env.PWA_URL ?? 'http://127.0.0.1:4176/plant/';
-const check = async (name, fn) => { if(process.env.PWA_ONLY_PLC==='1'&&!/^(all 23|Saturn inspector|clicking two|commissioning bench|offline PWA restores compiled)/.test(name))return; const start = performance.now(); console.log('START', name); await fn(); checks.push(name); console.log('PASS', name, Math.round(performance.now() - start) + 'ms'); };
+const check = async (name, fn) => { if(process.env.PWA_HMI_VIDEO==='1'&&!/^(all 23|Saturn WASM HMI video)/.test(name))return; if(process.env.PWA_ONLY_PLC==='1'&&!/^(all 23|Saturn inspector|clicking two|commissioning bench|offline PWA restores compiled)/.test(name))return; const start = performance.now(); console.log('START', name); await fn(); checks.push(name); console.log('PASS', name, Math.round(performance.now() - start) + 'ms'); };
 try {
     await check('persistent browser Worker starts with SQLite WASM and live equipment', async () => { await page.goto(base + 'demo/'); await page.locator('#application').waitFor({ state: 'visible', timeout: 20000 }); await page.waitForTimeout(1500); assert.match(await page.locator('#storage').innerText(), /OPFS/); assert.equal(await page.locator('[data-node]').count(), 47); assert.equal(await page.locator('#error').isVisible(), false); await page.screenshot({ path: evidence + '/desktop.png', fullPage: true }); });
     await check('service worker installs and only public demo resources enter cache', async () => { await page.evaluate(async () => { await navigator.serviceWorker.ready; }); await page.waitForFunction(() => !!navigator.serviceWorker.controller); const urls = await page.evaluate(async () => { const result = []; for (const name of await caches.keys())
@@ -114,7 +114,9 @@ try {
     await context.setOffline(false);
     await check('authenticated Node receives operator commands and publishes SSE without a local simulation', async () => { const remote = await browser.newContext({ viewport: { width: 1440, height: 980 } }); const p = await remote.newPage(); p.on('pageerror', e => errors.push(e.message)); await p.goto(base + 'app/'); await p.locator('#login').waitFor(); await p.locator('[name="user"]').fill(process.env.SCADA_USER ?? 'engineer'); await p.locator('[name="password"]').fill(process.env.SCADA_PASSWORD ?? 'test-password-only-9284'); await p.locator('#login button').click(); await p.locator('#application').waitFor({ state: 'visible', timeout: 15000 }); assert.match(await p.locator('#mode').innerText(), /NODE.JS/); assert.equal(p.workers().length, 0); const clock = await p.locator('#clock').innerText(); await p.waitForTimeout(400); assert.notEqual(await p.locator('#clock').innerText(), clock); await p.locator('[data-tab="controls"]').click(); await p.locator('[data-control-input="MAKEUP"]').fill('0.16'); await p.locator('[data-operate="MAKEUP"]').click(); await p.waitForFunction(() => document.querySelector('[data-control="MAKEUP"] [data-demand]').textContent === '0.16'); assert.equal(await p.locator('#error').isVisible(), false); await p.screenshot({ path: evidence + '/server.png', fullPage: true }); await p.locator('#logout').click(); await p.locator('#login').waitFor(); await remote.close(); });
     await context.close(); // Release the previous WebGL/Worker before the independent bench.
-    const wiringContext=await browser.newContext({viewport:{width:1680,height:1100}}),bench=await wiringContext.newPage();
+    const videoMode=process.env.PWA_HMI_VIDEO==='1';
+    const wiringContext=await browser.newContext({viewport:{width:1680,height:1100},...(videoMode?{recordVideo:{dir:evidence+'/video',size:{width:1680,height:1100}}}:{})}),bench=await wiringContext.newPage();
+    const recordedVideo=bench.video();
     evidencePage=bench;
     bench.on('pageerror',e=>errors.push(e.message));wiringContext.setDefaultTimeout(20000);
     await check('all 23 pipe and cable endpoints hit the rendered terminal centers after camera transforms',async()=>{
@@ -132,6 +134,21 @@ try {
         const offset=await bench.evaluate(()=>{const result=[];for(const pin of document.querySelectorAll('#diagram [data-node="SATURN-1"] .saturn-terminal-pin[data-terminal-id]')){const target=document.querySelector(`#diagram [data-node="SATURN-1"] [data-port="${pin.dataset.terminalId}"]`);if(!target)continue;const a=new DOMPoint(pin.x.baseVal.value+pin.width.baseVal.value/2,pin.y.baseVal.value+pin.height.baseVal.value/2).matrixTransform(pin.getScreenCTM());const b=new DOMPoint(target.cx.baseVal.value,target.cy.baseVal.value).matrixTransform(target.getScreenCTM());if(Math.hypot(a.x-b.x,a.y-b.y)>.2)result.push(pin.dataset.terminalId);}return result;});assert.deepEqual(offset,[]);
         assert.equal(await bench.locator('#diagram .saturn-block-outline').first().evaluate(e=>getComputedStyle(e).fill),'none');
         await bench.screenshot({path:evidence+'/commissioning-2d.png',fullPage:true});
+    });
+    await check('Saturn WASM HMI video',async()=>{
+        await bench.locator('#diagram [data-node="SATURN-1"]').click();
+        await bench.waitForFunction(()=>Number(document.querySelector('#inspector [data-signal="SATURN-1.AI1"] b')?.textContent)===300);
+        await bench.waitForTimeout(1500);
+        await bench.locator('[data-tab="controls"]').click();
+        await bench.locator('[data-control-input="BENCH-LEVEL"]').fill('8');
+        await bench.locator('[data-operate="BENCH-LEVEL"]').click();
+        await bench.waitForFunction(()=>Number(document.querySelector('[data-control="BENCH-LEVEL"] [data-actual]').textContent)>=8);
+        await bench.locator('[data-tab="scheme"]').click();
+        await bench.locator('#diagram [data-node="SATURN-1"]').click();
+        await bench.waitForFunction(()=>Number(document.querySelector('#inspector [data-signal="SATURN-1.AI1"] b')?.textContent)===800);
+        assert.equal(Number(await bench.locator('#inspector [data-signal="SATURN-1.DO1"] b').innerText()),1);
+        await bench.waitForTimeout(3500);
+        await bench.screenshot({path:evidence+'/saturn-wasm-hmi-video-final.png',fullPage:true});
     });
     await check('Saturn inspector executes the same compiled WASM program, downloads exact CRC-tested bytes and renders its HMI',async()=>{
         await bench.locator('#diagram [data-node="SATURN-1"]').click();
@@ -201,6 +218,7 @@ try {
         await bench.locator('[data-tab="events"]').click();await bench.waitForFunction(()=>document.querySelector('#event-list').textContent.includes('command.control'));
     });
     await wiringContext.close();
+    if(videoMode&&recordedVideo)await recordedVideo.saveAs(evidence+'/saturn-wasm-hmi.webm');
     assert.deepEqual(errors, []);
     await writeFile(evidence + '/browser-summary.json', JSON.stringify({ checks, errors, browser: browser.version() }, null, 2));
     console.log(JSON.stringify({ passed: checks.length, browser: browser.version() }));

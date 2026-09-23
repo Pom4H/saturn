@@ -1,0 +1,32 @@
+{
+  "id": "EXP-0002",
+  "question": "Can the physical Saturn PLC HMI become an ordinary deterministic C23 target without creating a second authored UI model?",
+  "hypothesis": "If canonical Presentation lowers to inspectable C23 through one small satgui port ABI, the same authored model can serve Web/report/PLC while legacy FBD screens disappear from the rich-HMI path.",
+  "status": "running",
+  "metrics": {
+    "canonicalPresentationModels": 1,
+    "physicalHmiTargetLanguages": 1,
+    "richHmiFbdScreenPathsTarget": 0
+  },
+  "evidencePlan": [
+    "npm run plant:typecheck",
+    "npm run plant:test",
+    "npm run architecture:check",
+    "compile generated source with the real Saturn C23 SDK once the satgui port binding is available",
+    "execute the C23 target ABI in Firmverse and compare deterministic 320x240 frames"
+  ],
+  "negativeKnowledge": [
+    {
+      "hypothesis": "Rich Saturn PLC HMI should compile into FBD screen records",
+      "decision": "rejected",
+      "condition": "Saturn PLC C23 exposes the display through libsatstd/satgui and supports physical keyboard input"
+    },
+    {
+      "hypothesis": "The browser should own an independent React HMI implementation for the PLC screen",
+      "decision": "rejected",
+      "condition": "The emulator must consume the same generated C23 target contract as the physical target"
+    }
+  ],
+  "decision": "pending",
+  "validity": "Applies to the Saturn PLC 320x240 physical target after the conventions-first BuildArtifact boundary."
+}

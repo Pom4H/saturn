@@ -4,15 +4,16 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { startPlantHttpServer } from '../plant/http-server';
-import { LocalRepository, Store } from '../plant/store';
 import { BunSql } from './bun-sql';
 import { runStandaloneReport } from './reports';
 import { loadProjectDirectory } from './project-loader';
 import { WorkspaceRegistry } from './workspace';
-import { WorkspaceRepository } from './workspace-repository';
 import { applyStagedUpdate, checkApplicationUpdate, installApplicationUpdate, runUpdateCommand, type UpdateChannel } from './update';
-import { ExtensionManager, runExtensionCommand } from './extensions';
+import { addRegistryItem, runRegistryCommand } from './registry';
 import { runIdeCommand } from './ide';
+import { buildArtifact } from '../plant/artifact';
+import { WorkspaceHost } from './workspace-host';
+import { createSaturnProject } from './scaffold';
 
 declare const SATURN_VERSION: string;
 declare const SATURN_DEMO_FILES: Record<string, string>;
@@ -37,8 +38,7 @@ async function selfHealthcheck(expectedVersion?: string): Promise<void> {
     let app: Awaited<ReturnType<typeof startPlantHttpServer>> | undefined;
     try {
         const database = new BunSql(resolve(directory, 'health.sqlite3'));
-        const store = new Store(database);
-        const repository = new LocalRepository(store, () => `health:${crypto.randomUUID()}`);
+        const seed = await buildArtifact(SATURN_DEMO_FILES, { packageName: '@saturn/demo' });
         app = await startPlantHttpServer({
             port: 0,
             host: '127.0.0.1',
@@ -49,9 +49,8 @@ async function selfHealthcheck(expectedVersion?: string): Promise<void> {
             autoTick: false,
             uiMode: 'runtime',
             database,
-            projectRepository: repository,
             reportRunner: runStandaloneReport,
-            seed: SATURN_DEMO_FILES,
+            seed,
         });
         const response = await fetch(`${app.origin}/plant/api/health`, { cache: 'no-store', signal: AbortSignal.timeout(5000) });
         const health: unknown = await response.json();
@@ -113,12 +112,37 @@ if (args[0] === 'update') {
     });
     process.exit(0);
 }
-if (args[0] === 'extension' || args[0] === 'extensions') {
-    await runExtensionCommand(args.slice(1), appData);
+if (args[0] === 'new') {
+    const directory = args[1];
+    if (!directory) throw new Error('Usage: saturn new <directory>');
+    const created = await createSaturnProject(directory);
+    const host = new WorkspaceHost(created);
+    const artifact = await host.build();
+    console.log(`Created Saturn project: ${created}`);
+    console.log(`Build: ${artifact.hash}`);
+    process.exit(0);
+}
+if (args[0] === 'check') {
+    const directory = args[1] ?? process.cwd();
+    const host = new WorkspaceHost(directory);
+    const artifact = await host.build();
+    console.log(`OK ${artifact.project.title} · ${artifact.hash}`);
+    process.exit(0);
+}
+if (args[0] === 'registry') {
+    await runRegistryCommand(args.slice(1));
+    process.exit(0);
+}
+if (args[0] === 'add') {
+    const name = args[1];
+    if (!name) throw new Error('Usage: saturn add <registry-item> [--project PATH]');
+    const projectIndex = args.indexOf('--project');
+    const project = projectIndex >= 0 ? args[projectIndex + 1] : process.cwd();
+    console.log(JSON.stringify(await addRegistryItem(project, name), null, 2));
     process.exit(0);
 }
 if (args[0] === 'ide') {
-    await runIdeCommand(args.slice(1), appData);
+    await runIdeCommand(args.slice(1));
     process.exit(0);
 }
 
@@ -129,7 +153,6 @@ if (args[0] === 'run' || args[0] === 'open')
 const kiosk = args.includes('--kiosk');
 const projectArgument = args.find(arg => !arg.startsWith('--')) ?? process.env.SATURN_PROJECT;
 const registry = new WorkspaceRegistry(resolve(appData, 'workspace.json'));
-const extensionManager = new ExtensionManager(resolve(appData, 'extensions'));
 
 let files = SATURN_DEMO_FILES;
 let projectDirectory: string | null = null;
@@ -138,7 +161,7 @@ let projectTitle = 'Saturn demo';
 
 if (projectArgument) {
     const loaded = await loadProjectDirectory(projectArgument);
-    files = loaded.files;
+    files = loaded.sources;
     projectDirectory = loaded.directory;
     projectId = loaded.id;
     projectTitle = loaded.title;
@@ -152,10 +175,10 @@ const dataDirectory = resolve(process.env.SATURN_DATA_DIR ?? resolve(appData, 'p
 mkdirSync(dataDirectory, { recursive: true });
 
 const database = new BunSql(resolve(dataDirectory, 'saturn.sqlite3'));
-const repositoryStore = new Store(database);
-const projectRepository = projectDirectory
-    ? await new WorkspaceRepository(repositoryStore, projectDirectory).initialize(files)
-    : new LocalRepository(repositoryStore, () => `standalone:${crypto.randomUUID()}`);
+const workspaceHost = projectDirectory ? new WorkspaceHost(projectDirectory) : null;
+const seedArtifact = workspaceHost
+    ? await workspaceHost.build()
+    : await buildArtifact(files, { packageName: '@saturn/demo' });
 
 const updateChannel = ((process.env.SATURN_UPDATE_CHANNEL ?? 'stable') as UpdateChannel);
 const updateContext = {
@@ -182,12 +205,6 @@ app = await startPlantHttpServer({
     uiMode: kiosk ? 'kiosk' : command === 'run' ? 'runtime' : 'ide',
     application: {
         version: SATURN_VERSION,
-        extensions: {
-            list: () => extensionManager.list(),
-            install: specifier => extensionManager.install(specifier),
-            remove: name => extensionManager.remove(name),
-            readAsset: (id, path) => extensionManager.readAsset(id, path),
-        },
         update: {
             check: () => checkApplicationUpdate(updateContext, updateChannel),
             install: async () => {
@@ -198,9 +215,9 @@ app = await startPlantHttpServer({
         },
     },
     database,
-    projectRepository,
+    ...(workspaceHost ? { workspace: workspaceHost } : {}),
     reportRunner: runStandaloneReport,
-    seed: files,
+    seed: seedArtifact,
 });
 
 console.log(`Saturn ${SATURN_VERSION} · ${kiosk ? 'kiosk' : command}`);

@@ -2,7 +2,6 @@ import { readFile, realpath } from 'node:fs/promises';
 import { resolve, sep, extname } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { BunSql } from './adapters/bun-sql';
-import { GitRepository } from './adapters/git';
 import { BunAuth } from './adapters/bun-auth';
 import { Push } from './adapters/push';
 import { runReport } from './adapters/bun-reports';
@@ -10,8 +9,9 @@ import { Store } from './store';
 import { Service } from './service';
 import { requireRole } from './types';
 import { AppError, failCode } from './diagnostics';
-import { commandValue, nullableStringValue, numberMapValue, objectValue, stringMapValue, stringValue, type JsonObject } from './http-input';
+import { commandValue, nullableStringValue, numberMapValue, objectValue, stringValue, type JsonObject } from './http-input';
 import { demoFiles } from './demo/files';
+import { buildArtifact, type BuildArtifact } from './artifact';
 
 const prefix = '/plant';
 const maxBodySize = 2_100_000;
@@ -97,7 +97,7 @@ export async function startPlantServer(options: {
     port?: number;
     host?: string;
     data?: string;
-    repository?: string;
+    artifact?: BuildArtifact;
     publicUrl?: string;
     user?: string;
     password?: string;
@@ -107,24 +107,11 @@ export async function startPlantServer(options: {
     unix?: string;
     tls?: { cert: string; key: string; ca?: string[] };
     http2?: boolean;
-    gitRemote?: string;
-    gitSourceBranch?: string;
-    gitReleaseBranch?: string;
-    sourceRef?: string;
-    releaseRef?: string;
 } = {}) {
-    const store = new Store(new BunSql(options.data ?? resolve('data-plant/plant.sqlite3')));
-    const sourceBranch = options.gitSourceBranch ?? 'main';
-    const releaseBranch = options.gitReleaseBranch ?? 'production';
-    const sourceRef = options.sourceRef ?? (options.gitRemote ? `refs/remotes/${options.gitRemote}/${sourceBranch}` : 'refs/heads/main');
-    const releaseRef = options.releaseRef ?? (options.gitRemote ? `refs/remotes/${options.gitRemote}/${releaseBranch}` : 'refs/scada/plant/published');
-    const repository = await new GitRepository(options.repository ?? resolve('data-plant/project.git'), sourceRef, releaseRef).initialize();
-    if (options.gitRemote) {
-        repository.track(options.gitRemote, sourceBranch, releaseBranch);
-        await repository.refresh();
-    }
-    const service = new Service(store, repository, { reportRunner: runReport });
-    await service.start(demoFiles);
+    const store = new Store(new BunSql(options.data ?? resolve('data-plant/runtime.sqlite3')));
+    const seed = options.artifact ?? await buildArtifact(demoFiles, { packageName: '@saturn/demo' });
+    const service = new Service(store, { reportRunner: runReport });
+    await service.start(seed);
 
     const auth = new BunAuth(store);
     const password = options.password ?? randomBytes(18).toString('base64url');
@@ -214,12 +201,8 @@ export async function startPlantServer(options: {
                                 : json(426, { error: 'WebSocket upgrade required' }, { Upgrade: 'websocket' });
                         }
                         if (action === 'session')
-                            return json(200, { ...await service.status(actor), csrf: session.csrf, transport: { sse: true, websocket: true }, push: push ? { publicKey: push.keys.publicKey } : null });
-                        if (action === 'project') return json(200, await service.files(actor));
-                        if (action === 'revisions') {
-                            requireRole(actor, 'engineer');
-                            return json(200, (await repository.log()).map(({ files, ...meta }) => meta));
-                        }
+                            return json(200, { ...await service.status(actor), csrf: session.csrf, uiMode: 'runtime', transport: { sse: true, websocket: true }, push: push ? { publicKey: push.keys.publicKey } : null });
+                        if (action === 'artifact') return json(200, service.artifactInfo(actor));
                         if (action === 'events') return json(200, store.events(service.kernel.state.runId));
                         if (action === 'reports') return json(200, service.reports());
                         if (action === 'history')
@@ -291,9 +274,11 @@ export async function startPlantServer(options: {
                         if (action === 'firmware') return json(200, service.firmware(stringValue(input,'controllerId'), stringValue(input,'revision'), actor));
                         if (action === 'command') return json(200, service.command(commandValue(input), actor));
                         if (action === 'restart') return json(200, await service.restart(actor));
-                        if (action === 'save') return json(200, await service.save(stringMapValue(input.files,'files'), nullableStringValue(input,'expected'), stringValue(input,'message'), actor));
-                        if (action === 'publish') return json(200, await service.publish(stringValue(input,'revision'), nullableStringValue(input,'expected'), actor));
-                        if (action === 'rollback') return json(200, await service.rollback(stringValue(input,'revision'), nullableStringValue(input,'expected'), actor));
+                        if (action === 'deploy') {
+                            requireRole(actor, 'engineer');
+                            return json(200, await service.deploy(input.artifact, nullableStringValue(input,'expected'), actor));
+                        }
+                        if (action === 'rollback') return json(200, await service.rollback(stringValue(input,'hash'), nullableStringValue(input,'expected'), actor));
                         if (action === 'report') return json(202, service.dispatch(stringValue(input,'reportId'), numberMapValue(input.inputs,'inputs'), actor));
                         if (action === 'subscribe') {
                             if (!push) failCode('SATURN_RUNTIME_INVALID',{reason:'missing'},{resource:'push.subject'},{status:503});

@@ -1,0 +1,8 @@
+{
+  "name": "first-pump",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Minimal Saturn pump project",
+  "saturn": { "title": "First pump" }
+}

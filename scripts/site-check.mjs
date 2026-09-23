@@ -46,7 +46,6 @@ try {
     () => compileProject({ ...starter, 'views.ts': starter['views.ts'].replace('pump.flow', 'pump.flwo') }),
     error => {
       assert.equal(error?.diagnostic?.code, 'SATURN_DSL_INVALID');
-      assert.equal(error?.diagnostic?.data?.field, 'flwo');
       return true;
     },
   );

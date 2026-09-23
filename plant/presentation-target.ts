@@ -1,6 +1,5 @@
-import { compileSaturnPlcPresentation } from './presentation-hmi';
+import { compileSaturnC23Presentation, type SaturnC23PresentationSource } from './presentation-c23';
 import { renderPresentation, validatePresentation, type Presentation, type PresentationContext, type PresentationTarget } from './presentation';
-import type { HmiScreenModel } from './vendor/saturn/src/types';
 
 /**
  * Presentation is the only authored HMI/report UI model.
@@ -20,18 +19,19 @@ export const presentationTargets = {
 
 export type PresentationProjectionRequest =
     | { target: 'web' | 'report'; context: PresentationContext }
-    | { target: 'saturn-plc-320'; bindings: Record<string, string> };
+    | { target: 'saturn-plc-320' };
 
 export type PresentationProjection =
     | { target: 'web' | 'report'; html: string }
-    | { target: 'saturn-plc-320'; screen: HmiScreenModel };
+    | { target: 'saturn-plc-320'; c23: SaturnC23PresentationSource };
 
 /**
  * Project one canonical Presentation IR into one concrete target.
  *
  * Web/report keep semantic nodes and resolve observations at render time.
- * The physical Saturn display compiles the same IR to the bounded 320x240
- * screen schema that Firmverse packages into / executes from the controller artifact.
+ * The physical Saturn display compiles the same IR to deterministic C23 source.
+ * A target toolchain links that generated source to libsatstd/satgui; FBD screen
+ * records are intentionally not part of the rich-HMI target.
  */
 export function projectPresentation(
     view: Presentation,
@@ -44,7 +44,7 @@ export function projectPresentation(
 export function projectPresentation(view: Presentation, request: PresentationProjectionRequest): PresentationProjection {
     validatePresentation(view, request.target);
     if (request.target === 'saturn-plc-320') {
-        return { target: request.target, screen: compileSaturnPlcPresentation(view, request.bindings) };
+        return { target: request.target, c23: compileSaturnC23Presentation(view) };
     }
     const interactive = request.target === 'web' && request.context.interactive !== false;
     return {

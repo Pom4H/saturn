@@ -12,20 +12,17 @@ import { installEquipment, sceneFor, visualFrame, references } from '../equipmen
 import { models, model } from '../models';
 import { compileProject, validateFiles } from '../compiler';
 import { chartSVG, escape } from '../workflows';
-import { LocalClient, RemoteClient, LinkedClient, type Connection, type Status, type Revision, type Frame, type ReportArtifact, type ReportData, type EnvironmentDescriptor } from './client';
+import { LocalClient, RemoteClient, LinkedClient, type Connection, type Status, type Frame, type ReportArtifact, type ReportData, type EnvironmentDescriptor } from './client';
 import type { Event as SaturnEvent } from '../types';
 import { localeFromLanguage, modelTitle } from '../i18n';
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const base = new URL('../', location.href), demo = location.pathname.endsWith('/demo/'), uiLocale = localeFromLanguage(navigator.language);
-let client: Connection, status: Status, frame: Frame, scene: SceneView, system = '', selected: string | null = null, tab = 'scheme', file = 'plant.ts', files: Record<string, string> = {}, head: string | null = null, dirty = false, validDraft = true, editor: EditorView, loadingEditor = false, failed = false;
+let client: Connection, status: Status, frame: Frame, scene: SceneView, system = '', selected: string | null = null, tab = 'scheme', file = 'src/plant.ts', files: Record<string, string> = {}, head: string | null = null, dirty = false, validDraft = true, editor: EditorView, loadingEditor = false, failed = false;
 let scene3d: SceneView3D | undefined, viewMode: '2d' | '3d' = '2d', changingView = false;
 type BeforeInstallPromptEvent = Event & { prompt(): Promise<void> };
 let registration: ServiceWorkerRegistration | undefined, pendingInstall: BeforeInstallPromptEvent | undefined, noticeEnabled = false, closed = false;
-type ApplicationExtension = { id: string; name: string; version: string; entry: string; entryUrl: string; capabilities: string[]; elements: Array<{ type: string; title: string; tag: string }> };
-let applicationInfo: { version: string | null; extensions: ApplicationExtension[] } | null = null;
 type ApplicationUpdateStatus = { configured: boolean; available: boolean; currentVersion: string | null; version?: string; channel?: string; publishedAt?: string; target?: string };
 let applicationUpdate: ApplicationUpdateStatus | null = null;
-const loadedExtensionEntries = new Set<string>();
 const fmt = (v: number | null | undefined, digits = 2) => typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—';
 const runtimeRole = () => status?.runtimeActor?.role ?? status?.actor?.role ?? 'viewer';
 const time = (v: number | null | undefined) => v ? new Date(v).toLocaleString('ru-RU') : '—';
@@ -101,33 +98,6 @@ async function installShellUpdate() {
     throw new Error('Saturn updated, but the restarted shell did not become ready');
 }
 
-async function refreshApplicationExtensions(loadCode = false) {
-    if (demo)
-        return;
-    applicationInfo = await client.request<{ version: string | null; extensions: ApplicationExtension[] }>('application');
-    if (loadCode) {
-        for (const extension of applicationInfo.extensions) {
-            if (!extension.capabilities.includes('elements') || loadedExtensionEntries.has(extension.entryUrl))
-                continue;
-            try {
-                await import(new URL(extension.entryUrl, location.origin).href);
-                loadedExtensionEntries.add(extension.entryUrl);
-            }
-            catch (extensionError) {
-                console.error('Extension load failed:', extension.name, extensionError);
-            }
-        }
-    }
-    renderExtensions();
-}
-function renderExtensions() {
-    if (demo || !applicationInfo)
-        return;
-    $('extension-note').textContent = applicationInfo.version
-        ? `Saturn ${applicationInfo.version} · ${applicationInfo.extensions.length} installed`
-        : 'Extension host is not configured in this server composition.';
-    $('extension-list').innerHTML = applicationInfo.extensions.map(extension => `<article class="extension-card"><div><h3>${escape(extension.name)}</h3><p>${escape(extension.version)} · ${escape(extension.capabilities.join(', ') || 'no capabilities')}</p>${extension.elements.length ? `<small>${extension.elements.map(element => escape(element.title + ' · ' + element.tag)).join('<br>')}</small>` : ''}</div><button data-extension-remove="${escape(extension.name)}">Remove</button></article>`).join('') || '<p>Нет установленных extensions.</p>';
-}
 function setupProject() {
     $('title').textContent = status.project.title;
     $('description').textContent = status.project.description;
@@ -257,7 +227,7 @@ function appendTerminalPanel(){
 function renderPlcInspector(){
  const c=status.project.controllers?.find(c=>c.id===selected);if(!c){$('inspector').textContent=selected;return;}
  const modules=(status.project.attachments??[]).filter(m=>m.controller===c.id);
- $('inspector').innerHTML=`<p class="eyebrow">SATURN · FBD / WASM</p><h2>${escape(c.id)}</h2><div id="plc-front">${renderSaturnPlcSvg({defsPrefix:'inspector-'+c.id})}</div><div class="signals">${[...Object.keys(c.outputs),'healthy','powered'].map(k=>`<div class="signal-row" data-signal="${escape(c.id+'.'+k)}"><span>${escape(k)}</span><b>—</b></div>`).join('')}</div><button id="build-plc" ${status.actor.role!=='engineer'?'disabled':''}>Собрать .fbdbin + HMI</button><p class="model-limit">Программа для установленного FBD-runtime. Не прошивка загрузчика/HAL. Виртуальные модули не подтверждают совместимость с аппаратурой.</p><h3>Клеммы входов</h3><div class="signals">${Object.keys(terminals('saturn')).filter(k=>/^DI|^AI/.test(k)).map(k=>`<div class="signal-row" data-signal="${escape(c.id+'.'+k)}"><span>${escape(k)}</span><b>—</b></div>`).join('')}</div><h3>Модули расширения</h3>${modules.map(m=>`<p>Слот ${m.slot} · ${escape(m.device)} · ${escape(m.profile)}</p>`).join('')||'<p>Нет подключённых модулей</p>'}<button id="build-manifest">Скачать манифест сборки</button><button id="attach-module" ${status.actor.role!=='engineer'?'disabled':''}>Добавить виртуальный AI4</button>`;
+ $('inspector').innerHTML=`<p class="eyebrow">SATURN · C23 / satgui</p><h2>${escape(c.id)}</h2><div id="plc-front">${renderSaturnPlcSvg({defsPrefix:'inspector-'+c.id})}</div><div class="signals">${[...Object.keys(c.outputs),'healthy','powered'].map(k=>`<div class="signal-row" data-signal="${escape(c.id+'.'+k)}"><span>${escape(k)}</span><b>—</b></div>`).join('')}</div><button id="build-plc" ${status.actor.role!=='engineer'?'disabled':''}>Собрать C23 target</button><p class="model-limit">Каноническая модель компилируется в C23 + satgui. Этот экран экспортирует target source; бинарная сборка выполняется только настроенным SatSDK toolchain.</p><h3>Клеммы входов</h3><div class="signals">${Object.keys(terminals('saturn')).filter(k=>/^DI|^AI/.test(k)).map(k=>`<div class="signal-row" data-signal="${escape(c.id+'.'+k)}"><span>${escape(k)}</span><b>—</b></div>`).join('')}</div><h3>Модули расширения</h3>${modules.map(m=>`<p>Слот ${m.slot} · ${escape(m.device)} · ${escape(m.profile)}</p>`).join('')||'<p>Нет подключённых модулей</p>'}<button id="build-manifest">Скачать манифест сборки</button><button id="attach-module" ${status.actor.role!=='engineer'?'disabled':''}>Добавить виртуальный AI4</button>`;
  $('build-plc').onclick=()=>void guard(async()=>{const artifact=await client.request<{fbdbin:number[]}&Record<string,unknown>>('firmware',{controllerId:c.id,revision:frame.revision});download(c.id+'.fbdbin',new Uint8Array(artifact.fbdbin),'application/octet-stream');toast('Собраны программа и HMI. Манифест скачивается отдельно. Аппаратная загрузка не выполнялась.');});
  $('build-manifest').onclick=()=>void guard(async()=>{const {fbdbin,...manifest}=await client.request<{fbdbin:number[]}&Record<string,unknown>>('firmware',{controllerId:c.id,revision:frame.revision});download(c.id+'-build.json',JSON.stringify(manifest,null,2),'application/json');});
  $('attach-module').onclick=()=>void guard(()=>attachModule(c.id));
@@ -331,15 +301,28 @@ async function refreshPanel() {
         $('event-list').innerHTML = `<div class="table-scroll"><table><thead><tr><th>Время модели</th><th>Событие</th><th>Объект</th><th>Автор</th><th>Детали</th></tr></thead><tbody>${rows.map(e => `<tr><td>${time(e.time)}</td><td>${escape(e.type)}</td><td>${escape(e.subject)}</td><td>${escape(e.actor ?? '—')}</td><td>${escape(e.detail)}</td></tr>`).join('')}</tbody></table></div>`;
     }
     if (tab === 'project') {
-        const revisions = await client.request<Omit<Revision, 'files'>[]>('revisions');
-        $('revisions-summary').textContent = `Активная: ${frame.revision} · ${demo ? 'Локальная история снимков, не формат .git' : 'Репозиторий Git сервера'}`;
-        $('revision-list').innerHTML = revisions.map(r => `<div class="card"><div class="card-header"><div><h3>${escape(r.message)}</h3><p>${escape(r.id)} · ${escape(r.actor)} · ${time(r.time)}</p></div><button data-rollback="${escape(r.id)}">Восстановить версию</button></div></div>`).join('');
+        const info = await client.request<{ hash:string; provenance:{ sourceRevision?:string }; project:{ id:string; title:string } }>('artifact');
+        const source = info.provenance.sourceRevision ?? status.head ?? 'workspace';
+        const published = status.instance?.published ?? status.desired ?? '—';
+        const applied = status.instance?.applied ?? frame.revision;
+        $('revisions-summary').textContent = `Source ${source.slice(0,12)} · Build ${info.hash.slice(0,19)} · Published ${published.slice(0,19)} · Applied ${applied.slice(0,19)}`;
+        $('revision-list').innerHTML = '';
     }
 }
-async function loadFiles() { if (dirty && !confirm('Загрузить сохранённое? Текущий черновик останется в файле восстановления браузера.'))
-    return; const revision = await client.request<Revision>('project'); if (!revision)
-    return; files = revision.files; head = revision.id; dirty = false; validDraft = true; if (!(file in files))
-    file = Object.keys(files)[0]; $('file').innerHTML = Object.keys(files).map(path => `<option ${path === file ? 'selected' : ''}>${escape(path)}</option>`).join(''); setEditor(); refreshActions(); $('recover-draft').hidden = !sessionStorage.getItem(`scada-draft:${demo ? 'demo' : 'server'}`); }
+type WorkspaceSnapshot = { id:string; sourceRevision:string|null; time:number; actor:string; message:string; files:Record<string,string> };
+async function loadFiles() {
+    if (dirty && !confirm('Перечитать workspace? Текущий черновик останется в восстановлении вкладки.')) return;
+    const workspace = await client.request<WorkspaceSnapshot>('workspace');
+    files = workspace.files;
+    head = workspace.id;
+    dirty = false;
+    validDraft = true;
+    if (!(file in files)) file = files['src/plant.ts'] !== undefined ? 'src/plant.ts' : Object.keys(files)[0];
+    populateFiles();
+    setEditor();
+    refreshActions();
+    $('recover-draft').hidden = !sessionStorage.getItem(`scada-draft:${demo ? 'demo' : 'server'}`);
+}
 function setEditor() { loadingEditor = true; editor.setState(EditorState.create({ doc: files[file] ?? '', extensions: [basicSetup, javascript({ typescript: true }), EditorView.updateListener.of(update => { if (update.docChanged && !loadingEditor) {
             files[file] = update.state.doc.toString();
             dirty = true;
@@ -352,19 +335,20 @@ function setEditor() { loadingEditor = true; editor.setState(EditorState.create(
             catch { }
             refreshActions();
         } })] })); loadingEditor = false; $('draft-state').textContent = dirty ? 'Несохранённый черновик' : `Сохранено · ${String(head).slice(0, 16)}`; }
-function validate() { try {
-    compileProject(files);
-    validDraft = true;
-    $('diagnostics').textContent = 'Все модули, сигналы, правила и расписания корректны.';
-    $('diagnostics').style.color = '#167568';
-    return true;
+function validate() {
+    try {
+        compileProject(files);
+        validDraft = true;
+        $('diagnostics').textContent = 'Проект корректен для локального build boundary.';
+        $('diagnostics').style.color = '#167568';
+        return true;
+    } catch (e) {
+        validDraft = false;
+        $('diagnostics').textContent = e instanceof Error ? e.message : String(e);
+        $('diagnostics').style.color = '#a44537';
+        return false;
+    }
 }
-catch (e) {
-    validDraft = false;
-    $('diagnostics').textContent = e instanceof Error ? e.message : String(e);
-    $('diagnostics').style.color = '#a44537';
-    return false;
-} }
 async function setupPwa() {
     const manifest = document.querySelector<HTMLLinkElement>('link[rel=manifest]')!;
     manifest.href = demo ? new URL('manifest.webmanifest', location.href).href : new URL('manifest.webmanifest', base).href;
@@ -441,14 +425,11 @@ async function start(memory = false) {
         $('loading').hidden = true;
         $('application').hidden = false;
         $('mode').textContent = demo ? 'СИМУЛЯЦИЯ · БЕЗ СЕРВЕРА' : 'СИМУЛЯЦИЯ · NODE.JS';
-        $('storage').textContent = demo ? memory ? 'SQLite WASM · память, без сохранения' : 'SQLite WASM · OPFS · одна вкладка-владелец' : 'Node.js · SQLite · Git · авторизованная сессия';
+        $('storage').textContent = demo ? memory ? 'ProjectFs · память · runtime SQLite' : 'ProjectFs · OPFS · runtime SQLite' : status.uiMode === 'runtime' ? 'Runtime · immutable artifacts' : 'Workspace files · runtime SQLite';
         $('logout').hidden = demo;
         renderEnvironmentStatus();
         installEquipment(uiLocale);
-        if (!demo) {
-            await refreshApplicationExtensions(true);
-            void checkShellUpdate();
-        }
+        if (!demo) void checkShellUpdate();
         scene = new SceneView($('diagram') as unknown as SVGSVGElement);
         scene.onSelect = selectEquipment;
         scene.onGroupFocus = focusSystem;
@@ -457,7 +438,6 @@ async function start(memory = false) {
         renderFrame(frame);
         const engineering = status.actor.role === 'engineer' && status.uiMode !== 'runtime' && status.uiMode !== 'kiosk', operator = runtimeRole() !== 'viewer';
         document.querySelector<HTMLElement>('[data-tab=project]')!.hidden = !engineering;
-        document.querySelector<HTMLElement>('[data-tab=extensions]')!.hidden = !engineering;
         $('restart').hidden = !engineering;
         $('pause').hidden = !operator;
         if (engineering)
@@ -536,27 +516,11 @@ $('environment-disconnect').onclick = () => void guard(async () => {
     renderEnvironmentStatus();
     toast('Live environment отключён. Runtime снова локальный.');
 });
-$('extensions-refresh').onclick = () => void guard(() => refreshApplicationExtensions(true));
-$('extension-add').onclick = () => void guard(async () => {
-    const input = $<HTMLInputElement>('extension-package');
-    const specifier = input.value.trim();
-    if (!specifier)
-        throw new Error('Введите package, например @company/custom-elements');
-    const installed = await client.request<ApplicationExtension>('extensions/install', { specifier });
-    input.value = '';
-    await refreshApplicationExtensions(true);
-    toast(`Installed ${installed.name}@${installed.version}`);
-});
 $('recover-draft').onclick = () => void guard(() => { const saved = JSON.parse(sessionStorage.getItem(`scada-draft:${demo ? 'demo' : 'server'}`) ?? 'null'); if (!saved?.files)
     throw new Error('Нет сохранённого черновика'); validateFiles(saved.files); files = saved.files; head = saved.head; file = saved.file in files ? saved.file : Object.keys(files)[0]; dirty = true; validDraft = false; populateFiles(); setEditor(); refreshActions(); toast('Черновик восстановлен с исходной базовой ревизией.'); });
 $('new-file').onclick = () => void guard(() => { const path = prompt('Имя нового модуля, например sensors.ts'); if (!path)
     return; if (path in files)
     throw new Error('Файл уже существует'); validateFiles({ ...files, [path]: '' }); files[path] = ''; file = path; dirty = true; validDraft = false; populateFiles(); setEditor(); refreshActions(); });
-$('import-project').onclick = () => $('project-upload').click();
-$('project-upload').onchange = () => void guard(async () => { const input = $<HTMLInputElement>('project-upload'), upload = input.files?.[0]; if (!upload)
-    return; if (upload.size > 2000000)
-    throw new Error('Проект больше 2 MB'); const incoming = JSON.parse(await upload.text()); validateFiles(incoming); if (dirty && !confirm('Заменить текущий черновик?'))
-    return; files = incoming; dirty = true; validDraft = false; file = 'plant.ts'; populateFiles(); setEditor(); validate(); refreshActions(); input.value = ''; });
 function populateFiles() { $('file').innerHTML = Object.keys(files).map(path => `<option ${path === file ? 'selected' : ''}>${escape(path)}</option>`).join(''); }
 $('memory').onclick = () => void start(true);
 $('notifications').onclick = () => void guard(enableNotifications);
@@ -585,24 +549,28 @@ $('diagram').addEventListener('pointerup', () => pan = null);
 $('file').onchange = () => { file = $<HTMLSelectElement>('file').value; setEditor(); };
 $('validate').onclick = () => validate();
 $('reload-project').onclick = () => void guard(loadFiles);
-$('commit').onclick = () => void guard(async () => { if (!validate())
-    return; const message = $<HTMLInputElement>('commit-message').value; if (!message.trim())
-    throw new Error('Добавьте описание изменения'); const revision = await client.request<Revision>('save', { files, expected: head, message }); head = revision.id; dirty = false; sessionStorage.removeItem(`scada-draft:${demo ? 'demo' : 'server'}`); $('recover-draft').hidden = true; setEditor(); await refreshStatus(); await refreshPanel(); toast('Commit сохранён. Публикация — отдельное действие.'); });
-$('publish').onclick = () => void guard(async () => { if (dirty || !head)
-    throw new Error('Сначала сохраните черновик'); await client.request('publish', { revision: head, expected: status.desired }); await refreshStatus(); await refreshPanel(); toast('Проверенная ревизия опубликована.'); });
-$('export').onclick = () => { const url = URL.createObjectURL(new Blob([JSON.stringify(files, null, 2)], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = 'scada-project.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); };
+$('commit').onclick = () => void guard(async () => {
+    if (!validate()) return;
+    const workspace = await client.request<WorkspaceSnapshot>('workspace/save', { files, expected: head });
+    head = workspace.id;
+    dirty = false;
+    sessionStorage.removeItem(`scada-draft:${demo ? 'demo' : 'server'}`);
+    $('recover-draft').hidden = true;
+    setEditor();
+    toast('Файлы сохранены. Runtime пока работает на предыдущем build artifact.');
+});
+$('publish').onclick = () => void guard(async () => {
+    if (dirty) throw new Error('Сначала сохраните файлы workspace');
+    await client.request('deploy', { expected: status.desired });
+    await refreshStatus();
+    await refreshPanel();
+    toast('Workspace собран и build artifact применён.');
+});
 document.addEventListener('click', e => {
     const button = (e.target as Element).closest<HTMLElement>('button');
     if (!button)
         return;
     const d = button.dataset;
-    if (d.extensionRemove) void guard(async () => {
-        if (!confirm(`Удалить extension ${d.extensionRemove}?`))
-            return;
-        await client.request('extensions/remove', { name: d.extensionRemove });
-        await refreshApplicationExtensions(false);
-        toast(`Removed ${d.extensionRemove}`);
-    });
     if(d.viewCommand)void guard(async()=>{
         const v=status.project.views?.find(v=>v.id===$<HTMLSelectElement>('view-select').value);
         const action=v&&presentationActions(v.body).find(a=>a.target===d.viewCommand&&a.value===Number(d.viewSet));
@@ -629,10 +597,6 @@ document.addEventListener('click', e => {
         void guard(async () => { const inputs = Object.fromEntries([...document.querySelectorAll<HTMLInputElement>(`[data-report="${CSS.escape(d.run!)}"]`)].map(i => [i.dataset.input, Number(i.value)])); await client.request('report', { reportId: d.run, inputs }); await refreshPanel(); toast('Отчёт поставлен в очередь.'); });
     if (d.artifact)
         void guard(async () => { const result = await client.request<ReportArtifact>('report-artifact', { id: d.artifact }); const preview = $<HTMLIFrameElement>('report-preview'); preview.srcdoc = result.html; preview.hidden = false; preview.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
-    if (d.rollback)
-        void guard(async () => { if (dirty)
-            throw new Error('Сначала сохраните или экспортируйте черновик'); if (!confirm('Создать новую ревизию с содержимым выбранной версии и опубликовать её?'))
-            return; await client.request('rollback', { revision: d.rollback, expected: head }); await refreshStatus(); await loadFiles(); await refreshPanel(); });
 });
 window.addEventListener('beforeunload', e => { if (dirty) {
     e.preventDefault();

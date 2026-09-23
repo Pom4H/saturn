@@ -20,7 +20,7 @@ First public release candidate of the unified Saturn engineering IDE and runtime
 - live telemetry, quality and stale/offline semantics;
 - alarms, acknowledgements and fail-closed commands;
 - historian, replay and report execution;
-- Git-backed source, published and applied revision flow;
+- content-addressed BuildArtifact deployment with distinct source, published and applied identities;
 - viewer, operator and engineer roles;
 - Saturn-to-Saturn live environment connection boundary.
 
@@ -38,12 +38,14 @@ First public release candidate of the unified Saturn engineering IDE and runtime
 - standalone Saturn for Windows x64, Linux x64/arm64 and macOS x64/arm64;
 - operator/kiosk runtime mode;
 - native VS Code host using normal TypeScript editor, SCM, Problems and Saturn views;
-- extension host and npm-compatible extension installer;
+- project-owned copy-based registry for equipment, reports and templates;
 - signed application-update protocol.
 
-### Extension API v1
+### Extensibility
 
-Extensions can declare `elements`, `protocol`, `datasource`, `panel`, `command` and `report` capabilities. Installed packages require sha512 integrity and Saturn does not execute npm lifecycle scripts.
+- `saturn add` copies typed registry source into the project, where Git owns its history;
+- normal package dependencies remain available for intentionally external shared libraries;
+- runtime executes validated BuildArtifacts rather than installing project extension state.
 
 PLC compile/deploy/flash remains behind a target-provider boundary so controller-specific toolchains do not fork the IDE.
 

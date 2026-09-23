@@ -4,46 +4,64 @@ Standalone is the Saturn application, not a compiled copy of one plant project.
 
 ## Build Saturn once
 
-Bun 1.4.2 or newer is required only on the build machine.
+Bun is required on the build machine:
 
 ~~~sh
 npm ci
 npm run saturn -- pack --target windows-x64
 ~~~
 
-Other targets include linux-x64, linux-arm64, darwin-x64 and darwin-arm64.
+The result is the application binary. No customer project is embedded into it.
 
-The result is the application:
+## Project contract
 
-~~~text
-dist/standalone/saturn.exe
-~~~
-
-No customer/project source is embedded by the pack command. The built-in demonstration remains available as an application resource.
-
-## Open projects at runtime
-
-~~~sh
-saturn open ./pump-station
-saturn open ./boiler-house
-~~~
-
-A project directory contains ordinary source files and a bounded manifest:
+A project is an ordinary directory:
 
 ~~~text
 pump-station/
-  scada.project.json
-  plant.ts
-  views/
-  reports/
-  ...
+├── package.json
+├── src/
+│   └── plant.ts
+├── tests/
+├── targets/
+└── assets/
 ~~~
 
-Saturn reads the project from disk. Source edits made in the IDE are written back to those ordinary files. A normal Git client can therefore diff, commit, branch, pull and push the same project.
+`package.json` is project identity/dependency metadata and `src/plant.ts` is the conventional engineering entrypoint; Saturn does not require a separate project manifest.
 
-External filesystem changes, including a Git checkout/pull, are detected by the workspace repository and hot-reloaded through the normal validation/release path.
+Create or verify a project with:
 
-The local SQLite revision journal provides CAS, recovery and provenance. Its workspace revision IDs are not Git commit IDs and must not be advertised as upstream history.
+~~~sh
+saturn new pump-station
+saturn check ./pump-station
+saturn open ./pump-station
+~~~
+
+Source edits are ordinary file edits, so Git/VS Code/CLI tools see the same project Saturn sees.
+
+## Workspace and runtime are separate
+
+Engineering mode owns project files and build tooling. Runtime owns operational state.
+
+~~~text
+project files / Git
+       │
+       ▼
+  saturn build
+       │
+       ▼
+immutable BuildArtifact
+       │
+       ├── published
+       ▼
+     applied
+       │
+       ▼
+runtime SQLite
+telemetry · history · alarms · commands
+~~~
+
+Runtime-only/kiosk mode does not expose project source. Updating the Saturn binary does not rewrite project files or runtime history.
 
 ## Run as SCADA
 
@@ -52,13 +70,39 @@ saturn run ./pump-station
 saturn run ./pump-station --kiosk
 ~~~
 
-run hides engineering source controls. kiosk is the operator-oriented form of the same runtime.
+`run` hides engineering controls; `--kiosk` further constrains the UI for operator use.
 
-The project is still source on disk; it is not recompiled into a new Saturn executable.
+## Deployment and Git
+
+Git is source control for the engineering workspace. It is not the production runtime transport.
+
+A CI/deployment system may watch a Git branch, run `saturn check/build`, and send the resulting BuildArtifact to a runtime. The runtime itself does not need to clone/fetch a project repository or resolve npm packages to execute an already-built artifact.
+
+The four identities remain distinct:
+
+~~~text
+source SHA -> BuildArtifact -> published -> applied
+~~~
+
+A failed candidate leaves the last-good applied artifact running. Re-applying a retained artifact is an operational recovery action and does not fabricate a Git commit.
+
+## Project-owned registry
+
+The default way to extend a Saturn project is to copy typed source into it:
+
+~~~sh
+saturn registry list
+saturn add pump --project ./pump-station
+saturn add hourly-water-report --project ./pump-station
+~~~
+
+After copying, there is no hidden installation state. The files belong to the project and are reviewed/versioned like any other source.
+
+Use a normal package dependency only when the code is intentionally external and shared. Native/server build hosts can resolve such dependencies; the offline PWA does not implement an npm client.
 
 ## Application data
 
-By default Saturn keeps application/runtime state outside both the executable and project source.
+Operational/application state is outside project source.
 
 Windows:
 
@@ -69,131 +113,19 @@ Windows:
     saturn.sqlite3
 ~~~
 
-macOS:
+macOS uses `~/Library/Application Support/Saturn/`. Linux uses `$XDG_STATE_HOME/saturn/` or `~/.local/state/saturn/`.
 
-~~~text
-~/Library/Application Support/Saturn/
-~~~
-
-Linux:
-
-~~~text
-$XDG_STATE_HOME/saturn/
-# or ~/.local/state/saturn/
-~~~
-
-SATURN_DATA_DIR may override a project's state directory for deployments/tests.
-
-Replacing saturn.exe does not replace project files or runtime history.
-
-## Multiple projects
-
-workspace.json records recent projects. One Saturn installation can open any number of independent project sessions. Each project gets its own runtime/database state.
-
-Project sessions are intentionally isolated. Opening two projects in the same installation does not merge their source or operational state.
+`SATURN_DATA_DIR` can override the runtime state directory for deployments/tests.
 
 ## Live environments
 
-An engineering project may observe/control a different Saturn instance without copying project state peer-to-peer.
+An engineering Saturn can connect to an operator/runtime Saturn while keeping source local. Live telemetry/history/commands come from the selected Environment; source and build provenance remain visible independently.
 
-In the IDE choose **Подключить объект** and enter a named environment such as Plant-01.
-
-The browser talks only to its local Saturn backend. That backend exchanges the remote credentials for a short-lived bearer session and keeps the bearer in RAM:
-
-~~~text
-Engineering browser
-       |
-Engineer Saturn
-       | bearer (memory only)
-       v
-Operator Saturn
-~~~
-
-The local project remains the source shown by the editor. Live frames, history, events, reports and commands come from the operator runtime. Project IDs must match. Local HEAD and remote applied revision may differ and are displayed as different revisions.
-
-Credentials are never written to project files, Git or share URLs.
-
-## Production Git synchronization
-
-For a production server, source/release synchronization remains Git.
-
-A recommended remote has two branches:
-
-~~~text
-main          engineering source
-production    explicitly released source
-~~~
-
-The operator Node composition can track them read-only:
-
-~~~sh
-SCADA_PROJECT_REPO=/srv/saturn/project.git \
-SCADA_PROJECT_REMOTE=origin \
-SCADA_PROJECT_BRANCH=main \
-SCADA_PROJECT_RELEASE_BRANCH=production \
-npm run plant
-~~~
-
-The bare repository must already have the configured remote and credentials through normal host Git/SSH configuration.
-
-The runtime periodically fetches exact configured refs. main is source visibility only. production is the desired release. A candidate is validated before application and a failed candidate leaves the previous applied revision running.
-
-This is intentionally separate from the live Saturn environment protocol.
-
-## Revision model
-
-Saturn exposes three different revisions:
-
-~~~text
-head -> published -> applied
-~~~
-
-- head: latest source known by the repository/workspace;
-- published: requested release;
-- applied: revision currently driving the runtime.
-
-They may differ. The UI/protocol must not collapse them into one value.
-
-## Windows CI
-
-.github/workflows/standalone-windows.yml runs on the self-hosted Windows runner and verifies:
-
-1. locked dependencies;
-2. plant typecheck;
-3. web build;
-4. Bun standalone compilation;
-5. actual saturn.exe process startup;
-6. GET /plant/api/health;
-7. SQLite creation;
-8. artifact upload.
-
-The target executable does not require Node or npm to run.
-
-## Architecture
-
-The normative boundaries for source, Git releases, runtime authority, instance communication, extensions, persistence and application updates are defined in [ADR-0001](adr/0001-saturn-system-architecture.md).
-
-## Extensions
-
-Standalone Saturn installs trusted extension packages itself; Node/Bun/npm do not need to be installed on the target machine.
-
-~~~sh
-saturn extension list
-saturn extension add @factory/equipment
-saturn extension add @factory/equipment@1.4.2
-saturn extension update @factory/equipment
-saturn extension remove @factory/equipment
-~~~
-
-npm-compatible registries are used for naming, versions and tarball distribution. Saturn requires sha512 npm integrity, extracts packages with path/symlink bounds and never runs npm lifecycle scripts.
-
-Extension packages are required to be pre-bundled/self-contained. Private registry credentials can be supplied through SATURN_NPM_TOKEN and SATURN_NPM_REGISTRY and are not stored in the project.
-
-The package/trust contract is normative in [ADR-0002](adr/0002-extension-packages.md).
+A disconnected live Environment must not silently fall back to simulation data.
 
 ## Application self-update
 
-Projects and runtime databases are not part of a Saturn application update.
+Application updates are independent from project releases and runtime history:
 
 ~~~sh
 saturn update --check
@@ -201,33 +133,8 @@ saturn update
 saturn update --channel preview
 ~~~
 
-Release artifacts are accepted only after Ed25519 metadata verification and SHA-256 content verification. On Windows Saturn copies the current executable to a temporary updater, exits, atomically replaces the application, starts the new binary in an internal health-check mode and restores saturn.previous.exe if that health gate fails.
+Release artifacts are verified by signed metadata and content digest before replacement; failed health verification rolls the application binary back.
 
-The public update key is embedded when Saturn is built:
+## Architecture
 
-~~~sh
-npm run saturn -- pack \
-  --target windows-x64 \
-  --update-public-key-file ./release/update-public.pem \
-  --update-manifest-url https://updates.example/saturn/stable.json
-~~~
-
-The signing private key belongs in protected release infrastructure and must never be committed or embedded.
-
-The update protocol is defined in [ADR-0003](adr/0003-signed-application-updates.md).
-
-### Signing a release manifest
-
-After release artifacts are uploaded to their final HTTPS URLs, release infrastructure can generate the manifest with the repository tool:
-
-~~~sh
-npm run update:manifest -- \
-  --version 0.2.0 \
-  --channel stable \
-  --private-key-file /secure/saturn-update-private.pem \
-  --artifact windows-x64 dist/saturn.exe https://downloads.example/saturn/0.2.0/saturn.exe \
-  --artifact linux-x64 dist/saturn-linux https://downloads.example/saturn/0.2.0/saturn-linux \
-  --output dist/stable.json
-~~~
-
-The command hashes the final bytes, signs each target's canonical metadata with Ed25519 and writes schema-1 JSON. The private key path is an input to release infrastructure only.
+The normative project/build/runtime/registry boundaries are [ADR-0008](adr/0008-conventions-first-artifact-runtime.md). Signed application updates remain covered by [ADR-0003](adr/0003-signed-application-updates.md).

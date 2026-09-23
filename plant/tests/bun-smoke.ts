@@ -135,7 +135,6 @@ const app = await startPlantServer({
     host: '127.0.0.1',
     port: 0,
     data: join(dir, 'plant.sqlite3'),
-    repository: join(dir, 'project.git'),
     root: resolve('dist/plant'),
     user: 'bun-smoke',
     password,

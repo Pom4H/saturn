@@ -9,16 +9,19 @@ let childArgs;
 if (command === 'pack') {
     childArgs = ['run', 'scripts/standalone-pack.ts', ...args.slice(1)];
 }
-else if (['open', 'run', 'update', 'extension', 'extensions', 'ide'].includes(command)) {
+else if (['open', 'run', 'update', 'new', 'check', 'registry', 'add', 'ide'].includes(command)) {
     childArgs = ['run', 'standalone/entry.ts', command, ...args.slice(1)];
 }
 else {
     console.error([
         'Usage:',
+        '  saturn new PROJECT',
+        '  saturn check [PROJECT]',
         '  saturn open [PROJECT]',
         '  saturn run PROJECT [--kiosk]',
+        '  saturn registry list',
+        '  saturn add ITEM [--project PROJECT]',
         '  saturn update [--check] [--channel stable|preview|nightly]',
-        '  saturn extension <list|add|update|remove> [package]',
         '  saturn ide catalog --json',
         '  saturn ide docs --locale en|ru --json',
         '  saturn ide check --project PROJECT --locale en|ru --json',

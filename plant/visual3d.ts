@@ -190,7 +190,7 @@ export function createPlantModel(c: Renderer3DContext, visual: string, readout: 
                 const screen=new T.CanvasTexture(hmi);screen.colorSpace=T.SRGBColorSpace;
                 const screenMaterial=new T.MeshBasicMaterial({map:screen,side:T.DoubleSide});owned.push(screenMaterial);
                 mesh(new T.PlaneGeometry(1.11,.79),screenMaterial,0,.1,1.02);
-                let key='';update.push(()=>{const next=JSON.stringify(getDisplay(c.equipment.id));if(next!==key){key=next;drawHmiCanvas(hmi,c.equipment.id);screen.needsUpdate=true;}});
+                let key='';update.push(()=>{const next=JSON.stringify(getDisplay(c.equipment.id));if(next!==key){key=next;drawHmiCanvas(hmi,c.equipment.id,()=>{screen.needsUpdate=true;c.invalidate?.();});}});
                 // Textures are separate GPU resources, retained until the device is disposed.
                 textureDisposers.push(()=>{img.onload=null;texture.dispose();screen.dispose();});
             }

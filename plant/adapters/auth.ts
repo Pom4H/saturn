@@ -8,7 +8,7 @@ export class Auth {
         count: number;
         until: number;
     }>();
-    constructor(readonly store: Store) { store.db.exec('CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,role TEXT NOT NULL,salt TEXT NOT NULL,hash TEXT NOT NULL); CREATE TABLE IF NOT EXISTS sessions(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,csrf TEXT NOT NULL,expires INTEGER NOT NULL);'); }
+    constructor(readonly store: Store) {}
     seed(id: string, password: string, role: Actor['role'] = 'engineer') { if (!/^[A-Za-z0-9_.@-]{1,100}$/.test(id) || password.length < 12)
         failCode('SATURN_VALUE_INVALID',{field:'credentials',reason:'invalid'},{user:id,minPasswordLength:12}); if (this.store.db.all('SELECT id FROM users WHERE id=?', [id]).length)
         return false; const salt = randomBytes(16).toString('hex'); this.store.db.exec('INSERT INTO users VALUES(?,?,?,?)', [id, role, salt, scryptSync(password, salt, 32).toString('hex')]); return true; }

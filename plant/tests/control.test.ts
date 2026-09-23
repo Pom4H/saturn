@@ -6,20 +6,20 @@ import { demoFiles } from '../demo/files';
 import { runControlTrace } from './control-trace';
 import { Kernel } from '../kernel';
 import { Service } from '../service';
-import { Store, LocalRepository } from '../store';
+import { Store } from '../store';
 import { NodeSql } from '../adapters/node-sql';
 import { model, models } from '../models';
 import { createPlantModel } from '../visual3d';
 import type { Actor, Project } from '../types';
 import { diagnostic } from './diagnostic';
+import { buildArtifact } from '../artifact';
 const operator: Actor = { id: 'operator', role: 'operator' };
 const engineer: Actor = { id: 'engineer', role: 'engineer' };
 const source = () => compileProject(demoFiles);
 async function service() {
     const store = new Store(new NodeSql()); let n = 0;
-    const repository = new LocalRepository(store, () => `local:${++n}`);
-    const s = new Service(store, repository, { now: () => 1000, uuid: () => `id-${++n}`, reportRunner: async () => ({ rows: [], html: '' }) });
-    await s.start(demoFiles); return s;
+    const s = new Service(store, { now: () => 1000, uuid: () => `id-${++n}`, reportRunner: async () => ({ rows: [], html: '' }) });
+    await s.start(await buildArtifact(demoFiles, { packageName: '@saturn/test' })); return s;
 }
 const payload = (s: Service, target = 'MAKEUP', value = .2) => ({ id: 'input-1', action: 'operate', revision: s.frame().revision, runId: s.frame().runId, target, value });
 
@@ -77,7 +77,7 @@ test('control failure leaves checkpoint unchanged and accepted values survive re
     const s = await service(); try {
         s.command(payload(s), operator); s.tick(); const before = s.frame();
         assert.throws(() => s.command({...payload(s), id:'bad', target:'absent'}, operator)); assert.deepEqual(s.frame(), before);
-        const restored = new Service(s.store, s.repository, {reportRunner:async()=>({rows:[],html:''})}); await restored.start(demoFiles); assert.deepEqual(restored.frame(), before);
+        const restored = new Service(s.store, {reportRunner:async()=>({rows:[],html:''})}); await restored.start(await buildArtifact(demoFiles, { packageName: '@saturn/test' })); assert.deepEqual(restored.frame(), before);
         await s.restart(engineer); assert.throws(() => s.command({...payload(s), id:'old-run',runId:before.runId}, operator), diagnostic('SATURN_CONFLICT'));
     } finally { s.store.db.close(); }
 });

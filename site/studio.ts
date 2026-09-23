@@ -18,7 +18,7 @@ import { examples, emptySource, createWorkspace, parseWorkspace, currentDocument
 import { SimulationStream, type TelemetryUpdate } from './telemetry';
 import type { RuntimeFrame } from '../src/runtime/protocol';
 import { FileNavigator } from './navigator';
-import { Documents, fetchServerProject, type ServerRevision } from './documents';
+import { Documents, fetchServerWorkspace, type ServerWorkspaceSnapshot } from './documents';
 import { updateFiles } from './shell-projects';
 import type { plantProjection } from './plant-project';
 import { downloadFile, exportHTML, shareURL, readSharedSource } from './exports';
@@ -41,11 +41,11 @@ export async function mountStudio() {
   let error = false, selected: string | null = null, surface: Surface = 'scene';
   let filesVisible = false;
   let plantTools: typeof import('./plant-project') | undefined, plant: ReturnType<typeof plantProjection> | undefined;
-  let serverRevision: ServerRevision | null = null, pendingRevision: ServerRevision | null = null;
+  let workspaceSnapshot: ServerWorkspaceSnapshot | null = null, pendingWorkspaceSnapshot: ServerWorkspaceSnapshot | null = null;
   let serverSession: ServerSession | null = null, runtimeOnly = false, runtimeRevision: string | null = null;
   let documents: Documents;
   let codeVisible = !compact.matches, propertiesVisible = false, mobilePane: 'scene' | 'source' | 'properties' = 'scene';
-  let progress = 0, explicit: '2d' | '3d' = '3d', fullscreen = false, scrollBeforeFullscreen = 0;
+  let progress = 0, explicit: '2d' | '3d' = compact.matches ? '2d' : '3d', fullscreen = false, scrollBeforeFullscreen = 0;
   let visible = false, paused = reduced.matches, toastTimer = 0;
   let connecting: Endpoint | 'choose' | null = null;
   const view = new SceneView(canvas);
@@ -59,13 +59,13 @@ export async function mountStudio() {
     ] });
   }
   const initial = currentDocument(workspace);
-  documents = new Documents(initial.files ?? { 'station.ts': initial.source }, editorState, initial.files?.['plant.ts'] !== undefined ? 'plant.ts' : 'station.ts');
+  documents = new Documents(initial.files ?? { 'station.ts': initial.source }, editorState, initial.files?.['src/plant.ts'] !== undefined ? 'src/plant.ts' : initial.files?.['plant.ts'] !== undefined ? 'plant.ts' : 'station.ts');
   const editor = new EditorView({ parent: $('studio-editor'), state: documents.state });
   function syncHistory(state = editor.state) {
     $('studio-undo').toggleAttribute('disabled', undoDepth(state) === 0);
     $('studio-redo').toggleAttribute('disabled', redoDepth(state) === 0);
   }
-  function isPlant() { return documents?.states.has('plant.ts') ?? false; }
+  function isPlant() { return documents?.states.has('src/plant.ts') || documents?.states.has('plant.ts') || false; }
   function fitScene() {
     view.fit(); capPlantScale();
   }
@@ -76,7 +76,7 @@ export async function mountStudio() {
     const maxScale = runtimeOnly && compact.matches ? 3.2 : 1.25;
     if (scale > maxScale) view.zoom(scale / maxScale);
   }
-  let serverDraft: { revision: ServerRevision; documents: Documents } | null = null;
+  let workspaceDraft: { snapshot: ServerWorkspaceSnapshot; documents: Documents } | null = null;
   let telemetry: TelemetryUpdate = { state: 'connecting', frame: null, message: '' };
   let observedRuntime: RuntimeFrame | null = null;
   const stream = new SimulationStream(update => {
@@ -87,18 +87,20 @@ export async function mountStudio() {
   let serverLoading = false;
   const shortRevision = (value: string | null | undefined) => value ? value.slice(0, 7) : '—';
   function syncProductContext() {
-    const source = serverSession?.head ?? serverRevision?.id ?? null;
+    const source = workspaceSnapshot?.sourceRevision ?? serverSession?.head ?? null;
     const published = serverSession?.desired ?? null;
-    const applied = telemetry.frame?.revision ?? runtimeRevision ?? null;
+    const applied = telemetry.frame?.revision ?? runtimeRevision ?? serverSession?.frame.revision ?? null;
     $('revision-source').textContent = source ? shortRevision(source) : workspace.active.kind === 'example' ? 'demo' : 'local';
     $('revision-published').textContent = shortRevision(published);
     $('revision-applied').textContent = shortRevision(applied);
     const drift = Boolean(published && applied && published !== applied);
-    shell.dataset.revisionState = drift ? 'drift' : published && applied ? 'synced' : 'local';
-    $('revision-chain').title = drift
-      ? 'Опубликованная и применённая ревизии различаются'
-      : published && applied ? 'Runtime работает на опубликованной ревизии' : 'Локальный инженерный контекст';
-    $('environment-name').textContent = serverSession ? (runtimeOnly ? 'Runtime' : 'Server') : workspace.active.kind === 'example' ? 'Demo' : 'Local';
+    const sourceAhead = Boolean(workspaceSnapshot && applied && workspaceSnapshot.id !== applied);
+    shell.dataset.revisionState = drift || sourceAhead ? 'drift' : published && applied ? 'synced' : 'local';
+    $('revision-chain').title = sourceAhead
+      ? 'Workspace собран в другой artifact, чем сейчас применён runtime'
+      : drift ? 'Опубликованный и применённый build artifacts различаются'
+      : published && applied ? 'Runtime работает на опубликованном build artifact' : 'Локальный инженерный контекст';
+    $('environment-name').textContent = serverSession ? (runtimeOnly ? 'Runtime' : 'Workspace') : workspace.active.kind === 'example' ? 'Demo' : 'Local';
   }
   function setServerRole(session: ServerSession | null) {
     serverSession = session;
@@ -115,7 +117,7 @@ export async function mountStudio() {
     syncProductContext();
   }
   function syncTelemetry() {
-    if ((serverRevision || runtimeOnly) && plant) stream.start();
+    if ((workspaceSnapshot || runtimeOnly) && plant) stream.start();
     else { stream.stop(); telemetry = { state: 'connecting', frame: null, message: '' }; }
     applyTelemetry();
   }
@@ -124,7 +126,7 @@ export async function mountStudio() {
     const liveFrame = telemetry.frame;
     let status: string = runtimeOnly ? telemetry.state : 'draft', label = runtimeOnly ? telemetry.message : 'Черновик · без телеметрии';
     observedRuntime = plant.runtime;
-    const revision = serverRevision?.id ?? runtimeRevision;
+    const revision = runtimeOnly ? (runtimeRevision ?? serverSession?.frame.revision ?? null) : workspaceSnapshot?.id ?? null;
     const sourceClean = runtimeOnly || !documents.dirty() && !error;
     if (revision && sourceClean) {
       status = telemetry.state; label = telemetry.message;
@@ -139,7 +141,7 @@ export async function mountStudio() {
         for (const equipment of Object.values(observedRuntime.equipment)) for (const signal of Object.values(equipment.signals)) signal.quality = 'stale';
         for (const signal of Object.values(observedRuntime.flows)) signal.quality = 'stale';
       }
-    } else if (serverRevision) label = 'Черновик · данные приостановлены';
+    } else if (workspaceSnapshot) label = 'Черновик · данные приостановлены';
     if (!['live','paused','stale'].includes(status)) observedRuntime = plantTools.unavailableRuntime(plant.project, status === 'draft' || status === 'revision' ? 'draft' : 'offline');
     shell.dataset.telemetry = status; shell.dataset.runtimeSeq = String(status === 'live' || status === 'paused' ? liveFrame?.seq ?? '' : '');
     $('studio-context').textContent = label || (runtimeOnly ? 'Установка' : 'Черновик'); $('studio-context').title = telemetry.message || label;
@@ -208,7 +210,7 @@ export async function mountStudio() {
   }
   async function activateRuntimeSession(session: ServerSession) {
     await ensurePlant();
-    setServerRole(session); runtimeOnly = true; runtimeRevision = session.frame.revision; serverRevision = null; pendingRevision = null;
+    setServerRole(session); runtimeOnly = true; runtimeRevision = session.frame.revision; workspaceSnapshot = null; pendingWorkspaceSnapshot = null;
     shell.dataset.runtimeOnly = 'true'; shell.dataset.serverProject = 'true';
     const trigger = $('project-trigger') as HTMLButtonElement; trigger.disabled = true;
     shell.querySelector<HTMLElement>('.project-trigger-name')!.textContent = session.project.title;
@@ -242,7 +244,7 @@ export async function mountStudio() {
   const fileNavigator = new FileNavigator(() => ({ paths: [...documents.states.keys()], active: documents.active,
     dirty: new Set([...documents.states.keys()].filter(path => documents.dirty(path))),
     errors: new Set(errorPath ? [errorPath] : []),
-    title: serverRevision ? plant?.project.title ?? 'Серверный проект' : currentDocument(workspace).title,
+    title: workspaceSnapshot ? plant?.project.title ?? 'Серверный проект' : currentDocument(workspace).title,
   }), openFile);
   async function ensurePlant() { if(!plantTools){ plantTools=await import('./plant-project'); renderEquipmentCatalog(); } }
   function openFile(path: string, pinned = false, show = true) {
@@ -266,39 +268,39 @@ export async function mountStudio() {
     }
     $('file-path').textContent = documents.active;
     $('file-path').hidden = !documents.active.includes('/');
-    $('file-server-state').hidden = !serverRevision && !serverLoading;
+    $('file-server-state').hidden = !workspaceSnapshot && !serverLoading;
     $('file-origin').replaceChildren();
-    const label = document.createElement('span'); label.textContent = serverRevision ? `Сервер · ${serverRevision.id.slice(0, 8)}` : `Локальный проект`; $('file-origin').append(label);
-    if (serverRevision) { const refresh = document.createElement('button'); refresh.textContent = 'Обновить'; refresh.id = 'server-refresh'; refresh.disabled = serverLoading; refresh.onclick = () => void loadServer(); $('file-origin').append(refresh); }
-    $('server-update').hidden = !pendingRevision;
+    const label = document.createElement('span'); label.textContent = workspaceSnapshot ? `Workspace · ${workspaceSnapshot.id.slice(0, 12)}` : `Локальный проект`; $('file-origin').append(label);
+    if (workspaceSnapshot) { const refresh = document.createElement('button'); refresh.textContent = 'Обновить'; refresh.id = 'server-refresh'; refresh.disabled = serverLoading; refresh.onclick = () => void loadServer(); $('file-origin').append(refresh); }
+    $('server-update').hidden = !pendingWorkspaceSnapshot;
     $('server-apply').toggleAttribute('disabled', documents.dirty());
-    $('server-update-hint').textContent = pendingRevision && documents.dirty() ? 'Скопируйте черновик или отмените изменения перед обновлением.' : '';
+    $('server-update-hint').textContent = pendingWorkspaceSnapshot && documents.dirty() ? 'Скопируйте черновик или отмените изменения перед обновлением.' : '';
     $('studio-shell').dataset.projectKind = isPlant() ? 'plant' : 'core';
-    $('studio-shell').dataset.serverProject = String(!!serverRevision);
+    $('studio-shell').dataset.serverProject = String(!!workspaceSnapshot);
     $('studio-context').textContent = isPlant() ? 'Черновик' : 'Демо';
     $('studio-context').title = isPlant() ? 'Исходники и схема; runtime не подключён' : 'Расчётная демонстрационная модель';
     window.dispatchEvent(new Event('saturn-project-change'));
     syncServerActions(); syncTelemetry();
-    $('studio-message').textContent = serverRevision ? (documents.dirty() ? 'Черновик в памяти' : 'Серверная ревизия') : isPlant() ? 'Черновик · без runtime' : $('studio-message').textContent;
+    $('studio-message').textContent = workspaceSnapshot ? (documents.dirty() ? 'Черновик в памяти' : 'Workspace snapshot') : isPlant() ? 'Черновик · без runtime' : $('studio-message').textContent;
   }
   async function openPlantExample() {
     try { await ensurePlant(); const files = plantTools!.nestedStarter(); plantTools!.plantProjection(files); persist();
-      if (serverRevision) serverDraft = { revision: serverRevision, documents };
+      if (workspaceSnapshot) workspaceDraft = { snapshot: workspaceSnapshot, documents };
       const project = createProject(workspace, 'Насосная установка', files['plant.ts']);
-      serverRevision = null; pendingRevision = null; updateFiles(workspace, files);
+      workspaceSnapshot = null; pendingWorkspaceSnapshot = null; updateFiles(workspace, files);
       switchDocument({ kind: 'project', id: project.id }, false); filesVisible = true; codeVisible = true; syncPanels();
     } catch (e) { toast(e instanceof Error ? e.message : String(e)); renderMeta(); }
   }
-  function activateServer(revision: ServerRevision) {
-    persist(); runtimeOnly = false; runtimeRevision = null; delete shell.dataset.runtimeOnly; shell.dataset.serverProject = 'true'; ($('project-trigger') as HTMLButtonElement).disabled = false; serverRevision = revision; pendingRevision = null;
-    documents = new Documents(revision.files, editorState, 'plant.ts'); editor.setState(documents.state);
-    serverDraft = { revision, documents }; selected = null; clearConnection(); refresh(false); fitScene(); spatial?.fit();
+  function activateServer(snapshot: ServerWorkspaceSnapshot) {
+    persist(); runtimeOnly = false; runtimeRevision = null; delete shell.dataset.runtimeOnly; shell.dataset.serverProject = 'true'; ($('project-trigger') as HTMLButtonElement).disabled = false; workspaceSnapshot = snapshot; pendingWorkspaceSnapshot = null;
+    documents = new Documents(snapshot.files, editorState, snapshot.files['src/plant.ts'] !== undefined ? 'src/plant.ts' : 'plant.ts'); editor.setState(documents.state);
+    workspaceDraft = { snapshot, documents }; selected = null; clearConnection(); refresh(false); fitScene(); spatial?.fit();
     filesVisible = true; renderMeta(); syncPanels();
   }
   async function loadServer() {
     if (serverLoading) return;
     serverLoading = true;
-    const serverState = $('file-server-state'); serverState.hidden = false; serverState.dataset.state = 'loading'; serverState.textContent = 'Получение ревизии…';
+    const serverState = $('file-server-state'); serverState.hidden = false; serverState.dataset.state = 'loading'; serverState.textContent = 'Чтение workspace…';
     $('file-tree').setAttribute('aria-busy', 'true');
     $('server-refresh')?.setAttribute('disabled', '');
     const baseDocuments = documents;
@@ -312,16 +314,16 @@ export async function mountStudio() {
         $('server-error').textContent = ''; $<HTMLDialogElement>('server-dialog').close();
         return;
       }
-      const revision = await fetchServerProject(); plantTools!.validateFiles(revision.files); plantTools!.plantProjection(revision.files);
+      const snapshot = await fetchServerWorkspace(); plantTools!.validateFiles(snapshot.files); plantTools!.plantProjection(snapshot.files);
       if (documents !== baseDocuments) throw new Error('Проект был переключён. Повторите загрузку.');
-      if (serverRevision && documents.dirty()) {
-        if (revision.id !== serverRevision.id) pendingRevision = revision;
-        renderFiles(); toast(revision.id === serverRevision.id ? 'Серверная ревизия не изменилась' : 'Доступна новая ревизия. Черновик сохранён.');
-      } else if (serverRevision?.id === revision.id) toast('Серверная ревизия не изменилась');
-      else if (!serverRevision && serverDraft?.documents.dirty()) {
-        persist(); serverRevision = serverDraft.revision; documents = serverDraft.documents; editor.setState(documents.state);
-        pendingRevision = revision.id !== serverRevision.id ? revision : null; refresh(false); renderMeta(); filesVisible = true; syncPanels();
-      } else activateServer(revision);
+      if (workspaceSnapshot && documents.dirty()) {
+        if (snapshot.id !== workspaceSnapshot.id) pendingWorkspaceSnapshot = snapshot;
+        renderFiles(); toast(snapshot.id === workspaceSnapshot.id ? 'Workspace snapshot не изменилась' : 'Workspace изменён снаружи. Черновик сохранён.');
+      } else if (workspaceSnapshot?.id === snapshot.id) toast('Workspace snapshot не изменилась');
+      else if (!workspaceSnapshot && workspaceDraft?.documents.dirty()) {
+        persist(); workspaceSnapshot = workspaceDraft.snapshot; documents = workspaceDraft.documents; editor.setState(documents.state);
+        pendingWorkspaceSnapshot = snapshot.id !== workspaceSnapshot.id ? snapshot : null; refresh(false); renderMeta(); filesVisible = true; syncPanels();
+      } else activateServer(snapshot);
       serverState.dataset.state = 'ready'; serverState.textContent = `Проверено ${new Date().toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}`;
       $('server-error').textContent = ''; $<HTMLDialogElement>('server-dialog').close();
     } catch (e) { const text = e instanceof Error ? e.message : String(e); $('server-error').textContent = text; serverState.dataset.state = 'error'; serverState.textContent = text; if (!$<HTMLDialogElement>('server-dialog').open) toast(text); }
@@ -395,42 +397,41 @@ export async function mountStudio() {
   document.querySelectorAll<HTMLButtonElement>('[data-server-open]').forEach(button => button.onclick = () => { $('server-error').textContent = ''; $<HTMLDialogElement>('server-dialog').showModal(); });
   $('server-close').onclick = () => $<HTMLDialogElement>('server-dialog').close();
   $('server-load').onclick = () => void loadServer();
-  $('server-apply').onclick = () => { if (pendingRevision && !documents.dirty()) activateServer(pendingRevision); };
+  $('server-apply').onclick = () => { if (pendingWorkspaceSnapshot && !documents.dirty()) activateServer(pendingWorkspaceSnapshot); };
   $('runtime-pause').onclick = () => void (async () => {
     try { await runtimeCommand(telemetry.frame?.paused ? 'resume' : 'pause'); }
     catch (e) { toast(e instanceof Error ? e.message : String(e)); }
   })();
-  $('server-save').onclick = () => {
-    if (!serverSession || serverSession.actor.role !== 'engineer' || !serverRevision || !documents.dirty() || error) return;
-    $('server-commit-error').textContent = '';
-    $<HTMLDialogElement>('server-commit-dialog').showModal();
-    $<HTMLInputElement>('server-commit-message').select();
-  };
+  $('server-save').onclick = () => void (async () => {
+    if (!serverSession || serverSession.actor.role !== 'engineer' || !workspaceSnapshot || !documents.dirty() || error) return;
+    try {
+      documents.capture(editor.state);
+      const snapshot = await serverPost<ServerWorkspaceSnapshot>(
+        serverSession,
+        'workspace/save',
+        { files: documents.files, expected: workspaceSnapshot.id },
+      );
+      activateServer(snapshot);
+      toast('Файлы workspace сохранены. Runtime ещё работает на предыдущем build artifact.');
+    } catch (e) { toast(e instanceof Error ? e.message : String(e)); }
+  })();
   $('server-commit-close').onclick = () => $<HTMLDialogElement>('server-commit-dialog').close();
-  $('server-commit-form').onsubmit = event => {
-    event.preventDefault();
-    void (async () => {
-      if (!serverSession || serverSession.actor.role !== 'engineer' || !serverRevision) return;
-      try {
-        documents.capture(editor.state);
-        const message = $<HTMLInputElement>('server-commit-message').value.trim();
-        const revision = await serverPost<ServerRevision>(serverSession, 'save', { files: documents.files, expected: serverRevision.id, message });
-        serverSession = { ...serverSession, head: revision.id };
-        activateServer(revision);
-        $<HTMLDialogElement>('server-commit-dialog').close();
-        toast('Ревизия сохранена. Runtime ещё работает на опубликованной версии.');
-      } catch (e) { $('server-commit-error').textContent = e instanceof Error ? e.message : String(e); }
-    })();
-  };
+  $('server-commit-form').onsubmit = event => { event.preventDefault(); $<HTMLDialogElement>('server-commit-dialog').close(); };
   $('server-publish').onclick = () => void (async () => {
-    if (!serverSession || serverSession.actor.role !== 'engineer' || !serverRevision || documents.dirty()) return;
+    if (!serverSession || serverSession.actor.role !== 'engineer' || !workspaceSnapshot || documents.dirty()) return;
     try {
       const csrf = serverSession.csrf;
-      const status = await serverPost<Omit<ServerSession, 'csrf'>>(serverSession, 'publish', { revision: serverRevision.id, expected: serverSession.desired });
+      const status = await serverPost<Omit<ServerSession, 'csrf'>>(
+        serverSession,
+        'deploy',
+        { expected: serverSession.desired },
+      );
       serverSession = { ...status, csrf };
       telemetry = { state: 'live', frame: status.frame, message: '' };
-      runtimeRevision = null;
-      syncTelemetry(); renderMeta(); toast('Ревизия опубликована и применена');
+      runtimeRevision = status.frame.revision;
+      syncTelemetry();
+      renderMeta();
+      toast('Workspace собран и build artifact применён');
     } catch (e) { toast(e instanceof Error ? e.message : String(e)); }
   })();
 
@@ -438,7 +439,7 @@ export async function mountStudio() {
   function toast(text: string) { $('shell-toast').textContent = text; $('shell-toast').hidden = false; clearTimeout(toastTimer); toastTimer = window.setTimeout(() => $('shell-toast').hidden = true, 4500); }
   function persist() {
     documents.capture(editor.state);
-    if (serverRevision) { message(documents.dirty() ? 'Черновик в памяти' : 'Без изменений'); renderFiles(); return true; }
+    if (workspaceSnapshot) { message(documents.dirty() ? 'Черновик в памяти' : 'Без изменений'); renderFiles(); return true; }
     if (isPlant()) updateFiles(workspace, documents.files); else updateSource(workspace, documents.files['station.ts']);
     try { localStorage.setItem(workspaceKey, JSON.stringify(workspace)); storageAvailable = true; message('Сохранено'); return true; }
     catch { storageAvailable = false; message('Не сохранено · скачайте .ts'); return false; }
@@ -480,12 +481,13 @@ export async function mountStudio() {
     if (save) persist();
   }
   function syncServerActions() {
-    const connected = Boolean(serverSession && (serverRevision || runtimeOnly));
+    const connected = Boolean(serverSession && (workspaceSnapshot || runtimeOnly));
     $('runtime-controls').hidden = !connected; $('runtime-alarms').hidden = !connected;
-    const engineer = connected && serverSession?.actor.role === 'engineer' && !!serverRevision;
+    const engineer = connected && serverSession?.actor.role === 'engineer' && !!workspaceSnapshot;
     $('server-save').hidden = !engineer; $('server-publish').hidden = !engineer;
     $('server-save').toggleAttribute('disabled', !engineer || !documents.dirty() || error);
-    $('server-publish').toggleAttribute('disabled', !engineer || documents.dirty() || !serverRevision || serverRevision.id === serverSession?.desired);
+    const applied = telemetry.frame?.revision ?? serverSession?.frame.revision;
+    $('server-publish').toggleAttribute('disabled', !engineer || documents.dirty() || !workspaceSnapshot || workspaceSnapshot.id === applied);
   }
   function renderMeta() {
     const picker = $<HTMLSelectElement>('project-switch'); picker.replaceChildren();
@@ -498,18 +500,18 @@ export async function mountStudio() {
       for (const project of workspace.projects) { const option = document.createElement('option'); option.value = `project:${project.id}`; option.textContent = project.title; group.append(option); }
       picker.append(group);
     }
-    if (serverRevision || runtimeOnly || serverDraft) { const option = document.createElement('option'); option.value = 'server:current'; option.textContent = plant?.project.title ?? serverSession?.project.title ?? 'Серверный проект'; picker.append(option); picker.value = serverRevision || runtimeOnly ? option.value : `${workspace.active.kind}:${workspace.active.id}`; }
+    if (workspaceSnapshot || runtimeOnly || workspaceDraft) { const option = document.createElement('option'); option.value = 'server:current'; option.textContent = plant?.project.title ?? serverSession?.project.title ?? 'Серверный проект'; picker.append(option); picker.value = workspaceSnapshot || runtimeOnly ? option.value : `${workspace.active.kind}:${workspace.active.id}`; }
     else picker.value = `${workspace.active.kind}:${workspace.active.id}`;
-    $('project-create').hidden = runtimeOnly || !serverRevision && workspace.active.kind !== 'example';
-    $('project-create').textContent = serverRevision ? 'Скопировать проект' : 'Создать проект';
-    $('project-duplicate').hidden = runtimeOnly || !!serverRevision || workspace.active.kind !== 'project';
+    $('project-create').hidden = runtimeOnly || !workspaceSnapshot && workspace.active.kind !== 'example';
+    $('project-create').textContent = workspaceSnapshot ? 'Скопировать проект' : 'Создать проект';
+    $('project-duplicate').hidden = runtimeOnly || !!workspaceSnapshot || workspace.active.kind !== 'project';
     $('studio-html').hidden = isPlant() || runtimeOnly; $('studio-share').hidden = isPlant() || runtimeOnly;
     $('equipment-toggle').hidden = isPlant() || runtimeOnly; $('studio-connect').hidden = isPlant() || runtimeOnly;
-    $('studio-download').hidden = runtimeOnly; $('studio-download').textContent = isPlant() ? 'Скачать проект (.json)' : 'Скачать исходник (.ts)';
+    $('studio-download').hidden = runtimeOnly || isPlant(); $('studio-download').textContent = 'Скачать исходник (.ts)';
     syncServerActions(); syncProductContext();
     documentTitle(); renderProjects();
   }
-  function documentTitle() { document.title = fullscreen ? `${(serverRevision || runtimeOnly ? plant?.project.title ?? serverSession?.project.title ?? 'Установка' : currentDocument(workspace).title)} — Saturn` : 'Saturn'; }
+  function documentTitle() { document.title = fullscreen ? `${(workspaceSnapshot || runtimeOnly ? plant?.project.title ?? serverSession?.project.title ?? 'Установка' : currentDocument(workspace).title)} — Saturn` : 'Saturn'; }
   function select(id: string | null) {
     if (id && id !== selected) propertiesVisible = true;
     if (!id) propertiesVisible = false;
@@ -638,7 +640,7 @@ export async function mountStudio() {
     }
   }
   function switchDocument(active: WorkspaceState['active'], save = true) {
-    if (save) { persist(); if (serverRevision) serverDraft = { revision: serverRevision, documents }; } runtimeOnly = false; runtimeRevision = null; delete shell.dataset.runtimeOnly; shell.dataset.serverProject = 'false'; ($('project-trigger') as HTMLButtonElement).disabled = false; serverRevision = null; pendingRevision = null; setServerRole(null); workspace.active = active; selected = null; clearConnection();
+    if (save) { persist(); if (workspaceSnapshot) workspaceDraft = { snapshot: workspaceSnapshot, documents }; } runtimeOnly = false; runtimeRevision = null; delete shell.dataset.runtimeOnly; shell.dataset.serverProject = 'false'; ($('project-trigger') as HTMLButtonElement).disabled = false; workspaceSnapshot = null; pendingWorkspaceSnapshot = null; setServerRole(null); workspace.active = active; selected = null; clearConnection();
     const next = currentDocument(workspace);
     documents = new Documents(next.files ?? { 'station.ts': next.source }, editorState, next.files?.['plant.ts'] !== undefined ? 'plant.ts' : 'station.ts');
     editor.setState(documents.state); refresh(false); fitScene();
@@ -669,7 +671,7 @@ export async function mountStudio() {
   function setSurface(next: Surface) {
     if (next === 'source') { codeVisible = true; mobilePane = 'source'; next = 'scene'; }
     if (next === 'equipment') { toggleEquipment(true); next = 'scene'; }
-    surface = next; shell.dataset.view = next;
+    surface = next; shell.dataset.surface = next;
     $('scene-panel').hidden = next !== 'scene';
     $('signals-panel').hidden = next !== 'signals'; $('controls-panel').hidden = next !== 'controls'; $('alarms-panel').hidden = next !== 'alarms'; $('projects-panel').hidden = next !== 'projects';
     document.querySelectorAll<HTMLDetailsElement>('.export-options').forEach(menu => menu.open = false);
@@ -692,9 +694,9 @@ export async function mountStudio() {
   }
   function openProjectDialog(empty = false) {
     $('project-error').textContent = '';
-    $('project-dialog-title').textContent = empty ? 'Новый проект' : serverRevision ? 'Скопировать проект' : workspace.active.kind === 'example' ? 'Создать проект' : 'Дублировать проект';
-    $<HTMLSelectElement>('project-base').querySelector<HTMLOptionElement>('[value="current"]')!.textContent = serverRevision ? 'Серверный проект с изменениями' : 'Текущий проект с изменениями';
-    $<HTMLInputElement>('project-name').value = empty ? 'Новая установка' : `${(serverRevision ? plant?.project.title ?? 'Проект' : currentDocument(workspace).title)} — мой проект`;
+    $('project-dialog-title').textContent = empty ? 'Новый проект' : workspaceSnapshot ? 'Скопировать проект' : workspace.active.kind === 'example' ? 'Создать проект' : 'Дублировать проект';
+    $<HTMLSelectElement>('project-base').querySelector<HTMLOptionElement>('[value="current"]')!.textContent = workspaceSnapshot ? 'Серверный проект с изменениями' : 'Текущий проект с изменениями';
+    $<HTMLInputElement>('project-name').value = empty ? 'Новая установка' : `${(workspaceSnapshot ? plant?.project.title ?? 'Проект' : currentDocument(workspace).title)} — мой проект`;
     $<HTMLSelectElement>('project-base').value = empty ? 'empty' : 'current';
     $<HTMLDialogElement>('project-dialog').showModal(); $<HTMLInputElement>('project-name').select();
   }
@@ -704,9 +706,9 @@ export async function mountStudio() {
     try {
       const fromFiles = $<HTMLSelectElement>('project-base').value !== 'empty' && isPlant() ? documents.files : null;
       if (fromFiles) plantTools!.plantProjection(fromFiles); else compile(source); persist();
-      const copiedServer = serverRevision, previousServerDocuments = documents;
+      const copiedServer = workspaceSnapshot, previousServerDocuments = documents;
       createProject(workspace, $<HTMLInputElement>('project-name').value, fromFiles?.['plant.ts'] ?? source);
-      serverRevision = null; pendingRevision = null;
+      workspaceSnapshot = null; pendingWorkspaceSnapshot = null;
       if (fromFiles) {
         updateFiles(workspace, fromFiles);
         const previous = documents;
@@ -717,7 +719,7 @@ export async function mountStudio() {
       }
       if (!fromFiles && (source !== editor.state.doc.toString() || isPlant())) { selected = null; documents = new Documents({ 'station.ts': source }, editorState, 'station.ts'); editor.setState(documents.state); refresh(false); fitScene(); }
       const saved = persist();
-      if (copiedServer) serverDraft = { revision: copiedServer, documents: saved && fromFiles ? new Documents(copiedServer.files, editorState, 'plant.ts') : previousServerDocuments };
+      if (copiedServer) workspaceDraft = { snapshot: copiedServer, documents: saved && fromFiles ? new Documents(copiedServer.files, editorState, 'plant.ts') : previousServerDocuments };
       renderFiles(); renderMeta(); setSurface('scene'); setFullscreen(true);
       $<HTMLDialogElement>('project-dialog').close(); toast(saved ? 'Проект создан' : 'Проект открыт в памяти. Хранилище недоступно — скачайте .ts.');
     } catch (e) { $('project-error').textContent = e instanceof Error ? e.message : String(e); }
@@ -837,10 +839,10 @@ export async function mountStudio() {
   $('studio-file').onchange = async () => {
     const input = $<HTMLInputElement>('studio-file'), file = input.files?.[0]; if (!file) return;
     try {
-      if (/\.json$/i.test(file.name)) { await ensurePlant(); const files = JSON.parse(await file.text()); plantTools!.validateFiles(files); plantTools!.plantProjection(files); persist(); const oldServer = serverRevision; createProject(workspace, file.name.replace(/\.json$/i, '').slice(0,80), files['plant.ts']); if (oldServer) serverDraft = { revision: oldServer, documents }; serverRevision = null; pendingRevision = null; updateFiles(workspace, files); switchDocument(workspace.active, false); filesVisible = true; syncPanels(); input.value = ''; return; }
+      if (/\.json$/i.test(file.name)) { await ensurePlant(); const files = JSON.parse(await file.text()); plantTools!.validateFiles(files); plantTools!.plantProjection(files); persist(); const oldServer = workspaceSnapshot; createProject(workspace, file.name.replace(/\.json$/i, '').slice(0,80), files['plant.ts']); if (oldServer) workspaceDraft = { snapshot: oldServer, documents }; workspaceSnapshot = null; pendingWorkspaceSnapshot = null; updateFiles(workspace, files); switchDocument(workspace.active, false); filesVisible = true; syncPanels(); input.value = ''; return; }
       if (file.size > 120000) throw new Error('Размер файла должен быть меньше 120 КБ');
-      const source = await file.text(); compile(source); persist(); if (serverRevision) serverDraft = { revision: serverRevision, documents }; createProject(workspace, file.name.replace(/\.ts$/i, '').slice(0, 80) || 'Импорт', source);
-      serverRevision = null; pendingRevision = null; documents = new Documents({ 'station.ts': source }, editorState, 'station.ts'); editor.setState(documents.state); selected = null; refresh(false); fitScene(); persist(); renderMeta(); setSurface('scene'); setMode('2d'); toast('Исходник импортирован в новый проект');
+      const source = await file.text(); compile(source); persist(); if (workspaceSnapshot) workspaceDraft = { snapshot: workspaceSnapshot, documents }; createProject(workspace, file.name.replace(/\.ts$/i, '').slice(0, 80) || 'Импорт', source);
+      workspaceSnapshot = null; pendingWorkspaceSnapshot = null; documents = new Documents({ 'station.ts': source }, editorState, 'station.ts'); editor.setState(documents.state); selected = null; refresh(false); fitScene(); persist(); renderMeta(); setSurface('scene'); setMode('2d'); toast('Исходник импортирован в новый проект');
     } catch (e) { toast(e instanceof Error ? e.message : String(e)); }
     input.value = '';
   };
@@ -860,9 +862,9 @@ export async function mountStudio() {
   window.addEventListener('pagehide', persist);
   window.addEventListener('saturn-before-update', event => {
     persist();
-    if (!storageAvailable || serverRevision && documents.dirty() || serverDraft?.documents.dirty()) event.preventDefault();
+    if (!storageAvailable || workspaceSnapshot && documents.dirty() || workspaceDraft?.documents.dirty()) event.preventDefault();
   });
-  window.addEventListener('beforeunload', event => { if (serverRevision && documents.dirty() || serverDraft?.documents.dirty()) { event.preventDefault(); event.returnValue = ''; } });
+  window.addEventListener('beforeunload', event => { if (workspaceSnapshot && documents.dirty() || workspaceDraft?.documents.dirty()) { event.preventDefault(); event.returnValue = ''; } });
   try { const layout = JSON.parse(localStorage.getItem('saturn.shell.layout.v1') ?? '{}'); filesVisible = layout.filesVisible === true; if (typeof layout.codeVisible === 'boolean') codeVisible = layout.codeVisible; if (/^\d+(\.\d+)?px$/.test(layout.navigatorWidth ?? '')) shell.style.setProperty('--navigator-width', layout.navigatorWidth); if (/^\d+(\.\d+)?px$/.test(layout.sourceWidth ?? '')) shell.style.setProperty('--source-width', layout.sourceWidth); } catch {}
   if (isPlant()) await ensurePlant();
   renderEquipmentCatalog();
@@ -880,5 +882,5 @@ export async function mountStudio() {
   if (shared) persist();
   // probeRuntime owns authenticated activation. Only unauthenticated server links
   // need the connection dialog; operator/viewer deliberately have no source revision.
-  if (requestedServer && !serverRevision && !runtimeOnly) $<HTMLDialogElement>('server-dialog').showModal();
+  if (requestedServer && !workspaceSnapshot && !runtimeOnly) $<HTMLDialogElement>('server-dialog').showModal();
 }

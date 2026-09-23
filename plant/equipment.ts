@@ -148,7 +148,7 @@ export function sceneFor(project: Project): Scene {
     };
 }
 export function visualFrame(project: Project, frame: Frame): RuntimeFrame {
-    setDisplays(frame.displays??{});
+    setDisplays(frame.displays??{},frame.time);
     const equipment: RuntimeFrame['equipment'] = {};
     const derived = new Map(project.signals.map(s => [s.id, s.expression]));
     const expand = (expr: Expr): string[] => references(expr).flatMap(ref => derived.has(ref) ? expand(derived.get(ref)!) : [ref]);

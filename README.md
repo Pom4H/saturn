@@ -6,7 +6,7 @@ Saturn is an open-source engineering IDE and runtime for physical systems. Descr
 
 ![Saturn turns one typed engineering model into HMI, signals, history, reports, PLC bindings and deployment](docs/assets/saturn-domain-model.svg)
 
-[Open browser editor](https://pom4h.github.io/saturn/) · [DSL reference](docs/plant/dsl.md) · [Architecture](docs/adr/0001-saturn-system-architecture.md) · [Product & interface system](docs/design-system.md) · [Element packs](docs/developer/element-packs.md) · [Developer guide](docs/developer/language-tooling.md) · [Changelog](CHANGELOG.md)
+[Open browser editor](https://pom4h.github.io/saturn/) · [DSL reference](docs/plant/dsl.md) · [Architecture](docs/adr/0008-conventions-first-artifact-runtime.md) · [Product & interface system](docs/design-system.md) · [Element packs](docs/developer/element-packs.md) · [Developer guide](docs/developer/language-tooling.md) · [Changelog](CHANGELOG.md)
 
 ## The project is the model
 
@@ -45,7 +45,7 @@ The TypeScript source is not an export format generated after the fact. It is th
 
 Saturn uses TypeScript for the things engineers already expect from serious software tooling: types, autocomplete, navigation, refactoring, diagnostics and source control. The Saturn compiler then adds domain rules for equipment, signals, topology, controls and deployment.
 
-Projects use a bounded declarative subset. Saturn does not execute arbitrary project JavaScript.
+Projects are ordinary TypeScript. Saturn executes trusted project code only at the build boundary to construct a validated, serializable engineering IR; plant runtime never evaluates project TypeScript.
 
 ## One model, multiple projections
 
@@ -81,24 +81,31 @@ This also means coding agents and human engineers work on the same artifact.
 Saturn deliberately separates Git from operational state.
 
 ```text
-project source
+project folder
+     │
+     ├──── normal Git history
      │
      ▼
-   head ──────► published ──────► applied
-     │                              │
-     │                              ▼
-     │                         live runtime
-     │                    signals · history
-     │                    alarms · commands
+saturn build
+     │
      ▼
-normal Git workflow
+immutable BuildArtifact
+     │
+     ├────► published ──────► applied
+     │                         │
+     │                         ▼
+     │                    live runtime
+     │               signals · history
+     │               alarms · commands
+     ▼
+source SHA + build hash provenance
 ```
 
-Git is the configuration and release authority. The running Saturn instance is the authority for telemetry, history and operator commands.
+Git is source history for the engineering workspace. A content-addressed BuildArtifact is the deployment unit. The running Saturn instance is the authority for telemetry, history and operator commands.
 
-An engineering Saturn can connect to an operator Saturn while keeping local source and Git local. The UI shows source and applied revisions independently instead of pretending they are always the same commit.
+An engineering Saturn can connect to an operator Saturn while keeping source, Git and package tooling local. The UI shows source SHA, build hash, published artifact and applied artifact independently.
 
-See [Standalone Saturn](docs/standalone.md) and [ADR-0001](docs/adr/0001-saturn-system-architecture.md).
+See [Standalone Saturn](docs/standalone.md) and [ADR-0008](docs/adr/0008-conventions-first-artifact-runtime.md).
 
 ## Use Saturn where you engineer
 
@@ -114,20 +121,18 @@ The standalone application is built once and opens projects at runtime. Portable
 
 The same project can also be used from the browser/PWA and from the native VS Code host. VS Code keeps TypeScript in the normal editor, Git in native SCM, diagnostics in Problems, project/catalog/targets in TreeViews and the mnemonic as a separate visual view.
 
-## Extend the domain instead of forking the IDE
+## Extend the domain by copying source
 
-Equipment catalogs and integration logic are extension points.
+Saturn uses a shadcn-style registry for project-owned building blocks.
 
 ```sh
-saturn extension add @factory/equipment
-saturn extension update @factory/equipment
+saturn add pump
+saturn add hourly-water-report
 ```
 
-Installed packages can contribute engineering entities and tooling without creating a second project format. First-party examples use the `@saturn/*` namespace; external vendors can use normal npm-compatible package scopes.
+The command copies ordinary TypeScript/assets/tests into the project. After that there is no installed-extension state: the project owns the files and Git owns their history.
 
-The extension installer verifies package integrity, runs no lifecycle scripts and keeps project source separate from application code.
-
-See [extension architecture](docs/adr/0002-extension-packages.md).
+Use a normal package dependency only when the code is intentionally external and shared. The native host resolves packages; the offline PWA does not implement an npm client.
 
 ## Reports belong to the engineering model too
 
@@ -155,7 +160,7 @@ See [report DSL](docs/plant/dsl.md#reports).
 
 ## What is implemented
 
-The current codebase includes the typed `@saturn/core` DSL, AST validation, source-preserving visual edits, CodeMirror engineering shell, 2D/3D views, equipment catalog metadata, alarms, controls, historian, replay/comparison, project-defined reports, Git-backed project/release workflow, standalone packaging, extensions, a signed update protocol and a native VS Code host.
+The current codebase includes the typed `@saturn/core` DSL, source-preserving visual edits, CodeMirror engineering shell, 2D/3D views, equipment catalog metadata, alarms, controls, historian, replay/comparison, project-defined reports, content-addressed build/deploy artifacts, standalone packaging, a copy-based registry, a signed update protocol and a native VS Code host.
 
 The repository also contains simulation models used for development and demonstrations. They are intentionally bounded engineering models, not validated process solvers.
 
@@ -189,7 +194,7 @@ npm run saturn -- pack --target windows-x64
 
 Useful documentation:
 
-- [Saturn system architecture](docs/adr/0001-saturn-system-architecture.md)
+- [Saturn system architecture](docs/adr/0008-conventions-first-artifact-runtime.md)
 - [Package and DSL names](docs/adr/0004-package-and-dsl-names.md)
 - [TypeScript DSL and language tooling](docs/developer/language-tooling.md)
 - [Standalone application](docs/standalone.md)

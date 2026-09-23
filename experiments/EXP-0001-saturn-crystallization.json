@@ -1,0 +1,36 @@
+{
+  "id": "EXP-0001",
+  "question": "Can Saturn converge on one project, artifact, runtime and extension model without adding compatibility abstractions?",
+  "hypothesis": "If repository invariants are made explicit and contradictory legacy descriptions are removed or superseded, agents can reconstruct the architecture from a small causal record instead of PR history.",
+  "status": "running",
+  "metrics": {
+    "canonicalProjectContracts": 1,
+    "canonicalRuntimeAuthorities": 1,
+    "canonicalExtensionModels": 1,
+    "contradictoryArchitectureSourcesTarget": 0
+  },
+  "evidencePlan": [
+    "npm run architecture:check",
+    "npm run check",
+    "usegit causal-history workflow on the exact Git tree"
+  ],
+  "negativeKnowledge": [
+    {
+      "hypothesis": "Production runtime should track Git source/release refs directly",
+      "decision": "rejected",
+      "condition": "BuildArtifact is the deployment unit and engineering/CI owns source tooling"
+    },
+    {
+      "hypothesis": "Saturn should keep an installation-scoped extension store as the default extensibility model",
+      "decision": "rejected",
+      "condition": "Registry items can be copied as typed project-owned source"
+    },
+    {
+      "hypothesis": "A Saturn-specific project manifest/database is needed",
+      "decision": "rejected",
+      "condition": "package.json plus src/plant.ts provide identity and conventional entrypoint"
+    }
+  ],
+  "decision": "pending",
+  "validity": "Applies to the v0.1 architecture line beginning at refactor/conventions-first."
+}
