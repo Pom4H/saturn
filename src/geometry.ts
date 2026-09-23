@@ -1,4 +1,4 @@
-import { catalog, directionVector, worldPort, type Scene, type Equipment, type Point, type Link } from './core';
+import { catalog, directionVector, worldPort, type Scene, type Equipment, type Point, type Link } from './scene';
 export interface Rect { x: number; y: number; width: number; height: number; id: string }
 export interface Route { points: Point[]; path: string; valid: boolean; reason?: string }
 export const bounds = (n: Equipment, pad = 0): Rect => ({ id: n.id, x: Number(n.props.x) - pad, y: Number(n.props.y) - pad, width: catalog[n.kind].width + pad * 2, height: catalog[n.kind].height + pad * 2 });
