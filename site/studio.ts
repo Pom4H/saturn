@@ -700,28 +700,44 @@ export async function mountStudio() {
     $<HTMLSelectElement>('project-base').value = empty ? 'empty' : 'current';
     $<HTMLDialogElement>('project-dialog').showModal(); $<HTMLInputElement>('project-name').select();
   }
-  $('project-form').onsubmit = event => {
+  $('project-form').onsubmit = async event => {
     event.preventDefault();
-    const source = $<HTMLSelectElement>('project-base').value === 'empty' ? emptySource : editor.state.doc.toString();
+    const empty = $<HTMLSelectElement>('project-base').value === 'empty';
+    const source = empty ? emptySource : editor.state.doc.toString();
     try {
-      const fromFiles = $<HTMLSelectElement>('project-base').value !== 'empty' && isPlant() ? documents.files : null;
-      if (fromFiles) plantTools!.plantProjection(fromFiles); else compile(source); persist();
+      let fromFiles: Record<string, string> | null = null;
+      if (empty) {
+        await ensurePlant();
+        fromFiles = { 'plant.ts': emptySource };
+      } else if (isPlant()) {
+        fromFiles = { ...documents.files };
+      }
+      if (fromFiles) plantTools!.plantProjection(fromFiles); else compile(source);
+      persist();
       const copiedServer = workspaceSnapshot, previousServerDocuments = documents;
       createProject(workspace, $<HTMLInputElement>('project-name').value, fromFiles?.['plant.ts'] ?? source);
       workspaceSnapshot = null; pendingWorkspaceSnapshot = null;
       if (fromFiles) {
         updateFiles(workspace, fromFiles);
         const previous = documents;
-        documents = new Documents(fromFiles, editorState, previous.active);
-        for (const [path, state] of previous.states) documents.states.set(path, state);
-        documents.tabs = [...previous.tabs]; documents.preview = previous.preview;
+        documents = new Documents(fromFiles, editorState, empty ? 'plant.ts' : previous.active);
+        if (!empty) {
+          for (const [path, state] of previous.states) documents.states.set(path, state);
+          documents.tabs = [...previous.tabs];
+          documents.preview = previous.preview;
+        }
         editor.setState(documents.state);
+      } else if (source !== editor.state.doc.toString() || isPlant()) {
+        selected = null;
+        documents = new Documents({ 'station.ts': source }, editorState, 'station.ts');
+        editor.setState(documents.state);
+        refresh(false);
+        fitScene();
       }
-      if (!fromFiles && (source !== editor.state.doc.toString() || isPlant())) { selected = null; documents = new Documents({ 'station.ts': source }, editorState, 'station.ts'); editor.setState(documents.state); refresh(false); fitScene(); }
       const saved = persist();
       if (copiedServer) workspaceDraft = { snapshot: copiedServer, documents: saved && fromFiles ? new Documents(copiedServer.files, editorState, 'plant.ts') : previousServerDocuments };
       renderFiles(); renderMeta(); setSurface('scene'); setFullscreen(true);
-      $<HTMLDialogElement>('project-dialog').close(); toast(saved ? 'Проект создан' : 'Проект открыт в памяти. Хранилище недоступно — скачайте .ts.');
+      $<HTMLDialogElement>('project-dialog').close(); toast(saved ? 'Проект создан' : 'Проект открыт в памяти. Хранилище недоступно — скачайте проект.');
     } catch (e) { $('project-error').textContent = e instanceof Error ? e.message : String(e); }
   };
   $('project-dialog-close').onclick = () => $<HTMLDialogElement>('project-dialog').close();
