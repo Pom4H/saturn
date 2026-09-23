@@ -22,7 +22,7 @@ async function mountWorkspace() {
   }
   // Runtime HTML keeps a strict CSP. A workspace host exposes a separate,
   // authenticated document for trusted TypeScript authoring, never for operators.
-  if (document.querySelector<HTMLMetaElement>('meta[name="saturn-authoring-entry"]')?.content === '/plant/ide/') {
+  if (!params.has('embed') && document.querySelector<HTMLMetaElement>('meta[name="saturn-authoring-entry"]')?.content === '/plant/ide/') {
     try {
       const response = await fetch('/plant/api/session', { signal: AbortSignal.timeout(5000) });
       const session: unknown = response.ok ? await response.json() : null;
