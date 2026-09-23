@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const port=4194, origin=`http://127.0.0.1:${port}`;
 const server=spawn(process.execPath,['scripts/site-dev.mjs'],{env:{...process.env,PORT:String(port)},stdio:['ignore','pipe','pipe']});
@@ -59,6 +61,12 @@ try{
 
   await mkdir('test-results/release-shell',{recursive:true});
   await page.screenshot({path:'test-results/release-shell/saturn-release-shell.png',fullPage:true});
+  const animated=await browser.newContext({reducedMotion:'no-preference'});
+  const diagram=await animated.newPage();
+  await diagram.goto(pathToFileURL(resolve('docs/assets/saturn-domain-model.svg')).href);
+  const animations=await diagram.evaluate(()=>['.rotor','.flow','.level'].map(selector=>getComputedStyle(document.querySelector(selector)).animationName));
+  assert.deepEqual(animations,['rotate','current','water-level'],'README equipment and water animate in the rendered SVG');
+  await animated.close();
   assert.deepEqual(errors,[]);
   console.log('PASS: release shell; Project/Surface/Environment; provenance; 2D/3D projection; visual drag -> canonical TypeScript.');
 }finally{
