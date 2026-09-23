@@ -217,6 +217,8 @@ export async function checkLandingStory(browser, origin) {
     assert(!await page.locator('.engineer-proof').isVisible());
     await page.locator('.operator-proof img').evaluate(image => image.decode());
     await page.locator('#workflow-title').click(); // Finish keyboard testing before capturing the normal, unfocused page.
+    // Capture from the actual top viewport; offscreen fixed skip-links must stay offscreen.
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
     for (const theme of ['light', 'dark']) {
       await page.emulateMedia({ colorScheme: theme });
       await page.waitForFunction(theme => document.querySelector('.operator-proof img')?.currentSrc.endsWith(`proof-operator-${theme}.png`), theme);
@@ -233,6 +235,7 @@ export async function checkLandingStory(browser, origin) {
       assert.equal(await page.locator('.operator-proof img').evaluate(image => image.naturalWidth), width <= 760 ? 390 : 1280, 'Mobile evidence is an actual responsive capture, not a shrunken desktop image');
     }
     await page.setViewportSize({ width: 390, height: 844 });
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
     await page.screenshot({ path: 'test-results/release-shell/landing-mobile.png', fullPage: true });
     for (const link of await page.locator('.site-header .landing-button, .hero-actions .landing-button').all()) assert.equal(await link.getAttribute('href'), '?mode=ide#workspace');
     const localLinks = await page.locator('a[href^="#"]').evaluateAll(links => links.map(link => link.getAttribute('href')).filter(href => href.length > 1));
