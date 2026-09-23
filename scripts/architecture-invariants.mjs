@@ -110,7 +110,8 @@ await assertText('plant/targets/saturn-plc-c23.ts', {
 });
 
 await assertText('site/index.html', {
-  required: ['data-surface="scene"', 'Source, build, published и applied', 'saturn add pump', 'project-owned source', 'artifact runtime'],
+  // Keep the semantic promise in the actual Russian UI, not its old English label.
+  required: ['data-surface="scene"', 'Source, build, published и applied', 'saturn add pump', 'project-owned source', 'Запуск собранного проекта'],
   forbidden: ['data-view="scene"', 'saturn extension add', 'self-contained npm package', 'Git-managed'],
 });
 

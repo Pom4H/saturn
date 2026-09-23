@@ -41,6 +41,31 @@ assert.match(formatDiagnostic(mismatch.diagnostic, 'en'), /expects dimension vol
 assert.equal(mismatch.diagnostic.data?.expectedDimension, 'voltage');
 assert.equal(mismatch.diagnostic.data?.actualDimension, 'flow');
 assert.equal(mismatch.diagnostic.data?.source?.path, 'plant.ts');
+assert.equal(mismatch.diagnostic.data?.source?.from, undefined);
+
+// An importing entry must not replace the failing module's source identity.
+const nestedMismatch = {
+  'src/plant.ts': "export { default } from './equipment/bad';",
+  'src/equipment/bad.ts': invalidDimension['plant.ts'],
+};
+assert.throws(() => compileProject(nestedMismatch), error => {
+  assert.ok(error instanceof SaturnDiagnosticError);
+  assert.equal(error.diagnostic.code, 'SATURN_TYPE_DIMENSION');
+  assert.equal(error.diagnostic.data?.path, 'src/equipment/bad.ts');
+  assert.equal(error.diagnostic.data?.source?.path, 'src/equipment/bad.ts');
+  assert.equal(error.diagnostic.data?.source?.from, undefined);
+  return true;
+});
+const badSyntax = 'export const = ;';
+assert.throws(() => compileProject({ 'plant.ts': badSyntax }), error => {
+  assert.ok(error instanceof SaturnDiagnosticError);
+  assert.equal(error.diagnostic.code, 'SATURN_DSL_INVALID');
+  const source = error.diagnostic.data?.source;
+  assert.equal(source?.path, 'plant.ts');
+  assert.ok(source?.from >= 0 && source.to <= badSyntax.length);
+  assert.equal(source?.line, 0);
+  return true;
+});
 
 const ruSimulation = localizedDslEntity('simulation', 'ru');
 const enSimulation = localizedDslEntity('simulation', 'en');

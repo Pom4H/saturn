@@ -20,7 +20,6 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-
       - uses: actions/setup-node@v7.0.0
         with:
           node-version-file: .nvmrc
@@ -32,51 +31,30 @@ jobs:
 
       - run: npm ci
 
-      # Capture the focused product evidence first: it is a short, objective
-      # browser oracle and should not wait behind the broader release suite.
       - run: npx playwright install --with-deps chromium
-      - name: Capture PLC HMI video
-        run: node scripts/hmi-video-evidence.mjs
 
-      # One canonical PR gate. This already covers build, TypeScript, unit/core
-      # tests, plant tests, Bun smoke, authoring, consumer and VS Code checks.
-      - name: Core release checks
-        run: npm run check
-
-      - name: Landing static checks
-        run: npm run site:check
-
-      - name: Convert HMI video to MP4
-        run: |
-          if ! command -v ffmpeg >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y ffmpeg
-          fi
-          ffmpeg -y -i plant-test-results/saturn-wasm-hmi.webm -an -c:v libx264 -pix_fmt yuv420p -movflags +faststart plant-test-results/saturn-wasm-hmi.mp4
+      # One locally reproducible product gate. Build once; the browser tests
+      # consume dist/plant/site, which is also copied into the Pages artifact.
+      - name: Saturn release check
+        run: npm run check:release
 
       - uses: actions/upload-artifact@v7.0.1
         if: always()
         with:
-          name: hmi-evidence
-          path: plant-test-results/
+          name: shell-evidence
+          path: test-results/release-shell/
           retention-days: 7
           if-no-files-found: ignore
 
-      - name: Saturn shell integration
-        run: node scripts/site-release-check.mjs
-
-      - run: npm audit --audit-level=high
-
+      # HMI recording is evidence, not a dependency of unrelated source edits.
+      - name: Capture PLC HMI video
+        if: github.event_name == 'workflow_dispatch'
+        run: node scripts/hmi-video-evidence.mjs
       - uses: actions/upload-artifact@v7.0.1
-        if: failure()
+        if: always() && github.event_name == 'workflow_dispatch'
         with:
-          name: browser-tests
-          path: |
-            playwright-report/
-            test-results/
-            runtime-playwright-report/
-            runtime-test-results/
-            challenge-results/
+          name: hmi-evidence
+          path: plant-test-results/
           retention-days: 7
           if-no-files-found: ignore
 
