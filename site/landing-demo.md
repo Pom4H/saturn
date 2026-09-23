@@ -17,6 +17,9 @@ saved project. Existing `#workspace`, `#studio`, `#code=…`, `?project=…` and
 standalone-PWA entry points continue to mount the complete workspace. Server
 and standalone bundles call `buildSite(outdir, 'ide')`; their HTML explicitly
 marks the host as an IDE, so authenticated operator/viewer roots are unchanged.
+Pages packaging reuses these assets and changes only the root HTML mode to demo.
+An explicit `?mode=demo` also opens the disposable view in a server build; the
+release gate uses it to exercise both surfaces without a second bundle.
 
 Regression coverage lives in `scripts/site-landing-check.mjs` and runs inside
 the existing `node scripts/site-release-check.mjs` CI gate. Full-workspace

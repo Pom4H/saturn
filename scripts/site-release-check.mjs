@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { checkLandingDemo } from './site-landing-check.mjs';
+import { checkShellUx } from './site-shell-ux-check.mjs';
 import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
@@ -7,7 +8,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const port=4194, origin=`http://127.0.0.1:${port}`;
-const server=spawn(process.execPath,['scripts/site-dev.mjs'],{env:{...process.env,PORT:String(port)},stdio:['ignore','pipe','pipe']});
+const server=spawn(process.execPath,['scripts/site-dev.mjs'],{env:{...process.env,PORT:String(port),...(process.argv.includes('--built')?{SATURN_SITE_DIR:'dist/plant/site'}:{})},stdio:['ignore','pipe','pipe']});
 let output='';server.stdout.on('data',c=>output+=c);server.stderr.on('data',c=>output+=c);
 let browser;
 try{
@@ -17,7 +18,7 @@ try{
     await new Promise(r=>setTimeout(r,100));
   }
   browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{channel:'chrome'})});
-  await checkLandingDemo(browser, origin);
+  await checkLandingDemo(browser, origin + '/?mode=demo');
   const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
   const page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
@@ -63,6 +64,7 @@ try{
 
   await mkdir('test-results/release-shell',{recursive:true});
   await page.screenshot({path:'test-results/release-shell/saturn-release-shell.png',fullPage:true});
+  await checkShellUx(page);
   const animated=await browser.newContext({reducedMotion:'no-preference'});
   const diagram=await animated.newPage();
   await diagram.goto(pathToFileURL(resolve('docs/assets/saturn-domain-model.svg')).href);

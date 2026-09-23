@@ -72,10 +72,10 @@ export async function checkLandingDemo(browser, origin) {
 
     const readSaved = () => page.evaluate(keys => keys.map(key => localStorage.getItem(key)), [workspaceKey, layoutKey]);
     assert.deepEqual(await readSaved(), [workspace, layout], 'Demo never changes IDE projects or layout');
-    await mkdir('test-results/landing-demo', { recursive: true });
+    await mkdir('test-results/release-shell/landing-demo', { recursive: true });
     for (const scheme of ['light', 'dark']) {
       await page.emulateMedia({ colorScheme: scheme });
-      await shell.screenshot({ path: `test-results/landing-demo/${scheme}.png` });
+      await shell.screenshot({ path: `test-results/release-shell/landing-demo/${scheme}.png` });
     }
     await page.emulateMedia({ colorScheme: 'light' });
     await page.setViewportSize({ width: 390, height: 844 });
@@ -87,7 +87,7 @@ export async function checkLandingDemo(browser, origin) {
     assert(await page.locator('.studio-viewport').isVisible());
     for (const button of await shell.locator('button:visible').all()) assert((await button.boundingBox()).height >= 44, 'Touch controls are at least 44px high');
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'No horizontal mobile overflow');
-    await shell.screenshot({ path: 'test-results/landing-demo/mobile.png' });
+    await shell.screenshot({ path: 'test-results/release-shell/landing-demo/mobile.png' });
     await page.reload();
     await page.locator('#studio-svg [data-node="P-01"]').waitFor({ state: 'attached' });
     assert.deepEqual(await readSaved(), [workspace, layout]);

@@ -103,6 +103,8 @@ export class SceneView3D {
   private groupBorders = new Map<string, THREE.LineBasicMaterial>();
   private groupResources: { dispose(): void }[] = [];
   private signalMaterial = new THREE.LineDashedMaterial({ color: 0x567f90, dashSize: .14, gapSize: .09, transparent: true, opacity: .75 });
+  private floorMaterial: THREE.MeshStandardMaterial;
+  private grid: THREE.GridHelper;
   private camera = new THREE.PerspectiveCamera(38, 1, .1, 600);
   private controls: OrbitControls;
   private canvas: HTMLCanvasElement;
@@ -140,8 +142,9 @@ export class SceneView3D {
     this.world.add(new THREE.HemisphereLight(0xe8f7ff, 0x8c9497, 2.4));
     const key = new THREE.DirectionalLight(0xffffff, 3.5); key.position.set(-4, -7, 12); key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024); Object.assign(key.shadow.camera, { left: -20, right: 20, top: 20, bottom: -20, near: .5, far: 45 }); key.shadow.bias = -.0003; this.world.add(key);
-    const floor = addMesh(this.world, new THREE.PlaneGeometry(160, 160), new THREE.MeshStandardMaterial({ color: options.landing ? 0x0c0c0f : 0xe6edef, roughness: .9 }), v(0, 0, -.025)); floor.castShadow = false; floor.renderOrder = -1000;
-    const grid = new THREE.GridHelper(100, 100, options.landing ? 0x292333 : 0xc4d3d9, options.landing ? 0x19151e : 0xd8e2e6); grid.rotation.x = Math.PI / 2; grid.position.z = -.015; grid.renderOrder = -999; this.world.add(grid);
+    this.floorMaterial = new THREE.MeshStandardMaterial({ color: options.landing ? 0x0c0c0f : 0xe6edef, roughness: .9 });
+    const floor = addMesh(this.world, new THREE.PlaneGeometry(160, 160), this.floorMaterial, v(0, 0, -.025)); floor.castShadow = false; floor.renderOrder = -1000;
+    const grid = this.grid = new THREE.GridHelper(100, 100, options.landing ? 0x292333 : 0xc4d3d9, options.landing ? 0x19151e : 0xd8e2e6); grid.rotation.x = Math.PI / 2; grid.position.z = -.015; grid.renderOrder = -999; this.world.add(grid);
     this.world.add(this.groupLayer, this.pipeLayer, this.equipmentLayer, this.signalLayer); this.camera.up.set(0, 0, 1);
     this.controls = new OrbitControls(this.camera, this.canvas); this.controls.enableDamping = false; this.controls.minDistance = 2; this.controls.maxDistance = 240; this.controls.maxPolarAngle = Math.PI / 2 - .015;
     if (options.landing) { this.controls.enabled = false; this.canvas.style.touchAction = 'pan-y'; }
@@ -481,5 +484,15 @@ export class SceneView3D {
     for (const layer of [this.equipmentLayer, this.pipeLayer]) { layer.traverse(object => { if (object instanceof THREE.Mesh) {object.geometry.dispose();if(object.userData.ownedConnectionMaterial)(object.material as THREE.Material).dispose();} }); layer.clear(); }
     this.objects.clear(); this.tracks = []; this.leaders.replaceChildren(); this.labels.replaceChildren(this.leaders);
   }
-  dispose() { cancelAnimationFrame(this.raf); this.environmentTexture.dispose(); this.resizeObserver.disconnect(); this.controls.dispose(); this.clearGroups(); this.clearGeometry(); this.world.traverse(object => { if (object instanceof THREE.Mesh) object.geometry.dispose(); }); this.signalMaterial.dispose(); this.renderer.dispose(); this.host.replaceChildren(); }
+  /** Host palette is presentation state, independent of source and telemetry. */
+  setAppearance(background: string, grid: string) {
+    this.renderer.setClearColor(background);
+    this.floorMaterial.color.set(background);
+    const material = this.grid.material as THREE.LineBasicMaterial;
+    material.vertexColors = false;
+    material.color.set(grid);
+    material.needsUpdate = true;
+    this.draw();
+  }
+  dispose() { this.floorMaterial.dispose(); this.grid.geometry.dispose(); (this.grid.material as THREE.Material).dispose(); cancelAnimationFrame(this.raf); this.environmentTexture.dispose(); this.resizeObserver.disconnect(); this.controls.dispose(); this.clearGroups(); this.clearGeometry(); this.world.traverse(object => { if (object instanceof THREE.Mesh) object.geometry.dispose(); }); this.signalMaterial.dispose(); this.renderer.dispose(); this.host.replaceChildren(); }
 }

@@ -4,10 +4,10 @@ import './landing-demo.css';
 import { configureAppUpdates } from './pwa';
 import './commands.css';
 const params = new URLSearchParams(location.search);
-const demo = document.querySelector<HTMLMetaElement>('meta[name="saturn-shell-mode"]')?.content !== 'ide'
+const demo = params.get('mode') === 'demo' || (document.querySelector<HTMLMetaElement>('meta[name="saturn-shell-mode"]')?.content !== 'ide'
   && params.get('mode') !== 'ide' && !params.has('project')
   && !['#workspace', '#studio'].includes(location.hash) && !location.hash.startsWith('#code=')
-  && !matchMedia('(display-mode: standalone)').matches;
+  && !matchMedia('(display-mode: standalone)').matches);
 document.getElementById('studio-shell')?.setAttribute('data-demo', String(demo));
 const shortcut = document.querySelector('#command-launcher kbd');
 if (shortcut) shortcut.textContent = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘ K' : 'Ctrl K';
