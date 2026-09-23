@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
   <title id="title">Saturn domain model</title>
-  <desc id="desc">A typed TypeScript engineering model drives topology, HMI, signals, history, reports, PLC bindings and deployment.</desc>
+  <desc id="desc">The Saturn IDE pump-station equipment: an animated water tank, pump rotor and flow through pipes, projected from typed source.</desc>
   <style>
     :root { color-scheme: light dark; }
     .bg { fill: #ffffff; }
@@ -14,6 +14,13 @@
     .water { fill: #dbeafe; stroke: #2563eb; }
     .ok { fill: #18864b; }
     .warn { fill: #d97706; }
+    .flow { fill: none; stroke: #67d8e9; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 14 24; animation: current 1.7s linear infinite; }
+    .rotor { transform-box: fill-box; transform-origin: center; animation: rotate 2.2s linear infinite; }
+    .level { transform-box: fill-box; transform-origin: center bottom; animation: water-level 5s ease-in-out infinite alternate; }
+    @keyframes current { to { stroke-dashoffset: -38; } }
+    @keyframes rotate { to { transform: rotate(360deg); } }
+    @keyframes water-level { to { transform: scaleY(.76); } }
+    @media (prefers-reduced-motion: reduce) { .flow, .rotor, .level { animation: none; } }
     text { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
     @media (prefers-color-scheme: dark) {
@@ -40,18 +47,18 @@
   <circle cx="78" cy="79" r="5" fill="#ef4444"/>
   <circle cx="96" cy="79" r="5" fill="#f59e0b"/>
   <circle cx="114" cy="79" r="5" fill="#22c55e"/>
-  <text class="muted mono" x="138" y="85" font-size="14">plant.ts</text>
+  <text class="muted mono" x="138" y="85" font-size="14">station.ts · pump demo</text>
 
-  <text class="muted mono" x="82" y="132" font-size="15">import</text>
-  <text class="ink mono" x="138" y="132" font-size="15">{ system, simulation, pipe }</text>
-  <text class="muted mono" x="82" y="160" font-size="15">from</text>
-  <text class="accent mono" x="128" y="160" font-size="15">'@saturn/core'</text>
+  <text class="muted mono" x="82" y="132" font-size="14">import</text>
+  <text class="ink mono" x="138" y="132" font-size="14">{ tank, pump, connect }</text>
+  <text class="muted mono" x="82" y="160" font-size="14">from</text>
+  <text class="accent mono" x="128" y="160" font-size="14">"@scada/core"</text>
 
-  <text class="muted mono" x="82" y="202" font-size="15">const</text>
-  <text class="ink mono" x="132" y="202" font-size="15">water = system('water', 'Water')</text>
-  <text class="muted mono" x="82" y="230" font-size="15">const</text>
-  <text class="ink mono" x="132" y="230" font-size="15">p1 = simulation('P-101', 'pump', …)</text>
-  <text class="ink mono" x="82" y="258" font-size="15">pipe('suction', tank.outlet, p1.inlet)</text>
+  <text class="muted mono" x="82" y="202" font-size="14">const</text>
+  <text class="ink mono" x="132" y="202" font-size="14">reservoir = tank("TK-01", { x:40, y:180 });</text>
+  <text class="muted mono" x="82" y="230" font-size="14">const</text>
+  <text class="ink mono" x="132" y="230" font-size="14">motor = pump("P-01", { x:330, y:268 });</text>
+  <text class="ink mono" x="82" y="258" font-size="14">connect(reservoir.outlet, motor.inlet);</text>
 
   <text class="muted" x="82" y="287" font-size="13">Typed source is the project. The canvas edits the same file.</text>
 
@@ -59,48 +66,67 @@
   <path class="accent-line" d="M316 320 V350" fill="none" stroke-width="2"/>
   <path class="accent" d="M310 348 L316 358 L322 348 Z"/>
 
-  <!-- physical model -->
+  <!-- The same TK-01 / P-01 / FT-01 / V-01 equipment and geometry as the IDE starter.
+       Vessel, pump, meter and valve silhouettes follow src/view.ts, not generic symbols. -->
   <rect class="panel" x="56" y="370" width="776" height="280" rx="10"/>
-  <text class="ink" x="82" y="406" font-size="17" font-weight="650">Physical system</text>
-  <text class="muted" x="82" y="430" font-size="13">stable identities · typed ports · topology · live bindings</text>
+  <text class="ink" x="82" y="406" font-size="17" font-weight="650">Pump station</text>
+  <text class="muted" x="82" y="430" font-size="13">TK-01 → P-01 → FT-01 → V-01 → OUT-01</text>
 
-  <!-- tank -->
-  <path class="line" d="M118 486 V580 Q118 598 136 598 H214 Q232 598 232 580 V486" fill="none" stroke-width="2"/>
-  <rect class="water" x="124" y="532" width="102" height="60" rx="2"/>
-  <line class="line" x1="118" y1="486" x2="232" y2="486" stroke-width="2"/>
-  <text class="ink mono" x="143" y="625" font-size="13">T-101</text>
+  <defs>
+    <linearGradient id="steel" x2="1" y2="0"><stop stop-color="#e2ebee"/><stop offset=".5" stop-color="#a9bec7"/><stop offset="1" stop-color="#809ca8"/></linearGradient>
+    <clipPath id="tank-water"><path d="M23 45C23 24 135 24 135 45V192C135 211 23 211 23 192Z"/></clipPath>
+  </defs>
+  <!-- Pipes use the starter's actual port positions: tank outlet, pump inlet/outlet,
+       flow meter, valve and discharge. Water is animated only on this open circuit. -->
+  <g fill="none" stroke="#718995" stroke-width="14" stroke-linejoin="round">
+    <path d="M211.5 563.2H256V550.4H320"/>
+    <path d="M369.4 488V465H475V524.7H510"/>
+    <path d="M572.4 524.7H620"/>
+    <path d="M724 526.3H771"/>
+  </g>
+  <g fill="none" stroke="#25668a" stroke-width="10" stroke-linejoin="round">
+    <path d="M211.5 563.2H256V550.4H320"/><path d="M369.4 488V465H475V524.7H510"/>
+    <path d="M572.4 524.7H620"/><path d="M724 526.3H771"/>
+  </g>
+  <g class="flow"><path d="M211.5 563.2H256V550.4H320"/><path d="M369.4 488V465H475V524.7H510"/><path d="M572.4 524.7H620"/><path d="M724 526.3H771"/></g>
 
-  <!-- pipe 1 -->
-  <line class="accent-line" x1="232" y1="548" x2="326" y2="548" stroke-width="6" stroke-linecap="round"/>
-  <circle class="panel" cx="274" cy="548" r="5" stroke-width="2"/>
-
-  <!-- pump -->
-  <circle class="panel" cx="382" cy="548" r="54" stroke-width="2"/>
-  <circle class="accent-line" cx="382" cy="548" r="20" fill="none" stroke-width="2"/>
-  <path class="accent-line" d="M382 528 L392 546 L374 554 Z M402 548 L384 558 L376 540 Z M382 568 L372 550 L390 542 Z" fill="none" stroke-width="2" stroke-linejoin="round"/>
-  <line class="accent-line" x1="436" y1="548" x2="510" y2="548" stroke-width="6" stroke-linecap="round"/>
-  <text class="ink mono" x="356" y="625" font-size="13">P-101</text>
-
-  <!-- valve -->
-  <path class="line" d="M510 524 L550 548 L510 572 Z M590 524 L550 548 L590 572 Z" fill="none" stroke-width="2"/>
-  <line class="line" x1="550" y1="510" x2="550" y2="548" stroke-width="2"/>
-  <circle class="panel" cx="550" cy="500" r="10" stroke-width="2"/>
-  <line class="accent-line" x1="590" y1="548" x2="676" y2="548" stroke-width="6" stroke-linecap="round"/>
-  <text class="ink mono" x="523" y="625" font-size="13">V-101</text>
-
-  <!-- sensor/output -->
-  <circle class="panel" cx="704" cy="548" r="28" stroke-width="2"/>
-  <path class="accent-line" d="M691 550 L700 559 L718 537" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  <text class="ink mono" x="681" y="625" font-size="13">FIT-1</text>
-
-  <!-- status pills -->
-  <rect class="soft" x="82" y="449" width="146" height="28" rx="14"/>
-  <circle class="ok" cx="100" cy="463" r="5"/>
-  <text class="muted" x="113" y="468" font-size="12">live signals</text>
-
-  <rect class="soft" x="240" y="449" width="166" height="28" rx="14"/>
-  <circle class="accent" cx="258" cy="463" r="5"/>
-  <text class="muted" x="271" y="468" font-size="12">source revision</text>
+  <g transform="translate(118 462) scale(.55)">
+    <path d="M18 42C18 15 140 15 140 42V193C140 218 18 218 18 193Z" fill="#e4f2f5" fill-opacity=".65" stroke="#86a2ae" stroke-width="2"/>
+    <g clip-path="url(#tank-water)"><g class="level"><rect x="20" y="90" width="120" height="125" fill="#9bc7e8" opacity=".85"/><ellipse cx="79" cy="90" rx="60" ry="9" fill="#70b9e1"/></g></g>
+    <path d="M29 52V187M34 58V183" fill="none" stroke="#fff" stroke-width="2.5" opacity=".6"/>
+    <ellipse cx="79" cy="41" rx="61" ry="15" fill="url(#steel)" stroke="#86a2ae" stroke-width="1.5"/>
+    <rect x="68" y="3" width="23" height="25" fill="url(#steel)" stroke="#718e9c"/>
+    <rect x="120" y="172" width="50" height="24" fill="url(#steel)" stroke="#718e9c"/>
+  </g>
+  <g transform="translate(320 488) scale(.65)">
+    <path d="M40 132 32 151H109L100 132M143 130 138 151H207L200 130" fill="#183f50" stroke="#547685"/>
+    <rect x="25" y="151" width="190" height="7" fill="url(#steel)" stroke="#718e9c"/>
+    <rect x="0" y="84" width="40" height="24" fill="url(#steel)" stroke="#718e9c"/>
+    <rect x="64" y="0" width="24" height="57" fill="url(#steel)" stroke="#718e9c"/>
+    <rect x="129" y="57" width="81" height="77" rx="13" fill="#183f50" stroke="#547685"/>
+    <path d="M141 65V126m8-61v61m8-61v61m8-61v61m8-61v61m8-61v61m8-61v61" stroke="#65818e" stroke-width="3"/>
+    <circle cx="76" cy="96" r="48" fill="url(#steel)" stroke="#7b97a3" stroke-width="2"/>
+    <circle cx="76" cy="96" r="39" fill="#183f50" stroke="#acbfc7" stroke-width="3"/>
+    <circle cx="76" cy="96" r="32" fill="#143e50" stroke="#deedf1" stroke-width="1.3"/>
+    <g class="rotor" fill="url(#steel)" stroke="#abc0c9"><path d="M76 91C83 87 96 86 101 75C105 89 94 101 82 104Z"/><path d="M76 91C83 87 96 86 101 75C105 89 94 101 82 104Z" transform="rotate(72 76 96)"/><path d="M76 91C83 87 96 86 101 75C105 89 94 101 82 104Z" transform="rotate(144 76 96)"/><path d="M76 91C83 87 96 86 101 75C105 89 94 101 82 104Z" transform="rotate(216 76 96)"/><path d="M76 91C83 87 96 86 101 75C105 89 94 101 82 104Z" transform="rotate(288 76 96)"/></g>
+    <circle cx="76" cy="96" r="8" fill="url(#steel)" stroke="#718f9c"/>
+  </g>
+  <g transform="translate(510 500) scale(.65)">
+    <rect y="26" width="96" height="24" fill="url(#steel)" stroke="#718e9c"/>
+    <circle cx="48" cy="38" r="32" fill="#f1f8fa" stroke="#7b9aa7" stroke-width="3"/>
+    <circle cx="48" cy="38" r="25" fill="#163e51" stroke="#bed3dd"/>
+    <text x="48" y="44" fill="#b9f6fd" font-family="monospace" font-size="14" text-anchor="middle">FT</text>
+  </g>
+  <g transform="translate(620 460) scale(.65)">
+    <rect y="90" width="160" height="24" fill="url(#steel)" stroke="#718e9c"/>
+    <path d="M43 88 62 72H98L119 88V116L98 132H62L43 116Z" fill="url(#steel)" stroke="#6d8d9b"/>
+    <rect x="57" y="88" width="46" height="29" rx="6" fill="#0ca6c0"/>
+    <rect x="77" y="40" width="6" height="42" fill="url(#steel)" stroke="#66899c"/>
+    <path d="M61 73V31H99V73M57 73H104" fill="none" stroke="#5f7f8f" stroke-width="4"/>
+    <rect x="51" y="6" width="58" height="28" rx="6" fill="#183f50"/>
+  </g>
+  <path d="M771 514H785V508L799 522 785 536V530H771Z" fill="url(#steel)" stroke="#668c9c"/>
+  <g class="muted mono" font-size="12" text-anchor="middle"><text x="161" y="617">TK-01</text><text x="391" y="617">P-01</text><text x="541" y="586">FT-01</text><text x="672" y="586">V-01</text><text x="773" y="560">OUT-01</text></g>
 
   <!-- fan-out connector -->
   <path class="line" d="M832 510 H866 M866 510 V180 M866 180 H906 M866 262 H906 M866 344 H906 M866 426 H906 M866 508 H906 M866 590 H906" fill="none" stroke-width="1.5"/>
