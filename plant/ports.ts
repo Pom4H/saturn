@@ -32,6 +32,7 @@ const saturnProfile=Object.fromEntries([...SATURN_TERMINAL_ANCHORS.map(a=>[a.id,
  ...SATURN_SERVICE_ANCHORS.map(a=>[a.id,t(a.x*.5,a.y*.5,a.side==='top'?'up':'down',a.id.startsWith('RS')?'bus':'power',a.family,a.id.startsWith('RS')?'passive':'sink',{z:1})] as const)]) as SaturnProfile;
 export const profiles={
     pump:{...inline(),drive:t(75,9,'up','power','drive','sink',{input:'voltage'})},
+    flowmeter:{inlet:t(0,48,'left','pipe','water','sink',{input:'flow'}),outlet:t(150,48,'right','pipe','water','source',{signal:'flow'})},
     turbine:{...inline()},separator:{inlet:t(0,48,'left','pipe','water','sink'),outlet:t(150,48,'right','pipe','steam','source')},
     exchanger:{...inline(),coldIn:t(40,85,'down','pipe','water','sink'),coldOut:t(110,85,'down','pipe','water','source')},
     valve:{...inline(),command:t(75,11,'up','control','analog','sink',{input:'demand'})},
