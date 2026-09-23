@@ -44,8 +44,12 @@ export async function checkLandingDemo(browser, origin) {
     assert.equal(await page.locator('#studio-play').getAttribute('aria-pressed'), 'true');
     await page.locator('#studio-play').click();
 
-    const pipe = page.locator('#studio-svg [data-edge] [data-water]').first();
+    const pipe = page.locator('#studio-svg [data-connection="suction"][data-medium="pipe"] path').first();
+    const cable = page.locator('#studio-svg [data-connection="feeder"][data-medium="power"] path').first();
+    assert.equal(await page.locator('#studio-svg [data-connection][data-medium="pipe"]').count(), 1);
+    assert.equal(await page.locator('#studio-svg [data-connection][data-medium="power"]').count(), 1);
     const pipeBefore = await pipe.getAttribute('d');
+    assert(await cable.getAttribute('d'), 'Canonical cable is rendered');
     const pump = page.locator('#studio-svg [data-node="P-01"]');
     const box = await pump.boundingBox(); assert(box);
     await page.mouse.move(box.x + box.width * .6, box.y + box.height * .75); await page.mouse.down();
