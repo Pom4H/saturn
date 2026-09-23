@@ -4,7 +4,9 @@ The landing sells a workflow: engineer a project, publish a checked build, then 
 
 ## Screenshots are generated evidence
 
-`npm run site:test:release` reuses the existing release browser. `scripts/landing-proof.mjs` starts the real Saturn server in a disposable directory with random credentials, publishes an engineering change, closes the engineering context and opens a separate operator context. It checks the applied revision, role boundaries, runtime pause/resume and access to alarms before capturing both roles in both system themes.
+`npm run site:test:release` reuses the existing release browser. `scripts/landing-proof.mjs` starts the real Saturn server in a disposable directory with random credentials, publishes an engineering change, closes the engineering context and opens a separate operator context. It checks the applied revision and role boundaries, then sends a real operator speed command to the small `examples/operator-pump` project. It observes the resulting model flow, waits for the declared low-flow warning, acknowledges it while the condition remains active, and restores the setpoint until the warning clears. Commands must not change the applied project revision. Both roles are then captured in both system themes.
+
+The browser server runs this ordinary project source; there is no dependency on the old `plant/demo` source directory or the large training installation. The same source is packaged as downloadable `operator-pump.json` for the IDE import command, and the gate checks byte-for-byte source equality. This accommodates the examples migration in PR #73 without reinstating legacy paths. The model is explicitly illustrative, not a physical hydraulic solver.
 
 The four PNGs and `landing-proof.json` are written into the built site and `test-results/release-shell/product`. The offline cache is recalculated after evidence is added. The existing Pages job copies these same tested assets; there is no new workflow or external screenshot service.
 

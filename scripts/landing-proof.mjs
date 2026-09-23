@@ -13,11 +13,11 @@ export async function captureLandingProof(browser, siteDir) {
   const out = 'test-results/release-shell/product';
   await mkdir(out, { recursive: true });
   await mkdir('.plant', { recursive: true });
-  await build({ entryPoints: { server: 'scripts/site-workspace-server.ts', project: 'plant/demo/files.ts' },
+  await build({ entryPoints: { server: 'scripts/site-workspace-server.ts' },
     outdir: '.plant/landing-proof', outExtension: { '.js': '.mjs' }, bundle: true,
     platform: 'node', format: 'esm', packages: 'external', plugins: [rawText] });
   const { startWorkspaceTestServer } = await import(pathToFileURL(resolve('.plant/landing-proof/server.mjs')));
-  const { demoFiles } = await import(pathToFileURL(resolve('.plant/landing-proof/project.mjs')));
+  const sourceProject = await readFile('examples/operator-pump/src/plant.ts', 'utf8');
   const work = await mkdtemp(join(tmpdir(), 'saturn-landing-proof-'));
   const passwords = { engineer: randomBytes(24).toString('base64url'), operator: randomBytes(24).toString('base64url') };
   const revision = (await readFile(`${siteDir}/index.html`, 'utf8')).match(/name="saturn-revision" content="([^"]+)"/)?.[1];
@@ -70,7 +70,7 @@ export async function captureLandingProof(browser, siteDir) {
     const project = join(work, 'project');
     await mkdir(join(project, 'src'), { recursive: true });
     await writeFile(join(project, 'package.json'), JSON.stringify({ name: 'saturn-landing-proof', private: true, type: 'module', version: '0.0.0' }));
-    for (const [name, source] of Object.entries(demoFiles)) await writeFile(join(project, 'src', name), source);
+    await writeFile(join(project, 'src/plant.ts'), sourceProject);
     app = await startWorkspaceTestServer({ project, data: join(work, 'plant.sqlite'), password: passwords.engineer,
       root: resolve(siteDir, '..'), autoTick: true });
     app.auth.seed('operator', passwords.operator, 'operator');
@@ -110,19 +110,62 @@ export async function captureLandingProof(browser, siteDir) {
     assert(await operator.locator('.runtime-control-edit button:not([disabled])').count() > 0, 'Operator has allowed controls');
     await operator.locator('#runtime-pause').click();
     await operator.waitForFunction(() => document.getElementById('studio-shell')?.dataset.telemetry === 'paused');
+    // Work through the real command UI. Pause prevents a moving simulation from
+    // changing the input while the explicit request is entered; it is resumed below.
+    const drive = operator.locator('.runtime-control-card').filter({ has: operator.getByRole('heading', { name: 'P-101 · скорость насоса' }) });
+    async function applyDrive(value) {
+      await drive.locator('input').fill(String(value));
+      const sent = operator.waitForResponse(response => response.url().endsWith('/plant/api/command') && response.request().method() === 'POST');
+      await drive.getByRole('button', { name: 'Применить', exact: true }).click();
+      const response = await sent;
+      assert.equal(response.status(), 200, 'The server accepts the authorized operator command');
+      assert.equal(response.request().postDataJSON().value, value);
+    }
+    async function session() {
+      const response = await operator.context().request.get(app.origin + '/plant/api/session');
+      assert.equal(response.status(), 200);
+      return response.json();
+    }
+    async function observe(predicate, message) {
+      const deadline = Date.now() + 15_000;
+      do {
+        const current = await session();
+        if (predicate(current.frame)) return current.frame;
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } while (Date.now() < deadline);
+      assert.fail(message);
+    }
+    await applyDrive(0);
     await operator.locator('#runtime-pause').click();
     await operator.waitForFunction(() => document.getElementById('studio-shell')?.dataset.telemetry === 'live');
+    const warning = await observe(frame => frame.samples['P-101.flow']?.quality === 'good'
+      && frame.samples['P-101.flow'].value < 0.3 && frame.alarms.some(alarm => alarm.id === 'low-flow' && alarm.active),
+      'An actual low-flow observation must raise the declared warning');
+    assert.equal(warning.samples['DRIVE.requested'].value, 0);
     await operator.locator('#runtime-alarms').click();
     assert(await operator.locator('#alarms-panel').isVisible(), 'Operator can inspect alarm state');
+    const alarm = operator.locator('.runtime-alarm').filter({ hasText: 'P-101: низкий расход' });
+    await alarm.getByRole('button', { name: 'Подтвердить', exact: true }).click();
+    await observe(frame => frame.alarms.some(alarm => alarm.id === 'low-flow' && alarm.active && alarm.acknowledged),
+      'Acknowledgement must retain the still-active condition');
+    await operator.locator('#runtime-controls').click();
+    await operator.locator('#runtime-pause').click();
+    await operator.waitForFunction(() => document.getElementById('studio-shell')?.dataset.telemetry === 'paused');
+    await applyDrive(0.72);
+    await operator.locator('#runtime-pause').click();
+    const restored = await observe(frame => frame.samples['P-101.flow']?.value > 0.65
+      && frame.alarms.some(alarm => alarm.id === 'low-flow' && !alarm.active && alarm.acknowledged),
+      'Restoring the drive must clear the condition while retaining its acknowledgement');
+    assert.equal(restored.revision, applied, 'Operational commands do not change the applied project');
     await operator.locator('[data-shell-view="scene"]:visible').first().click();
     await operator.locator('#studio-fit').click();
     await capture(operator, 'operator');
     assert.deepEqual(errors, [], 'Authenticated capture has no browser exceptions');
-    const manifest = JSON.stringify({ available: true, revision, source: 'authenticated-server-simulation', roles: ['engineer', 'operator'], applied }, null, 2);
+    const manifest = JSON.stringify({ available: true, revision, source: 'authenticated-server-simulation', roles: ['engineer', 'operator'], applied, project: 'operator-pump', checks: ['publish', 'independent-operator', 'command', 'observed-flow', 'alarm-raised', 'acknowledged-active', 'condition-cleared'] }, null, 2);
     await writeFile(`${siteDir}/assets/landing-proof.json`, manifest);
     await writeFile(join(out, 'landing-proof.json'), manifest);
     await writeSiteCache(siteDir); // Generated evidence is part of this build's offline cache identity.
-    console.log('PASS: real engineer publication -> independent operator session; roles, scoped authoring CSP, pause/resume, alarms; light/dark screenshots.');
+    console.log('PASS: real engineer publication -> independent operator session; roles, scoped authoring CSP, command -> measured model response -> active alarm -> acknowledgement -> recovery; light/dark screenshots.');
   } catch (error) {
     for (const [index, context] of contexts.entries()) for (const page of context.pages()) {
       await page.screenshot({ path: join(out, `failed-${index}.png`), fullPage: true }).catch(() => {});
@@ -143,6 +186,9 @@ export async function checkLandingStory(browser, origin) {
   try {
     const page = await context.newPage(), errors = [];
     page.on('pageerror', error => errors.push(error.message));
+    const example = await context.request.get(origin + '/site/assets/operator-pump.json');
+    assert.equal(example.status(), 200, 'The demonstrated project is downloadable');
+    assert.deepEqual(await example.json(), { 'plant.ts': await readFile('examples/operator-pump/src/plant.ts', 'utf8') }, 'The downloadable project is exactly the source exercised by the server');
     await page.goto(origin + '/?mode=demo');
     await page.locator('#studio-svg [data-node="P-01"]').waitFor({ state: 'attached' });
     assert.match(await page.locator('h1').innerText(), /Инженерная IDE/);
@@ -158,6 +204,7 @@ export async function checkLandingStory(browser, origin) {
     assert(await page.locator('.operator-proof').isVisible());
     assert(!await page.locator('.engineer-proof').isVisible());
     await page.locator('.operator-proof img').evaluate(image => image.decode());
+    await page.locator('#workflow-title').click(); // Finish keyboard testing before capturing the normal, unfocused page.
     for (const theme of ['light', 'dark']) {
       await page.emulateMedia({ colorScheme: theme });
       await page.waitForFunction(theme => document.querySelector('.operator-proof img')?.currentSrc.endsWith(`proof-operator-${theme}.png`), theme);

@@ -30,6 +30,7 @@ export async function buildSite(outdir = 'dist/site', mode = 'demo') {
   await cp('site/saturn-icon.png', `${outdir}/assets/saturn-icon.png`);
   await cp('docs/plant/self-hosting.md', `${outdir}/assets/server-guide.md`);
   await writeFile(`${outdir}/assets/first-pump.json`, JSON.stringify(starter, null, 2));
+  await writeFile(`${outdir}/assets/operator-pump.json`, JSON.stringify({ 'plant.ts': await readFile('examples/operator-pump/src/plant.ts', 'utf8') }, null, 2));
   for (const count of bankCounts) {
     await writeFile(`${outdir}/assets/pump-bank-${count}.json`, JSON.stringify(bankExample(count).files, null, 2));
     await writeFile(`${outdir}/assets/saturn-context-${count}.md`, projectContext(count));

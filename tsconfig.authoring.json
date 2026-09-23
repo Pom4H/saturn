@@ -23,6 +23,7 @@
   },
   "include": [
     "plant/demo/**/*.ts",
+    "examples/operator-pump/src/**/*.ts",
     "plant/tests/sdk-types.ts",
     "packages/core/index.ts",
     "packages/core/elements.ts"

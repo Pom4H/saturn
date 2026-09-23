@@ -29,7 +29,7 @@ export function mountLandingProof(): void {
         if (status) status.textContent = 'Снимок из работающего Saturn. Расчётные данные.';
       }
       const origin = document.getElementById('proof-origin');
-      if (origin) origin.textContent = `Эти экраны сняты на одном сервере Saturn: инженер публикует проект, оператор открывает его по своей роли. Сборка ${proof.revision.slice(0, 8)}. Это симуляция, не подключение к оборудованию.`;
+      if (origin) origin.textContent = `Насосный стенд на одном сервере Saturn. Проверен путь от публикации до команды оператора, изменения расхода и подтверждения предупреждения. Сборка ${proof.revision.slice(0, 8)}. Это симуляция, не подключение к оборудованию.`;
       section!.dataset.proof = 'ready';
     } catch {
       // Offline / unavailable evidence does not block the editor or invent a replacement screenshot.
