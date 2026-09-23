@@ -81,6 +81,7 @@ export function observedFlows(scene: Scene, frame: RuntimeFrame | null): Map<str
   if (!frame) return simulate(scene).flows;
   return new Map([
     ...scene.links.map(l => [l.id, numeric(frame.flows[l.id])] as const),
+    ...(scene.connections ?? []).map(connection => [connection.id, numeric(frame.flows[connection.id])] as const),
     ...scene.nodes.map(n => [n.id, numeric(frame.equipment[n.id]?.signals.flow)] as const),
   ]);
 }
@@ -264,7 +265,7 @@ export class SceneView {
     this.geometryKey = key; this.updates = []; this.roots.clear();
     this.renderedNodes = new Map(scene.nodes.map(n => [n.id, { ...n, props: { ...n.props } }]));
     // Remove animation state for deleted items as well as rendered values.
-    for (const id of this.phases.keys()) if (!scene.links.some(l => l.id === id) && !scene.nodes.some(n => id.startsWith(`${n.id}:`))) this.phases.delete(id);
+    for (const id of this.phases.keys()) if (!scene.links.some(l => l.id === id) && !(scene.connections ?? []).some(connection => connection.id === id) && !scene.nodes.some(n => id.startsWith(`${n.id}:`))) this.phases.delete(id);
     for (const id of this.visual.keys()) if (!scene.nodes.some(n => n.id === id)) this.visual.delete(id);
     const geometry = layout(scene); this.routes = geometry.routes; this.warnings = geometry.warnings;
     this.layers.replaceChildren(); const pipes = el(this.layers, 'g'), devices = el(this.layers, 'g'), instruments = el(this.layers, 'g');
@@ -273,7 +274,11 @@ export class SceneView {
       const g=el(pipes,'g',{'data-connection':wire.id,'data-medium':wire.medium,'data-valid':String(wire.valid),tabindex:0});
       el(g,'title',{},`${wire.from.device}.${wire.from.port} → ${wire.to.device}.${wire.to.port}${wire.error?' · '+wire.error:''}`);
       el(g,'path',{d,fill:'none',stroke:wire.valid?style.color:'#c45544','stroke-width':style.width,'stroke-linejoin':'round','stroke-linecap':'butt'});
-      el(g,'path',{d,fill:'none',stroke:style.inner,'stroke-width':Math.max(1,style.width-4),'stroke-dasharray':wire.valid?style.dash:'6 4','pointer-events':'none'});
+      const inner=el(g,'path',{d,fill:'none',stroke:style.inner,'stroke-width':Math.max(1,style.width-4),'stroke-dasharray':wire.valid?style.dash:'6 4','stroke-linejoin':'round','stroke-linecap':'butt','pointer-events':'none'});
+      if(wire.medium==='pipe'){
+        const flow=el(g,'path',{d,fill:'none',stroke:medium2d.highlight,'stroke-width':4,'stroke-linecap':'round','stroke-linejoin':'round','stroke-dasharray':'16 28','data-flow':wire.id,'pointer-events':'none'});
+        this.updates.push(dt=>{const q=wire.valid?this.flows.get(wire.id):0;const phase=this.phase(wire.id,q==null?0:q*4.5,dt);flow.setAttribute('stroke-dashoffset',String(-phase%60));flow.setAttribute('opacity',q==null||q===0?'0':'.86');inner.setAttribute('stroke',!wire.valid?'#c45544':q==null?medium2d.stale:style.inner);});
+      }
     }
     for (const edge of scene.links) {
       const route = this.routes.get(edge.id)!;
