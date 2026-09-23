@@ -56,11 +56,12 @@ export async function captureLandingProof(browser, siteDir) {
     await page.locator('#studio-fit').click();
     return { page, context };
   }
-  async function capture(page, role) {
+  async function capture(page, role, variant = '') {
     assert.equal(await page.locator('meta[name="saturn-revision"]').getAttribute('content'), revision, 'Capture must use this exact site build');
+    await page.locator('#shell-toast').waitFor({ state: 'hidden' });
     for (const scheme of ['light', 'dark']) {
       await page.emulateMedia({ colorScheme: scheme });
-      const file = `proof-${role}-${scheme}.png`;
+      const file = `proof-${role}${variant}-${scheme}.png`;
       await page.locator('#studio-shell').screenshot({ path: join(out, file) });
       await copyFile(join(out, file), `${siteDir}/assets/${file}`);
     }
@@ -96,14 +97,20 @@ export async function captureLandingProof(browser, siteDir) {
     assert.equal(deployed.frame.revision, snapshot.id, 'The checked artifact is actually applied');
     const applied = deployed.frame.revision;
     const appliedLabel = await page.locator('#revision-applied').textContent();
-    assert(appliedLabel && appliedLabel !== '—', 'The applied revision is visible');
+    assert.equal(appliedLabel, applied.replace(/^sha256:/, '').slice(0, 8), 'Show a distinguishing build hash, not only the sha256 prefix');
+    assert.equal(await page.locator('#revision-applied').getAttribute('title'), applied, 'Full artifact identity remains inspectable');
+    assert.equal(await page.locator('#studio-count').textContent(), '3 объектов · 2 связей', 'Engineering counts include canonical pipe connections');
     await source.press('ControlOrMeta+Home');
+    if (await page.locator('#file-browser').isVisible()) await page.locator('#files-toggle').click();
+    await page.locator('#studio-fit').click();
     await capture(page, 'engineer');
     await engineering.context.close(); // Runtime must survive closing the engineering workstation.
 
     const { page: operator } = await login('operator');
     assert(!await operator.locator('#studio-code').isVisible(), 'Operator has no code editor');
     assert(!await operator.locator('#server-publish').isVisible(), 'Operator cannot publish');
+    assert.equal(await operator.locator('#studio-count').textContent(), '3 объектов · 2 связей', 'Runtime counts must not retain the unrelated starter project');
+    assert.notEqual(await operator.locator('#revision-source').textContent(), 'demo', 'An authenticated runtime is not labelled as the local demo source');
     assert.equal(await operator.locator('#revision-applied').textContent(), appliedLabel, 'Both roles display the same published project');
     assert.equal((await (await operator.context().request.get(app.origin + '/plant/api/session')).json()).frame.revision, applied);
     await operator.locator('#runtime-controls').click();
@@ -153,15 +160,20 @@ export async function captureLandingProof(browser, siteDir) {
     await operator.waitForFunction(() => document.getElementById('studio-shell')?.dataset.telemetry === 'paused');
     await applyDrive(0.72);
     await operator.locator('#runtime-pause').click();
-    const restored = await observe(frame => frame.samples['P-101.flow']?.value > 0.65
+    const restored = await observe(frame => frame.samples['P-101.flow']?.value > 0.715
       && frame.alarms.some(alarm => alarm.id === 'low-flow' && !alarm.active && alarm.acknowledged),
       'Restoring the drive must clear the condition while retaining its acknowledgement');
     assert.equal(restored.revision, applied, 'Operational commands do not change the applied project');
     await operator.locator('[data-shell-view="scene"]:visible').first().click();
     await operator.locator('#studio-fit').click();
     await capture(operator, 'operator');
+    await operator.setViewportSize({ width: 390, height: 760 });
+    await operator.locator('#runtime-controls').click();
+    assert(await drive.locator('input').isEnabled(), 'The responsive operator screen retains permitted controls');
+    assert(await operator.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'The real mobile runtime fits its viewport');
+    await capture(operator, 'operator', '-mobile');
     assert.deepEqual(errors, [], 'Authenticated capture has no browser exceptions');
-    const manifest = JSON.stringify({ available: true, revision, source: 'authenticated-server-simulation', roles: ['engineer', 'operator'], applied, project: 'operator-pump', checks: ['publish', 'independent-operator', 'command', 'observed-flow', 'alarm-raised', 'acknowledged-active', 'condition-cleared'] }, null, 2);
+    const manifest = JSON.stringify({ available: true, revision, source: 'authenticated-server-simulation', roles: ['engineer', 'operator'], applied, project: 'operator-pump', mobileOperator: true, checks: ['publish', 'independent-operator', 'command', 'observed-flow', 'alarm-raised', 'acknowledged-active', 'condition-cleared'] }, null, 2);
     await writeFile(`${siteDir}/assets/landing-proof.json`, manifest);
     await writeFile(join(out, 'landing-proof.json'), manifest);
     await writeSiteCache(siteDir); // Generated evidence is part of this build's offline cache identity.
@@ -216,6 +228,9 @@ export async function checkLandingStory(browser, origin) {
     for (const width of [320, 390, 768]) {
       await page.setViewportSize({ width, height: 844 });
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `Landing has no overflow at ${width}px`);
+      await page.waitForFunction(mobile => document.querySelector('.operator-proof img')?.currentSrc.endsWith(mobile ? 'proof-operator-mobile-light.png' : 'proof-operator-light.png'), width <= 760);
+      await page.locator('.operator-proof img').evaluate(image => image.decode());
+      assert.equal(await page.locator('.operator-proof img').evaluate(image => image.naturalWidth), width <= 760 ? 390 : 1280, 'Mobile evidence is an actual responsive capture, not a shrunken desktop image');
     }
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({ path: 'test-results/release-shell/landing-mobile.png', fullPage: true });

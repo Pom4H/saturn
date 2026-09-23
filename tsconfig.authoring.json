@@ -23,10 +23,10 @@
   },
   "include": [
     "plant/demo/**/*.ts",
-    "examples/operator-pump/src/**/*.ts",
     "plant/tests/sdk-types.ts",
     "packages/core/index.ts",
-    "packages/core/elements.ts"
+    "packages/core/elements.ts",
+    "examples/operator-pump/src/**/*.ts"
   ],
   "exclude": [
     "plant/demo/files.ts"

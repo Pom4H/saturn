@@ -8,9 +8,11 @@ The landing sells a workflow: engineer a project, publish a checked build, then 
 
 The browser server runs this ordinary project source; there is no dependency on the old `plant/demo` source directory or the large training installation. The same source is packaged as downloadable `operator-pump.json` for the IDE import command, and the gate checks byte-for-byte source equality. This accommodates the examples migration in PR #73 without reinstating legacy paths. The model is explicitly illustrative, not a physical hydraulic solver.
 
-The four PNGs and `landing-proof.json` are written into the built site and `test-results/release-shell/product`. The offline cache is recalculated after evidence is added. The existing Pages job copies these same tested assets; there is no new workflow or external screenshot service.
+The desktop PNGs, responsive operator PNGs and `landing-proof.json` are written into the built site and `test-results/release-shell/product`. The offline cache is recalculated after evidence is added. The existing Pages job copies these same tested assets; there is no new workflow or external screenshot service.
 
-The browser loads images only when the manifest is available and its revision matches the page. Normal local builds provide a textual explanation and server instructions, without broken images or stock substitutes. A screenshot is explicitly identified as a server simulation, not a real hardware deployment. Images open at full size and the role switch uses native keyboard-accessible radio inputs.
+The browser loads images only when the manifest is available and its revision matches the page. Normal local builds provide a textual explanation and server instructions, without broken images or stock substitutes. A screenshot is explicitly identified as a server simulation, not a real hardware deployment. Images open at full size and the role switch uses native keyboard-accessible radio inputs. At phone widths, the operator picture uses an actual 390px server screen with permitted controls, captured after the same scenario. It is not a resized desktop diagram. The gate checks image selection and native image dimensions at each breakpoint.
+
+Visual inspection exposed two existing metadata defects: shortened artifact IDs showed only the common `sha256:` prefix, and runtime counts retained the starter scene. The shell now shows hash characters with the full ID in the tooltip, and counts canonical project devices/connections in both roles. The capture gate asserts these values before accepting the images.
 
 ## Authoring document boundary
 

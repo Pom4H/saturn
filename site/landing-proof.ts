@@ -19,6 +19,15 @@ export function mountLandingProof(): void {
         const dark = figure?.querySelector<HTMLSourceElement>('source');
         if (!figure || !link || !image || !dark) continue;
         const asset = (theme: string) => new URL(`./site/assets/proof-${role}-${theme}.png`, document.baseURI).href;
+        if (role === 'operator' && 'mobileOperator' in proof && proof.mobileOperator === true) {
+          for (const theme of ['dark', 'light']) {
+            const mobile = document.createElement('source');
+            mobile.media = theme === 'dark' ? '(max-width: 760px) and (prefers-color-scheme: dark)' : '(max-width: 760px)';
+            mobile.srcset = asset(`mobile-${theme}`);
+            mobile.width = 390; mobile.height = 760;
+            dark.before(mobile);
+          }
+        }
         dark.srcset = asset('dark');
         image.src = asset('light');
         link.href = asset(matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
