@@ -1,34 +1,81 @@
-name: Temporary PR72 conflict workbench
+name: Temporary PR72 conflict resolver
 on:
   push:
     branches: [workbench/pr72-conflict-resolve]
 permissions:
-  contents: read
+  contents: write
 jobs:
-  export:
+  resolve-test-push:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7.0.1
         with:
+          ref: feat/landing-workflow-proof
           fetch-depth: 0
-          persist-credentials: false
-      - name: Merge current main and preserve conflict state
+          persist-credentials: true
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - name: Merge main and resolve the six real conflicts
         shell: bash
         run: |
-          git config user.name "Saturn conflict workbench"
+          git config user.name "Saturn conflict resolver"
           git config user.email "saturn-conflict@users.noreply.github.com"
           git fetch origin main
-          set +e
-          git merge --no-commit --no-ff origin/main
-          status=$?
-          set -e
-          echo "merge_status=$status" > /tmp/merge-status.txt
-          git status --short >> /tmp/merge-status.txt
-          tar -czf /tmp/saturn-pr72-merge-worktree.tgz --exclude=node_modules .
-      - uses: actions/upload-artifact@v7.0.1
-        with:
-          name: pr72-merge-worktree
-          path: |
-            /tmp/saturn-pr72-merge-worktree.tgz
-            /tmp/merge-status.txt
-          retention-days: 1
+          git merge --no-commit --no-ff origin/main || true
+          python <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          p=Path('plant/equipment.ts'); s=p.read_text()
+          start=s.index('<<<<<<< HEAD', s.index('installed.add(kind)'))
+          end=s.index('>>>>>>> origin/main', start)+len('>>>>>>> origin/main')
+          merged="""        if (!componentRegistry.findSchematic(kind))
+                      componentRegistry.register(defineSchematicElement(kind, { version: '1.0.0', label: modelTitle(spec.kind, locale), ...footprint(spec.visual), visual:{glyph:glyphByVisual[spec.visual]??'generic.element',category:categoryByVisual(spec.visual),geometry:`plant.${spec.visual}`,envelope:{min:[-.8,-.6,.02],max:[.8,.6,1.9]}}, fields: { x: { label: 'X', scope: 'layout', default: 0 }, y: { label: 'Y', scope: 'layout', default: 0 } }, ports: Object.fromEntries(Object.entries(terminals(spec.visual)).map(([name,t])=>[name,{x:t.x,y:t.y,direction:t.side,role:t.role==='source'?'out':'in'}])), signals: Object.fromEntries(Object.entries(spec.outputs).map(([k, unit]) => [k, { label: k, unit, type: outputType(spec, k) }])) }));
+                  registerSvgRenderer(kind, c => { shapes[spec.visual](c); if(['saturn','pump','reservoir','valve'].includes(spec.visual))return; const key = Object.keys(spec.outputs)[0]; const text = el(c.root, 'text', { x: 75, y: 111, 'text-anchor': 'middle', 'font-family': 'ui-monospace,monospace', 'font-size': 15, fill: '#214d5f' }); c.onUpdate(dt => { const value = c.number(key, dt); text.textContent = value === null ? '—' : `${value.toFixed(2)} ${spec.outputs[key]}`; }); });"""
+          p.write_text(s[:start]+merged+s[end:])
+
+          p=Path('plant/tests/core.test.ts'); s=p.read_text()
+          start=s.index('<<<<<<< HEAD'); end=s.index('>>>>>>> origin/main',start)+len('>>>>>>> origin/main')
+          p.write_text(s[:start]+"""import './svg-projection.test';
+          import "./presentation.test.ts";
+          import "./connections.test.ts";
+          import "./stability.test.ts";
+          import "./group-layout.test.ts";
+          import "./control.test.ts";"""+s[end:])
+
+          p=Path('scripts/site-build.mjs'); s=p.read_text()
+          start=s.index('<<<<<<< HEAD'); end=s.index('>>>>>>> origin/main',start)+len('>>>>>>> origin/main')
+          p.write_text(s[:start]+"""  await writeDslLibrary(`${outdir}/assets/dsl-library.json`);
+            await build({ entryPoints: ['examples/diagram/standalone.ts'], outfile: `${outdir}/assets/standalone.js`, bundle: true, format: 'iife', platform: 'browser', minify: true, target: 'es2022' });"""+s[end:])
+
+          p=Path('site/studio.ts'); s=p.read_text()
+          start=s.index('<<<<<<< HEAD'); end=s.index('>>>>>>> origin/main',start)+len('>>>>>>> origin/main')
+          p.write_text(s[:start]+"""import { dslHover } from '../src/editor-hover';
+          import { nestedStarter } from '../examples/pumping/files';
+          import { simulate } from '../examples/diagram/simulation';"""+s[end:])
+
+          Path('src/core.ts').write_text(subprocess.check_output(['git','show','origin/main:src/core.ts'],text=True))
+
+          p=Path('src/view.ts'); s=p.read_text()
+          start=s.index('<<<<<<< HEAD'); end=s.index('>>>>>>> origin/main',start)+len('>>>>>>> origin/main')
+          p.write_text(s[:start]+"""import { componentRegistry, type Equipment, type Scene, type Point } from './core';
+          import { layout, tapPoint, roundedPath, type Route } from './geometry';"""+s[end:])
+          PY
+          git add plant/equipment.ts plant/tests/core.test.ts scripts/site-build.mjs site/studio.ts src/core.ts src/view.ts examples/landing/project.ts
+          test -z "$(git diff --name-only --diff-filter=U)"
+          ! grep -R -n -E '^(<<<<<<<|=======|>>>>>>>)' plant/equipment.ts plant/tests/core.test.ts scripts/site-build.mjs site/studio.ts src/core.ts src/view.ts
+          git commit -m "Merge main into feat/landing-workflow-proof"
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Verify resolved tree
+        shell: bash
+        run: GITHUB_SHA="$(git rev-parse HEAD)" npm run check:release
+      - name: Push resolved merge
+        shell: bash
+        run: git push origin HEAD:feat/landing-workflow-proof
