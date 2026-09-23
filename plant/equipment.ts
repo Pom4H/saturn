@@ -4,7 +4,7 @@ import { renderSaturnPlcSvg } from './saturn-view';
 import { drawHmiSvg, setDisplays } from './hmi-view';
 import { groupLayout } from './group-layout';
 import { createPlantModel } from './visual3d';
-import { registerComponent, catalog, type Equipment, type Scene } from '../src/core';
+import { registerComponent, catalog, type Equipment, type Scene } from '../src/scene';
 import { registerSvgRenderer, register3dRenderer, el, type SvgRendererContext } from '../src/view';
 import type { RuntimeFrame } from '../src/runtime/protocol';
 import { models, outputType } from './models';
