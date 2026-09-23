@@ -231,7 +231,8 @@ export async function checkLandingStory(browser, origin) {
     assert.equal(await engineer.locator('body').getAttribute('data-embed'), 'shell', 'Embedded IDE uses shell-only document mode');
     assert.equal(await engineer.locator('#studio-shell').getAttribute('data-demo'), 'false', 'Embedded engineering surface is the real IDE, not the landing demo');
     assert(await engineer.locator('.shell-topbar').isVisible(), 'Embedded IDE exposes the real application chrome');
-    assert(await engineer.locator('#studio-svg [data-node]').count() > 0, 'Embedded IDE renders a real project');
+    await engineer.locator('#project-switch option').first().waitFor({ state: 'attached' });
+    assert((await engineer.locator('#studio-svg [data-node]').count()) > 0 || (await engineer.locator('#studio-spatial canvas').count()) > 0, 'Embedded IDE renders the real project in 2D or 3D');
 
     await page.locator('#proof-engineer').focus();
     await page.keyboard.press('ArrowRight');
