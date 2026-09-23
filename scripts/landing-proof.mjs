@@ -255,6 +255,13 @@ export async function checkLandingStory(browser, origin) {
       assert.equal(await page.locator('.operator-proof img').evaluate(image => image.naturalWidth), width <= 760 ? 390 : 1280, 'Mobile evidence is an actual responsive capture, not a shrunken desktop image');
     }
     await page.setViewportSize({ width: 390, height: 844 });
+    // The final resize selects a different picture source after the 768px check.
+    // Load and paint that real responsive image before taking the full-page capture.
+    await page.locator('.operator-proof img').scrollIntoViewIfNeeded();
+    await page.waitForFunction(() => document.querySelector('.operator-proof img')?.currentSrc.endsWith('proof-operator-mobile-light.png'));
+    await page.locator('.operator-proof img').evaluate(image => image.decode());
+    assert.equal(await page.locator('.operator-proof img').evaluate(image => image.naturalWidth), 390);
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
     await page.screenshot({ path: 'test-results/release-shell/landing-mobile.png', fullPage: true });
     for (const link of await page.locator('.site-header .landing-button, .hero-actions .landing-button').all()) assert.equal(await link.getAttribute('href'), '?mode=ide#workspace');
