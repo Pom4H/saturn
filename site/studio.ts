@@ -355,7 +355,9 @@ export async function mountStudio() {
     positionPreviewFrame = requestAnimationFrame(() => {
       positionPreviewFrame = 0;
       const preview = positionPreview; if (!preview) return;
-      const scene = { ...compiled.scene, nodes: compiled.scene.nodes.map(node => node.id === preview.id ? { ...node, props: { ...node.props, x: preview.x, y: preview.y } } : node) };
+      const scene = isPlant() && plant && plantTools
+        ? plantTools.previewPlantScene(plant.project, preview.id, preview.x, preview.y)
+        : { ...compiled.scene, nodes: compiled.scene.nodes.map(node => node.id === preview.id ? { ...node, props: { ...node.props, x: preview.x, y: preview.y } } : node) };
       view.render(scene); spatial?.render(scene); view.select(selected); spatial?.select(selected);
     });
   }
