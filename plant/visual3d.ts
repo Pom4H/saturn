@@ -86,6 +86,15 @@ export function createPlantModel(c: Renderer3DContext, visual: string, readout: 
             const lamp = cylinder(.07, .025, teal, 0, -.27, .52, 'y'); lamp.userData.part = 'status';
             update.push(() => { const trip = c.number('trip'); lamp.material = trip === null ? dark : trip > .5 ? red : teal; }); top = 1.65; break;
         }
+        case 'flowmeter': {
+            base(); flanges(.58); cylinder(.24, .42, steel, 0, 0, .58, 'x');
+            cylinder(.035, .42, steel, 0, 0, .91); cylinder(.25, .12, steel, 0, 0, 1.16, 'y');
+            cylinder(.21, .025, dark, 0, -.07, 1.16, 'y');
+            const needle = new T.Group(); needle.position.set(0, -.09, 1.16); root.add(needle); needle.userData.part = 'needle';
+            box(.016, .025, .17, copper, 0, 0, .06, needle);
+            update.push(dt => { const value = c.number('flow', dt); needle.visible = value !== null; needle.rotation.y = -(Math.max(-110, Math.min(110, (value ?? 0) * 55 - 55))) * Math.PI / 180; });
+            top = 1.65; break;
+        }
         case 'sensor': {
             base(.6); cylinder(.035, .5, steel, 0, 0, .4); cylinder(.27, .13, steel, 0, 0, .9, 'y');
             cylinder(.23, .025, dark, 0, -.075, .9, 'y');
