@@ -17,7 +17,7 @@ import { LocalClient, RemoteClient, LinkedClient, type Connection, type Status, 
 import type { Event as SaturnEvent } from '../types';
 import { localeFromLanguage, modelTitle } from '../i18n';
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
-const base = new URL('../', location.href), demo = location.pathname.endsWith('/demo/'), uiLocale = localeFromLanguage(navigator.language);
+const base = new URL('../', location.href), demo = location.pathname.endsWith('/demo/'), embedded = new URLSearchParams(location.search).get('embed') === 'landing', uiLocale = localeFromLanguage(navigator.language);
 let client: Connection, status: Status, frame: Frame, scene: SceneView, system = '', selected: string | null = null, tab = 'scheme', file = 'src/plant.ts', files: Record<string, string> = {}, head: string | null = null, dirty = false, validDraft = true, editor: EditorView, loadingEditor = false, failed = false;
 let scene3d: SceneView3D | undefined, viewMode: '2d' | '3d' = '2d', changingView = false;
 type BeforeInstallPromptEvent = Event & { prompt(): Promise<void> };
@@ -351,6 +351,7 @@ function validate() {
     }
 }
 async function setupPwa() {
+    if (embedded) return;
     const manifest = document.querySelector<HTMLLinkElement>('link[rel=manifest]')!;
     manifest.href = demo ? new URL('manifest.webmanifest', location.href).href : new URL('manifest.webmanifest', base).href;
     if ('serviceWorker' in navigator)
