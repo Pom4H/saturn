@@ -59,3 +59,12 @@ TypeScript DSL декларативный: const, named imports и функци�
 Не используйте произвольные JS-функции, циклы или сетевые импорты.
 `,
 };
+
+export function nestedStarter() {
+  const files = { ...starter };
+  files['systems/pumping.ts'] = files['equipment.ts']; delete files['equipment.ts'];
+  files['plant.ts'] = files['plant.ts'].replace("'./equipment'", "'./systems/pumping'");
+  files['views.ts'] = files['views.ts'].replace("'./equipment'", "'./systems/pumping'");
+  files['README.md'] = '# Насосная установка\n\nplant.ts — состав проекта.\nsystems/pumping.ts — насос и команда.\nviews.ts — операторский экран.\n\nИзменения здесь остаются черновиком до публикации на сервере.\n';
+  return files;
+}

@@ -57,9 +57,11 @@ Shell поддерживает однофайловые примеры `@scada/c
   валидация формата хранилища `saturn.shell.workspace.v1`.
 - `exports.ts`: переносимый HTML, файлы и ссылки.
 - `pwa.ts`, `manifest.json`, `sw.js`: установка и офлайн-оболочка.
-- `model.ts`, `scene.ts`, `starter.ts`, `typescript-example.ts`, `connection.ts`,
-  `project-context.ts`: прежние модели/примеры сохраняются как самостоятельные
-  модули; новый лендинг не монтирует старую страницу.
+- Проектные исходники, учебная гидравлика и их визуальное демо находятся в
+  `examples/diagram`, `examples/pumping`, `examples/pump-bank`,
+  `examples/hydraulic-loop` и `examples/landing`. Оболочка загружает их явно;
+  реестр и рендереры ядра не импортируют примеры. `connection.ts` остаётся
+  адаптером подключения, а `shell-projects.ts` хранит логику workspace.
 
 ## Запуск и проверки
 

@@ -3,7 +3,7 @@ export { el } from './svg';
 import { renderProcessSvg } from './equipment-svg';
 import { connectionStyles } from './connection-style';
 import { groupFill, groupStroke, groupAccent, groupTitleLines } from './group-style';
-import { catalog, simulate, type Equipment, type Scene, type Point } from './core';
+import { componentRegistry, type Equipment, type Scene, type Point } from './core';
 import { layout, tapPoint, roundedPath, type Route } from './geometry';
 import { numeric, type RuntimeFrame, type Signal, type Quality, type Alarm } from './runtime/protocol';
 import type * as Three from 'three';
@@ -63,7 +63,7 @@ export function observation(scene: Scene, frame: RuntimeFrame | null, id: string
   const node = scene.nodes.find(n => n.id === id);
   if (!node) return undefined;
   const value = node.props[key];
-  const unit = catalog[node.kind].signals?.[key]?.unit ?? catalog[node.kind].fields[key]?.unit ?? '';
+  const unit = componentRegistry.schematic(node.kind).signals?.[key]?.unit ?? componentRegistry.schematic(node.kind).fields[key]?.unit ?? '';
   const quality = (node.props.quality ?? 'good') as Quality;
   if (typeof value === 'number') return { type: 'number', value, unit, timestamp: 0, quality };
   if (typeof value === 'boolean') return { type: 'boolean', value, unit, timestamp: 0, quality };
@@ -80,8 +80,10 @@ export function observationQuality(scene: Scene, frame: RuntimeFrame | null, id:
 export function observationAlarm(scene: Scene, frame: RuntimeFrame | null, id: string): Alarm {
   return frame ? frame.equipment[id]?.facts.alarm ?? 'none' : (scene.nodes.find(n => n.id === id)?.props.alarm ?? 'none') as Alarm;
 }
-export function observedFlows(scene: Scene, frame: RuntimeFrame | null): Map<string, number | null> {
-  if (!frame) return simulate(scene).flows;
+export interface ScenePreview { flows: Map<string, number | null>; notes: string[] }
+export type PreviewProvider = (scene: Scene) => ScenePreview;
+export function observedFlows(scene: Scene, frame: RuntimeFrame | null, preview?: ScenePreview): Map<string, number | null> {
+  if (!frame) return preview?.flows ?? new Map();
   return new Map([
     ...scene.links.map(l => [l.id, numeric(frame.flows[l.id])] as const),
     ...(scene.connections ?? []).filter(c => c.medium === 'pipe').map(c => [c.id, numeric(frame.flows[c.id])] as const),
@@ -122,7 +124,7 @@ export class SceneView {
   camera = { x: 0, y: 0, width: 1500, height: 620 };
   onFrame?: () => void;
   onSelect?: (id: string | null) => void;
-  constructor(public svg: SVGSVGElement) {
+  constructor(public svg: SVGSVGElement, public preview?: PreviewProvider) {
     svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', 'Редактируемая SCADA схема');
     const defs = el(svg, 'defs');
     for (const [id, stops] of [['metal', ['#e2ebee', '#a9bec7', '#809ca8']], ['dark', ['#335a6b', '#183f50', '#11303e']]] as const) {
@@ -170,8 +172,9 @@ export class SceneView {
   setRuntime(frame: RuntimeFrame | null) {
     if (frame?.runId !== this.runtime?.runId) { this.visual.clear(); this.phases.clear(); }
     this.runtime = frame;
-    this.flows = observedFlows(this.scene, frame);
-    this.notes = frame ? [] : simulate(this.scene).notes;
+    const preview = frame ? undefined : this.preview?.(this.scene);
+    this.flows = observedFlows(this.scene, frame, preview);
+    this.notes = preview?.notes ?? [];
     this.svg.dataset.runId = frame?.runId ?? ''; this.svg.dataset.sequence = String(frame?.seq ?? '');
     this.syncStatuses(); for (const update of this.updates) update(0);
   }
@@ -247,7 +250,9 @@ export class SceneView {
   render(scene: Scene) {
     this.scene = scene;
     this.renderGroups();
-    this.flows = observedFlows(scene, this.runtime); this.notes = this.runtime ? [] : simulate(scene).notes;
+    const preview = this.runtime ? undefined : this.preview?.(scene);
+    this.flows = observedFlows(scene, this.runtime, preview);
+    this.notes = preview?.notes ?? [];
     // Parameters/quality do not change routing. Keep DOM nodes and animation
     // closures alive; refresh only the derived props they read on the next frame.
     const key = JSON.stringify([
@@ -286,8 +291,8 @@ export class SceneView {
       }
 
     }
-    for (const n of [...this.renderedNodes.values()].filter(n => !catalog[n.kind].instrument)) this.equipment(devices, n);
-    for (const n of [...this.renderedNodes.values()].filter(n => catalog[n.kind].instrument)) this.instrument(instruments, n);
+    for (const n of [...this.renderedNodes.values()].filter(n => !componentRegistry.schematic(n.kind).instrument)) this.equipment(devices, n);
+    for (const n of [...this.renderedNodes.values()].filter(n => componentRegistry.schematic(n.kind).instrument)) this.instrument(instruments, n);
     this.syncStatuses(); this.select(this.selected);
     for (const fn of this.updates) fn(0);
   }
@@ -299,7 +304,7 @@ export class SceneView {
       this.updates.push(dt => { const q = valid ? this.flows.get(id) : 0; const phase = this.phase(id, q == null ? 0 : q * 4.5, dt); flow.setAttribute('stroke-dashoffset', String(-phase % flowDashPeriod)); flow.setAttribute('opacity', q == null || q === 0 ? '0' : '.86'); water.setAttribute('stroke', !valid ? '#ca6661' : q == null ? medium2d.stale : medium2d.water); });
   }
   private root(parent: SVGGElement, n: Equipment, x: number, y: number): SVGGElement {
-    const d = catalog[n.kind];
+    const d = componentRegistry.schematic(n.kind);
     const g = el(parent, 'g', { transform: `translate(${x} ${y})`, 'data-node': n.id, 'data-kind': n.kind, 'data-quality': String(n.props.quality), 'data-alarm': String(n.props.alarm), class: 'node', tabindex: 0, role: 'button', 'aria-label': `${n.id} ${d.label}` });
     el(g, 'rect', { x: -10, y: -53, width: d.width + 20, height: d.height + 77, rx: 7, class: 'selection', fill: 'none', stroke: '#16a4b7', 'stroke-width': 1.5, 'stroke-dasharray': '5 4' });
     const header = el(g, 'g', { class: 'object-label' });
@@ -322,7 +327,7 @@ export class SceneView {
     }
   }
   private equipment(parent: SVGGElement, n: Equipment) {
-    const d = catalog[n.kind], g = this.root(parent, n, Number(n.props.x), Number(n.props.y));
+    const d = componentRegistry.schematic(n.kind), g = this.root(parent, n, Number(n.props.x), Number(n.props.y));
     const metal = this.paint('metal'), dark = this.paint('dark');
     const body = part(g, 'body');
     const rect = (x: number, y: number, width: number, height: number, rx = 2, fill = metal) => el(body, 'rect', { x, y, width, height, rx, fill, stroke: '#718e9c', 'stroke-width': 1.4 });
@@ -374,7 +379,7 @@ export class SceneView {
     } else this.generic(this.context(n, g));
   }
   private generic(context: SvgRendererContext) {
-    const d = catalog[context.equipment.kind];
+    const d = componentRegistry.schematic(context.equipment.kind);
     el(context.root, 'rect', { x: 8, y: 8, width: d.width - 16, height: d.height - 16, rx: 8, fill: this.paint('metal'), stroke: '#668c9c', 'stroke-width': 2, 'data-representation': 'generic' });
     const value = label(context.root, d.width / 2, d.height / 2 + 5, '—', 14);
     const entry = Object.entries(d.signals ?? {}).find(([, field]) => field.type === 'number');

@@ -36,7 +36,7 @@ All equipment supports `quality: "good" | "stale" | "bad"` and `alarm: "none" | 
 | `temperature` | instrument tap | `value` −40…150 °C, `at`, `offset` |
 | `component("filter", …)` | `inlet`, `outlet` | `resistance` 0–1; installed package with `clean` command |
 
-Physical equipment has literal `x`, `y` in scene coordinates. Bounds and defaults come from the installed metadata catalog (`src/core.ts` and component definition modules). The visual symbols share local coordinates with their ports; moving equipment cannot detach a path endpoint from its port.
+Physical equipment has literal `x`, `y` in scene coordinates. Bounds and defaults come from the installed metadata catalog (`src/elements/core-elements.ts` and registered element packs). The visual symbols share local coordinates with their ports; moving equipment cannot detach a path endpoint from its port.
 
 ## Connections and instruments
 

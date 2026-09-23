@@ -36,7 +36,7 @@ The older engineer-only model-parameter editor remains for testing model assumpt
 
 ## Auxiliary model
 
-`plant/demo/auxiliary.ts` contributes three systems and six instances:
+`examples/plant/auxiliary.ts` contributes three systems and six instances:
 
 | Instance | Model | Coupling |
 |---|---|---|

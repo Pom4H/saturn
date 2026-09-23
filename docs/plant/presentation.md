@@ -37,7 +37,7 @@ existing 320x240 target screen records. Unsupported widgets and overflow are
 compile errors, not silently omitted widgets. Tables, charts and action buttons
 remain web/report capabilities; they are not pretended to work on this LCD.
 
-`plant/demo/views.ts` declares a single `benchPanel` actually reused by the
+`examples/plant/views.ts` declares a single `benchPanel` actually reused by the
 web view, the `bench-state` report and the compiled Saturn program. A second
 web panel adds audited operator buttons. All source remains editable through
 the existing multi-file DSL editor and Git commit/publish lifecycle.

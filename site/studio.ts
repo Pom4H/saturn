@@ -1,4 +1,6 @@
 import { dslHover } from '../src/editor-hover';
+import { nestedStarter } from '../examples/pumping/files';
+import { simulate } from '../examples/diagram/simulation';
 import { EditorState } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers, drawSelection, highlightActiveLine } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, undo, redo, undoDepth, redoDepth, indentWithTab, isolateHistory } from '@codemirror/commands';
@@ -8,7 +10,7 @@ import { autocompletion, closeBrackets } from '@codemirror/autocomplete';
 import { tags } from '@lezer/highlight';
 import { setDiagnostics } from '@codemirror/lint';
 import { compile, patchFields, editable, appendEquipment, appendConnection, appendTap, removeObject, SourceError, type Compiled } from '../src/source';
-import { catalog, type Endpoint, type Value } from '../src/core';
+import { componentRegistry, type Endpoint, type Value } from '../src/core';
 import { dslCompletions } from '../src/completion';
 import { SceneView } from '../src/view';
 import { createGlyphSvg } from '../src/elements/symbols';
@@ -49,7 +51,7 @@ export async function mountStudio() {
   let progress = 0, explicit: '2d' | '3d' = compact.matches ? '2d' : '3d', fullscreen = false, scrollBeforeFullscreen = 0;
   let visible = false, paused = reduced.matches, toastTimer = 0;
   let connecting: Endpoint | 'choose' | null = null;
-  const view = new SceneView(canvas);
+  const view = new SceneView(canvas, simulate);
   const editorTheme = EditorView.theme({ '&': { height: '100%', background: 'var(--bg)', color: 'var(--text)', fontSize: '12px' }, '.cm-scroller': { overflow: 'auto', fontFamily: 'var(--mono)' }, '.cm-content': { padding: '16px 0', caretColor: 'var(--text)' }, '.cm-gutters': { background: 'var(--bg)', color: 'var(--muted)', border: 'none' }, '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': { background: 'var(--shell-selection)' }, '.cm-activeLine': { background: 'var(--shell-panel)' } }, { dark: true });
   function editorState(source: string, path = 'station.ts') {
     return EditorState.create({ doc: source, extensions: [dslHover({ files: () => documents.files, path: () => path }), lineNumbers(), drawSelection(), history(), foldGutter(), highlightActiveLine(), ...(path.endsWith('.ts') || path.endsWith('.json') ? [javascript({ typescript: path.endsWith('.ts') })] : []), bracketMatching(), closeBrackets(), syntaxHighlighting(HighlightStyle.define([{ tag: tags.keyword, color: 'var(--code-keyword)' }, { tag: tags.string, color: 'var(--code-string)' }, { tag: tags.number, color: 'var(--code-number)' }, { tag: tags.comment, color: 'var(--code-comment)' }, { tag: [tags.function(tags.variableName), tags.definition(tags.variableName)], color: 'var(--code-function)' }, { tag: tags.propertyName, color: 'var(--code-property)' }, { tag: tags.variableName, color: 'var(--text)' }])), editorTheme,
@@ -288,7 +290,7 @@ export async function mountStudio() {
     $('studio-message').textContent = workspaceSnapshot ? (documents.dirty() ? 'Черновик в памяти' : 'Workspace snapshot') : isPlant() ? 'Черновик · без runtime' : $('studio-message').textContent;
   }
   async function openPlantExample() {
-    try { await ensurePlant(); const files = plantTools!.nestedStarter(); plantTools!.plantProjection(files); persist();
+    try { await ensurePlant(); const files = nestedStarter(); plantTools!.plantProjection(files); persist();
       if (workspaceSnapshot) workspaceDraft = { snapshot: workspaceSnapshot, documents };
       const project = createProject(workspace, 'Насосная установка', files['plant.ts']);
       workspaceSnapshot = null; pendingWorkspaceSnapshot = null; updateFiles(workspace, files);
@@ -548,7 +550,7 @@ export async function mountStudio() {
   function renderEquipmentCatalog() {
     const host=$('equipment-catalog-list'), query=$<HTMLInputElement>('equipment-search').value.trim().toLocaleLowerCase();
     host.replaceChildren();
-    const entries=Object.entries(catalog).filter(([,definition])=>!query || (definition.label+' '+definition.visual?.geometry).toLocaleLowerCase().includes(query));
+    const entries=componentRegistry.schematicEntries().filter(([,definition])=>!query || (definition.label+' '+definition.visual?.geometry).toLocaleLowerCase().includes(query));
     const groups=new Map<string,typeof entries>();
     for(const entry of entries){const category=entry[1].visual?.category??'generic';const list=groups.get(category)??[];list.push(entry);groups.set(category,list);}
     for(const [category,items] of groups){
@@ -572,9 +574,9 @@ export async function mountStudio() {
     const tree = $('studio-tree'); tree.replaceChildren();
     for (const node of compiled.scene.nodes) {
       const button = document.createElement('button'); button.dataset.id = node.id;
-      const icon=document.createElement('span');icon.className='equipment-tree-glyph';icon.append(createGlyphSvg(document,catalog[node.kind]?.visual?.glyph??'generic.element','equipment-glyph'));
+      const icon=document.createElement('span');icon.className='equipment-tree-glyph';icon.append(createGlyphSvg(document,componentRegistry.findSchematic(node.kind)?.visual?.glyph??'generic.element','equipment-glyph'));
       const label = document.createElement('span'); label.textContent = node.id;
-      button.append(icon, label); button.title = catalog[node.kind]?.label ?? node.kind; button.onclick = () => select(node.id); tree.append(button);
+      button.append(icon, label); button.title = componentRegistry.findSchematic(node.kind)?.label ?? node.kind; button.onclick = () => select(node.id); tree.append(button);
     }
   }
   function renderInspector() {
@@ -582,7 +584,7 @@ export async function mountStudio() {
     const node = compiled.scene.nodes.find(n => n.id === selected), edge = compiled.scene.links.find(l => l.id === selected);
     syncPanels();
     $('studio-selected').textContent = node?.id ?? (edge ? 'Соединение' : '');
-    $('studio-kind').textContent = node ? catalog[node.kind]?.label ?? node.kind : edge ? `${edge.from.node} → ${edge.to.node}` : '';
+    $('studio-kind').textContent = node ? componentRegistry.findSchematic(node.kind)?.label ?? node.kind : edge ? `${edge.from.node} → ${edge.to.node}` : '';
     $('object-source').toggleAttribute('disabled', error);
     $('object-source').hidden = runtimeOnly || !node || (isPlant() ? !plant?.objects.has(node.id) : !compiled.objects.has(node.id));
     if (runtimeOnly) {
@@ -602,7 +604,7 @@ export async function mountStudio() {
       return;
     }
     if (!node && !edge) { $('studio-kind').textContent = 'Выберите объект'; return; }
-    if (node) for (const [key, field] of Object.entries(catalog[node.kind].fields)) {
+    if (node) for (const [key, field] of Object.entries(componentRegistry.schematic(node.kind).fields)) {
       if (['nominalFlow', 'degradationRate', 'startDelay', 'maintenanceSeconds'].includes(key)) continue;
       const label = document.createElement('label'); label.textContent = field.label + (field.unit ? ` · ${field.unit}` : '');
       const input = field.choices ? document.createElement('select') : document.createElement('input');
@@ -633,7 +635,7 @@ export async function mountStudio() {
       return;
     }
     for (const node of compiled.scene.nodes) {
-      const data = Object.entries(catalog[node.kind].fields).filter(([key, field]) => typeof field.default === 'number' && !['x', 'y', 'at', 'offset', 'nominalFlow', 'degradationRate', 'startDelay', 'maintenanceSeconds'].includes(key)).map(([key, field]) => [field.label, `${node.props[key]} ${field.unit ?? ''}`, 'Задано в проекте']);
+      const data = Object.entries(componentRegistry.schematic(node.kind).fields).filter(([key, field]) => typeof field.default === 'number' && !['x', 'y', 'at', 'offset', 'nominalFlow', 'degradationRate', 'startDelay', 'maintenanceSeconds'].includes(key)).map(([key, field]) => [field.label, `${node.props[key]} ${field.unit ?? ''}`, 'Задано в проекте']);
       if (view.flows.has(node.id)) data.push(['Расход', view.flows.get(node.id) === null ? 'Неизвестно' : `${view.flows.get(node.id)!.toFixed(1)} м³/ч`, 'Расчёт учебной модели']);
       for (const cells of data) { const row = document.createElement('tr'); for (const value of [node.id, ...cells]) { const cell = document.createElement('td'); cell.textContent = value; row.append(cell); } rows.append(row); }
     }
@@ -801,7 +803,7 @@ export async function mountStudio() {
     const object = compiled.scene.nodes.find(n => n.id === node);
     if (!object) return;
     if (connecting === 'choose') {
-      if (catalog[object.kind].ports[port]?.role !== 'out') { toast('Сначала выберите выходной порт'); return; }
+      if (componentRegistry.schematic(object.kind).ports[port]?.role !== 'out') { toast('Сначала выберите выходной порт'); return; }
       connecting = { node, port }; $('studio-mode-note').textContent = 'Выберите вход'; $('studio-mode-note').hidden = false; return;
     }
     try { const source = appendConnection(editor.state.doc.toString(), connecting, { node, port }); editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: source }, annotations: isolateHistory.of('full'), userEvent: 'input' }); clearConnection(); }
@@ -904,7 +906,7 @@ export async function mountStudio() {
   view.render(compiled.scene); refresh(false); fitScene(); updatePause(); renderMeta();
   message(storageAvailable ? '' : 'Хранилище недоступно');
   try {
-    const { SceneView3D } = await import('../src/view3d'); spatial = new SceneView3D(spatialHost, { landing: true }); syncCanvasTheme(); spatial.onSelect = select;
+    const { SceneView3D } = await import('../src/view3d'); spatial = new SceneView3D(spatialHost, {...{ landing: true }, preview: simulate}); syncCanvasTheme(); spatial.onSelect = select;
     spatial.canMove = canMoveNode;
     spatial.onMove = (id, x, y, commit) => commit ? commitPosition(id, x, y) : previewPosition(id, x, y);
     spatial.render(compiled.scene); spatial.setRuntime(observedRuntime ?? plant?.runtime ?? null); spatial.select(selected); setMode(explicit);

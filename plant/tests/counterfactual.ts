@@ -1,6 +1,6 @@
 export {runPlcTrace} from './plc-trace';
 import { compileProject } from '../compiler';
-import { demoFiles } from '../demo/files';
+import { demoFiles } from "../../examples/plant/files";
 import { Kernel } from '../kernel';
 export function runCounterfactuals() {
     const project = compileProject(demoFiles);

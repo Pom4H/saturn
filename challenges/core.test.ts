@@ -1,9 +1,10 @@
+import { simulate } from '../examples/diagram/simulation';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, SourceError, applyChanges, patchFields, removeObject, appendEquipment, appendTap } from '../src/source';
-import { simulate, worldPort, catalog } from '../src/core';
+import { worldPort, componentRegistry } from '../src/core';
 import { layout, bounds, segmentClear, tapPoint } from '../src/geometry';
-import { booster, twin } from '../src/examples';
+import { booster, twin } from "../examples/diagram/projects";
 import { nestedTap, collidingImport, stackedTaps, crowdedCircuit } from './fixtures';
 
 declare global { var challengeSideEffect: boolean | undefined; }
@@ -113,7 +114,7 @@ test('C13 48 elements route without collisions, and element 49 is rejected', () 
       const port = worldPort(scene.nodes.find(n => n.id === endpoint.node)!, endpoint.port);
       assert.equal(point.x, port.x); assert.equal(point.y, port.y);
     }
-    const boxes = scene.nodes.filter(n => !catalog[n.kind].instrument && n.id !== link.from.node && n.id !== link.to.node).map(n => bounds(n, 10));
+    const boxes = scene.nodes.filter(n => !componentRegistry.schematic(n.kind).instrument && n.id !== link.from.node && n.id !== link.to.node).map(n => bounds(n, 10));
     for (let i = 1; i < route.points.length; i++) assert.ok(segmentClear(route.points[i - 1], route.points[i], boxes));
   }
   assert.throws(() => compile(crowdedCircuit(49)), SourceError);

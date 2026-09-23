@@ -1,3 +1,5 @@
+import type { Quality } from '../src/observation';
+export type { Quality } from '../src/observation';
 import type { Presentation } from './presentation';
 import type { Controller, ControllerState } from './controller';
 import type { Connection, Attachment } from './ports';
@@ -7,7 +9,7 @@ import { failCode } from './diagnostics';
 export { AppError } from './diagnostics';
 /** Portable contracts. No DOM, Node, filesystem, SQL driver or network imports. */
 export type Scalar = number | boolean | string;
-export type Quality = 'good' | 'bad' | 'stale' | 'offline';
+
 
 declare const signalValueType: unique symbol;
 declare const expressionValueType: unique symbol;

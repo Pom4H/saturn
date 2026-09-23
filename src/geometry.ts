@@ -1,7 +1,7 @@
-import { catalog, directionVector, worldPort, type Scene, type Equipment, type Point, type Link } from './core';
+import { componentRegistry, directionVector, worldPort, type Scene, type Equipment, type Point, type Link } from './core';
 export interface Rect { x: number; y: number; width: number; height: number; id: string }
 export interface Route { points: Point[]; path: string; valid: boolean; reason?: string }
-export const bounds = (n: Equipment, pad = 0): Rect => ({ id: n.id, x: Number(n.props.x) - pad, y: Number(n.props.y) - pad, width: catalog[n.kind].width + pad * 2, height: catalog[n.kind].height + pad * 2 });
+export const bounds = (n: Equipment, pad = 0): Rect => ({ id: n.id, x: Number(n.props.x) - pad, y: Number(n.props.y) - pad, width: componentRegistry.schematic(n.kind).width + pad * 2, height: componentRegistry.schematic(n.kind).height + pad * 2 });
 const eq = (a: number, b: number) => Math.abs(a - b) < .01;
 const inside = (p: Point, r: Rect) => p.x > r.x + .01 && p.x < r.x + r.width - .01 && p.y > r.y + .01 && p.y < r.y + r.height - .01;
 export function segmentClear(a: Point, b: Point, boxes: Rect[]): boolean {
@@ -37,10 +37,10 @@ export function roundedPath(points: Point[], radius = 18): string {
 export function routeLink(scene: Scene, link: Link): Route {
   const a = scene.nodes.find(n => n.id === link.from.node)!, b = scene.nodes.find(n => n.id === link.to.node)!;
   const s = worldPort(a, link.from.port), t = worldPort(b, link.to.port);
-  if (eq(s.y, t.y) && s.direction === 'right' && t.direction === 'left' && t.x > s.x && segmentClear(s, t, scene.nodes.filter(n => !catalog[n.kind].instrument && n.id !== a.id && n.id !== b.id).map(n => bounds(n, 26)))) return { points: [s, t], path: roundedPath([s, t]), valid: true };
+  if (eq(s.y, t.y) && s.direction === 'right' && t.direction === 'left' && t.x > s.x && segmentClear(s, t, scene.nodes.filter(n => !componentRegistry.schematic(n.kind).instrument && n.id !== a.id && n.id !== b.id).map(n => bounds(n, 26)))) return { points: [s, t], path: roundedPath([s, t]), valid: true };
   const sv = directionVector[s.direction], tv = directionVector[t.direction], stub = 36;
   const start = { x: s.x + sv.x * stub, y: s.y + sv.y * stub }, end = { x: t.x + tv.x * stub, y: t.y + tv.y * stub };
-  const physical = scene.nodes.filter(n => !catalog[n.kind].instrument);
+  const physical = scene.nodes.filter(n => !componentRegistry.schematic(n.kind).instrument);
   const boxes = physical.map(n => bounds(n, 26));
   const endpointsClear = segmentClear(s, start, boxes.filter(r => r.id !== a.id)) && segmentClear(end, t, boxes.filter(r => r.id !== b.id));
   const finish = (inner: Point[]): Route => {
@@ -111,17 +111,17 @@ export function routeLink(scene: Scene, link: Link): Route {
 export function layout(scene: Scene): { routes: Map<string, Route>; warnings: string[] } {
   const routes = new Map<string, Route>(); const warnings: string[] = [];
   for (const link of scene.links) { const route = routeLink(scene, link); routes.set(link.id, route); if (!route.valid) warnings.push(`${link.from.node} → ${link.to.node}: ${route.reason}`); }
-  const boxes = scene.nodes.filter(n => !catalog[n.kind].instrument).map(n => bounds(n));
-  for (const n of scene.nodes.filter(n => catalog[n.kind].instrument && n.tap)) {
+  const boxes = scene.nodes.filter(n => !componentRegistry.schematic(n.kind).instrument).map(n => bounds(n));
+  for (const n of scene.nodes.filter(n => componentRegistry.schematic(n.kind).instrument && n.tap)) {
     const route = routes.get(n.tap!); if (!route) continue;
     const p = tapPoint(route, Number(n.props.at));
-    boxes.push({ id: n.id, x: p.x - 33, y: p.y - Number(n.props.offset), width: catalog[n.kind].width, height: catalog[n.kind].height });
+    boxes.push({ id: n.id, x: p.x - 33, y: p.y - Number(n.props.offset), width: componentRegistry.schematic(n.kind).width, height: componentRegistry.schematic(n.kind).height });
   }
   for (let i = 0; i < boxes.length; i++) for (const b of boxes.slice(i + 1)) {
     const a = boxes[i];
     if (a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y) warnings.push(`Перекрытие: ${a.id} / ${b.id}`);
   }
-  for (const n of scene.nodes.filter(n => catalog[n.kind].instrument)) {
+  for (const n of scene.nodes.filter(n => componentRegistry.schematic(n.kind).instrument)) {
     const route = routes.get(n.tap!);
     if (route && !route.points.slice(1).some((b, i) => eq(b.y, route.points[i].y) && Math.abs(b.x - route.points[i].x) >= 90)) warnings.push(`${n.id}: для отвода нужен горизонтальный участок от 90 единиц. Раздвиньте оборудование.`);
   }

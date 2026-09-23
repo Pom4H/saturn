@@ -7,7 +7,7 @@ import { BunSql } from './bun-sql';
 import { localizedDslEntities, localizedDslOperators } from '../plant/dsl-i18n';
 import { modelTitle } from '../plant/i18n';
 import { formatDiagnostic, SaturnDiagnosticError, type SaturnLocale } from '../plant/diagnostics';
-import { catalog } from '../src/core';
+import { componentRegistry } from '../src/core';
 import { listRegistry } from './registry';
 import { loadProjectDirectory } from './project-loader';
 
@@ -141,7 +141,7 @@ export async function ideDiagram(projectPath: string, locale: SaturnLocale = 'en
     const definitions = Object.fromEntries(
         [...new Set(scene.nodes.map(node => node.kind))]
             .map(kind => {
-                const definition = catalog[kind];
+                const definition = componentRegistry.schematic(kind);
                 if (!definition)
                     throw new Error(`Missing visual definition for ${kind}`);
                 return [kind, { label: definition.label, width: definition.width, height: definition.height }];

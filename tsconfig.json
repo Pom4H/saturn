@@ -21,7 +21,8 @@
   "include": [
     "src",
     "generated",
-    "examples"
+    "examples/diagram",
+    "examples/first-pump"
   ],
   "exclude": [
     "examples/consumer"

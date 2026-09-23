@@ -1,2 +1,2 @@
-// Composition root: install component packages here, not in the compiler.
-import './filter/definition';
+/** Built-in metadata is installed once by the canonical registry. */
+import '../elements/core-elements';

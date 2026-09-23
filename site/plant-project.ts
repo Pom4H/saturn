@@ -2,7 +2,6 @@ import ts from '@typescript/typescript6';
 import { compileProject, validateFiles } from '../plant/compiler';
 import { installEquipment, sceneFor, visualFrame } from '../plant/equipment';
 import type { Frame, Project } from '../plant/types';
-import { starter } from './starter';
 export interface SourceField { key: string; label: string; value: number; from: number; to: number; }
 export interface SourceObject { path: string; from: number; to: number; fields: SourceField[]; }
 export function sourceObjects(files: Record<string, string>) {
@@ -49,12 +48,5 @@ export function runtimeProjection(project: Project, frame: Frame) {
   installEquipment(typeof document === 'undefined' ? 'en' : document.documentElement.lang === 'ru' ? 'ru' : 'en');
   return { project, scene: sceneFor(project), runtime: visualFrame(project, frame), objects: new Map<string, SourceObject>() };
 }
-export function nestedStarter() {
-  const files = { ...starter };
-  files['systems/pumping.ts'] = files['equipment.ts']; delete files['equipment.ts'];
-  files['plant.ts'] = files['plant.ts'].replace("'./equipment'", "'./systems/pumping'");
-  files['views.ts'] = files['views.ts'].replace("'./equipment'", "'./systems/pumping'");
-  files['README.md'] = '# Насосная установка\n\nplant.ts — состав проекта.\nsystems/pumping.ts — насос и команда.\nviews.ts — операторский экран.\n\nИзменения здесь остаются черновиком до публикации на сервере.\n';
-  return files;
-}
+
 export { validateFiles, visualFrame, sceneFor as plantScene };

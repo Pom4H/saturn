@@ -1,13 +1,15 @@
+import type { Quality, Alarm } from '../observation';
+export type { Quality, Alarm } from '../observation';
 /** Data and installed metadata only: no transport or behavior execution. */
 import type { ProjectSnapshot } from './project';
-import { catalog } from '../core';
-export type Quality = 'good' | 'stale' | 'bad' | 'offline';
+import { componentRegistry } from '../core';
+
 interface SignalBase { unit: string; timestamp: number; quality: Quality }
 export interface NumericSignal extends SignalBase { type: 'number'; value: number | null }
 export interface BooleanSignal extends SignalBase { type: 'boolean'; value: boolean | null }
 export interface StringSignal extends SignalBase { type: 'string'; value: string | null }
 export type Signal = NumericSignal | BooleanSignal | StringSignal;
-export type Alarm = 'none' | 'warning' | 'trip';
+
 export interface EquipmentState {
   positionId: string;
   instanceId: string;
@@ -84,7 +86,7 @@ export function numeric(signal: Signal | undefined): number | null {
 }
 /** Stable equipment configuration identity; transport metadata and TS aliases are not equipment. */
 export function configurationJSON(scene: { nodes: { id: string; kind: string; props: Record<string, unknown>; tap?: string }[]; links: { id: string; from: { node: string; port: string }; to: { node: string; port: string } }[] }): string {
-  const nodes = scene.nodes.map(n => ({ id: n.id, kind: n.kind, props: Object.fromEntries(Object.entries(n.props).filter(([key]) => catalog[n.kind]?.fields[key]?.scope !== 'layout').sort(([a], [b]) => a.localeCompare(b, 'en'))), ...(n.tap ? { tap: n.tap } : {}) })).sort((a, b) => a.id.localeCompare(b.id, 'en'));
+  const nodes = scene.nodes.map(n => ({ id: n.id, kind: n.kind, props: Object.fromEntries(Object.entries(n.props).filter(([key]) => componentRegistry.findSchematic(n.kind)?.fields[key]?.scope !== 'layout').sort(([a], [b]) => a.localeCompare(b, 'en'))), ...(n.tap ? { tap: n.tap } : {}) })).sort((a, b) => a.id.localeCompare(b.id, 'en'));
   const links = scene.links.map(l => ({ id: l.id, from: { node: l.from.node, port: l.from.port }, to: { node: l.to.node, port: l.to.port } })).sort((a, b) => a.id.localeCompare(b.id, 'en'));
   return JSON.stringify({ nodes, links });
 }

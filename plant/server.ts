@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { NodeSql } from './adapters/node-sql';
 import { runReport } from './adapters/node-reports';
-import { demoFiles } from './demo/files';
+import { demoFiles } from "../examples/plant/files";
 import { buildArtifact, type BuildArtifact } from './artifact';
 import { startPlantHttpServer } from './http-server';
 

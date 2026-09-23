@@ -33,7 +33,7 @@ There is no automatic conversion between unlabelled physical units. The declared
 
 ## Working DSL
 
-See `plant/demo/commissioning.ts`, an imported module of the same project:
+See `examples/plant/commissioning.ts`, an imported module of the same project:
 
 ```ts
 import {system, simulation, control, plc, pin, gt, port, cable} from '@saturn/core';
