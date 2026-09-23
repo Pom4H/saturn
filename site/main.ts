@@ -5,6 +5,7 @@ import './landing.css';
 import { configureAppUpdates } from './pwa';
 import './commands.css';
 const params = new URLSearchParams(location.search);
+if (params.get('embed') === 'shell') document.body.dataset.embed = 'shell';
 const demo = params.get('mode') === 'demo' || (document.querySelector<HTMLMetaElement>('meta[name="saturn-shell-mode"]')?.content !== 'ide'
   && params.get('mode') !== 'ide' && !params.has('project')
   && !['#workspace', '#studio'].includes(location.hash) && !location.hash.startsWith('#code=')
@@ -16,12 +17,12 @@ async function mountWorkspace() {
   if (demo) {
     const { mountLandingDemo } = await import('./landing-demo');
     const result = mountLandingDemo();
-    import('./landing-proof').then(({ mountLandingProof }) => mountLandingProof()).catch(console.error);
+    import('./landing-live').then(({ mountLandingLive }) => mountLandingLive()).catch(console.error);
     return result;
   }
   // Runtime HTML keeps a strict CSP. A workspace host exposes a separate,
   // authenticated document for trusted TypeScript authoring, never for operators.
-  if (document.querySelector<HTMLMetaElement>('meta[name="saturn-authoring-entry"]')?.content === '/plant/ide/') {
+  if (!params.has('embed') && document.querySelector<HTMLMetaElement>('meta[name="saturn-authoring-entry"]')?.content === '/plant/ide/') {
     try {
       const response = await fetch('/plant/api/session', { signal: AbortSignal.timeout(5000) });
       const session: unknown = response.ok ? await response.json() : null;

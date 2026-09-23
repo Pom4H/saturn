@@ -38,8 +38,6 @@ export async function buildSite(outdir = 'dist/site', mode = 'demo') {
     await writeFile(`${outdir}/assets/saturn-context-${count}.md`, projectContext(count));
   }
   for (const name of ['manifest.json', 'icon-192.png', 'icon-512.png']) await cp(`site/${name}`, `${outdir}/assets/${name}`);
-  // A normal build has a text fallback. The existing browser gate supplies verified captures.
-  await writeFile(`${outdir}/assets/landing-proof.json`, JSON.stringify({ available: false, revision }));
   await writeSiteCache(outdir);
   console.log(`Saturn landing built → ${outdir}`);
 }

@@ -10,9 +10,10 @@ export async function checkShell(browser, origin) {
       await landing.goto(origin);
       await landing.waitForFunction(() => document.documentElement.dataset.theme === 'system');
       assert.equal(await landing.locator('html').evaluate(node => getComputedStyle(node).colorScheme), scheme, 'Fresh visit follows the system theme');
-      assert.equal(await landing.locator('.distribution-item svg').count(), 6, 'Every platform has an icon');
-      assert(await landing.locator('.distribution-list').evaluate(node => node.scrollWidth <= node.clientWidth + 1), 'Platform list fits a phone viewport');
-      assert.notEqual(await landing.locator('.code-keyword').first().evaluate(node => getComputedStyle(node).color), await landing.locator('.code-string').first().evaluate(node => getComputedStyle(node).color), 'TypeScript tokens have distinct colors');
+      assert.equal(await landing.locator('.landing-platforms svg').count(), 4, 'Every published platform has an icon');
+      assert(await landing.locator('.landing-platforms').evaluate(node => node.scrollWidth <= node.clientWidth + 1), 'Platform list fits a phone viewport');
+      const syntax = await landing.locator('html').evaluate(node => { const style = getComputedStyle(node); return [style.getPropertyValue('--code-keyword'), style.getPropertyValue('--code-string')]; });
+      assert.notEqual(syntax[0].trim(), syntax[1].trim(), 'TypeScript tokens have distinct colors');
     } finally { await fresh.close(); }
   }
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce', acceptDownloads: true });

@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { rawText } from './esbuild-raw-text.mjs';
-import { mkdtemp, mkdir, rm, copyFile, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomBytes } from 'node:crypto';
-import { writeSiteCache } from './site-build.mjs';
 
 /** Capture the actual authenticated shell, not a marketing reconstruction. */
 async function checkDiagramContrast(page) {
@@ -82,7 +81,6 @@ export async function captureLandingProof(browser, siteDir) {
       await checkDiagramContrast(page);
       const file = `proof-${role}${variant}-${scheme}.png`;
       await page.locator('#studio-shell').screenshot({ path: join(out, file) });
-      await copyFile(join(out, file), `${siteDir}/assets/${file}`);
     }
   }
   const errors = [];
@@ -193,9 +191,7 @@ export async function captureLandingProof(browser, siteDir) {
     await capture(operator, 'operator', '-mobile');
     assert.deepEqual(errors, [], 'Authenticated capture has no browser exceptions');
     const manifest = JSON.stringify({ available: true, revision, source: 'authenticated-server-simulation', roles: ['engineer', 'operator'], applied, project: 'operator-pump', mobileOperator: true, checks: ['publish', 'independent-operator', 'command', 'observed-flow', 'alarm-raised', 'acknowledged-active', 'condition-cleared'] }, null, 2);
-    await writeFile(`${siteDir}/assets/landing-proof.json`, manifest);
     await writeFile(join(out, 'landing-proof.json'), manifest);
-    await writeSiteCache(siteDir); // Generated evidence is part of this build's offline cache identity.
     console.log('PASS: real engineer publication -> independent operator session; roles, scoped authoring CSP, command -> measured model response -> active alarm -> acknowledgement -> recovery; light/dark screenshots.');
   } catch (error) {
     for (const [index, context] of contexts.entries()) for (const page of context.pages()) {
@@ -220,54 +216,60 @@ export async function checkLandingStory(browser, origin) {
     const example = await context.request.get(origin + '/site/assets/operator-pump.json');
     assert.equal(example.status(), 200, 'The demonstrated project is downloadable');
     assert.deepEqual(await example.json(), { 'plant.ts': await readFile('examples/operator-pump/src/plant.ts', 'utf8') }, 'The downloadable project is exactly the source exercised by the server');
+
     await page.goto(origin + '/?mode=demo');
     await page.locator('#studio-svg [data-node="P-01"]').waitFor({ state: 'attached' });
     assert.match(await page.locator('h1').innerText(), /Инженерная IDE/);
     assert.match(await page.locator('h1').innerText(), /со встроенной SCADA/);
-    assert.match(await page.locator('.demo-boundary').innerText(), /Без подключения к оборудованию/);
+    assert.equal(await page.locator('.eyebrow, .section-number, .demo-intro').count(), 0, 'Landing has no marketing kickers');
+
     await page.locator('#workflow').scrollIntoViewIfNeeded();
-    await page.waitForFunction(() => document.getElementById('workflow')?.dataset.proof === 'ready');
-    await page.locator('.engineer-proof img').evaluate(image => image.decode());
-    assert(await page.locator('.engineer-proof img').evaluate(image => image.naturalWidth > 1000), 'A real full-size captured screen is loaded');
+    const engineerFrameElement = page.locator('.engineer-proof .live-product-frame');
+    await page.waitForFunction(() => Boolean(document.querySelector('.engineer-proof .live-product-frame')?.getAttribute('src')));
+    const engineer = page.frameLocator('.engineer-proof .live-product-frame');
+    await engineer.locator('#studio-shell').waitFor({ state: 'visible' });
+    assert.equal(await engineer.locator('body').getAttribute('data-embed'), 'shell', 'Embedded IDE uses shell-only document mode');
+    assert.equal(await engineer.locator('#studio-shell').getAttribute('data-demo'), 'false', 'Embedded engineering surface is the real IDE, not the landing demo');
+    assert(await engineer.locator('.shell-topbar').isVisible(), 'Embedded IDE exposes the real application chrome');
+    await engineer.locator('#project-switch option').first().waitFor({ state: 'attached' });
+    assert((await engineer.locator('#studio-svg [data-node]').count()) > 0 || (await engineer.locator('#studio-spatial canvas').count()) > 0, 'Embedded IDE renders the real project in 2D or 3D');
+
     await page.locator('#proof-engineer').focus();
     await page.keyboard.press('ArrowRight');
     assert(await page.locator('#proof-operator').isChecked(), 'Native keyboard switching works');
     assert(await page.locator('.operator-proof').isVisible());
     assert(!await page.locator('.engineer-proof').isVisible());
-    await page.locator('.operator-proof img').evaluate(image => image.decode());
-    await page.locator('#workflow-title').click(); // Finish keyboard testing before capturing the normal, unfocused page.
-    // Capture from the actual top viewport; offscreen fixed skip-links must stay offscreen.
+
+    await page.waitForFunction(() => Boolean(document.querySelector('.operator-proof .live-product-frame')?.getAttribute('src')));
+    const operator = page.frameLocator('.operator-proof .live-product-frame');
+    await operator.locator('.topbar').waitFor({ state: 'visible' });
+    await operator.locator('#application').waitFor({ state: 'visible', timeout: 15000 });
+    assert(await operator.locator('[data-tab="scheme"]').isVisible(), 'Embedded runtime exposes the real process surface');
+    assert(await operator.locator('[data-tab="alarms"]').isVisible(), 'Embedded runtime exposes actual alarm navigation');
+
+    await page.locator('#workflow-title').click();
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
     for (const theme of ['light', 'dark']) {
       await page.emulateMedia({ colorScheme: theme });
       await checkDiagramContrast(page);
-      await page.waitForFunction(theme => document.querySelector('.operator-proof img')?.currentSrc.endsWith(`proof-operator-${theme}.png`), theme);
-      await page.locator('.operator-proof img').evaluate(image => image.decode());
-      assert((await page.locator('.operator-proof img').evaluate(image => image.currentSrc)).endsWith(`proof-operator-${theme}.png`));
       await page.screenshot({ path: `test-results/release-shell/landing-${theme}.png`, fullPage: true });
     }
+
     await page.emulateMedia({ colorScheme: 'light' });
     for (const width of [320, 390, 768]) {
       await page.setViewportSize({ width, height: 844 });
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `Landing has no overflow at ${width}px`);
-      await page.waitForFunction(mobile => document.querySelector('.operator-proof img')?.currentSrc.endsWith(mobile ? 'proof-operator-mobile-light.png' : 'proof-operator-light.png'), width <= 760);
-      await page.locator('.operator-proof img').evaluate(image => image.decode());
-      assert.equal(await page.locator('.operator-proof img').evaluate(image => image.naturalWidth), width <= 760 ? 390 : 1280, 'Mobile evidence is an actual responsive capture, not a shrunken desktop image');
+      await page.locator('#workflow').scrollIntoViewIfNeeded();
+      assert(await operator.locator('html').evaluate(node => node.scrollWidth <= node.clientWidth + 1), `Live runtime fits its iframe at ${width}px`);
     }
+
     await page.setViewportSize({ width: 390, height: 844 });
-    // The final resize selects a different picture source after the 768px check.
-    // Load and paint that real responsive image before taking the full-page capture.
-    await page.locator('.operator-proof img').scrollIntoViewIfNeeded();
-    await page.waitForFunction(() => document.querySelector('.operator-proof img')?.currentSrc.endsWith('proof-operator-mobile-light.png'));
-    await page.locator('.operator-proof img').evaluate(image => image.decode());
-    assert.equal(await page.locator('.operator-proof img').evaluate(image => image.naturalWidth), 390);
-    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
     await page.screenshot({ path: 'test-results/release-shell/landing-mobile.png', fullPage: true });
     for (const link of await page.locator('.site-header .landing-button, .hero-actions .landing-button').all()) assert.equal(await link.getAttribute('href'), '?mode=ide#workspace');
     const localLinks = await page.locator('a[href^="#"]').evaluateAll(links => links.map(link => link.getAttribute('href')).filter(href => href.length > 1));
     for (const href of localLinks) assert(await page.locator(href).count() > 0, `Local destination exists: ${href}`);
     assert.deepEqual(errors, []);
-    console.log('PASS: buyer-facing story; authenticated screenshots and provenance; keyboard role switch; system themes; 320/390/768px; working CTAs.');
+    console.log('PASS: buyer-facing story; no kickers; live IDE/runtime embeds; keyboard switch; system themes; 320/390/768px; working CTAs.');
   } finally { await context.close(); }
 }
