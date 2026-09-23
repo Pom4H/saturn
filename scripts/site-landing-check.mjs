@@ -59,10 +59,14 @@ export async function checkLandingDemo(browser, origin) {
     const pipeBefore = await pipe.getAttribute('d');
     assert(await delivery.getAttribute('d'), 'The return pipe meets the original top pump outlet');
     const pump = page.locator('#studio-svg [data-node="P-01"]');
-    await pump.scrollIntoViewIfNeeded();
-    const box = await pump.boundingBox(); assert(box);
-    await page.mouse.move(box.x + box.width * .6, box.y + box.height * .75); await page.mouse.down();
-    await page.mouse.move(box.x + box.width * .6 + 40, box.y + box.height * .75 + 20, { steps: 5 });
+    // Use the actual casing center; a group bounding box includes labels, ports and shadows.
+    const casing = pump.locator('[data-anatomy="saturn-pump"] > circle[r="48"]');
+    await casing.scrollIntoViewIfNeeded();
+    const box = await casing.boundingBox(); assert(box);
+    const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    assert.equal(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[data-node]')?.getAttribute('data-node'), point), 'P-01', 'Drag starts on the pump, not a clipped/overlaid part of its bounds');
+    await page.mouse.move(point.x, point.y); await page.mouse.down();
+    await page.mouse.move(point.x + 40, point.y + 20, { steps: 5 });
     assert.notEqual(await pipe.getAttribute('d'), pipeBefore, 'Pipes follow during drag, not just after drop');
     assert.equal(await source(), initial, 'Drag preview does not spam source history');
     await page.mouse.up();
