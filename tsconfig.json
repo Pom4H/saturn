@@ -13,8 +13,8 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "paths": {
-      "@scada/core": [
-        "./src/core.ts"
+      "@saturn/core": [
+        "./packages/core/index.ts"
       ]
     }
   },
