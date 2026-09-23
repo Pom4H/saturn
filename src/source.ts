@@ -100,7 +100,7 @@ export function compile(source: string): Compiled {
       if (name === 'pipe') {
         if (n.arguments.length !== 3) fail(n, 'pipe("ID", from.outlet, to.inlet) принимает ID и два порта.');
         const pipeId = ev(n.arguments[0]), from = ev(n.arguments[1]), to = ev(n.arguments[2]);
-        if (typeof pipeId !== 'string' || !/^[\\p{L}\\p{N}_.-]{1,48}$/u.test(pipeId)) fail(n.arguments[0], 'ID трубы: 1–48 букв, цифр, точек, дефисов или подчёркиваний.');
+        if (typeof pipeId !== 'string' || !/^[\p{L}\p{N}_.-]{1,48}$/u.test(pipeId)) fail(n.arguments[0], 'ID трубы: 1–48 букв, цифр, точек, дефисов или подчёркиваний.');
         if (objects.has(pipeId) || scene.links.some(link => link.id === pipeId)) fail(n, `Повторный ID: ${pipeId}.`);
         if (!isEndpoint(from) || !isEndpoint(to)) fail(n, 'Соединяйте порты: pipe("P-101", pump.outlet, valve.inlet).');
         if (from.node === to.node) fail(n, 'Нельзя соединить элемент с самим собой.');
