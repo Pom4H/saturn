@@ -36,7 +36,7 @@ export async function mountStudio() {
   catch { storageAvailable = false; }
   let shared = false;
   try { const source = readSharedSource(location.hash); if (source) { compile(source); createProject(workspace, 'Проект по ссылке', source); shared = true; } } catch { storageAvailable = false; }
-  let compiled: Compiled = compile(examples.pump.source), spatial: SceneView3D | undefined;
+  let compiled: Compiled = compile(''), spatial: SceneView3D | undefined;
   let errorPath: string | null = null;
   let error = false, selected: string | null = null, surface: Surface = 'scene';
   let filesVisible = false;
