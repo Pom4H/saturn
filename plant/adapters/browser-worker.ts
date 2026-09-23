@@ -1,5 +1,6 @@
 import { openBrowserSql } from './browser-sql';
 import { Store } from '../store';
+import { migrate } from '../migrations';
 import { Service } from '../service';
 import { demoFiles } from '../demo/files';
 import { buildArtifact } from '../artifact';
@@ -78,6 +79,7 @@ async function saveWorkspace(files: Record<string, string>, expected: string | n
 async function initialize(memory: boolean) {
     const open = async () => {
         const { db, persistent } = await openBrowserSql({ memory });
+        migrate(db);
         const store = new Store(db);
         projectFs = memory ? new MemoryProjectFs() : await OpfsProjectFs.open('saturn-project-demo');
         await seedWorkspace(projectFs);

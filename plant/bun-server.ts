@@ -6,6 +6,7 @@ import { BunAuth } from './adapters/bun-auth';
 import { Push } from './adapters/push';
 import { runReport } from './adapters/bun-reports';
 import { Store } from './store';
+import { migrate } from './migrations';
 import { Service } from './service';
 import { requireRole } from './types';
 import { AppError, failCode } from './diagnostics';
@@ -108,7 +109,9 @@ export async function startPlantServer(options: {
     tls?: { cert: string; key: string; ca?: string[] };
     http2?: boolean;
 } = {}) {
-    const store = new Store(new BunSql(options.data ?? resolve('data-plant/runtime.sqlite3')));
+    const database = new BunSql(options.data ?? resolve('data-plant/runtime.sqlite3'));
+    migrate(database);
+    const store = new Store(database);
     const seed = options.artifact ?? await buildArtifact(demoFiles, { packageName: '@saturn/demo' });
     const service = new Service(store, { reportRunner: runReport });
     await service.start(seed);

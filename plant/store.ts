@@ -1,15 +1,12 @@
 import type { SqlDatabase, Checkpoint, Frame, Event, AlarmState, HistoryPolicy, ReportData, Project } from './types';
 import type { BuildArtifact } from './artifact';
 import { validateBuildArtifact } from './artifact';
-import { migrate } from './migrations';
 import { failCode } from './diagnostics';
 
 export class Store {
     private last = new Map<string, { time: number; value: number | null; quality: string } | undefined>();
 
-    constructor(readonly db: SqlDatabase) {
-        migrate(db);
-    }
+    constructor(readonly db: SqlDatabase) {}
 
     meta<T>(key: string, fallback: T): T {
         const row = this.db.all<{ value: string }>('SELECT value FROM meta WHERE key=?', [key])[0];
