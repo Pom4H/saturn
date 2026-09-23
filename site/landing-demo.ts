@@ -101,7 +101,9 @@ export function mountLandingDemo(): void {
   };
   let drag: { id: string; pointer: number; x: number; y: number; startX: number; startY: number; dx: number; dy: number } | null = null;
   function preview(id: string, x: number, y: number) {
-    const project = { ...compiled.project, simulations: compiled.project.simulations.map(item => item.id === id ? { ...item, at: { x, y } } : item) };
+    const simulations = compiled.project.simulations.map(item => item.id === id ? { ...item, at: { x, y } } : item);
+    const devices = compiled.project.devices.map(item => item.id === id ? { ...item, layout: { x, y } } : item);
+    const project = { ...compiled.project, simulations, devices };
     const scene = sceneFor(project);
     view.render(scene); view.select(selected);
   }
