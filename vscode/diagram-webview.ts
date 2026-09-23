@@ -1,6 +1,6 @@
 import { installEquipment } from '../plant/equipment';
 import { SceneView } from '../src/view';
-import type { Scene } from '../src/core';
+import type { Scene } from '../src/scene';
 
 declare function acquireVsCodeApi(): { postMessage(value: unknown): void };
 
