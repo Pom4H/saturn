@@ -1,6 +1,6 @@
 import { connectionStyles } from './connection-style';
 import { groupFill, groupStroke, groupAccent, groupTitleLines } from './group-style';
-import { catalog, simulate, type Equipment, type Scene, type Point } from './core';
+import { catalog, simulate, type Equipment, type Scene, type Point } from './scene';
 import { layout, tapPoint, type Route } from './geometry';
 import { numeric, type RuntimeFrame, type Signal, type Quality, type Alarm } from './runtime/protocol';
 import type * as Three from 'three';
