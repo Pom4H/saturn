@@ -436,14 +436,20 @@
   .revision-chain strong { max-width: 62px; }
 }
 @media(max-width:520px) {
-  .shell-topbar { height: 48px; padding: 0 6px; grid-template-columns: minmax(100px,1fr) auto auto; }
+  .shell-topbar { height: 52px; padding: 0 8px; grid-template-columns: minmax(0,1fr) auto auto; gap: 5px; }
   .shell-actions { position: static; inset: auto; height: auto; border: 0; }
   .shell-project-context .export-options { display: none; }
+  .shell-project-context { gap: 2px; }
+  .shell-project-context #files-toggle { width: 40px; height: 44px; flex-shrink: 0; }
+  #project-trigger { padding-inline: 4px; width: 100%; min-height: 44px; }
+  #project-trigger svg { width: 14px; }
   .surface-nav { gap: 0; }
-  .shell .surface-tab { min-width: 0; padding: 6px 7px; }
+  .shell .surface-tab { min-width: 0; min-height: 40px; padding: 6px 9px; }
   .shell .surface-tab[data-shell-view=signals] { display: none; }
   #command-launcher { display: none; }
   #mobile-scene { display: none; }
+  #shell-fullscreen { width: 40px; height: 44px; }
+  .environment-trigger { width: 40px; height: 44px; }
   .shell-contextbar { padding-inline: 8px; gap: 8px; }
   .revision-chain { gap: 4px; }
   .revision-chain span:nth-of-type(2),.revision-chain span:nth-of-type(2)+i { display: none; }
