@@ -50,15 +50,15 @@
   <text class="muted mono" x="138" y="85" font-size="14">station.ts · pump demo</text>
 
   <text class="muted mono" x="82" y="132" font-size="14">import</text>
-  <text class="ink mono" x="138" y="132" font-size="14">{ tank, pump, connect }</text>
+  <text class="ink mono" x="138" y="132" font-size="14">{ simulation, pipe }</text>
   <text class="muted mono" x="82" y="160" font-size="14">from</text>
-  <text class="accent mono" x="128" y="160" font-size="14">"@scada/core"</text>
+  <text class="accent mono" x="128" y="160" font-size="14">"@saturn/core"</text>
 
   <text class="muted mono" x="82" y="202" font-size="14">const</text>
-  <text class="ink mono" x="132" y="202" font-size="14">reservoir = tank("TK-01", { x:40, y:180 });</text>
+  <text class="ink mono" x="132" y="202" font-size="14">reservoir = simulation("TK-01", "reservoir", { at:{x:40,y:180} });</text>
   <text class="muted mono" x="82" y="230" font-size="14">const</text>
-  <text class="ink mono" x="132" y="230" font-size="14">motor = pump("P-01", { x:330, y:268 });</text>
-  <text class="ink mono" x="82" y="258" font-size="14">connect(reservoir.outlet, motor.inlet);</text>
+  <text class="ink mono" x="132" y="230" font-size="14">motor = simulation("P-01", "pump", { at:{x:330,y:268} });</text>
+  <text class="ink mono" x="82" y="258" font-size="14">pipe("suction", reservoir.ports.outlet, motor.ports.inlet);</text>
 
   <text class="muted" x="82" y="287" font-size="13">Typed source is the project. The canvas edits the same file.</text>
 
