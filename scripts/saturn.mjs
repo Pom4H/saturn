@@ -9,7 +9,7 @@ let childArgs;
 if (command === 'pack') {
     childArgs = ['run', 'scripts/standalone-pack.ts', ...args.slice(1)];
 }
-else if (['open', 'run', 'update', 'new', 'check', 'registry', 'add', 'ide'].includes(command)) {
+else if (['open', 'run', 'update', 'new', 'check', 'docs', 'registry', 'add', 'ide'].includes(command)) {
     childArgs = ['run', 'standalone/entry.ts', command, ...args.slice(1)];
 }
 else {
@@ -18,6 +18,7 @@ else {
         '  saturn new PROJECT',
         '  saturn check [PROJECT]',
         '  saturn open [PROJECT]',
+        '  saturn docs [PROJECT] [--locale ru|en] [--out FILE]',
         '  saturn run PROJECT [--kiosk]',
         '  saturn registry list',
         '  saturn add ITEM [--project PROJECT]',
