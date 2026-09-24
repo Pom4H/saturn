@@ -14,6 +14,7 @@ import { runIdeCommand } from './ide';
 import { buildArtifact } from '../plant/artifact';
 import { WorkspaceHost } from './workspace-host';
 import { createSaturnProject } from './scaffold';
+import { generateProjectDocumentation } from '../plant/autodoc';
 
 declare const SATURN_VERSION: string;
 declare const SATURN_DEMO_FILES: Record<string, string>;
@@ -127,6 +128,24 @@ if (args[0] === 'check') {
     const host = new WorkspaceHost(directory);
     const artifact = await host.build();
     console.log(`OK ${artifact.project.title} · ${artifact.hash}`);
+    process.exit(0);
+}
+if (args[0] === 'docs') {
+    const directory = args[1] && !args[1].startsWith('--') ? args[1] : process.cwd();
+    const localeIndex = args.indexOf('--locale');
+    const locale = localeIndex >= 0 && args[localeIndex + 1] === 'en' ? 'en' : 'ru';
+    const outIndex = args.indexOf('--out');
+    const host = new WorkspaceHost(directory);
+    const artifact = await host.build();
+    const markdown = generateProjectDocumentation(artifact.project, { locale });
+    if (outIndex >= 0) {
+        const output = args[outIndex + 1];
+        if (!output) throw new Error('Usage: saturn docs [PROJECT] [--locale ru|en] [--out FILE]');
+        await Bun.write(resolve(output), markdown);
+        console.log('Generated: ' + resolve(output));
+    } else {
+        console.log(markdown);
+    }
     process.exit(0);
 }
 if (args[0] === 'registry') {
