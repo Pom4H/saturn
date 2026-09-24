@@ -24,7 +24,7 @@ test('derived and aggregate signals expose dependencies for tooling and docs',()
   const efficiency=derived(signal.number('efficiency',{unit:'m3/kWh'}),[flow,power],{op:'div',args:[flow.ref!,power.ref!]});
   const hourly=aggregate(signal.number('hourly',{unit:'m3'}),flow,'integral',3600000);
   const catalog=new SignalCatalog().add(flow,power,efficiency,hourly);
-  assert.equal((catalog.get('efficiency')!.definition.origin as {kind:string;dependencies:string[]}).dependencies.join(','),'flow,power');
+  assert.equal((catalog.get('efficiency')!.definition.origin as {kind:string;dependencies:readonly string[]}).dependencies.join(','),'flow,power');
   assert.equal(catalog.list().length,4);
 });
 
