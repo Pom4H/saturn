@@ -41,3 +41,6 @@ export type {
 } from '../../plant/ports';
 
 export type { ReportFieldRef, ReportSchema } from '../../plant/reporting';
+
+export * from '../../plant/signals';
+export * from '../../plant/autodoc';
