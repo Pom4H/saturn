@@ -1,4 +1,5 @@
 import "./component-registry.test.ts";
+import "./decision.test.ts";
 import { simulate } from '../examples/diagram/simulation';
 import test from 'node:test';
 import assert from 'node:assert/strict';
