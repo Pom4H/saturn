@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./index.ts",
-    "./elements": "./elements.ts"
+    "./elements": "./elements.ts",
+    "./decision": "./decision.ts"
   }
 }
