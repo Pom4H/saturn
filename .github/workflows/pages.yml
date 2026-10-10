@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   check:
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v7.0.1
@@ -70,7 +70,7 @@ jobs:
   deploy:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs: check
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 10
     permissions:
       pages: write
@@ -89,7 +89,7 @@ jobs:
 
   verify-live:
     needs: deploy
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v7.0.1
