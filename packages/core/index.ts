@@ -5,6 +5,7 @@
  */
 export * from '../../plant/dsl';
 export * from '../../plant/diagnostics';
+export * from './decision';
 export type {
   Actor,
   AlarmRule,
