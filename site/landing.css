@@ -7,22 +7,17 @@
 .landing-button.compact { min-height: 38px; padding: 8px 13px; font-size: 12px; gap: 14px; }
 .landing-text-link { display: inline-flex; align-items: center; gap: 12px; font-size: 14px; padding: 12px 0; }
 .hero.landing-hero { max-width: 1200px; margin: auto; padding: 66px 40px 48px; text-align: left; }
-.eyebrow, .hero .eyebrow { display: flex; align-items: center; gap: 10px; margin: 0 0 24px; font-family: var(--mono); font-size: 11px; line-height: 1.6; font-weight: 450; color: var(--muted); }
-.open-mark { width: 7px; height: 7px; background: var(--accent); border-radius: 50%; }
 .hero.landing-hero h1 { font-size: clamp(38px, 5.3vw, 74px); line-height: 1.065; letter-spacing: -.045em; font-weight: 550; }
 .hero .hero-description { max-width: 615px; margin-top: 25px; font-size: 18px; line-height: 1.6; color: var(--muted); }
 .hero-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 26px; margin-top: 27px; }
 .hero .hero-note { margin-top: 17px; font-size: 12px; line-height: 1.6; }
-.demo-intro { max-width: 1320px; margin: 16px auto 13px; padding: 0 20px; display: flex; align-items: baseline; justify-content: space-between; gap: 18px; font-size: 12px; }
-.section-number { font-family: var(--mono); color: var(--accent); margin-right: 7px; }
-.demo-boundary { color: var(--muted); font-size: 11px; }
 .shell-stage { max-width: 1320px; margin: 0 auto; padding: 0 20px; }
 body:has(#studio-shell[data-demo="true"]) .shell-frame { height: clamp(490px, 45vw, 610px); }
 .demo-takeaway { max-width: 780px; margin: 18px auto 0; padding: 0 24px; text-align: center; font-size: 13px; line-height: 1.7; color: var(--muted); }
 .landing-section { max-width: 1120px; margin: 0 auto; padding: 100px 0; border-bottom: 1px solid var(--line); }
 .landing-section .section-heading { max-width: 710px; }
 .landing-section h2 { font-size: clamp(30px, 3.5vw, 48px); line-height: 1.12; letter-spacing: -.035em; font-weight: 550; }
-.landing-section .section-heading > p:not(.eyebrow) { max-width: 660px; margin-top: 20px; color: var(--muted); font-size: 16px; line-height: 1.7; }
+.landing-section .section-heading > p { max-width: 660px; margin-top: 20px; color: var(--muted); font-size: 16px; line-height: 1.7; }
 .proof-switcher { position: relative; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 32px; }
 .proof-radio { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .proof-switcher > label { display: flex; align-items: center; gap: 9px; padding: 11px 18px; border: 1px solid var(--line); border-radius: var(--radius-control); cursor: pointer; color: var(--muted); font-size: 14px; }
@@ -34,10 +29,8 @@ body:has(#studio-shell[data-demo="true"]) .shell-frame { height: clamp(490px, 45
 .proof-description { margin: 0 0 22px; }
 .proof-description h3 { font-size: 17px; font-weight: 550; line-height: 1.5; }
 .proof-description p { color: var(--muted); font-size: 14px; line-height: 1.7; margin-top: 7px; }
-.product-proof { margin: 0; }
-.proof-image { display: block; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--panel); }
-.proof-image picture, .proof-image img { display: block; width: 100%; height: auto; }
-.product-proof figcaption { color: var(--muted); font-size: 12px; line-height: 1.7; margin-top: 12px; }
+.live-product { overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--panel); }
+.live-product-frame { display: block; width: 100%; height: clamp(520px, 58vw, 700px); border: 0; background: var(--bg); }
 .proof-footnote { display: flex; justify-content: space-between; align-items: baseline; gap: 24px; margin-top: 24px; font-size: 12px; line-height: 1.7; color: var(--muted); }
 .proof-footnote p { max-width: 730px; }
 .proof-footnote a { flex-shrink: 0; color: var(--accent); }
@@ -74,17 +67,16 @@ body:has(#studio-shell[data-demo="true"]) .shell-frame { height: clamp(490px, 45
   .site-header { height: 66px; padding: 0 20px; }
   .landing-nav { display: none; }
   .hero.landing-hero { padding: 40px 24px 34px; }
-  .hero .eyebrow { font-size: 10px; margin-bottom: 20px; }
   .hero.landing-hero h1 { font-size: clamp(32px, 7vw, 52px); letter-spacing: -.04em; }
   .hero .hero-description { font-size: 16px; margin-top: 21px; }
   .hero-actions { gap: 12px 22px; }
   .hero .hero-note { font-size: 11px; }
-  .demo-intro { align-items: flex-start; flex-direction: column; gap: 6px; padding: 0 20px; }
   .shell-stage { padding: 0 12px; }
   body:has(#studio-shell[data-demo="true"]) .shell-frame { height: 400px; }
   .demo-takeaway { text-align: left; font-size: 12px; }
   .landing-section { margin: 0 24px; padding: 64px 0; }
-  .landing-section .section-heading > p:not(.eyebrow) { font-size: 15px; }
+  .landing-section .section-heading > p { font-size: 15px; }
+  .live-product-frame { height: 560px; }
   .proof-footnote { flex-direction: column; gap: 8px; }
   .change-path { grid-template-columns: 1fr 1fr; gap: 12px; }
   .change-path li { padding-right: 8px; }
@@ -97,3 +89,15 @@ body:has(#studio-shell[data-demo="true"]) .shell-frame { height: clamp(490px, 45
   .site-footer { padding: 24px; flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+/* Embedded product surfaces show the actual Saturn shell without nesting the landing. */
+body[data-embed="shell"] { overflow: hidden; padding: 0; }
+body[data-embed="shell"] .skip-link,
+body[data-embed="shell"] .site-header,
+body[data-embed="shell"] .landing-hero,
+body[data-embed="shell"] .demo-takeaway,
+body[data-embed="shell"] .landing-section,
+body[data-embed="shell"] .site-footer { display: none !important; }
+body[data-embed="shell"] #studio { position: fixed; inset: 0; max-width: none; margin: 0; padding: 0; }
+body[data-embed="shell"] #studio .shell-frame { height: 100dvh !important; }
+body[data-embed="shell"] #studio-shell { height: 100%; border-radius: 0; }

@@ -7,10 +7,24 @@ import { buildSite } from './site-build.mjs';
 if (!process.env.SATURN_SITE_DIR) await buildSite();
 const root = resolve(process.env.SATURN_SITE_DIR ?? 'dist/site'), port = Number(process.env.PORT ?? 4190);
 const target = new URL(process.env.SATURN_PREVIEW_TARGET ?? 'http://127.0.0.1:4177');
-const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.txt': 'text/plain', '.md': 'text/plain; charset=utf-8' };
+const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.txt': 'text/plain', '.md': 'text/plain; charset=utf-8', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json' };
 createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   if (url.pathname.startsWith('/plant/')) {
+    // The public browser demo is a build artifact and needs no running server.
+    // Serve it directly so landing embeds exercise the exact runtime bundle.
+    const plantRoot = process.env.SATURN_SITE_DIR ? resolve(root, '..') : resolve('dist/plant');
+    const relative = decodeURIComponent(url.pathname).replace(/^\/plant\//, '/');
+    const staticFile = resolve(plantRoot, '.' + (relative.endsWith('/') ? relative + 'index.html' : relative));
+    if (staticFile.startsWith(plantRoot + sep)) {
+      try {
+        if ((await stat(staticFile)).isFile()) {
+          const data = await readFile(staticFile);
+          res.writeHead(200, { 'Content-Type': mime[extname(staticFile)] ?? 'application/octet-stream', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+          res.end(data); return;
+        }
+      } catch { /* Authenticated/runtime API paths still proxy to the server below. */ }
+    }
     const headers = { ...req.headers, host: target.host };
     // The local preview and its runtime form one origin; never used in production.
     if (headers.origin === `http://127.0.0.1:${port}` || headers.origin === `http://localhost:${port}`) headers.origin = target.origin;

@@ -33,6 +33,10 @@ try {
   assert((await primaryHeading.innerText()).trim().length > 0, 'Landing primary heading is not empty');
   assert.equal(await page.locator('#workflow, #readiness, #start').count(), 3, 'Landing keeps the workflow, readiness, and start sections');
   assert((await page.locator('a[href*="mode=ide"]').count()) > 0, 'Landing exposes an entry into the IDE');
+  assert.equal(await page.locator('.eyebrow, .section-number, .demo-intro').count(), 0, 'Published landing has no marketing kickers');
+  assert.equal(await page.locator('.live-product-frame').count(), 2, 'Landing exposes live IDE and runtime surfaces');
+  const runtimeResponse = await page.request.get(new URL('plant/demo/', url).href);
+  assert.equal(runtimeResponse.status(), 200, 'Published Pages artifact includes the live runtime demo');
 
   assert((await page.locator('#studio-svg [data-node]').count()) > 0, 'Published landing renders the real Saturn scene');
 
@@ -51,7 +55,7 @@ try {
     status,
     revision: expectedRevision,
     passed: true,
-    checks: ['Saturn landing', 'model/release/extension/distribution sections', 'real 2D scene', 'base-path-safe PWA', 'mobile layout', 'no page errors'],
+    checks: ['Saturn landing', 'no marketing kickers', 'live IDE/runtime surfaces', 'real 2D scene', 'base-path-safe PWA', 'mobile layout', 'no page errors'],
   };
   await writeFile('live-check/result.json', JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));
