@@ -14,7 +14,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7.0.0
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -22,7 +22,7 @@ jobs:
       - run: npx playwright install --with-deps chromium webkit
       - name: Run adversarial browser and core suites
         run: npm run challenge
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v7.0.2
         if: always()
         with:
           name: scada-challenge

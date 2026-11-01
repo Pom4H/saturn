@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7.0.0
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version: '22'
           cache: npm
@@ -29,7 +29,7 @@ jobs:
       - run: npm run plant:check
       - run: npx playwright install --with-deps chromium-headless-shell
       - run: xvfb-run -a npm run plant:test:browser
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v7.0.2
         if: always()
         with:
           name: plant-evidence

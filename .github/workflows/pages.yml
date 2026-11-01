@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7.0.0
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -38,7 +38,7 @@ jobs:
       - name: Saturn release check
         run: npm run check:release
 
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v7.0.2
         if: always()
         with:
           name: shell-evidence
@@ -50,7 +50,7 @@ jobs:
       - name: Capture PLC HMI video
         if: github.event_name == 'workflow_dispatch'
         run: node scripts/hmi-video-evidence.mjs
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v7.0.2
         if: always() && github.event_name == 'workflow_dispatch'
         with:
           name: hmi-evidence
@@ -95,7 +95,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7.0.0
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -105,7 +105,7 @@ jobs:
         run: node scripts/verify-live.mjs
         env:
           SATURN_URL: ${{ needs.deploy.outputs.page_url }}
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v7.0.2
         if: failure()
         with:
           name: live-pages-check

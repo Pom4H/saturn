@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7.0.0
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -126,7 +126,7 @@ jobs:
       - name: Run exact main.bin in official Saturn emulator
         run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/saturn-c23-emulator.ps1
 
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v7.0.2
         if: always()
         with:
           name: saturn-c23-sdk-evidence

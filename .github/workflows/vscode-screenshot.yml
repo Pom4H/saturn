@@ -22,7 +22,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@v7.0.0
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -49,7 +49,7 @@ jobs:
       - name: Launch installed Saturn extension and capture real VS Code
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\vscode-screenshot.ps1
 
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v7.0.2
         if: always()
         with:
           name: saturn-vscode-installed
